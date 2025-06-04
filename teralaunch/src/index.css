@@ -475,12 +475,12 @@ table {
     }
 
 .dropdown-panel {
-    margin-top: -45px;
+    margin-top: 0;
     width: 200px;
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.25);
     backdrop-filter: blur(16.5px);
     border-radius: 10px;
-    background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.2) 61.5%), rgba(255, 255, 255, 0.01);
+    background: rgba(0, 0, 0, 0.7);
     padding: 15px;
 }
 
