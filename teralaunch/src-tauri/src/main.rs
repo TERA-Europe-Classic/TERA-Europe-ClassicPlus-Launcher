@@ -7,7 +7,7 @@ use std::fs::{self, File, remove_file};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Once, RwLock};
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, AtomicBool, Ordering};
 use std::time::{Duration, Instant, SystemTime};
 
 // Third-party imports
@@ -140,6 +140,7 @@ struct GameState {
 
 lazy_static! {
     static ref HASH_CACHE: Mutex<HashMap<String, CachedFileInfo>> = Mutex::new(HashMap::new());
+    static ref CANCEL_DOWNLOAD: AtomicBool = AtomicBool::new(false);
 }
 
 
@@ -225,6 +226,11 @@ fn clear_cache() -> Result<(), String> {
         remove_file(cache_path).map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+#[tauri::command]
+fn cancel_downloads() {
+    CANCEL_DOWNLOAD.store(true, Ordering::SeqCst);
 }
 
 fn get_hash_file_url() -> String {
@@ -529,6 +535,9 @@ async fn update_file(
     println!("Downloading file: {}", file_info.path);
 
     while let Some(chunk_result) = stream.next().await {
+        if CANCEL_DOWNLOAD.load(Ordering::SeqCst) {
+            return Err("cancelled".into());
+        }
         let chunk = chunk_result.map_err(|e| e.to_string())?;
         file.write_all(&chunk).await.map_err(|e| e.to_string())?;
         downloaded += chunk.len() as u64;
@@ -625,8 +634,15 @@ async fn download_all_files(
     let mut downloaded_sizes = Vec::with_capacity(total_files);
     let mut downloaded_size: u64 = 0;
 
+    CANCEL_DOWNLOAD.store(false, Ordering::SeqCst);
+
     for (index, file_info) in files_to_update.into_iter().enumerate() {
-        let file_size = update_file(
+        if CANCEL_DOWNLOAD.load(Ordering::SeqCst) {
+            let _ = window.emit("download_cancelled", ());
+            break;
+        }
+
+        let file_size = match update_file(
             app_handle.clone(),
             window.clone(),
             file_info,
@@ -634,15 +650,26 @@ async fn download_all_files(
             index + 1,
             total_size,
             downloaded_size
-        ).await?;
+        ).await {
+            Ok(size) => size,
+            Err(e) if e == "cancelled" => {
+                let _ = window.emit("download_cancelled", ());
+                break;
+            }
+            Err(e) => return Err(e),
+        };
 
         downloaded_size += file_size;
         downloaded_sizes.push(file_size);
     }
 
-    println!("Download complete for {} file(s)", total_files);
-    if let Err(e) = window.emit("download_complete", ()) {
-        eprintln!("Failed to emit download_complete event: {}", e);
+    if CANCEL_DOWNLOAD.load(Ordering::SeqCst) {
+        println!("Download cancelled");
+    } else {
+        println!("Download complete for {} file(s)", total_files);
+        if let Err(e) = window.emit("download_complete", ()) {
+            eprintln!("Failed to emit download_complete event: {}", e);
+        }
     }
 
     Ok(downloaded_sizes)
@@ -1167,6 +1194,7 @@ fn main() {
                 check_server_connection,
                 check_update_required,
                 download_all_files,
+                cancel_downloads,
             ]
         )
         .run(tauri::generate_context!())
