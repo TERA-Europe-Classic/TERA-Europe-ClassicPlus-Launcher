@@ -1,7 +1,7 @@
 const { invoke } = window.__TAURI__.tauri;
 const { listen } = window.__TAURI__.event;
 const { appWindow } = window.__TAURI__.window;
-const { message } = window.__TAURI__.dialog;
+const { message, ask } = window.__TAURI__.dialog;
 
 const REQUIRED_PRIVILEGE_LEVEL = 3;
 const UPDATE_CHECK_ENABLED = true;
@@ -1561,12 +1561,33 @@ const App = {
 
     async checkLauncherUpdate() {
         try {
-            const response = await fetch("https://web.tera-germany.de/gameserver/version.json");
+            const response = await fetch(
+                "https://web.tera-germany.de/gameserver/version.json",
+            );
             const data = await response.json();
-            if (window.__TAURI__ && window.__TAURI__.app && window.__TAURI__.app.getVersion) {
+            if (
+                window.__TAURI__ &&
+                window.__TAURI__.app &&
+                window.__TAURI__.app.getVersion
+            ) {
                 const current = await window.__TAURI__.app.getVersion();
                 if (data.version && data.version !== current) {
-                    await invoke("update_launcher", { downloadUrl: data.download_url });
+                    let userConfirm = false;
+                    if (typeof ask === "function") {
+                        userConfirm = await ask(
+                            "A new launcher version is available. Do you want to update now?",
+                            { title: "Launcher Update" },
+                        );
+                    } else {
+                        userConfirm = window.confirm(
+                            "A new launcher version is available. Do you want to update now?",
+                        );
+                    }
+                    if (userConfirm) {
+                        await invoke("update_launcher", {
+                            downloadUrl: data.download_url,
+                        });
+                    }
                 }
             }
         } catch (e) {
