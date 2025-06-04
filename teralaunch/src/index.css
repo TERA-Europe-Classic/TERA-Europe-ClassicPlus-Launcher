@@ -984,17 +984,17 @@ span#current-file {
 }
 
 .content {
-    width: 1282px;
+    width: 100%;
     flex-direction: row;
     align-items: flex-start;
     justify-content: flex-end;
     padding: 0 5px;
-    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .mainpage {
-    width: 1282px;
-    height: 759px;
+    width: 100vw;
+    height: 100vh;
     display: flex;
     border-radius: 5px;
     flex-direction: column;
@@ -1007,6 +1007,7 @@ span#current-file {
     background-position: top;
     letter-spacing: normal;
     line-height: normal;
+    box-sizing: border-box;
 }
 
 

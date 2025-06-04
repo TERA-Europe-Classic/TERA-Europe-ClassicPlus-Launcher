@@ -182,8 +182,8 @@
 }
 
 .login {
-    width: 1282px;
-    height: 759px;
+    width: 100vw;
+    height: 100vh;
     position: relative;
     border-radius: 5px;
     display: flex;
