@@ -365,8 +365,50 @@ const App = {
         }
 
         const settingsBtn = document.getElementById("settings-button");
-        if (settingsBtn) {
-            settingsBtn.addEventListener("click", () => this.openGamePathSettings());
+        const settingsDropdown = document.getElementById("settings-dropdown-wrapper");
+        const logModal = document.getElementById("log-modal");
+        const logClose = document.querySelector(".log-modal-close");
+        if (settingsBtn && settingsDropdown) {
+            let open = false;
+            gsap.set(settingsDropdown, { display: "none", opacity: 0, y: -10 });
+            const tl = gsap.timeline({ paused: true });
+            tl.to(settingsDropdown, {
+                duration: 0.3,
+                display: "block",
+                opacity: 1,
+                y: 0,
+                ease: "power2.out",
+            });
+            settingsBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                if (!open) {
+                    tl.play();
+                } else {
+                    tl.reverse().then(() => gsap.set(settingsDropdown, { display: "none" }));
+                }
+                open = !open;
+            });
+            document.addEventListener("click", () => {
+                if (open) {
+                    tl.reverse().then(() => gsap.set(settingsDropdown, { display: "none" }));
+                    open = false;
+                }
+            });
+            settingsDropdown.addEventListener("click", (event) => {
+                event.stopPropagation();
+                if (event.target.tagName === 'A' && event.target.target === '_blank') {
+                    event.preventDefault();
+                    this.openExternal(event.target.href);
+                }
+            });
+            const logsLink = document.getElementById("logs-link");
+            if (logsLink && logModal && logClose) {
+                logsLink.addEventListener("click", (evt) => {
+                    evt.preventDefault();
+                    logModal.style.display = "block";
+                });
+                logClose.addEventListener("click", () => (logModal.style.display = "none"));
+            }
         }
 
         const links = [
