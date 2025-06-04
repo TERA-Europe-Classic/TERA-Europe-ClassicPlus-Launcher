@@ -959,22 +959,24 @@ fn set_auth_info(auth_key: String, user_name: String, user_no: i32, character_co
 
 #[tauri::command]
 async fn login(username: String, password: String) -> Result<String, String> {
-    let client = reqwest::Client::builder().cookie_store(true).build().map_err(|e| e.to_string())?;
-    let login_url = get_config_value("LOGIN_ACTION_URL");
-    let gotp_url = get_config_value("GET_ONE_TIME_PASS_URL");
-    let gcc_url = get_config_value("GET_CHARACTER_COUNT_URL");
-    let gap_url = get_config_value("GET_ACCOUNT_PERMISSION_URL");
-    let guno_url = get_config_value("GET_USER_NO_URL");
-    //let gcname_url = get_config_value("GET_USER_NAME_URL");
+    let client = reqwest::Client::builder()
+        .cookie_store(true)
+        .build()
+        .map_err(|e| e.to_string())?;
 
-    // Prepare the payload
+    // URLs aus der Konfiguration abrufen
+    let login_url = get_config_value("LOGIN_ACTION_URL");
+    let account_info_url = get_config_value("GET_ACCOUNT_INFO_URL");
+    let gcc_url = get_config_value("GET_CHARACTER_COUNT_URL");
+    let gotp_url = get_config_value("GET_AUTH_KEY_URL");
+
+    // Login-Payload vorbereiten
     let mut payload = HashMap::new();
     payload.insert("login", username.clone());
-    payload.insert("pass", password);
-    payload.insert("bindip", "Yes".to_string());
+    payload.insert("password", password);
 
-    // Send the login request with custom user agent
-    let res = client
+    // Login-Anfrage senden
+    let login_res = client
         .post(&login_url)
         .header(USER_AGENT, "Tera Game Launcher")
         .form(&payload)
@@ -982,120 +984,81 @@ async fn login(username: String, password: String) -> Result<String, String> {
         .await
         .map_err(|e| e.to_string())?;
 
-    if res.status().is_success() {
-        let this_auth_key;
-        let this_character_count;
-        let this_permission;
-        let this_user_id;
-        let this_status;
-
-        // Make a request to the gotp URL with the session maintained
-        let data_res = client
-            .get(&gotp_url)
-            .header(USER_AGENT, "Tera Game Launcher")
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-
-        // Check if the response is successful
-        if data_res.status().is_success() {
-            let json: Value = data_res.json().await.map_err(|e| e.to_string())?;
-            this_auth_key = json["otp"].as_str().unwrap_or("").to_string();
-            this_status = json["status"].as_str().unwrap_or("").to_string();
-        } else {
-            return Err("Failed to retrieve data".to_string());
-        }
-
-        // Make a request to the gcc URL with the session maintained
-        let data_res = client
-            .get(&gcc_url)
-            .header(USER_AGENT, "Tera Game Launcher")
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-
-        // Check if the response is successful
-        if data_res.status().is_success() {
-            let json: Value = data_res.json().await.map_err(|e| e.to_string())?;
-            this_character_count = json["data"]["char_cnt"].as_str().unwrap_or("").to_string();
-        } else {
-            return Err("Failed to retrieve data".to_string());
-        }
-
-        // Make a request to the gap URL with the session maintained
-        let data_res = client
-            .get(&gap_url)
-            .header(USER_AGENT, "Tera Game Launcher")
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-
-        // Check if the response is successful
-        if data_res.status().is_success() {
-            let json: Value = data_res.json().await.map_err(|e| e.to_string())?;
-            this_permission = json["data"]["permission"].as_str().unwrap_or("").to_string();
-        } else {
-            return Err("Failed to retrieve data".to_string());
-        }
-
-        // Make a request to the guno URL with the session maintained
-        let data_res = client
-            .get(&guno_url)
-            .header(USER_AGENT, "Tera Game Launcher")
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-        
-        // Check if the response is successful
-        if data_res.status().is_success() {
-            let content = data_res.text().await.map_err(|e| e.to_string())?;
-        
-            // Use regex to extract the USER_ID from the HTML response
-            let re = Regex::new(r"var\s+USER_ID\s*=\s*'(\d+)';").unwrap();
-            if let Some(caps) = re.captures(&content) {
-                this_user_id = caps.get(1).map_or("", |m| m.as_str()).to_string();
-                let result_json = json!({
-                    "Return": {
-                        "AuthKey": this_auth_key,
-                        "UserName": username,
-                        "UserNo": this_user_id,
-                        "CharacterCount": this_character_count,
-                        "Permission": this_permission,
-                        "Privilege": "0"
-                    },
-                    "Msg": this_status
-                });
-                //FIXXED PRIVILEGE, NO API FOUND YET, CRIMSONHAWK PLEASE FIX!!!
-                println!("{}", result_json.to_string());
-                return Ok(result_json.to_string());
-            } else {
-                return Err("USER_ID not found in the response".to_string());
-            }
-        } else {
-            return Err("Failed to retrieve data".to_string());
-        }
-
-        /* Make a request to the gcname URL with the session maintained
-        let data_res = client
-            .get(&gcname_url)
-            .header(USER_AGENT, "Tera Game Launcher")
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-
-        // Check if the response is successful
-        if data_res.status().is_success() {
-            //let json: Value = data_res.json().await.map_err(|e| e.to_string())?;
-            //println!("JSON Response: {:?}", json);
-            return Ok("Login and data retrieval successful".to_string());
-        } else {
-            return Err("Failed to retrieve data".to_string());
-        }
-        */
-
-    } else {
-        Err("Login request failed".to_string())
+    if !login_res.status().is_success() {
+        return Err("Login request failed".to_string());
     }
+
+    // Login-Daten extrahieren
+    let login_data: Value = login_res.json().await.map_err(|e| e.to_string())?;
+    let this_status = login_data["Msg"]
+        .as_str()
+        .ok_or("Failed to retrieve status message")?
+        .to_string();
+
+    // Zusätzliche Benutzerinformationen abrufen
+    let account_info_res = client
+        .get(&account_info_url)
+        .header(USER_AGENT, "Tera Game Launcher")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let account_info_data: Value = account_info_res.json().await.map_err(|e| e.to_string())?;
+    let this_user_id = account_info_data["UserNo"]
+        .as_i64()
+        .ok_or("Failed to retrieve UserNo")?;
+    let this_permission = account_info_data["Permission"]
+        .as_i64()
+        .ok_or("Failed to retrieve Permission")?;
+    let this_username = account_info_data["UserName"]
+        .as_str()
+        .ok_or("Failed to retrieve UserName")?
+        .to_string();
+
+    // AuthKey abrufen
+    let auth_key_res = client
+        .get(&gotp_url)
+        .header(USER_AGENT, "Tera Game Launcher")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let auth_key_data: Value = auth_key_res.json().await.map_err(|e| e.to_string())?;
+    let this_auth_key = auth_key_data["AuthKey"]
+        .as_str()
+        .ok_or("Failed to retrieve AuthKey")?
+        .to_string();
+
+    // CharacterCount abrufen
+    let character_count_res = client
+        .get(&gcc_url)
+        .header(USER_AGENT, "Tera Game Launcher")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let character_count_data: Value = character_count_res.json().await.map_err(|e| e.to_string())?;
+    let this_character_count = character_count_data["CharacterCount"]
+        .as_str()
+        .ok_or("Failed to retrieve CharacterCount")?
+        .to_string();
+
+    // Ergebnis im gewünschten Format zurückgeben
+    let result_json = json!({
+        "Return": {
+            "AuthKey": this_auth_key,
+            "UserName": this_username,
+            "UserNo": this_user_id,
+            "CharacterCount": this_character_count,
+            "Permission": this_permission,
+            "Privilege": account_info_data["Privilege"].as_i64().unwrap_or(0),
+            "Region": account_info_data["Region"].as_str().unwrap_or("Unknown"),
+            "Banned": account_info_data["Banned"].as_bool().unwrap_or(false)
+        },
+        "Msg": this_status
+    });
+
+    Ok(result_json.to_string())
 }
 
 #[tauri::command]

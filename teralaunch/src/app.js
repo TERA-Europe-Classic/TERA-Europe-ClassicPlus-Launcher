@@ -1094,7 +1094,7 @@ const App = {
             if (
                 jsonResponse &&
                 jsonResponse.Return &&
-                jsonResponse.Msg === "ok"
+                jsonResponse.Msg === "success"
             ) {
                 const jsonResponseFormatted = {
                     AuthKey: jsonResponse.Return.AuthKey,
@@ -2973,7 +2973,7 @@ function LoadStartPage() {
             document.getElementById('NewsWartungImgId').style.display = 'block';
             document.getElementById('NewsWartungTextId').style.display ='flex';
             document.getElementById('NewsWartungTextId').textContent = jsonNews.WARTUNG_info_text;
-            
+
         } else {
             document.getElementById('NewsWartungImgId').style.display = 'none';
             document.getElementById('NewsWartungTextId').style.display = 'none';
