@@ -1,0 +1,79 @@
+body {
+    font-family: 'Inter', sans-serif;
+    background: linear-gradient(135deg, #0f1b2c, #15294b);
+    color: #f0f0f0;
+    height: 100%;
+}
+
+header.header1 {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 8px 16px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+}
+
+.top-button {
+    background: #2463eb;
+    border: none;
+    border-radius: 4px;
+    color: #fff;
+    transition: background 0.3s ease;
+}
+
+.top-button:hover {
+    background: #3483ff;
+}
+
+.btn-launch-game {
+    background: #1c447b;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 10px 20px;
+    transition: background 0.3s ease;
+}
+
+.btn-launch-game:hover {
+    background: #2e5f9d;
+}
+
+.loading-modal {
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+}
+
+/* Login page overrides */
+.login-form-container-wrapper {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.login-form {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    backdrop-filter: blur(10px);
+}
+
+.input-text,
+.input-text1 {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff;
+}
+
+.btn {
+    background: #2463eb;
+    border: none;
+    border-radius: 4px;
+    color: #fff;
+    box-shadow: 0 0 15px rgba(36,99,235,0.4);
+    transition: background 0.3s ease;
+}
+
+.btn:hover {
+    background: #3483ff;
+}
