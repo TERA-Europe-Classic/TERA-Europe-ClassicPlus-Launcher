@@ -63,7 +63,6 @@
         "FOLDER_SAVED_SUCCESS": "Dossier enregistré avec succès !",
         "GAME_LAUNCH_ERROR": "Erreur lors du lancement du jeu: ",
         "SETTINGS_GAME_FOLDER": "Dossier du jeu",
-        "SETTINGS_DEBUG": "Debug",
         "SETTINGS_VERSION_INFO": "Informations sur la version"
     },
     "EUR": {
@@ -129,7 +128,6 @@
         "FOLDER_SAVED_SUCCESS": "Folder saved successfully!",
         "GAME_LAUNCH_ERROR": "Error launching game: ",
         "SETTINGS_GAME_FOLDER": "Game Folder",
-        "SETTINGS_DEBUG": "Debug",
         "SETTINGS_VERSION_INFO": "Version Info"
     },
     "RUS": {
@@ -195,7 +193,6 @@
         "FOLDER_SAVED_SUCCESS": "Папка успешно сохранена!",
         "GAME_LAUNCH_ERROR": "Ошибка при запуске игры: ",
         "SETTINGS_GAME_FOLDER": "Папка игры",
-        "SETTINGS_DEBUG": "Отладка",
         "SETTINGS_VERSION_INFO": "Информация о версии"
     },
     "GER": {
@@ -261,7 +258,6 @@
         "FOLDER_SAVED_SUCCESS": "Ordner erfolgreich gespeichert!",
         "GAME_LAUNCH_ERROR": "Fehler beim Starten des Spiels: ",
         "SETTINGS_GAME_FOLDER": "Spieleordner",
-        "SETTINGS_DEBUG": "Debug",
         "SETTINGS_VERSION_INFO": "Versionsinfo"
     }
 }

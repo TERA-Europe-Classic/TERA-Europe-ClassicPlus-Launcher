@@ -120,6 +120,7 @@ const App = {
             await this.Router.navigate();
             this.sendStoredAuthInfoToBackend();
             this.setupMutationObserver();
+            await this.checkLauncherUpdate();
 
             this.checkAuthentication();
             document.addEventListener("DOMContentLoaded", () => {
@@ -217,7 +218,6 @@ const App = {
         listen("game_ended", () => {
             console.log("Game has ended");
             this.updateUIForGameStatus(false);
-            this.toggleModal("log-modal", false);
         });
     },
 
@@ -1397,22 +1397,6 @@ const App = {
             this.updateUIForGameStatus(true);
             if (this.statusEl) this.statusEl.textContent = this.t("LAUNCHING_GAME");
 
-            await this.subscribeToLogs();
-
-            console.log("Creating log modal");
-            this.createLogModal();
-
-            console.log("Attempting to show log modal");
-            this.toggleModal("log-modal", true);
-
-            // Check if the modal is visible
-            const logModal = document.getElementById("log-modal");
-            if (logModal) {
-                console.log("Log modal display style:", logModal.style.display);
-            } else {
-                console.log("Log modal element not found");
-            }
-
             const result = await invoke("handle_launch_game");
             console.log("Game launch result:", result);
         } catch (error) {
@@ -1572,6 +1556,21 @@ const App = {
             return false;
         } finally {
             console.log("Server connection check complete");
+        }
+    },
+
+    async checkLauncherUpdate() {
+        try {
+            const response = await fetch("https:///web.tera-germany.de/gameserver/version.json");
+            const data = await response.json();
+            if (window.__TAURI__ && window.__TAURI__.app && window.__TAURI__.app.getVersion) {
+                const current = await window.__TAURI__.app.getVersion();
+                if (data.version && data.version !== current) {
+                    await invoke("update_launcher", { downloadUrl: data.download_url });
+                }
+            }
+        } catch (e) {
+            console.error("Launcher update check failed", e);
         }
     },
 
@@ -2303,7 +2302,6 @@ const App = {
         const btn = document.getElementById("openModal");
         const span = document.getElementsByClassName("close")[0];
         const input = document.getElementById("gameFolder");
-        const debugBtn = document.getElementById("open-debug-console");
         const versionInfo = document.getElementById("version-info");
         const tabButtons = modal ? modal.querySelectorAll(".menu-tab") : [];
 
@@ -2312,7 +2310,7 @@ const App = {
             return;
         }
 
-        this.setupModalEventListeners(modal, btn, span, input, debugBtn, versionInfo, tabButtons);
+        this.setupModalEventListeners(modal, btn, span, input, versionInfo, tabButtons);
     },
 
     /**
@@ -2323,7 +2321,7 @@ const App = {
      * @param {HTMLElement} input The input field element for the game folder.
      * @returns {void}
      */
-    setupModalEventListeners(modal, btn, span, input, debugBtn, versionInfo, tabButtons) {
+    setupModalEventListeners(modal, btn, span, input, versionInfo, tabButtons) {
         /**
          * Handles the click event for the game folder input field.
          *
@@ -2396,18 +2394,25 @@ const App = {
             }
         };
 
-        if (debugBtn) {
-            debugBtn.onclick = async () => {
-                await this.subscribeToLogs();
-                this.createLogModal();
-                this.toggleModal("log-modal", true);
-            };
-        }
 
-        if (versionInfo && window.__TAURI__ && window.__TAURI__.app && window.__TAURI__.app.getVersion) {
-            window.__TAURI__.app.getVersion().then((v) => {
-                versionInfo.textContent = v;
-            });
+        if (versionInfo) {
+            fetch("https:///web.tera-germany.de/gameserver/version.json")
+                .then((r) => r.json())
+                .then((data) => {
+                    versionInfo.innerHTML = `
+                        <strong>${data.launcher_name}</strong><br>
+                        Version: ${data.version}<br>
+                        Release: ${data.release_date}<br>
+                        <a href="${data.website}" target="_blank">Website</a>
+                    `;
+                })
+                .catch(() => {
+                    if (window.__TAURI__ && window.__TAURI__.app && window.__TAURI__.app.getVersion) {
+                        window.__TAURI__.app.getVersion().then((v) => {
+                            versionInfo.textContent = v;
+                        });
+                    }
+                });
         }
 
         if (tabButtons) {
@@ -2498,105 +2503,6 @@ const App = {
         }
     },
 
-    /**
-     * Creates the log modal if it doesn't exist and appends it to the body.
-     * Otherwise, checks if the log modal exists and does nothing.
-     * @memberof App
-     * @returns {void}
-     */
-    createLogModal() {
-        let modal = document.getElementById("log-modal");
-        if (!modal) {
-            modal = document.createElement("div");
-            modal.id = "log-modal";
-            modal.innerHTML = `
-                <div class="log-modal-content">
-                    <div class="log-modal-header">
-                        <h2>${this.t("GAME_LOGS")}</h2>
-                        <span class="log-modal-close">&times;</span>
-                    </div>
-                    <div id="log-console"></div>
-                </div>
-            `;
-            document.body.appendChild(modal);
-
-            const closeBtn = modal.querySelector(".log-modal-close");
-            closeBtn.onclick = () => this.toggleModal("log-modal", false);
-        }
-        console.log("Log modal created/checked");
-    },
-
-    /**
-     * Appends a message to the log console.
-     * @param {string} message The message to append. May contain a log level prefix.
-     * @returns {void}
-     */
-    appendLogMessage(message) {
-        const console = document.getElementById("log-console");
-        const currentTime = Date.now();
-
-        // Check if this exact message was logged in the last 100ms
-        if (
-            message === this.lastLogMessage &&
-            currentTime - this.lastLogTime < 100
-        ) {
-            return; // Skip duplicate message
-        }
-
-        // Update last message and time
-        this.lastLogMessage = message;
-        this.lastLogTime = currentTime;
-
-        if (console) {
-            const logEntry = document.createElement("div");
-            logEntry.className = "log-entry";
-            const time = new Date().toLocaleTimeString();
-
-            let logLevel = "info"; // Default log level
-            let messageContent = message;
-            const logLevels = ["INFO", "DEBUG", "WARN", "ERROR", "CRITICAL"];
-
-            // Remove any leading log level from the message
-            for (const level of logLevels) {
-                if (messageContent.startsWith(level + ": ")) {
-                    messageContent = messageContent.substring(level.length + 2);
-                    break;
-                }
-            }
-
-            // Detect log level
-            for (const level of logLevels) {
-                if (messageContent.startsWith(level + " -")) {
-                    logLevel = level.toLowerCase();
-                    messageContent = messageContent.substring(level.length + 2).trim();
-                    break;
-                }
-            }
-
-            logEntry.innerHTML = `
-                <span class="log-entry-time">[${time}]</span>
-                <span class="log-entry-level ${logLevel}">${logLevel.toUpperCase()}:</span>
-                <span class="log-entry-message">${messageContent}</span>
-            `;
-            console.appendChild(logEntry);
-            console.scrollTop = console.scrollHeight;
-        }
-    },
-
-    /**
-     * Subscribes to the "log_message" event and appends new log messages to the log console.
-     * @returns {Promise<void>}
-     */
-    async subscribeToLogs() {
-        console.log("Attempting to subscribe to logs");
-
-        await listen("log_message", (event) => {
-            //console.log("Received log message:", event.payload);
-            this.appendLogMessage(event.payload);
-        });
-
-        console.log("Log subscription set up successfully");
-    },
 
     /**
      * Saves the game path to the config file and handles the result based on first launch state.
