@@ -357,17 +357,30 @@ const App = {
         }
     },
 
-    // Set up handlers for the header buttons (Forum/Discord/Support)
+    // Set up handlers for the header buttons and links
     setupHeaderLinks() {
+        const startBtn = document.getElementById("start-button");
+        if (startBtn) {
+            startBtn.addEventListener("click", () => this.Router.navigate("home"));
+        }
+
+        const settingsBtn = document.getElementById("settings-button");
+        if (settingsBtn) {
+            settingsBtn.addEventListener("click", () => this.openGamePathSettings());
+        }
+
         const links = [
-            { id: "forum-button", url: "https://crazy-esports.com/forum/board/19-tera-germany-de/" },
             { id: "discord-button", url: "https://discord.gg/DARHAaNBYS" },
             { id: "support-button", url: "https://helpdesk.crazy-esports.com" },
+            { id: "privacy-link", url: "https://crazy-esports.com/index.php?datenschutzerklaerung/" },
         ];
         links.forEach((link) => {
             const el = document.getElementById(link.id);
             if (el) {
-                el.addEventListener("click", () => this.openExternal(link.url));
+                el.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    this.openExternal(link.url);
+                });
             }
         });
     },

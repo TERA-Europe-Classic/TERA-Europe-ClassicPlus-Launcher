@@ -104,6 +104,16 @@ table {
     margin-right: 8px;
 }
 
+.privacy-link {
+    color: #8c93a9;
+    text-decoration: none;
+    margin-left: 8px;
+}
+
+.privacy-link:hover {
+    text-decoration: underline;
+}
+
     .top-button:hover {
         filter: brightness(1.1);
         transform: scale(1.08);
