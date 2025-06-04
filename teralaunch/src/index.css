@@ -1094,6 +1094,34 @@ input[type="text"] {
     font-size: 14px;
 }
 
+.settings-menu {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.menu-tab {
+    background-color: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.menu-tab.active {
+    background-color: rgba(255, 255, 255, 0.3);
+}
+
+.settings-section {
+    display: none;
+    width: 100%;
+}
+
+.settings-section.active {
+    display: block;
+}
+
 .success {
     background-color: rgba(0, 255, 0, 0.2);
     color: #7af77a;
