@@ -2303,13 +2303,16 @@ const App = {
         const btn = document.getElementById("openModal");
         const span = document.getElementsByClassName("close")[0];
         const input = document.getElementById("gameFolder");
+        const debugBtn = document.getElementById("open-debug-console");
+        const versionInfo = document.getElementById("version-info");
+        const tabButtons = modal ? modal.querySelectorAll(".menu-tab") : [];
 
         if (!modal || !btn || !span || !input) {
             console.warn("Modal elements not found in the DOM");
             return;
         }
 
-        this.setupModalEventListeners(modal, btn, span, input);
+        this.setupModalEventListeners(modal, btn, span, input, debugBtn, versionInfo, tabButtons);
     },
 
     /**
@@ -2320,7 +2323,7 @@ const App = {
      * @param {HTMLElement} input The input field element for the game folder.
      * @returns {void}
      */
-    setupModalEventListeners(modal, btn, span, input) {
+    setupModalEventListeners(modal, btn, span, input, debugBtn, versionInfo, tabButtons) {
         /**
          * Handles the click event for the game folder input field.
          *
@@ -2351,6 +2354,9 @@ const App = {
          * @returns {void}
          */
         btn.onclick = () => {
+            if (tabButtons && tabButtons.length) {
+                tabButtons[0].click();
+            }
             gsap.to(modal, {
                 duration: 0.5,
                 display: "flex",
@@ -2389,6 +2395,39 @@ const App = {
                 this.closeModal(modal);
             }
         };
+
+        if (debugBtn) {
+            debugBtn.onclick = async () => {
+                await this.subscribeToLogs();
+                this.createLogModal();
+                this.toggleModal("log-modal", true);
+            };
+        }
+
+        if (versionInfo && window.__TAURI__ && window.__TAURI__.app && window.__TAURI__.app.getVersion) {
+            window.__TAURI__.app.getVersion().then((v) => {
+                versionInfo.textContent = v;
+            });
+        }
+
+        if (tabButtons) {
+            tabButtons.forEach((tab) => {
+                tab.onclick = () => {
+                    const section = tab.dataset.section;
+                    modal.querySelectorAll(".settings-section").forEach((sec) => {
+                        sec.classList.remove("active");
+                        sec.style.display = "none";
+                    });
+                    modal.querySelectorAll(".menu-tab").forEach((btn) => btn.classList.remove("active"));
+                    const target = document.getElementById(`settings-${section}`);
+                    if (target) {
+                        target.classList.add("active");
+                        target.style.display = "block";
+                    }
+                    tab.classList.add("active");
+                };
+            });
+        }
     },
 
     /**
