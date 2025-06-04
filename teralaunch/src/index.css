@@ -1686,7 +1686,18 @@ input[type="text"] {
         border: 1px solid black; /* optional for clarity */
     }
 
-    .container-bottom div:last-child {
-        width: 33.33%;
-        border: 1px solid black; /* optional for clarity */
-    }
+.container-bottom div:last-child {
+    width: 33.33%;
+    border: 1px solid black; /* optional for clarity */
+}
+
+body.light-mode {
+    background: #f5f5f5;
+    color: #000;
+}
+
+body.light-mode .modal-content,
+body.light-mode .log-modal-content {
+    background-color: #fff;
+    color: #000;
+}

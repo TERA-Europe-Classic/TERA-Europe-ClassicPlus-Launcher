@@ -565,19 +565,41 @@ async fn update_file(
         corrected_url = format!("{}{}", &corrected_url[..pos], &corrected_url[(pos + 7)..]);
     }
 
-    //CORRECTED URL FROM ALL THIS FUCKERY, LOOK ABOVE FILES
+    let mut start_byte = 0u64;
+    let mut file = if file_path.exists() {
+        let meta = tokio::fs::metadata(&file_path).await.map_err(|e| e.to_string())?;
+        start_byte = meta.len();
+        tokio::fs::OpenOptions::new().append(true).open(&file_path).await.map_err(|e| e.to_string())?
+    } else {
+        tokio::fs::File::create(&file_path).await.map_err(|e| e.to_string())?
+    };
 
-    let res = client.get(&corrected_url)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
+    let mut req = client.get(&corrected_url);
+    if start_byte > 0 {
+        req = req.header(reqwest::header::RANGE, format!("bytes={}-", start_byte));
+    }
 
-    let file_size = res.content_length().unwrap_or(file_info.size);
-    let mut file = tokio::fs::File::create(&file_path).await.map_err(|e| e.to_string())?;
-    let mut downloaded: u64 = 0;
+    let res = req.send().await.map_err(|e| e.to_string())?;
+
+    let file_size = file_info.size;
+    let mut downloaded: u64 = start_byte;
     let mut stream = res.bytes_stream();
     let start_time = Instant::now();
     let mut last_update = Instant::now();
+
+    if start_byte > 0 {
+        let progress_payload = ProgressPayload {
+            file_name: file_info.path.clone(),
+            progress: (downloaded as f64 / file_size as f64) * 100.0,
+            speed: 0.0,
+            downloaded_bytes: downloaded_size + downloaded,
+            total_bytes: total_size,
+            total_files,
+            elapsed_time: 0.0,
+            current_file_index,
+        };
+        let _ = window.emit("download_progress", &progress_payload);
+    }
 
     info!("Downloading file: {}", file_info.path);
 
