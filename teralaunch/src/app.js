@@ -9,6 +9,8 @@ const LAUNCHER_DOWNLOAD_URL =
     "https://web.tera-germany.de/gameserver/Tera-Germany_Launcher.exe";
 
 const NewsPageUpdaterJsonUrl = "https://web.tera-germany.de/gameserver/Launcher_StartPage_News.json"
+const PatchNotesUrl = "https://web.tera-germany.de/gameserver/patchnotes.json"
+const ServerStatusUrl = "https://web.tera-germany.de/testserver/serverlist.json?lang=ger&sort=3"
 
 const App = {
     translations: {},
@@ -112,6 +114,10 @@ const App = {
     async init() {
         try {
             this.disableContextMenu();
+            const savedTheme = localStorage.getItem("theme");
+            if (savedTheme === "light") {
+                document.body.classList.add("light-mode");
+            }
             this.setupEventListeners();
             this.setupWindowControls();
             this.setupCustomAnimations();
@@ -190,6 +196,7 @@ const App = {
         this.setupGameStatusListeners();
         this.setupUpdateListeners();
         this.setupErrorListener();
+        this.setupLogListener();
     },
 
     /**
@@ -268,6 +275,26 @@ const App = {
         listen("error", (event) => {
             this.showErrorMessage(event.payload);
         });
+    },
+
+    setupLogListener() {
+        listen("log_message", (event) => {
+            const consoleEl = document.getElementById("log-console");
+            if (consoleEl) {
+                const div = document.createElement("div");
+                div.textContent = event.payload;
+                consoleEl.appendChild(div);
+                consoleEl.scrollTop = consoleEl.scrollHeight;
+            }
+        });
+
+        const btn = document.getElementById("view-logs");
+        const modal = document.getElementById("log-modal");
+        const close = document.querySelector(".log-modal-close");
+        if (btn && modal && close) {
+            btn.addEventListener("click", () => (modal.style.display = "block"));
+            close.addEventListener("click", () => (modal.style.display = "none"));
+        }
     },
 
     // Function to handle the first launch
@@ -849,6 +876,17 @@ const App = {
             currentProcessingFile: "",
             processedFiles: 0,
         });
+    },
+
+    toggleTheme() {
+        const body = document.body;
+        if (body.classList.contains("light-mode")) {
+            body.classList.remove("light-mode");
+            localStorage.setItem("theme", "dark");
+        } else {
+            body.classList.add("light-mode");
+            localStorage.setItem("theme", "light");
+        }
     },
 
     /**
@@ -1561,6 +1599,33 @@ const App = {
         }
     },
 
+    async loadServerStatus() {
+        try {
+            const data = await fetchData(ServerStatusUrl);
+            if (data && data.servers && data.servers.length > 0) {
+                const statusEl = document.getElementById("game-status");
+                statusEl.textContent =
+                    data.servers[0].available === 1 ? "Online" : "Offline";
+            }
+        } catch (e) {
+            console.error("Failed to load server status", e);
+        }
+    },
+
+    async loadPatchNotes() {
+        try {
+            const notes = await fetchData(PatchNotesUrl);
+            if (notes && notes.notes && Array.isArray(notes.notes)) {
+                const container = document.getElementById("patch-notes");
+                container.innerHTML = notes.notes
+                    .map((n) => `<p>${n}</p>`)
+                    .join("");
+            }
+        } catch (e) {
+            console.error("Failed to load patch notes", e);
+        }
+    },
+
     async checkLauncherUpdate() {
         try {
             const response = await fetch(
@@ -2222,6 +2287,14 @@ const App = {
         if (pauseButton) {
             pauseButton.addEventListener("click", () => this.stopDownloads());
         }
+
+        const themeBtn = document.getElementById("toggle-theme");
+        if (themeBtn) {
+            themeBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                this.toggleTheme();
+            });
+        }
     },
 
     /**
@@ -2238,6 +2311,8 @@ const App = {
         this.initUserPanel();
         this.initModalSettings();
         await this.updateGameStatus();
+        await this.loadServerStatus();
+        await this.loadPatchNotes();
         this.updateUIBasedOnPrivileges();
         this.updateUI();
         const isGameRunning = await this.isGameRunning();
