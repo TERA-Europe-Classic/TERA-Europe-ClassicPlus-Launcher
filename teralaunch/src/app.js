@@ -1561,7 +1561,7 @@ const App = {
 
     async checkLauncherUpdate() {
         try {
-            const response = await fetch("https:///web.tera-germany.de/gameserver/version.json");
+            const response = await fetch("https://web.tera-germany.de/gameserver/version.json");
             const data = await response.json();
             if (window.__TAURI__ && window.__TAURI__.app && window.__TAURI__.app.getVersion) {
                 const current = await window.__TAURI__.app.getVersion();
@@ -2396,7 +2396,7 @@ const App = {
 
 
         if (versionInfo) {
-            fetch("https:///web.tera-germany.de/gameserver/version.json")
+            fetch("https://web.tera-germany.de/gameserver/version.json")
                 .then((r) => r.json())
                 .then((data) => {
                     versionInfo.innerHTML = `
