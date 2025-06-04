@@ -248,6 +248,9 @@ const App = {
                 currentUpdateMode: "complete",
             });
         });
+        listen("download_cancelled", () => {
+            this.setState({ currentUpdateMode: "ready" });
+        });
     },
 
     /**
@@ -805,6 +808,12 @@ const App = {
             elements.timeRemaining.style.display = showDownloadInfo
                 ? "inline"
                 : "none";
+
+        const pauseBtn = document.querySelector(".btn-pause");
+        if (pauseBtn) {
+            pauseBtn.style.display =
+                this.state.currentUpdateMode === "download" ? "flex" : "none";
+        }
     },
 
     /**
@@ -2186,6 +2195,11 @@ const App = {
         if (appQuitButton) {
             appQuitButton.addEventListener("click", () => this.appQuit());
         }
+
+        const pauseButton = document.querySelector(".btn-pause");
+        if (pauseButton) {
+            pauseButton.addEventListener("click", () => this.stopDownloads());
+        }
     },
 
     /**
@@ -2902,6 +2916,14 @@ const App = {
      */
     appQuit() {
         appWindow.close();
+    },
+
+    async stopDownloads() {
+        try {
+            await invoke("cancel_downloads");
+        } catch (error) {
+            console.error("Failed to stop downloads:", error);
+        }
     },
 
     /**
