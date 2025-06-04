@@ -5,6 +5,8 @@ const { message, ask } = window.__TAURI__.dialog;
 
 const REQUIRED_PRIVILEGE_LEVEL = 3;
 const UPDATE_CHECK_ENABLED = true;
+const LAUNCHER_DOWNLOAD_URL =
+    "https://web.tera-germany.de/gameserver/Tera-Germany_Launcher.exe";
 
 const NewsPageUpdaterJsonUrl = "https://web.tera-germany.de/gameserver/Launcher_StartPage_News.json"
 
@@ -1585,7 +1587,7 @@ const App = {
                     }
                     if (userConfirm) {
                         await invoke("update_launcher", {
-                            downloadUrl: data.download_url,
+                            downloadUrl: LAUNCHER_DOWNLOAD_URL,
                         });
                     }
                 }
