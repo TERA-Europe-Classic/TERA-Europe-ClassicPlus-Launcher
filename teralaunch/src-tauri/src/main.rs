@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Once, RwLock};
 use std::sync::atomic::{AtomicU64, AtomicUsize, AtomicBool, Ordering};
 use std::time::{Duration, Instant, SystemTime};
+use std::process::Command;
 
 // Third-party imports
 use dotenv::dotenv;
@@ -231,6 +232,52 @@ fn clear_cache() -> Result<(), String> {
 #[tauri::command]
 fn cancel_downloads() {
     CANCEL_DOWNLOAD.store(true, Ordering::SeqCst);
+}
+
+#[tauri::command]
+async fn update_launcher(download_url: String) -> Result<(), String> {
+    let current_exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let exe_dir = current_exe.parent().ok_or("exe dir not found")?;
+    let new_path = exe_dir.join("launcher_update.exe");
+
+    let client = reqwest::Client::builder()
+        .no_proxy()
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let bytes = client
+        .get(&download_url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .bytes()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    tokio::fs::write(&new_path, &bytes).await.map_err(|e| e.to_string())?;
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        let cmd = format!(
+            "ping 127.0.0.1 -n 2 > NUL && move /Y \"{}\" \"{}\" && start \"\" \"{}\"",
+            new_path.display(),
+            current_exe.display(),
+            current_exe.display()
+        );
+        Command::new("cmd")
+            .args(["/C", &cmd])
+            .creation_flags(0x08000000)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        std::fs::rename(&new_path, &current_exe).map_err(|e| e.to_string())?;
+        let _ = Command::new(&current_exe).spawn();
+    }
+
+    std::process::exit(0);
 }
 
 fn get_hash_file_url() -> String {
@@ -1199,6 +1246,7 @@ fn main() {
                 check_update_required,
                 download_all_files,
                 cancel_downloads,
+                update_launcher,
             ]
         )
         .run(tauri::generate_context!())
