@@ -288,13 +288,6 @@ const App = {
             }
         });
 
-        const btn = document.getElementById("view-logs");
-        const modal = document.getElementById("log-modal");
-        const close = document.querySelector(".log-modal-close");
-        if (btn && modal && close) {
-            btn.addEventListener("click", () => (modal.style.display = "block"));
-            close.addEventListener("click", () => (modal.style.display = "none"));
-        }
     },
 
     // Function to handle the first launch
@@ -2294,6 +2287,17 @@ const App = {
                 e.preventDefault();
                 this.toggleTheme();
             });
+        }
+
+        const viewLogsBtn = document.getElementById("view-logs");
+        const logModal = document.getElementById("log-modal");
+        const logClose = document.querySelector(".log-modal-close");
+        if (viewLogsBtn && logModal && logClose) {
+            viewLogsBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                logModal.style.display = "block";
+            });
+            logClose.addEventListener("click", () => (logModal.style.display = "none"));
         }
     },
 

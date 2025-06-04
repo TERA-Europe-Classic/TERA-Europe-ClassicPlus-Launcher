@@ -81,7 +81,7 @@
     <div class="mainpage">
         <header class="header1" data-tauri-drag-region>
             <img class="logo-top-left" loading="lazy" alt="" src="./assets/icon.png" />
-            <div class="region-select1">
+            <div class="region-select1" style="-webkit-app-region: no-drag;">
                 <a class="region1">Region:</a>
                 <div class="select-wrapper">
                     <select id="language-selector">
@@ -107,19 +107,19 @@
             </div>
             <div class="app-btn">
                 <div class="app-btn-content">
-                    <div class="btn-minimize1" id="app-minimize">
+                    <div class="btn-minimize1" id="app-minimize" style="-webkit-app-region: no-drag;">
                         <img class="minimize-icon1" loading="lazy" alt="" src="./assets/minimize.svg" />
                     </div>
-                    <div class="btn-close1" id="app-close">
+                    <div class="btn-close1" id="app-close" style="-webkit-app-region: no-drag;">
                         <img class="close-icon1" loading="lazy" alt="" src="./assets/close.svg" />
                     </div>
                 </div>
             </div>
         </header>
         <div class="top-button-frame">
-            <button class="top-button" onclick="window.open('https://crazy-esports.com/forum/board/19-tera-germany-de/', '_blank', 'noopener noreferrer')">Forum</button>
-            <button class="top-button" onclick="window.open('https://discord.gg/DARHAaNBYS', '_blank', 'noopener noreferrer')">Discord</button>
-            <button class="top-button" onclick="window.open('https://helpdesk.crazy-esports.com', '_blank', 'noopener noreferrer')">Support Center</button>
+            <button class="top-button" style="-webkit-app-region: no-drag;" onclick="window.open('https://crazy-esports.com/forum/board/19-tera-germany-de/', '_blank', 'noopener noreferrer')">Forum</button>
+            <button class="top-button" style="-webkit-app-region: no-drag;" onclick="window.open('https://discord.gg/DARHAaNBYS', '_blank', 'noopener noreferrer')">Discord</button>
+            <button class="top-button" style="-webkit-app-region: no-drag;" onclick="window.open('https://helpdesk.crazy-esports.com', '_blank', 'noopener noreferrer')">Support Center</button>
         </div>
         <div id="app"></div>
     </div>
