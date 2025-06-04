@@ -36,6 +36,7 @@ const App = {
         isDownloadComplete: false,
         lastProgressUpdate: null,
         lastDownloadedBytes: 0,
+        downloadStartTime: null,
         currentUpdateMode: null,
         currentProgress: 0,
         currentFileName: "",
@@ -403,11 +404,24 @@ const App = {
         // Update total downloaded bytes
         const totalDownloadedBytes = downloaded_bytes;
 
-        // Calculate global remaining time using totalDownloadedBytes
+        const now = Date.now();
+
+        // Initialize download start time on first progress event
+        if (this.state.downloadStartTime === null) {
+            this.state.downloadStartTime = now;
+        }
+
+        // Calculate global download speed based on elapsed time
+        const elapsedSeconds =
+            (now - this.state.downloadStartTime) / 1000;
+        const globalSpeed =
+            elapsedSeconds > 0 ? totalDownloadedBytes / elapsedSeconds : speed;
+
+        // Calculate global remaining time using the global speed
         const timeRemaining = this.calculateGlobalTimeRemaining(
             totalDownloadedBytes,
             this.state.totalSize,
-            speed,
+            globalSpeed,
         );
 
         console.log("Calculated download progress:", {
@@ -418,17 +432,20 @@ const App = {
 
         this.setState({
             currentFileName: file_name,
-            currentProgress: Math.min(100, progress),
-            currentSpeed: speed,
-            downloadedSize: downloaded_bytes,
+            currentProgress: Math.min(
+                100,
+                (totalDownloadedBytes / this.state.totalSize) * 100,
+            ),
+            currentSpeed: globalSpeed,
+            downloadedSize: totalDownloadedBytes,
             totalSize: total_bytes,
             totalFiles: total_files,
             currentFileIndex: current_file_index,
             totalDownloadedBytes: totalDownloadedBytes,
             timeRemaining: timeRemaining,
             currentUpdateMode: "download",
-            lastProgressUpdate: Date.now(),
-            lastDownloadedBytes: downloaded_bytes,
+            lastProgressUpdate: now,
+            lastDownloadedBytes: totalDownloadedBytes,
         });
 
         console.log("Updated state:", this.state);
@@ -802,6 +819,7 @@ const App = {
             isDownloadComplete: false,
             lastProgressUpdate: null,
             lastDownloadedBytes: 0,
+            downloadStartTime: null,
             currentUpdateMode: null,
             currentProgress: 0,
             currentFileName: "",
