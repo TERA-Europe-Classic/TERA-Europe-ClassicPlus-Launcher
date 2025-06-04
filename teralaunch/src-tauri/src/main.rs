@@ -532,7 +532,7 @@ async fn update_file(
     let start_time = Instant::now();
     let mut last_update = Instant::now();
 
-    println!("Downloading file: {}", file_info.path);
+    info!("Downloading file: {}", file_info.path);
 
     while let Some(chunk_result) = stream.next().await {
         if CANCEL_DOWNLOAD.load(Ordering::SeqCst) {
@@ -559,11 +559,15 @@ async fn update_file(
                 current_file_index,
             };
 
-            println!("Current file: {}, Download speed: {}/s, Progress: {:.2}%",
-                     file_info.path, format_bytes(speed), progress_payload.progress);
+            info!(
+                "Current file: {}, Download speed: {}/s, Progress: {:.2}%",
+                file_info.path,
+                format_bytes(speed),
+                progress_payload.progress
+            );
 
             if let Err(e) = window.emit("download_progress", &progress_payload) {
-                println!("Failed to emit download_progress event: {}", e);
+                error!("Failed to emit download_progress event: {}", e);
             }
             last_update = now;
         }
@@ -593,10 +597,10 @@ async fn update_file(
         current_file_index,
     };
     if let Err(e) = window.emit("download_progress", &final_progress_payload) {
-        println!("Failed to emit final download_progress event: {}", e);
+        error!("Failed to emit final download_progress event: {}", e);
     }
 
-    println!("File download completed: {}", file_info.path);
+    info!("File download completed: {}", file_info.path);
 
     Ok(downloaded)
 }
@@ -624,9 +628,9 @@ async fn download_all_files(
     let total_size: u64 = files_to_update.iter().map(|f| f.size).sum();
 
     if total_files == 0 {
-        println!("No files to download");
+        info!("No files to download");
         if let Err(e) = window.emit("download_complete", ()) {
-            eprintln!("Failed to emit download_complete event: {}", e);
+            error!("Failed to emit download_complete event: {}", e);
         }
         return Ok(vec![]);
     }
@@ -664,11 +668,11 @@ async fn download_all_files(
     }
 
     if CANCEL_DOWNLOAD.load(Ordering::SeqCst) {
-        println!("Download cancelled");
+        info!("Download cancelled");
     } else {
-        println!("Download complete for {} file(s)", total_files);
+        info!("Download complete for {} file(s)", total_files);
         if let Err(e) = window.emit("download_complete", ()) {
-            eprintln!("Failed to emit download_complete event: {}", e);
+            error!("Failed to emit download_complete event: {}", e);
         }
     }
 
@@ -678,7 +682,7 @@ async fn download_all_files(
 
 #[tauri::command]
 async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, String> {
-    println!("Starting get_files_to_update");
+    info!("Starting get_files_to_update");
 
     let start_time = Instant::now();
     let server_hash_file = get_server_hash_file().await?;
@@ -687,13 +691,13 @@ async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, Str
     // files. This is the folder that we will be comparing with the server hash file
     // to determine which files need to be updated.
     let local_game_path = get_game_path()?;
-    println!("Local game path: {:?}", local_game_path);
+    info!("Local game path: {:?}", local_game_path);
 
-    println!("Attempting to read server hash file");
+    info!("Attempting to read server hash file");
     let files = server_hash_file["files"].as_array().ok_or("Invalid server hash file format")?;
-    println!("Server hash file parsed, {} files found", files.len());
+    info!("Server hash file parsed, {} files found", files.len());
 
-    println!("Starting file comparison");
+    info!("Starting file comparison");
     let _cache = load_cache_from_disk().unwrap_or_else(|_| HashMap::new());
     let cache = Arc::new(RwLock::new(_cache));
 
@@ -729,7 +733,7 @@ async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, Str
 
                 let _ = window.emit("file_check_progress", progress_payload)
                     .map_err(|e| {
-                        println!("Error emitting file_check_progress event: {}", e);
+                        error!("Error emitting file_check_progress event: {}", e);
                         e.to_string()
                     });
             }
@@ -825,11 +829,11 @@ async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, Str
     // Save the updated cache to disk
     let final_cache = cache.read().unwrap();
     if let Err(e) = save_cache_to_disk(&*final_cache) {
-        eprintln!("Failed to save cache to disk: {}", e);
+        error!("Failed to save cache to disk: {}", e);
     }
 
     let total_time = start_time.elapsed();
-    println!("File comparison completed. Files to update: {}", files_to_update.len());
+    info!("File comparison completed. Files to update: {}", files_to_update.len());
 
     // Emit a final event with complete statistics
     let _ = window.emit("file_check_completed", json!({
@@ -856,7 +860,7 @@ async fn handle_launch_game(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, GameState>
 ) -> Result<String, String> {
-    println!("Total time: {:?}", 3);
+    info!("Total time: {:?}", 3);
     let mut is_launching = state.is_launching.lock().await;
     if *is_launching {
         return Err("Game is already launching".to_string());
@@ -1137,9 +1141,9 @@ fn main() {
     // Spawn a task to receive logs and send them through the channel
     rt.spawn(async move {
         while let Some(log_message) = tera_log_receiver.recv().await {
-            println!("Teralib: {}", log_message);
+            info!("Teralib: {}", log_message);
             if let Err(e) = log_sender.send(log_message).await {
-                eprintln!("Failed to send log message: {}", e);
+                error!("Failed to send log message: {}", e);
             }
         }
     });
@@ -1157,7 +1161,7 @@ fn main() {
         .setup(|app| {
             let window = app.get_window("main").unwrap();
             let app_handle = app.handle();
-            println!("Tauri setup started");
+            info!("Tauri setup started");
 
             #[cfg(debug_assertions)]
             window.open_devtools();
@@ -1169,7 +1173,7 @@ fn main() {
                 }
             });
 
-            println!("Tauri setup completed");
+            info!("Tauri setup completed");
 
 
             Ok(())
