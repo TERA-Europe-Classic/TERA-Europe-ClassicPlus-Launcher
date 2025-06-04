@@ -1,0 +1,52 @@
+{
+    "build": {
+        "devPath": "../src",
+        "distDir": "../src",
+        "withGlobalTauri": true
+    },
+    "package": {
+        "productName": "Tera-Germany_Launcher",
+        "version": "1.0.1"
+    },
+    "tauri": {
+        "allowlist": {
+            "all": true,
+            "shell": {
+                "all": true,
+                "open": true
+            }
+        },
+        "windows": [
+            {
+                "title": "Tera-Germany Launcher",
+                "width": 1282,
+                "height": 759,
+                "resizable": false,
+                "decorations": false,
+                "transparent": true,
+                "center": true,
+                "contentProtected": false,
+                "url": "index.html"
+            }
+        ],
+        "security": {
+            "csp": null
+        },
+        "bundle": {
+            "active": true,
+            "targets": "all",
+            "identifier": "Crazy-eSports.com",
+            "publisher": "Crazy-eSports",
+            "icon": [
+                "icons/tera_server.png",
+                "icons/tera_server.ico"
+            ],
+            "copyright": "Crazy-eSports",
+            "shortDescription": "Tera-Germany Launcher",
+            "resources": [
+                "./src/tera_config.ini",
+                "./src/TERA/readme.txt"
+            ]
+        }
+    }
+}

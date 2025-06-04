@@ -1,0 +1,128 @@
+<main class="content" id="home-page">
+    <div class="home-grid" id="my-home-grid">
+        <div class="home-1">
+            <img class="home-entries" id="Tera-Logo-home" loading="lazy" alt="" src="./assets/tera-logo@2x.png" />
+        </div>
+        <div class="home-2">
+            <div style="display: flex; flex-direction: column;">
+                <img class="home-entries" style="display: none;" id="NewsWartungImgId" loading="lazy" alt="" src="./assets/WARTUNG.png" />
+                <div class="home-wartung-text" style="display: none;" id="NewsWartungTextId"></div>
+            </div>
+        </div>
+        <div class="home-3">
+            <div>
+                <a id="NewsImgIdHref" href="https://tera-germany.com/" target="_blank">
+                    <img class="home-entries" id="NewsImgId" loading="lazy" alt="" src="" />
+                </a>
+            </div>
+        </div>
+        <div class="home-3-5">
+            <div class="top-overlay" id="NewsSideTitleTextId"></div>
+            <div id="NewsTextId" style="margin: 10px 0; text-align: center;"></div>
+        </div>
+        <div class="home-4">
+            <a id="AdImgId1Href" href="https://tera-germany.com/" target="_blank">
+                <img class="home-entries" id="AdImgId1" loading="lazy" alt="" src="" />
+            </a>
+            <div class="home-text-overlay" id="AdTextId1"></div>
+        </div>
+        <div class="home-5">
+            <a id="AdImgId2Href" href="https://tera-germany.com/" target="_blank">
+                <img class="home-entries" id="AdImgId2" loading="lazy" alt="" src="" />
+            </a>
+            <div class="home-text-overlay" id="AdTextId2"></div>
+        </div>
+        <div class="home-6">
+            <a id="AdImgId3Href" href="https://tera-germany.com/" target="_blank">
+                <img class="home-entries" id="AdImgId3" loading="lazy" alt="" src="" />
+            </a>
+            <div class="home-text-overlay" id="AdTextId3"></div>
+        </div>
+    </div>
+    <section class="home-container">
+        <div class="home-wrapper">
+            <div class="home-content">
+                <img class="tera-logo-icon" loading="lazy" alt="" src="./assets/tera-logo@2x.png" />
+            </div>
+            <div class="user-panel">
+                <div class="btn-user-avatar">
+                    <img class="user-icon" loading="lazy" alt="" src="./assets/avatar.png" />
+                </div>
+                <div class="dropdown-panel-wrapper">
+                    <div class="dropdown-panel">
+                        <div class="user-name-container">
+                            <span class="hey"></span>
+                            <span class="username" id="userName">User</span>
+                        </div>
+                        <div class="menu-divider"></div>
+                        <nav class="user-menu">
+                            <a href="https://www.tera-germany.com/profile" target="_blank" class="menu-item" data-translate="ACCOUNT_DETAILS">ACCOUNT DETAILS</a>
+                            <a href="https://monitor.tera-germany.com/status/crazy-esports" target="_blank" class="menu-item">SERVICE STATUS</a>
+                            <a href="https://crazy-esports.com/jcoins-shop/" target="_blank" class="menu-item">SHOP/COINS PURCHASE</a>
+                            <a href="https://www.tera-germany.com/profile#twitch" target="_blank" class="menu-item">LINK TWITCH ACCOUNT</a>
+                            <a href="https://tera-germany.com/community/twitch" target="_blank" class="menu-item">CLAIM TWITCH DROPS</a>
+                            <a href="#" class="menu-item" id="openModal" data-translate="SETTINGS">SETTINGS</a>
+                            <a href="#" class="menu-item" id="check-game-files">RECHECK & REPAIR FILES</a>
+                            <a href="#" class="menu-item" id="logout-link" data-translate="SIGN_OUT">SIGN OUT</a>
+                            <a href="#" class="menu-item" id="app-quit" data-translate="EXIT">EXIT</a>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="game-status">
+            <div class="game-progress-parent">
+                <div class="game-progress">
+                    <div class="progress-container">
+                        <div class="content-parent-parent">
+                            <div class="content-parent">
+                                <div class="dl-status-string" id="dl-status-string">
+                                    <span id="status-string"></span>
+                                    <span id="files-progress"></span>
+                                    <span id="size-progress">
+                                        <span id="downloaded-size"></span>
+                                        <span id="total-size"></span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="dl-status-percentage" id="progress-percentage"></div>
+                        </div>
+                        <div class="outer-progress">
+                            <div class="inner-progress" id="progress-percentage-div" style="width: 0%;"><span id="current-file">current-file :S1Game/CookedPC/Sound_Data/Packages/PC_Skill.gpk</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="btn-pause" style="display: none;">
+                    <img class="pause-icon" alt="" src="./assets/pause-icon.svg" />
+                </div>
+                <div class="btn-restart" style="display: none;">
+                    <img class="vector-icon" loading="lazy" alt="" src="./assets/vector-3.svg" />
+                </div>
+                <div class="launch-game-parent">
+                    <button class="btn-launch-game" id="launch-game-btn">
+                        <b class="launch-game" data-translate="LAUNCH_GAME">LAUNCH GAME</b>
+                    </button>
+                </div>
+            </div>
+            <div class="download-info">
+                <div class="download-speed move-up-15px" id="download-speed-div">
+                    <div class="dl-speed-string" data-translate="SPEED_LABEL">Speed:</div>
+                    <div class="speed-value-container">
+                        <div class="dl-speed-number" id="download-speed">--</div>
+                    </div>
+                    <div class="tr-string" data-translate="TIME_REMAINING_LABEL">Time remaining:</div>
+                    <div class="tr-time" id="time-remaining">--</div>
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+<div id="modal" class="modal">
+    <div class="modal-content">
+        <h2 data-translate="CHOOSE_GAME_FOLDER">Choose Your Game Folder</h2>
+        <p data-translate="CLICK_INPUT_INSTRUCTION">Just click inside the input</p>
+        <span class="close">&times;</span>
+        <input type="text" id="gameFolder" data-translate-placeholder="LOCATE_GAME_FOLDER">
+        <div id="notification" class="notification"></div>
+    </div>
+</div>

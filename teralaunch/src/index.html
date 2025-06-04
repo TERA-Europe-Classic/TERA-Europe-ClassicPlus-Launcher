@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+
+    <link rel="stylesheet" href="./login.css" />
+    <link rel="stylesheet" href="./index.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tauri App</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Raleway:wght@500;600;700&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Swiper/8.4.5/swiper-bundle.min.css">
+    <style>
+        #app {
+            position: relative;
+            height: 759px;
+        }
+
+        .page {
+            position: absolute;
+            width: 100%;
+            opacity: 0;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+        }
+
+        #iframeContainer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 140%;
+            width: 100%;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+
+        #iframeContainer.show {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        #iframeContainer.hide {
+            visibility: hidden;
+            opacity: 0;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        #exitButton {
+            position: fixed;
+            border-radius: 1px;
+            top: 15px;
+            right: 10px;
+            height: 45px;
+            width: 140px;
+            padding: 5px 10px;
+            background-color: #33B5E5;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="mainpage">
+        <header class="header1" data-tauri-drag-region>
+            <img class="logo-top-left" loading="lazy" alt="" src="./assets/icon.png" />
+            <div class="region-select1">
+                <a class="region1">Region:</a>
+                <div class="select-wrapper">
+                    <select id="language-selector">
+                        <option value="GER">GERMAN</option>
+                        <option value="EUR">ENGLISH</option>
+                        <option value="FRA">FRENCH</option>
+                        <option value="RUS">RUSSIAN</option>
+                    </select>
+                    <div class="select-styled">ENGLISH</div>
+                    <ul class="select-options">
+                        <li rel="GER">GERMAN</li>
+                        <li rel="EUR">ENGLISH</li>
+                        <li rel="FRA">FRENCH</li>
+                        <li rel="RUS">RUSSIAN</li>
+                    </ul>
+                </div>
+                <div style="padding-left:4px;" data-translate="GAME_STATUS">Game Status:</div>
+                <div id="game-status" data-translate="GAME_STATUS_NOT_RUNNING" style="font-weight:700;"></div>
+                <button id="generate-hash-file" class="top-button" data-translate="GENERATE_HASH_FILE"
+                        style="display: none;">
+                    Generate Hash File
+                </button>
+            </div>
+            <div class="app-btn">
+                <div class="app-btn-content">
+                    <div class="btn-minimize1" id="app-minimize">
+                        <img class="minimize-icon1" loading="lazy" alt="" src="./assets/minimize.svg" />
+                    </div>
+                    <div class="btn-close1" id="app-close">
+                        <img class="close-icon1" loading="lazy" alt="" src="./assets/close.svg" />
+                    </div>
+                </div>
+            </div>
+        </header>
+        <div class="top-button-frame">
+            <button class="top-button" onclick="window.open('https://crazy-esports.com/forum/board/19-tera-germany-de/', '_blank', 'noopener noreferrer')">Forum</button>
+            <button class="top-button" onclick="window.open('https://discord.gg/DARHAaNBYS', '_blank', 'noopener noreferrer')">Discord</button>
+            <button class="top-button" onclick="window.open('https://crazy-esports.com/ticketsystem/', '_blank', 'noopener noreferrer')">Support Center</button>
+        </div>
+        <div id="app"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.4/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Swiper/8.4.5/swiper-bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/particles.js/2.0.0/particles.min.js"></script>
+    <script src="router.js"></script>
+    <script type="module" src="/app.js"></script>
+
+
+    <div id="loading-modal" class="loading-modal">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <p id="loading-message" class="loading-text" data-translate="CHECKING_UPDATES">Cheking updates...</p>
+            <p id="loading-error" class="loading-error loading-text"></p>
+            <div class="loading-buttons">
+                <button id="refresh-button" class="action-button" data-translate="REFRESH">Refresh</button>
+                <button id="quit-button" class="action-button" data-translate="EXIT">EXIT</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="hash-file-progress-modal" class="hash-progress-modal">
+        <div class="hash-progress-modal-content">
+            <h2 data-translate="GENERATING_HASH_FILE">Generating Hash File</h2>
+            <div class="hash-progress-bar-container">
+                <div id="hash-file-progress-bar" class="hash-progress-bar"></div>
+            </div>
+            <p id="hash-file-current-file"></p>
+            <p id="hash-file-progress-text"></p>
+        </div>
+    </div>
+    <script>
+        function closeIframe() {
+            document.getElementById('iframeContainer').classList.remove('show');
+            document.getElementById('iframeContainer').classList.add('hide');
+            setTimeout(function () {
+                document.getElementById('iframeContainer').style.display = 'none';
+                document.getElementById('embeddedSite').src = '';
+            }, 500);
+        }
+        function showIframe(thisurl) {
+            document.getElementById('embeddedSite').src = thisurl;
+            document.getElementById('iframeContainer').style.display = 'block';
+            document.getElementById('iframeContainer').classList.remove('hide');
+            document.getElementById('iframeContainer').classList.add('show');
+        }
+
+        async function fetchData(url) {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                console.log(data);
+                return data;
+            } catch (error) {
+                console.error('There was a problem with the News fetch operation:', error);
+            }
+        }
+    </script>
+    <div id="iframeContainer">
+        <iframe id="embeddedSite"></iframe>
+        <button id="exitButton" onclick="closeIframe()" data-translate="RETURN_BUTTON">RETURN</button>
+    </div>
+</body>
+</html >
