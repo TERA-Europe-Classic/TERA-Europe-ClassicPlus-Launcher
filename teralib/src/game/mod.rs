@@ -6,6 +6,8 @@ use crate::{
 use lazy_static::lazy_static;
 use log::{error, info, Level, Metadata, Record};
 use once_cell::sync::Lazy;
+use std::fs::{File, OpenOptions};
+use std::io::Write;
 use prost::Message;
 use reqwest;
 use serde_json::Value;
@@ -52,6 +54,9 @@ mod serverlist {
     ));
 }
 use serverlist::{server_list::ServerInfo, ServerList};
+
+static LOG_FILE: Lazy<Mutex<Option<File>>> = Lazy::new(|| Mutex::new(None));
+static LOGGING_ENABLED: AtomicBool = AtomicBool::new(false);
 
 // Global static variables
 lazy_static! {
@@ -152,7 +157,14 @@ impl log::Log for TeraLogger {
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
             let log_message = format!("{} - {}", record.level(), record.args());
-            let _ = self.sender.try_send(log_message);
+            let _ = self.sender.try_send(log_message.clone());
+            if LOGGING_ENABLED.load(Ordering::SeqCst) {
+                if let Ok(mut file_opt) = LOG_FILE.lock() {
+                    if let Some(ref mut file) = *file_opt {
+                        let _ = writeln!(file, "{}", log_message);
+                    }
+                }
+            }
         }
     }
 
@@ -169,6 +181,25 @@ impl log::Log for TeraLogger {
 pub fn setup_logging() -> (TeraLogger, other_mpsc::Receiver<String>) {
     let (sender, receiver) = other_mpsc::channel(100);
     (TeraLogger { sender }, receiver)
+}
+
+/// Enables or disables logging to a file named `log.txt` in the application directory.
+pub fn enable_file_logging(enabled: bool) -> Result<(), String> {
+    LOGGING_ENABLED.store(enabled, Ordering::SeqCst);
+    if enabled {
+        let mut path = std::env::current_exe().map_err(|e| e.to_string())?;
+        path.pop();
+        let file_path = path.join("log.txt");
+        let file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(file_path)
+            .map_err(|e| e.to_string())?;
+        *LOG_FILE.lock().map_err(|e| e.to_string())? = Some(file);
+    } else {
+        *LOG_FILE.lock().map_err(|e| e.to_string())? = None;
+    }
+    Ok(())
 }
 
 /// Runs the game with the provided credentials and language.

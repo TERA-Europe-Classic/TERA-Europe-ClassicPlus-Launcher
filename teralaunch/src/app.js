@@ -118,6 +118,8 @@ const App = {
             if (savedTheme === "light") {
                 document.body.classList.add("light-mode");
             }
+            const logsEnabled = localStorage.getItem("logsEnabled") === "true";
+            invoke("set_logging", { enabled: logsEnabled });
             this.setupEventListeners();
             this.setupWindowControls();
             this.setupCustomAnimations();
@@ -361,13 +363,16 @@ const App = {
     setupHeaderLinks() {
         const startBtn = document.getElementById("start-button");
         if (startBtn) {
-            startBtn.addEventListener("click", () => this.Router.navigate("home"));
+            startBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                this.openExternal(
+                    "https://crazy-esports.com/forum/index.php?board/19-tera-germany-de/"
+                );
+            });
         }
 
         const settingsBtn = document.getElementById("settings-button");
         const settingsDropdown = document.getElementById("settings-dropdown-wrapper");
-        const logModal = document.getElementById("log-modal");
-        const logClose = document.querySelector(".log-modal-close");
         if (settingsBtn && settingsDropdown) {
             let open = false;
             gsap.set(settingsDropdown, { display: "none", opacity: 0, y: -10 });
@@ -401,13 +406,12 @@ const App = {
                     this.openExternal(event.target.href);
                 }
             });
-            const logsLink = document.getElementById("logs-link");
-            if (logsLink && logModal && logClose) {
-                logsLink.addEventListener("click", (evt) => {
+            const toggleLogsLink = document.getElementById("toggle-logs");
+            if (toggleLogsLink) {
+                toggleLogsLink.addEventListener("click", (evt) => {
                     evt.preventDefault();
-                    logModal.style.display = "block";
+                    this.toggleLogs();
                 });
-                logClose.addEventListener("click", () => (logModal.style.display = "none"));
             }
         }
 
@@ -960,6 +964,13 @@ const App = {
             body.classList.add("light-mode");
             localStorage.setItem("theme", "light");
         }
+    },
+
+    toggleLogs() {
+        const enabled = localStorage.getItem("logsEnabled") === "true";
+        const newValue = !enabled;
+        localStorage.setItem("logsEnabled", newValue);
+        invoke("set_logging", { enabled: newValue });
     },
 
     /**
