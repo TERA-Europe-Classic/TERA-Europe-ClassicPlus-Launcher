@@ -243,6 +243,7 @@ table {
     font-size: 13px;
     color: #8c93a9;
     font-family: Raleway;
+    z-index: 1001;
 }
 
 .tera-logo-icon {
@@ -521,7 +522,7 @@ table {
 
 .home-container,
 .home-wrapper {
-    pointer-events: none;
+    pointer-events: auto;
 }
 
 .home-content,
