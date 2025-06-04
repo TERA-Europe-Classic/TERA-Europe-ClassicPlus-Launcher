@@ -89,6 +89,7 @@ table {
     right: 145px;
     color: #fff;
     opacity: 0.8;
+    z-index: 1002; /* ensure buttons remain clickable above header */
 }
 
 .top-button {

@@ -124,6 +124,7 @@ const App = {
             this.initializeLoadingModalElements();
             this.setupModalButtonEventHandlers();
             await this.updateLanguageSelector();
+            this.setupHeaderLinks();
             this.Router.setupEventListeners();
             await this.Router.navigate();
             this.sendStoredAuthInfoToBackend();
@@ -345,6 +346,30 @@ const App = {
         if (settingsBtn) {
             settingsBtn.click();
         }
+    },
+
+    // Opens an url in the user's default browser
+    openExternal(url) {
+        if (window.__TAURI__ && window.__TAURI__.shell && window.__TAURI__.shell.open) {
+            window.__TAURI__.shell.open(url);
+        } else {
+            window.open(url, "_blank");
+        }
+    },
+
+    // Set up handlers for the header buttons (Forum/Discord/Support)
+    setupHeaderLinks() {
+        const links = [
+            { id: "forum-button", url: "https://crazy-esports.com/forum/board/19-tera-germany-de/" },
+            { id: "discord-button", url: "https://discord.gg/DARHAaNBYS" },
+            { id: "support-button", url: "https://helpdesk.crazy-esports.com" },
+        ];
+        links.forEach((link) => {
+            const el = document.getElementById(link.id);
+            if (el) {
+                el.addEventListener("click", () => this.openExternal(link.url));
+            }
+        });
     },
 
     // Function to complete the first launch process
