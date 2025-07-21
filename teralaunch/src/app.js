@@ -307,13 +307,27 @@ const App = {
             <div class="first-launch-modal-content">
                 <h2>${this.t("WELCOME_TO_LAUNCHER")}</h2>
                 <p>${this.t("FIRST_LAUNCH_MESSAGE")}</p>
+                <label for="first-launch-language" style="display:block;margin-bottom:8px;">
+                    ${this.t("CHOOSE_DEFAULT_LANGUAGE")}
+                </label>
+                <select id="first-launch-language" style="margin-bottom:15px;padding:8px;border-radius:4px;"></select>
                 <button id="set-game-path-btn">${this.t("SET_GAME_PATH")}</button>
             </div>
         `;
         document.body.appendChild(modal);
+        const languageSelect = document.getElementById("first-launch-language");
+        for (const [code, name] of Object.entries(this.languages)) {
+            const option = document.createElement("option");
+            option.value = code;
+            option.textContent = name;
+            languageSelect.appendChild(option);
+        }
+        languageSelect.value = this.currentLanguage;
 
         const setGamePathBtn = document.getElementById("set-game-path-btn");
-        setGamePathBtn.addEventListener("click", () => {
+        setGamePathBtn.addEventListener("click", async () => {
+            const newLang = languageSelect.value;
+            await this.changeLanguage(newLang);
             this.closeFirstLaunchModal();
             this.openGamePathSettings();
         });
