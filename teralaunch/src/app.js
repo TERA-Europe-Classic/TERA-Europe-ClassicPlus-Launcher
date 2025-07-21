@@ -8,9 +8,9 @@ const UPDATE_CHECK_ENABLED = true;
 const LAUNCHER_DOWNLOAD_URL =
     "https://web.tera-germany.de/gameserver/Tera-Germany_Launcher.exe";
 
-const NewsPageUpdaterJsonUrl = "https://web.tera-germany.de/gameserver/Launcher_StartPage_News.json"
-const PatchNotesUrl = "https://web.tera-germany.de/gameserver/patchnotes.json"
-const ServerStatusUrl = "https://web.tera-germany.de/testserver/serverlist.json?lang=ger&sort=3"
+const NewsPageUpdaterJsonUrl = "https://web.tera-germany.de/classic/Launcher_StartPage_News.json"
+const PatchNotesUrl = "https://web.tera-germany.de/classic/patchnotes.json"
+const ServerStatusUrl = "https://web.tera-germany.de/classic/serverlist.json?lang=ger&sort=3"
 
 const App = {
     translations: {},

@@ -6,5 +6,5 @@
 	"GET_AUTH_KEY_URL": "http://168.119.14.38:81/launcher/GetAuthKeyAction",
 	"HASH_FILE_URL": "https://web.tera-germany.de/gameserver/hash-file.json",
 	"FILE_SERVER_URL": "http://torrent.tera-germany.de/TERA",
-	"SERVER_LIST_URL": "https://web.tera-germany.de/testserver/serverlist.json?lang=ger&sort=3"
+        "SERVER_LIST_URL": "https://web.tera-germany.de/classic/serverlist.json?lang=ger&sort=3"
 }
