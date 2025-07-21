@@ -1,10 +1,10 @@
 {
-	"COOKIE_DOMAIN": "http://168.119.14.38:81",
-	"LOGIN_ACTION_URL": "http://168.119.14.38:81/launcher/LoginAction",
-	"GET_ACCOUNT_INFO_URL": "http://168.119.14.38:81/launcher/GetAccountInfoAction",
-	"GET_CHARACTER_COUNT_URL": "http://168.119.14.38:81/launcher/GetCharacterCountAction",
-	"GET_AUTH_KEY_URL": "http://168.119.14.38:81/launcher/GetAuthKeyAction",
-	"HASH_FILE_URL": "https://web.tera-germany.de/gameserver/hash-file.json",
-	"FILE_SERVER_URL": "http://torrent.tera-germany.de/TERA",
+        "COOKIE_DOMAIN": "http://162.55.239.4:8090",
+        "LOGIN_ACTION_URL": "http://162.55.239.4:8090/launcher/LoginAction",
+        "GET_ACCOUNT_INFO_URL": "http://162.55.239.4:8090/launcher/GetAccountInfoAction",
+        "GET_CHARACTER_COUNT_URL": "http://162.55.239.4:8090/launcher/GetCharacterCountAction",
+        "GET_AUTH_KEY_URL": "http://162.55.239.4:8090/launcher/GetAuthKeyAction",
+        "HASH_FILE_URL": "https://web.tera-germany.de/classic/hash-file.json",
+        "FILE_SERVER_URL": "https://dl.tera-europe.net/TERAClassic/",
         "SERVER_LIST_URL": "https://web.tera-germany.de/classic/serverlist.json?lang=ger&sort=3"
 }
