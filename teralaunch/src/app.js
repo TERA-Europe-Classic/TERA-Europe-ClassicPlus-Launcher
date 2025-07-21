@@ -2416,7 +2416,10 @@ const App = {
      * @returns {Promise<void>}
      */
     async initializeHomePageComponents() {
-        await this.loadGamePath();
+        this.checkFirstLaunch();
+        if (!this.state.isFirstLaunch) {
+            await this.loadGamePath();
+        }
         this.initUserPanel();
         this.initModalSettings();
         await this.updateGameStatus();
