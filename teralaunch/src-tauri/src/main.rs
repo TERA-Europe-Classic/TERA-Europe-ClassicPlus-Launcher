@@ -4,7 +4,7 @@
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs::{self, File, remove_file};
-use std::io::{Read, Write};
+use std::io::{BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Once, RwLock};
 use std::sync::atomic::{AtomicU64, AtomicUsize, AtomicBool, Ordering};
@@ -179,12 +179,15 @@ async fn get_server_hash_file() -> Result<serde_json::Value, String> {
 
 
 fn calculate_file_hash<P: AsRef<Path>>(path: P) -> Result<String, String> {
-    let mut file = File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
+    let file = File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
+    let mut reader = BufReader::with_capacity(65_536, file);
     let mut hasher = Sha256::new();
-    let mut buffer = [0; 1024];
+    let mut buffer = [0u8; 65_536];
 
     loop {
-        let bytes_read = file.read(&mut buffer).map_err(|e| format!("Failed to read file: {}", e))?;
+        let bytes_read = reader
+            .read(&mut buffer)
+            .map_err(|e| format!("Failed to read file: {}", e))?;
         if bytes_read == 0 {
             break;
         }
