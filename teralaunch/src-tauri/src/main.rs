@@ -235,6 +235,11 @@ fn cancel_downloads() {
 }
 
 #[tauri::command]
+fn set_logging(enabled: bool) -> Result<(), String> {
+    teralib::enable_file_logging(enabled)
+}
+
+#[tauri::command]
 async fn update_launcher(download_url: String) -> Result<(), String> {
     let current_exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let exe_dir = current_exe.parent().ok_or("exe dir not found")?;
@@ -1268,6 +1273,7 @@ fn main() {
                 check_update_required,
                 download_all_files,
                 cancel_downloads,
+                set_logging,
                 update_launcher,
             ]
         )
