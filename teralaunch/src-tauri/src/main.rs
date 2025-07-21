@@ -903,6 +903,21 @@ async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, Str
 
     progress_bar.finish_with_message("File comparison completed");
 
+    // Ensure the UI receives a final 100% progress update
+    let final_progress = FileCheckProgress {
+        current_file: String::new(),
+        progress: 100.0,
+        current_count: files.len(),
+        total_files: files.len(),
+        elapsed_time: start_time.elapsed().as_secs_f64(),
+        files_to_update: files_to_update_count.load(Ordering::SeqCst),
+    };
+
+    let _ = window.emit("file_check_progress", final_progress).map_err(|e| {
+        error!("Error emitting final file_check_progress event: {}", e);
+        e.to_string()
+    });
+
     // Save the updated cache to disk
     let final_cache = cache.read().unwrap();
     if let Err(e) = save_cache_to_disk(&*final_cache) {
@@ -957,7 +972,7 @@ async fn handle_launch_game(
     let ticket = auth_info.auth_key.clone();
     let (game_path, game_lang) = load_config()?;
 
-    let full_game_path = game_path.join("Binaries").join("VTEQ.exe");
+    let full_game_path = game_path.join("Binaries").join("TERA.exe");
 
     if !full_game_path.exists() {
         *is_launching = false;
