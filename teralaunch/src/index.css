@@ -1563,6 +1563,14 @@ input[type="text"] {
         margin-bottom: 25px;
     }
 
+    .first-launch-modal-content select {
+        margin-bottom: 15px;
+        padding: 8px;
+        border-radius: 4px;
+        background-color: #fff;
+        color: #000;
+    }
+
     .first-launch-modal-content button {
         background-color: #3498db;
         color: #ffffff;
