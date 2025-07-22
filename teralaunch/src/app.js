@@ -1,6 +1,6 @@
 const { invoke } = window.__TAURI__.tauri;
 const { listen } = window.__TAURI__.event;
-const { appWindow } = window.__TAURI__.window;
+const { appWindow, WebviewWindow } = window.__TAURI__.window;
 const { message, ask } = window.__TAURI__.dialog;
 
 const REQUIRED_PRIVILEGE_LEVEL = 3;
@@ -413,6 +413,19 @@ const App = {
         } else {
             window.open(url, "_blank");
         }
+    },
+
+    // Open the registration website in a popup window
+    async openRegisterPopup() {
+        const size = await appWindow.innerSize();
+        const popup = new WebviewWindow('register', {
+            url: 'https://reg.tera-europe-classic.de/register.php',
+            width: Math.round(size.width / 2),
+            height: Math.round(size.height / 2),
+            title: 'Register',
+            resizable: false
+        });
+        popup.center();
     },
 
     // Set up handlers for the header buttons and links
@@ -2307,6 +2320,7 @@ const App = {
     initLogin() {
         console.log("Initializing login page");
         const loginButton = document.getElementById("login-button");
+        const registerButton = document.getElementById("register-button");
 
         if (loginButton) {
             loginButton.addEventListener("click", async () => {
@@ -2314,6 +2328,12 @@ const App = {
                 const username = document.getElementById("username").value;
                 const password = document.getElementById("password").value;
                 await this.login(username, password);
+            });
+        }
+
+        if (registerButton) {
+            registerButton.addEventListener('click', () => {
+                this.openRegisterPopup();
             });
         }
     },
