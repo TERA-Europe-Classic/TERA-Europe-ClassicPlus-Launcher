@@ -48,9 +48,12 @@ const WM_GAME_EXITED: u32 = WM_USER + 1;
 /// which likely contains protobuf-generated structures and functions for
 /// managing server list data.
 mod serverlist {
+    // Include the generated server list protobuf definitions. Using a
+    // forward slash makes the path platform agnostic so that builds on
+    // non-Windows hosts succeed as well.
     include!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "\\src\\_serverlist_proto.rs"
+        "/src/_serverlist_proto.rs"
     ));
 }
 use serverlist::{server_list::ServerInfo, ServerList};

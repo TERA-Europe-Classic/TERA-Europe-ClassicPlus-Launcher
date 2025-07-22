@@ -1217,8 +1217,12 @@ async fn register_new_account(login: String, email: String, password: String) ->
         .await
         .map_err(|e| e.to_string())?;
 
+    // `reqwest::Response::text` consumes the response, so capture the status
+    // first and evaluate it after reading the body.
+    let status_success = res.status().is_success();
     let text = res.text().await.map_err(|e| e.to_string())?;
-    if res.status().is_success() {
+
+    if status_success {
         Ok(text)
     } else {
         Err(text)
