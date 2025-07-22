@@ -14,6 +14,12 @@ const createRouter = (App) => ({
             file: 'login.html',
             public: true,
             init: 'initLogin'
+        },
+        register: {
+            title: 'Register',
+            file: 'register.html',
+            public: true,
+            init: 'initRegister'
         }
     },
 

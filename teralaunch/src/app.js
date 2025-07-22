@@ -179,6 +179,54 @@ const App = {
         }
     },
 
+    /**
+     * Registers a new user using the provided credentials.
+     * @param {string} username - Desired username
+     * @param {string} email - User email
+     * @param {string} password - Desired password
+     * @returns {Promise<void>}
+     */
+    async register(username, email, password) {
+        const registerButton = document.getElementById('register-submit-button');
+        const errorMsg = document.getElementById('register-error-msg');
+
+        if (registerButton) {
+            registerButton.disabled = true;
+        }
+        if (errorMsg) {
+            errorMsg.style.display = 'none';
+            errorMsg.style.opacity = 0;
+        }
+
+        try {
+            const response = await fetch('http://162.55.239.4:8090/accountApi/RegisterNewAccount', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ login: username, email, password })
+            });
+
+            if (!response.ok) {
+                const error = await response.text();
+                throw new Error(`Registration failed: ${error}`);
+            }
+
+            await response.json();
+            alert('Registration successful!');
+            this.Router.navigate('login');
+        } catch (err) {
+            console.error(err);
+            if (errorMsg) {
+                errorMsg.textContent = err.message;
+                errorMsg.style.display = 'flex';
+                errorMsg.style.opacity = 1;
+            }
+        } finally {
+            if (registerButton) {
+                registerButton.disabled = false;
+            }
+        }
+    },
+
     // function to check if it's the first launch
     checkFirstLaunch() {
         const isFirstLaunch = localStorage.getItem("isFirstLaunch") !== "false";
@@ -2272,6 +2320,29 @@ const App = {
                 const username = document.getElementById("username").value;
                 const password = document.getElementById("password").value;
                 await this.login(username, password);
+            });
+        }
+    },
+
+    /**
+     * Initializes the register page by wiring up button handlers.
+     */
+    initRegister() {
+        const submitBtn = document.getElementById('register-submit-button');
+        const backBtn = document.getElementById('register-back-button');
+
+        if (submitBtn) {
+            submitBtn.addEventListener('click', async () => {
+                const username = document.getElementById('reg-username').value;
+                const email = document.getElementById('reg-email').value;
+                const password = document.getElementById('reg-password').value;
+                await this.register(username, email, password);
+            });
+        }
+
+        if (backBtn) {
+            backBtn.addEventListener('click', () => {
+                this.Router.navigate('login');
             });
         }
     },

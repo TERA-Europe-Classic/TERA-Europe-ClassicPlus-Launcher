@@ -2,7 +2,9 @@
     "FRA": {
         "RECHECK_GAME_FILES": null,
         "LOGIN_TITLE": "Connexion",
+        "REGISTER_TITLE": "Inscription",
         "USERNAME_PLACEHOLDER": "Nom d'utilisateur",
+        "EMAIL_PLACEHOLDER": "Email",
         "PASSWORD_PLACEHOLDER": "Mot de passe",
         "LOGIN_BUTTON": "SE CONNECTER",
         "REGISTER_BUTTON": "S'INSCRIRE",
@@ -75,7 +77,9 @@
     },
     "EUR": {
         "LOGIN_TITLE": "Login",
+        "REGISTER_TITLE": "Register",
         "USERNAME_PLACEHOLDER": "Username",
+        "EMAIL_PLACEHOLDER": "Email",
         "PASSWORD_PLACEHOLDER": "Password",
         "LOGIN_BUTTON": "LOGIN",
         "REGISTER_BUTTON": "REGISTER",
@@ -148,7 +152,9 @@
     },
     "RUS": {
         "LOGIN_TITLE": "Вход",
+        "REGISTER_TITLE": "Регистрация",
         "USERNAME_PLACEHOLDER": "Имя пользователя",
+        "EMAIL_PLACEHOLDER": "Эл. почта",
         "PASSWORD_PLACEHOLDER": "Пароль",
         "LOGIN_BUTTON": "ВОЙТИ",
         "RETURN_BUTTON": "НАЗАД",
@@ -221,7 +227,9 @@
     },
     "GER": {
         "LOGIN_TITLE": "Anmelden",
+        "REGISTER_TITLE": "Registrieren",
         "USERNAME_PLACEHOLDER": "Benutzername",
+        "EMAIL_PLACEHOLDER": "E-Mail",
         "PASSWORD_PLACEHOLDER": "Passwort",
         "LOGIN_BUTTON": "ANMELDEN",
         "REGISTER_BUTTON": "REGISTRIEREN",
