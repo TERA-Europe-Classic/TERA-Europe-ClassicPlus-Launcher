@@ -5,8 +5,8 @@
         "withGlobalTauri": true
     },
     "package": {
-        "productName": "Tera-Germany_Launcher",
-        "version": "1.0.1"
+        "productName": "Tera-Europe_Launcher",
+        "version": "1.0.9"
     },
     "tauri": {
         "allowlist": {
@@ -18,7 +18,7 @@
         },
         "windows": [
             {
-                "title": "Tera-Germany Launcher",
+                "title": "Tera-Europe Launcher",
                 "width": 1282,
                 "height": 759,
                 "resizable": false,
@@ -42,7 +42,7 @@
                 "icons/tera_server.ico"
             ],
             "copyright": "Crazy-eSports",
-            "shortDescription": "Tera-Germany Launcher",
+            "shortDescription": "Tera-Europe Launcher",
             "resources": [
                 "./src/tera_config.ini",
                 "./src/TERA/readme.txt"
