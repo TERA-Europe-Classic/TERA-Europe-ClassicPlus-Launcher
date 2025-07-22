@@ -1192,6 +1192,40 @@ async fn login(username: String, password: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+async fn register_new_account(login: String, email: String, password: String) -> Result<String, String> {
+    if login.is_empty() || email.is_empty() || password.is_empty() {
+        return Err("All fields must be provided".to_string());
+    }
+
+    let client = reqwest::Client::builder()
+        .cookie_store(true)
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let register_url = get_config_value("REGISTER_ACTION_URL");
+
+    let mut payload = HashMap::new();
+    payload.insert("login", login);
+    payload.insert("email", email);
+    payload.insert("password", password);
+
+    let res = client
+        .post(&register_url)
+        .header(USER_AGENT, "Tera Game Launcher")
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let text = res.text().await.map_err(|e| e.to_string())?;
+    if res.status().is_success() {
+        Ok(text)
+    } else {
+        Err(text)
+    }
+}
+
+#[tauri::command]
 async fn handle_logout(state: tauri::State<'_, GameState>) -> Result<(), String> {
     let mut is_launching = state.is_launching.lock().await;
     *is_launching = false;
@@ -1287,6 +1321,7 @@ fn main() {
                 reset_launch_state,
                 clear_cache,
                 login,
+                register_new_account,
                 set_auth_info,
                 get_language_from_config,
                 save_language_to_config,
