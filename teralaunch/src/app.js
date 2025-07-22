@@ -997,6 +997,8 @@ const App = {
             isDownloadComplete: true,
             currentProgress: 100,
             currentUpdateMode: "complete",
+            // Reset update flag so the game can be launched after updates
+            isUpdateAvailable: false,
         });
         setTimeout(() => {
             this.setState({
