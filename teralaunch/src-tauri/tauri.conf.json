@@ -50,7 +50,6 @@
             "windows": {
                 "nsis": {
                     "license": "../license.txt",
-                    "installerSidebar": true,
                     "installMode": "perMachine"
                 }
             }
