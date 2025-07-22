@@ -419,7 +419,7 @@ const App = {
     async openRegisterPopup() {
         const size = await appWindow.innerSize();
         const popup = new WebviewWindow('register', {
-            url: 'https://reg.tera-europe-classic.de',
+            url: 'https://reg.tera-europe-classic.de/register.php',
             width: Math.round(size.width / 2),
             height: Math.round(size.height / 2),
             title: 'Register',
