@@ -838,7 +838,7 @@ span#current-file {
 
 .btn-launch-game {
     pointer-events: auto;
-    margin-bottom: -50px;
+    margin-bottom: 0;
     font-size: 16px;
     font-weight: 600;
     cursor: pointer;
@@ -940,10 +940,12 @@ span#current-file {
     align-items: flex-start;
     justify-content: flex-start;
     max-width: 100%;
-    transform: translateY(35px);
+    bottom: 10px;
+    left: 50%;
+    transform: translate(-50%, 0);
 }
 .move-up-15px {
-    transform: translateY(35px);
+    transform: translate(-50%, 0);
 }
 
 .client-version {
@@ -1001,10 +1003,13 @@ span#current-file {
     font-size: 15px;
     color: #8c93a9;
     font-family: Raleway;
-    position: absolute;
-    bottom: 20px;
+    position: fixed;
+    bottom: 0;
     left: 0;
-    padding-right: 20px;
+    right: 0;
+    padding: 0 20px 10px 0;
+    box-sizing: border-box;
+    z-index: 1000;
 }
 
 .home-container {
