@@ -15,12 +15,6 @@ const createRouter = (App) => ({
             public: true,
             init: 'initLogin'
         },
-        register: {
-            title: 'Register',
-            file: 'register.html',
-            public: true,
-            init: 'initRegister'
-        }
     },
 
     currentRoute: null,
