@@ -199,18 +199,12 @@ const App = {
         }
 
         try {
-            const response = await fetch('http://162.55.239.4:8090/accountApi/RegisterNewAccount', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ login: username, email, password })
+            const response = await invoke("register_new_account", {
+                login: username,
+                email,
+                password,
             });
-
-            if (!response.ok) {
-                const error = await response.text();
-                throw new Error(`Registration failed: ${error}`);
-            }
-
-            await response.json();
+            console.log("Registration response", response);
             alert('Registration successful!');
             this.Router.navigate('login');
         } catch (err) {
