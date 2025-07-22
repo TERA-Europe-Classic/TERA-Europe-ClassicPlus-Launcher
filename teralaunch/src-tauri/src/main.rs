@@ -1073,6 +1073,8 @@ fn set_auth_info(auth_key: String, user_name: String, user_no: i32, character_co
     auth_info.user_no = user_no;
     auth_info.character_count = character_count;
 
+    // AC: log auth info received from frontend
+
     info!("Auth info set from frontend:");
     info!("User Name: {}", auth_info.user_name);
     info!("User No: {}", auth_info.user_no);
@@ -1082,6 +1084,11 @@ fn set_auth_info(auth_key: String, user_name: String, user_no: i32, character_co
 
 #[tauri::command]
 async fn login(username: String, password: String) -> Result<String, String> {
+    // AC: early validation to avoid unnecessary network calls
+    if username.is_empty() || password.is_empty() {
+        return Err("Username and password cannot be empty".to_string());
+    }
+
     let client = reqwest::Client::builder()
         .cookie_store(true)
         .build()
@@ -1297,4 +1304,15 @@ fn main() {
         )
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_login_with_empty_username() {
+        let result = login("".to_string(), "pass".to_string()).await;
+        assert_eq!(result.unwrap_err(), "Username and password cannot be empty");
+    }
 }
