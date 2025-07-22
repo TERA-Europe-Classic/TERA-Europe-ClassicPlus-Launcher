@@ -778,14 +778,14 @@ span#current-file {
 }
 
 .progress-container {
-    margin-left: 20px;
+    margin-left: 0;
     align-self: stretch;
     justify-content: flex-start;
     gap: 5px;
 }
 
 .game-progress {
-    margin-bottom: -50px;
+    margin-bottom: 0;
     flex: 1;
     justify-content: flex-start;
     padding: 0 0 37px;
@@ -877,7 +877,8 @@ span#current-file {
     align-items: center;
     justify-content: center;
     padding: 12px 0;
-    width: 100%;
+    width: auto;
+    margin-left: 10px;
 }
 
     .launch-game-parent.disabled {
@@ -890,9 +891,9 @@ span#current-file {
     align-self: stretch;
     display: flex;
     flex-direction: row;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    justify-content: flex-start;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-end;
     gap: 11.3px;
     max-width: 100%;
 }
@@ -996,13 +997,14 @@ span#current-file {
 
 .game-status {
     width: 100%;
-    align-items: flex-start;
+    align-items: flex-end;
     font-size: 15px;
     color: #8c93a9;
     font-family: Raleway;
     position: absolute;
-    bottom: -185px;
+    bottom: 20px;
     left: 0;
+    padding-right: 20px;
 }
 
 .home-container {
