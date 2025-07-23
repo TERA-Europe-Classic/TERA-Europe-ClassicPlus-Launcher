@@ -415,17 +415,9 @@ const App = {
         }
     },
 
-    // Open the registration website in a popup window
+    // Open the registration website in the user's default browser
     async openRegisterPopup() {
-        const size = await appWindow.innerSize();
-        const popup = new WebviewWindow('register', {
-            url: 'https://reg.tera-europe-classic.de/register.php',
-            width: Math.round(size.width / 2),
-            height: Math.round(size.height / 2),
-            title: 'Register',
-            resizable: false
-        });
-        popup.center();
+        this.openExternal('https://reg.tera-europe-classic.de/register.php');
     },
 
     // Set up handlers for the header buttons and links
