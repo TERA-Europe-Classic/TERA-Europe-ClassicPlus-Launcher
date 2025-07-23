@@ -479,18 +479,14 @@ async fn generate_hash_file(window: tauri::Window) -> Result<String, String> {
 
 #[tauri::command]
 async fn select_game_folder() -> Result<String, String> {
-    let (tx, mut rx) = mpsc::channel(1);
+    use tauri::api::dialog::blocking::FileDialogBuilder;
 
-    FileDialogBuilder::new()
+    let folder = FileDialogBuilder::new()
         .set_title("Select Tera Game Folder")
         .set_directory("/")
-        .pick_folder(move |folder_path| {
-            if let Some(path) = folder_path {
-                let _ = tx.try_send(path);
-            }
-        });
+        .pick_folder();
 
-    match rx.recv().await {
+    match folder {
         Some(path) => Ok(path.to_string_lossy().into_owned()),
         None => Err("Folder selection cancelled or failed".into()),
     }
