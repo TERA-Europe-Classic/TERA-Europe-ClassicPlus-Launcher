@@ -297,25 +297,42 @@ fn get_files_server_url() -> String {
 }
 
 fn find_config_file() -> Option<PathBuf> {
-    let current_dir = env::current_dir().ok()?;
-    let config_in_current = current_dir.join("src/tera_config.ini");
-    if config_in_current.exists() {
-        return Some(config_in_current);
+    use dirs_next::config_dir;
+
+    let dir = config_dir()?.join("Crazy-eSports.com");
+    let file_path = dir.join("tera_config.ini");
+
+    if file_path.exists() {
+        return Some(file_path);
     }
 
-    let parent_dir = current_dir.parent()?;
-    let config_in_parent = parent_dir.join("src/tera_config.ini");
-    if config_in_parent.exists() {
-        return Some(config_in_parent);
+    let mut legacy_paths = Vec::new();
+    if let Ok(current_dir) = env::current_dir() {
+        legacy_paths.push(current_dir.join("src/tera_config.ini"));
+        if let Some(parent) = current_dir.parent() {
+            legacy_paths.push(parent.join("src/tera_config.ini"));
+        }
     }
-
     if let Ok(exe_path) = env::current_exe() {
         if let Some(exe_dir) = exe_path.parent() {
-            let config_in_exe_dir = exe_dir.join("src/tera_config.ini");
-            if config_in_exe_dir.exists() {
-                return Some(config_in_exe_dir);
-            }
+            legacy_paths.push(exe_dir.join("src/tera_config.ini"));
         }
+    }
+
+    let legacy_config = legacy_paths.into_iter().find(|p| p.exists());
+
+    if fs::create_dir_all(&dir).is_err() {
+        return None;
+    }
+
+    if let Some(old) = legacy_config {
+        if fs::copy(&old, &file_path).is_ok() {
+            return Some(file_path);
+        }
+    }
+
+    if fs::write(&file_path, include_str!("tera_config.ini")).is_ok() {
+        return Some(file_path);
     }
 
     None

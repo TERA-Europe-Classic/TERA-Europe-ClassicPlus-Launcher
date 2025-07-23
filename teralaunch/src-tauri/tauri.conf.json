@@ -44,7 +44,6 @@
             "copyright": "Crazy-eSports",
             "shortDescription": "Tera-Europe Launcher",
             "resources": [
-                "./src/tera_config.ini",
                 "./src/TERA/readme.txt"
             ],
             "windows": {
