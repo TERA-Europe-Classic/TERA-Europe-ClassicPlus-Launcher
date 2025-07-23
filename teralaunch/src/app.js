@@ -7,6 +7,25 @@ const REQUIRED_PRIVILEGE_LEVEL = 3;
 const UPDATE_CHECK_ENABLED = true;
 const LAUNCHER_DOWNLOAD_URL =
     "https://web.tera-germany.de/gameserver/Tera-Germany_Launcher.exe";
+// URL that provides metadata about the latest launcher release
+const VERSION_CHECK_URL =
+    "https://web.tera-germany.de/classic/version.json";
+// Local launcher release date used for update comparisons
+const CURRENT_RELEASE_DATE = "2024-06-07";
+
+// Simple semantic version comparison
+function compareVersions(v1, v2) {
+    const parts1 = v1.split(".").map((n) => parseInt(n, 10) || 0);
+    const parts2 = v2.split(".").map((n) => parseInt(n, 10) || 0);
+    const len = Math.max(parts1.length, parts2.length);
+    for (let i = 0; i < len; i++) {
+        const a = parts1[i] || 0;
+        const b = parts2[i] || 0;
+        if (a > b) return 1;
+        if (a < b) return -1;
+    }
+    return 0;
+}
 
 const NewsPageUpdaterJsonUrl = "https://web.tera-germany.de/classic/Launcher_StartPage_News.json"
 const PatchNotesUrl = "https://web.tera-germany.de/classic/patchnotes.json"
@@ -1775,17 +1794,26 @@ const App = {
 
     async checkLauncherUpdate() {
         try {
-            const response = await fetch(
-                "https://web.tera-germany.de/gameserver/version.json",
-            );
+            const response = await fetch(VERSION_CHECK_URL);
+            if (!response.ok) {
+                return; // Do nothing when the version URL is unreachable
+            }
             const data = await response.json();
+
             if (
                 window.__TAURI__ &&
                 window.__TAURI__.app &&
                 window.__TAURI__.app.getVersion
             ) {
                 const current = await window.__TAURI__.app.getVersion();
-                if (data.version && data.version !== current) {
+
+                const isNewerVersion =
+                    data.version && compareVersions(data.version, current) > 0;
+                const isNewerDate =
+                    data.release_date &&
+                    new Date(data.release_date) > new Date(CURRENT_RELEASE_DATE);
+
+                if (isNewerVersion && isNewerDate) {
                     let userConfirm = false;
                     if (typeof ask === "function") {
                         userConfirm = await ask(
