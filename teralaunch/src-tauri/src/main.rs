@@ -299,21 +299,11 @@ fn get_files_server_url() -> String {
 fn find_config_file() -> Option<PathBuf> {
     use dirs_next::config_dir;
 
-    let dir = config_dir()?.join("crazy-esports");
+    let dir = config_dir()?.join("Crazy-eSports.com");
     let file_path = dir.join("tera_config.ini");
 
     if file_path.exists() {
         return Some(file_path);
-    }
-
-    // Look for a config file from the previous launcher version
-    if let Some(old_base) = config_dir() {
-        let old_path = old_base.join("Crazy-eSports.com/tera_config.ini");
-        if old_path.exists() {
-            if fs::create_dir_all(&dir).is_ok() && fs::copy(&old_path, &file_path).is_ok() {
-                return Some(file_path);
-            }
-        }
     }
 
     let mut legacy_paths = Vec::new();
@@ -328,6 +318,22 @@ fn find_config_file() -> Option<PathBuf> {
             legacy_paths.push(exe_dir.join("src/tera_config.ini"));
         }
     }
+    let legacy_config = legacy_paths.into_iter().find(|p| p.exists());
+
+    if fs::create_dir_all(&dir).is_err() {
+        return None;
+    }
+
+    if let Some(old) = legacy_config {
+        if fs::copy(&old, &file_path).is_ok() {
+            return Some(file_path);
+        }
+    }
+
+    if fs::write(&file_path, include_str!("tera_config.ini")).is_ok() {
+        return Some(file_path);
+    }
+
     let legacy_config = legacy_paths.into_iter().find(|p| p.exists());
 
     if fs::create_dir_all(&dir).is_err() {
