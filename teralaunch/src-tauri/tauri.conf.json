@@ -47,9 +47,6 @@
                 "./src/TERA/readme.txt"
             ],
             "windows": {
-                "certificateThumbprint": "env:WINDOWS_CERT_THUMBPRINT",
-                "digestAlgorithm": "sha256",
-                "timestampUrl": "http://timestamp.digicert.com",
                 "nsis": {
                     "license": "../license.txt",
                     "installMode": "perMachine"
