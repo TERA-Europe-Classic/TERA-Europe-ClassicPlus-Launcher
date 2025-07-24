@@ -36,6 +36,7 @@ tracing = "0.1"
 dotenv = "0.15.0"
 cookie = "0.16"
 regex = "1.5.4"
+dirs-next = "2"
 
 
 

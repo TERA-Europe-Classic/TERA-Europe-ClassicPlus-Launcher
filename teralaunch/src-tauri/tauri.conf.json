@@ -35,7 +35,7 @@
         "bundle": {
             "active": true,
             "targets": "all",
-            "identifier": "Crazy-eSports.com",
+            "identifier": "crazy-esports",
             "publisher": "Crazy-eSports",
             "icon": [
                 "icons/tera_server.png",
@@ -44,10 +44,12 @@
             "copyright": "Crazy-eSports",
             "shortDescription": "Tera-Europe Launcher",
             "resources": [
-                "./src/tera_config.ini",
                 "./src/TERA/readme.txt"
             ],
             "windows": {
+                "certificateThumbprint": "env:WINDOWS_CERT_THUMBPRINT",
+                "digestAlgorithm": "sha256",
+                "timestampUrl": "http://timestamp.digicert.com",
                 "nsis": {
                     "license": "../license.txt",
                     "installMode": "perMachine"

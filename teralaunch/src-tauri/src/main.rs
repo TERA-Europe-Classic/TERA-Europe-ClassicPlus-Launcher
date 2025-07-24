@@ -297,25 +297,52 @@ fn get_files_server_url() -> String {
 }
 
 fn find_config_file() -> Option<PathBuf> {
-    let current_dir = env::current_dir().ok()?;
-    let config_in_current = current_dir.join("src/tera_config.ini");
-    if config_in_current.exists() {
-        return Some(config_in_current);
+    use dirs_next::config_dir;
+
+    let dir = config_dir()?.join("crazy-esports");
+    let file_path = dir.join("tera_config.ini");
+
+    if file_path.exists() {
+        return Some(file_path);
     }
 
-    let parent_dir = current_dir.parent()?;
-    let config_in_parent = parent_dir.join("src/tera_config.ini");
-    if config_in_parent.exists() {
-        return Some(config_in_parent);
-    }
-
-    if let Ok(exe_path) = env::current_exe() {
-        if let Some(exe_dir) = exe_path.parent() {
-            let config_in_exe_dir = exe_dir.join("src/tera_config.ini");
-            if config_in_exe_dir.exists() {
-                return Some(config_in_exe_dir);
+    // Look for a config file from the previous launcher version
+    if let Some(old_base) = config_dir() {
+        let old_path = old_base.join("Crazy-eSports.com/tera_config.ini");
+        if old_path.exists() {
+            if fs::create_dir_all(&dir).is_ok() && fs::copy(&old_path, &file_path).is_ok() {
+                return Some(file_path);
             }
         }
+    }
+
+    let mut legacy_paths = Vec::new();
+    if let Ok(current_dir) = env::current_dir() {
+        legacy_paths.push(current_dir.join("src/tera_config.ini"));
+        if let Some(parent) = current_dir.parent() {
+            legacy_paths.push(parent.join("src/tera_config.ini"));
+        }
+    }
+    if let Ok(exe_path) = env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            legacy_paths.push(exe_dir.join("src/tera_config.ini"));
+        }
+    }
+
+    let legacy_config = legacy_paths.into_iter().find(|p| p.exists());
+
+    if fs::create_dir_all(&dir).is_err() {
+        return None;
+    }
+
+    if let Some(old) = legacy_config {
+        if fs::copy(&old, &file_path).is_ok() {
+            return Some(file_path);
+        }
+    }
+
+    if fs::write(&file_path, include_str!("tera_config.ini")).is_ok() {
+        return Some(file_path);
     }
 
     None
@@ -522,7 +549,7 @@ fn get_game_path_from_config() -> Result<String, String> {
             .map(|s| s.to_string()),
         Err(e) => {
             if e.contains("Config file not found") {
-                Err("Launcher/tera_config.ini is missing".to_string())
+                Err("tera_config.ini is missing".to_string())
             } else {
                 Err(e)
             }
@@ -569,41 +596,23 @@ async fn update_file(
         corrected_url = format!("{}{}", &corrected_url[..pos], &corrected_url[(pos + 7)..]);
     }
 
-    let mut start_byte = 0u64;
-    let mut file = if file_path.exists() {
-        let meta = tokio::fs::metadata(&file_path).await.map_err(|e| e.to_string())?;
-        start_byte = meta.len();
-        tokio::fs::OpenOptions::new().append(true).open(&file_path).await.map_err(|e| e.to_string())?
-    } else {
-        tokio::fs::File::create(&file_path).await.map_err(|e| e.to_string())?
-    };
+    // When a file needs to be updated we always download it from scratch.
+    // Resuming downloads was causing issues if the server file changed because
+    // the launcher would append the new data to the old file.
+    if file_path.exists() {
+        tokio::fs::remove_file(&file_path).await.map_err(|e| e.to_string())?;
+    }
+    let mut file = tokio::fs::File::create(&file_path).await.map_err(|e| e.to_string())?;
 
     let mut req = client.get(&corrected_url);
-    if start_byte > 0 {
-        req = req.header(reqwest::header::RANGE, format!("bytes={}-", start_byte));
-    }
 
     let res = req.send().await.map_err(|e| e.to_string())?;
 
     let file_size = file_info.size;
-    let mut downloaded: u64 = start_byte;
+    let mut downloaded: u64 = 0;
     let mut stream = res.bytes_stream();
     let start_time = Instant::now();
     let mut last_update = Instant::now();
-
-    if start_byte > 0 {
-        let progress_payload = ProgressPayload {
-            file_name: file_info.path.clone(),
-            progress: (downloaded as f64 / file_size as f64) * 100.0,
-            speed: 0.0,
-            downloaded_bytes: downloaded_size + downloaded,
-            total_bytes: total_size,
-            total_files,
-            elapsed_time: 0.0,
-            current_file_index,
-        };
-        let _ = window.emit("download_progress", &progress_payload);
-    }
 
     info!("Downloading file: {}", file_info.path);
 
@@ -650,12 +659,12 @@ async fn update_file(
 
     file.flush().await.map_err(|e| e.to_string())?;
 
-    // Only calculate and check hash for the first file
-    if current_file_index == 0 {
-        let downloaded_hash = tokio::task::spawn_blocking(move || calculate_file_hash(&file_path)).await.map_err(|e| e.to_string())??;
-        if downloaded_hash != file_info.hash {
-            return Err(format!("Hash mismatch for file: {}", file_info.path));
-        }
+    // Verify the downloaded file matches the expected hash
+    let downloaded_hash = tokio::task::spawn_blocking(move || {
+        calculate_file_hash(&file_path)
+    }).await.map_err(|e| e.to_string())??;
+    if downloaded_hash != file_info.hash {
+        return Err(format!("Hash mismatch for file: {}", file_info.path));
     }
 
     // Emit a final event for this file
@@ -1110,16 +1119,27 @@ async fn login(username: String, password: String) -> Result<String, String> {
         .await
         .map_err(|e| e.to_string())?;
 
-    if !login_res.status().is_success() {
-        return Err("Login request failed".to_string());
+    let status = login_res.status();
+    let text = login_res.text().await.map_err(|e| e.to_string())?;
+
+    if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
+        return Err("INVALID_CREDENTIALS".to_string());
+    }
+
+    if !status.is_success() {
+        return Err(format!("Login request failed with status {}", status));
     }
 
     // Login-Daten extrahieren
-    let login_data: Value = login_res.json().await.map_err(|e| e.to_string())?;
+    let login_data: Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
     let this_status = login_data["Msg"]
         .as_str()
         .ok_or("Failed to retrieve status message")?
         .to_string();
+
+    if this_status.to_lowercase() != "success" {
+        return Err(this_status);
+    }
 
     // Zusätzliche Benutzerinformationen abrufen
     let account_info_res = client

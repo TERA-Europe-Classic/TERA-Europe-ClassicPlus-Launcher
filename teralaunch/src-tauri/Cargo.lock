@@ -5038,6 +5038,7 @@ version = "0.0.0"
 dependencies = [
  "cookie 0.16.2",
  "devtools",
+ "dirs-next",
  "dotenv",
  "env_logger 0.10.2",
  "flate2",
