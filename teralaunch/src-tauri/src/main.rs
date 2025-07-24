@@ -328,7 +328,6 @@ fn find_config_file() -> Option<PathBuf> {
             legacy_paths.push(exe_dir.join("src/tera_config.ini"));
         }
     }
-
     let legacy_config = legacy_paths.into_iter().find(|p| p.exists());
 
     if fs::create_dir_all(&dir).is_err() {
