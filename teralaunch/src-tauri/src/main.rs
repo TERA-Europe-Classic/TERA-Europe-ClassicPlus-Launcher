@@ -334,22 +334,6 @@ fn find_config_file() -> Option<PathBuf> {
         return Some(file_path);
     }
 
-    let legacy_config = legacy_paths.into_iter().find(|p| p.exists());
-
-    if fs::create_dir_all(&dir).is_err() {
-        return None;
-    }
-
-    if let Some(old) = legacy_config {
-        if fs::copy(&old, &file_path).is_ok() {
-            return Some(file_path);
-        }
-    }
-
-    if fs::write(&file_path, include_str!("tera_config.ini")).is_ok() {
-        return Some(file_path);
-    }
-
     None
 }
 
