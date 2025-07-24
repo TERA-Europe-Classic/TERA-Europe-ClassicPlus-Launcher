@@ -74,6 +74,11 @@ Write-Host "`nWechsle ins Projektverzeichnis: $projectPath" -ForegroundColor $su
 # -- Tauri Build starten
 Write-Host "`nBaue Projekt via: npm run tauri build" -ForegroundColor $warn
 npm run tauri build
+if ($env:WINDOWS_CERT_THUMBPRINT) {
+    Write-Host "[OK] Signiere Installer mit Zertifikat $env:WINDOWS_CERT_THUMBPRINT" -ForegroundColor $success
+} else {
+    Write-Host "[INFO] Kein Zertifikat angegeben - Installer bleibt unsigniert" -ForegroundColor $warn
+}
 
 # -- Installer finden
 $installerPath = Join-Path $projectPath "src-tauri\target\release\bundle\nsis"

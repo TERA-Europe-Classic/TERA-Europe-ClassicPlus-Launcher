@@ -1375,8 +1375,14 @@ const App = {
         } catch (error) {
             console.error("Error during login:", error);
             if (loginErrorMsg) {
-                loginErrorMsg.textContent =
-                    error.message || this.t("SERVER_CONNECTION_ERROR");
+                const message = error && (error.message || error);
+                if (message === "INVALID_CREDENTIALS") {
+                    loginErrorMsg.textContent = this.t("LOGIN_ERROR");
+                } else if (message && typeof message === "string") {
+                    loginErrorMsg.textContent = message;
+                } else {
+                    loginErrorMsg.textContent = this.t("SERVER_CONNECTION_ERROR");
+                }
                 loginErrorMsg.style.display = "flex";
                 loginErrorMsg.style.opacity = 1;
             }
