@@ -12,8 +12,8 @@ The launcher now stores `tera_config.ini` in your operating system's configurati
 directory. On first run the file is created automatically using the bundled
 defaults.
 
-If a `tera_config.ini` is found in the old launcher directory it will be moved
-to the new location so existing settings are preserved.
+If a legacy configuration exists in `%APPDATA%/Crazy-eSports.com` it will be
+copied to the new location so existing settings are preserved.
 
 - **Windows:** `%APPDATA%/crazy-esports/tera_config.ini`
 - **Linux:** `$XDG_CONFIG_HOME/crazy-esports/tera_config.ini` or
