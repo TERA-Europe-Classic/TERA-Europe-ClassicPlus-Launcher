@@ -883,94 +883,77 @@ fn parse_server_list_json(json: &Value) -> Result<ServerList, Box<dyn std::error
         player_last_server, player_last_server_id, character_counts
     );
 
-    let servers = json["servers"]
+    let servers = json["Servers"]
         .as_array()
-        .ok_or("No servers found in JSON")?;
+        .ok_or("No Servers found in JSON")?;
     for server in servers {
-        let server_id = server["id"]
+        let server_id = server["ServerId"]
             .as_u64()
-            .ok_or("Missing or invalid 'id' field")? as u32;
+            .ok_or("Missing or invalid 'ServerId' field")? as u32;
         let character_count = character_counts.get(&server_id).cloned().unwrap_or(0);
 
-        let json_available = server["available"].as_u64().unwrap_or(0);
+        let is_available = server["IsAvailable"].as_u64().unwrap_or(0) != 0
+            && server["IsEnabled"].as_u64().unwrap_or(0) != 0;
 
         info!(
-            "Processing server: id={}, name={}, json_available={}",
-            server_id, server["name"], json_available
+            "Processing server: id={}, name={}, is_available={}",
+            server_id,
+            server["NameString"],
+            is_available
         );
 
         let display_count = format!("({})", character_count);
         let name = format!(
             "{}{}",
-            server["name"]
+            server["NameString"]
                 .as_str()
-                .ok_or("Missing or invalid 'name' field")?,
+                .ok_or("Missing or invalid 'NameString' field")?,
             display_count
         );
         let title = format!(
             "{}{}",
-            server["title"]
-                .as_str()
-                .ok_or("Missing or invalid 'title' field")?,
+            server["DescrString"].as_str().unwrap_or(""),
             display_count
         );
 
         info!("Formatted server name: {}", name);
 
-        // Modify population field based on 'available' in JSON
-        let population = if json_available == 0 {
+        let population = if !is_available {
             "<b><font color=\"#FF0000\">Offline</font></b>".to_string()
         } else {
-            server["population"]
+            format!(
+                "{} / {}",
+                server["UsersOnline"].as_u64().unwrap_or(0),
+                server["UsersTotal"].as_u64().unwrap_or(0)
+            )
+        };
+
+        let address = ipv4_to_u32(
+            server["LoginIp"]
                 .as_str()
-                .ok_or("Missing or invalid 'population' field")?
-                .to_string()
-        };
-
-        // Handle address and host fields
-        let address_str = server["address"].as_str();
-        let host_str = server["host"].as_str();
-
-        let (address, host) = match (address_str, host_str) {
-            (Some(addr), Some(_)) => {
-                // If both are present, use address and ignore host
-                (ipv4_to_u32(addr), Vec::new())
-            }
-            (Some(addr), None) => (ipv4_to_u32(addr), Vec::new()),
-            (None, Some(h)) => (0, utf16_to_bytes(h)),
-            (None, None) => return Err("Either 'address' or 'host' must be set".into()),
-        };
+                .ok_or("Missing or invalid 'LoginIp' field")?,
+        );
 
         let server_info = ServerInfo {
             id: server_id,
             name: utf16_to_bytes(&name),
-            category: utf16_to_bytes(
-                server["category"]
-                    .as_str()
-                    .ok_or("Missing or invalid 'category' field")?,
-            ),
+            category: utf16_to_bytes(server["Language"].as_str().unwrap_or("")),
             title: utf16_to_bytes(&title),
-            queue: utf16_to_bytes(
-                server["queue"]
-                    .as_str()
-                    .ok_or("Missing or invalid 'queue' field")?,
-            ),
+            queue: utf16_to_bytes(""),
             population: utf16_to_bytes(&population),
             address,
-            port: server["port"]
+            port: server["LoginPort"]
                 .as_u64()
-                .ok_or("Missing or invalid 'port' field")? as u32,
-            available: 1,
-            unavailable_message: utf16_to_bytes(
-                server["unavailable_message"].as_str().unwrap_or(""),
-            ),
-            host,
+                .ok_or("Missing or invalid 'LoginPort' field")? as u32,
+            available: if is_available { 1 } else { 0 },
+            unavailable_message: utf16_to_bytes(""),
+            host: Vec::new(),
         };
         server_list.servers.push(server_info);
     }
 
     server_list.last_server_id = player_last_server_id;
-    server_list.sort_criterion = json["sort_criterion"].as_u64().unwrap_or(3) as u32;
+    server_list.sort_criterion = 3;
 
     Ok(server_list)
 }
