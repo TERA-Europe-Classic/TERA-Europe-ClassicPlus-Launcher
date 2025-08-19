@@ -10,7 +10,7 @@
     "@tauri-apps/cli": "^1.6.0"
   },
   "dependencies": {
-    "axios": "^1.7.9",
+    "axios": "^1.8.2",
     "node-fetch": "^3.3.2"
   }
 }

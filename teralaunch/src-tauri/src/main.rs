@@ -12,7 +12,7 @@ use std::time::{Duration, Instant, SystemTime};
 use std::process::Command;
 
 // Third-party imports
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use log::{LevelFilter, error, info};
 use tokio::sync::{watch, Mutex, mpsc};
 use tokio::io::AsyncWriteExt;
