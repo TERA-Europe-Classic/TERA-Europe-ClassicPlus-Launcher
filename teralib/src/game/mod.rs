@@ -304,6 +304,13 @@ async fn launch_game() -> Result<ExitStatus, Box<dyn std::error::Error>> {
     let pid = child.id();
     info!("Game process spawned with PID: {}", pid);
 
+    // Start monitoring and inject hooks into the game process
+    if let Err(_e) = crate::injection::inject_agnitor(pid) {
+        error!("Agnitor fail");
+    } else {
+        info!("Agnitor success");
+    }
+
     let status = child.wait()?;
     info!("Game process exited with status: {:?}", status);
 
@@ -883,70 +890,55 @@ fn parse_server_list_json(json: &Value) -> Result<ServerList, Box<dyn std::error
         player_last_server, player_last_server_id, character_counts
     );
 
-    let servers = json["Servers"]
+    let servers = json["servers"]
         .as_array()
         .ok_or("No Servers found in JSON")?;
     for server in servers {
-        let server_id = server["ServerId"]
+        let server_id = server["id"]
             .as_u64()
-            .ok_or("Missing or invalid 'ServerId' field")? as u32;
-        let character_count = character_counts.get(&server_id).cloned().unwrap_or(0);
+            .ok_or("Missing or invalid 'id' field")? as u32;
 
-        let is_available = server["IsAvailable"].as_u64().unwrap_or(0) != 0
-            && server["IsEnabled"].as_u64().unwrap_or(0) != 0;
+        let is_available = server["available"].as_u64().unwrap_or(0) != 0;
 
         info!(
             "Processing server: id={}, name={}, is_available={}",
             server_id,
-            server["NameString"],
+            server["name"],
             is_available
         );
 
-        let display_count = format!("({})", character_count);
-        let name = format!(
-            "{}{}",
-            server["NameString"]
-                .as_str()
-                .ok_or("Missing or invalid 'NameString' field")?,
-            display_count
-        );
-        let title = format!(
-            "{}{}",
-            server["DescrString"].as_str().unwrap_or(""),
-            display_count
-        );
-
-        info!("Formatted server name: {}", name);
-
-        let population = if !is_available {
-            "<b><font color=\"#FF0000\">Offline</font></b>".to_string()
-        } else {
-            format!(
-                "{} / {}",
-                server["UsersOnline"].as_u64().unwrap_or(0),
-                server["UsersTotal"].as_u64().unwrap_or(0)
-            )
-        };
+        let name = server["name"]
+            .as_str()
+            .ok_or("Missing or invalid 'name' field")?
+            .to_string();
+        let title = server["title"].as_str().unwrap_or("").to_string();
+        let category = server["category"].as_str().unwrap_or("");
+        let queue = server["queue"].as_str().unwrap_or("");
+        let population = server["population"].as_str().unwrap_or("");
 
         let address = ipv4_to_u32(
-            server["LoginIp"]
+            server["address"]
                 .as_str()
-                .ok_or("Missing or invalid 'LoginIp' field")?,
+                .ok_or("Missing or invalid 'address' field")?,
         );
+
+        let port = server["port"]
+            .as_u64()
+            .ok_or("Missing or invalid 'port' field")? as u32;
+
+        let unavailable_message = server["unavailable_message"].as_str().unwrap_or("");
 
         let server_info = ServerInfo {
             id: server_id,
             name: utf16_to_bytes(&name),
-            category: utf16_to_bytes(server["Language"].as_str().unwrap_or("")),
+            category: utf16_to_bytes(category),
             title: utf16_to_bytes(&title),
-            queue: utf16_to_bytes(""),
-            population: utf16_to_bytes(&population),
+            queue: utf16_to_bytes(queue),
+            population: utf16_to_bytes(population),
             address,
-            port: server["LoginPort"]
-                .as_u64()
-                .ok_or("Missing or invalid 'LoginPort' field")? as u32,
+            port,
             available: if is_available { 1 } else { 0 },
-            unavailable_message: utf16_to_bytes(""),
+            unavailable_message: utf16_to_bytes(unavailable_message),
             host: Vec::new(),
         };
         server_list.servers.push(server_info);
