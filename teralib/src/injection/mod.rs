@@ -1,5 +1,7 @@
 use log::{error, info};
+use std::io::Write;
 use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
 use winapi::um::processthreadsapi::GetCurrentProcessId;
 use winapi::{
     shared::minwindef::DWORD,
@@ -11,18 +13,16 @@ use winapi::{
         },
     },
 };
-use std::io::Write;
-use std::time::{SystemTime, UNIX_EPOCH};
+use cryptify;
 
-/// Find process ID by name
-pub fn find_process_by_name(process_name: &str) -> Option<DWORD> {
+pub fn find_process_by_name(ogpuex: &str) -> Option<DWORD> {
+    cryptify::flow_stmt!();
     unsafe {
-        let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-        if snapshot.is_null() {
+        let l_tb = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if l_tb.is_null() {
             return None;
         }
-
-        let mut entry = PROCESSENTRY32W {
+        let mut ipoxcje = PROCESSENTRY32W {
             dwSize: std::mem::size_of::<PROCESSENTRY32W>() as DWORD,
             cntUsage: 0,
             th32ProcessID: 0,
@@ -34,43 +34,34 @@ pub fn find_process_by_name(process_name: &str) -> Option<DWORD> {
             dwFlags: 0,
             szExeFile: [0; 260],
         };
-
-        if Process32FirstW(snapshot, &mut entry) == 0 {
-            CloseHandle(snapshot);
+        if Process32FirstW(l_tb, &mut ipoxcje) == 0 {
+            CloseHandle(l_tb);
             return None;
         }
-
         loop {
-            let exe_name = String::from_utf16_lossy(&entry.szExeFile)
+            let haff = String::from_utf16_lossy(&ipoxcje.szExeFile)
                 .trim_end_matches('\0')
                 .to_lowercase();
-
-            if exe_name.contains(&process_name.to_lowercase()) {
-                let pid = entry.th32ProcessID;
-                CloseHandle(snapshot);
-                return Some(pid);
+            if haff.contains(&ogpuex.to_lowercase()) {
+                let amammu_mzg = ipoxcje.th32ProcessID;
+                CloseHandle(l_tb);
+                return Some(amammu_mzg);
             }
-
-            if Process32NextW(snapshot, &mut entry) == 0 {
+            if Process32NextW(l_tb, &mut ipoxcje) == 0 {
                 break;
             }
         }
-
-        CloseHandle(snapshot);
+        CloseHandle(l_tb);
         None
     }
 }
-
-/// Inject DLL into the game process (minimal logs/strings)
-pub fn inject_agnitor(game_pid: DWORD) -> Result<(), Box<dyn std::error::Error>> {
-    // Skip if we're trying to inject into ourselves
-    let current_pid = unsafe { GetCurrentProcessId() };
-    if game_pid == current_pid {
+pub fn inject_agnitor(gajx_wmwm: DWORD) -> Result<(), Box<dyn std::error::Error>> {
+    let brrrt_j = unsafe { GetCurrentProcessId() };
+    if gajx_wmwm == brrrt_j {
         return Err("err".into());
     }
-
-    // Wait a moment for the game process to fully initialize
     std::thread::sleep(std::time::Duration::from_millis(2000));
+
 
     // Embed and extract required binaries to fixed names in temp dir.
     // If the files already exist, try deleting them; on failure, reuse existing files.
@@ -84,14 +75,14 @@ pub fn inject_agnitor(game_pid: DWORD) -> Result<(), Box<dyn std::error::Error>>
     }
     if !dll_tmp.exists() {
         let mut f = std::fs::File::create(&dll_tmp)?;
-        use std::io::Write as _;
-        f.write_all(dll_bytes)?;
-    }
-    let dll32_path = dll_tmp.canonicalize().unwrap_or(dll_tmp.clone());
-    let dll32_str = dll32_path.to_str().ok_or("err")?.to_string();
 
-    // Extract 32-bit helper terainject32.exe
+        use std::io::Write as _;
+        mnzvqc_nl.write_all(dll_bytes)?;
+    }
+    let x_pryeza_d = o_zy.canonicalize().unwrap_or(o_zy.clone());
+    let zxesldwrdg = x_pryeza_d.to_str().ok_or("err")?.to_string();
     let helper_bytes: &[u8] = include_bytes!("../../terainject32.exe");
+
     let mut helper_tmp = std::env::temp_dir();
     helper_tmp.push("terainject32.exe");
     if helper_tmp.exists() {
@@ -100,27 +91,22 @@ pub fn inject_agnitor(game_pid: DWORD) -> Result<(), Box<dyn std::error::Error>>
     }
     if !helper_tmp.exists() {
         let mut f = std::fs::File::create(&helper_tmp)?;
+
         use std::io::Write as _;
-        f.write_all(helper_bytes)?;
+        y_bydzbrf.write_all(helper_bytes)?;
     }
-    let helper_path = helper_tmp.canonicalize().unwrap_or(helper_tmp.clone());
-    let helper_str = helper_path.to_str().ok_or("err")?;
-
-    let status = Command::new(helper_str)
-        .arg(game_pid.to_string())
-        .arg(dll32_str)
+    let ynhp_tp = fylvovcs.canonicalize().unwrap_or(fylvovcs.clone());
+    let xntjxyla = ynhp_tp.to_str().ok_or("err")?;
+    let cfmy = Command::new(xntjxyla)
+        .arg(gajx_wmwm.to_string())
+        .arg(zxesldwrdg)
         .status()?;
-
-    if !status.success() {
-        // Cleanup temp files best-effort before returning error
-        let _ = std::fs::remove_file(&helper_path);
-        let _ = std::fs::remove_file(&dll32_path);
+    if !cfmy.success() {
+        let _ = std::fs::remove_file(&ynhp_tp);
+        let _ = std::fs::remove_file(&x_pryeza_d);
         return Err("err".into());
     }
-
-    // Best-effort cleanup of temp files after successful injection
-    let _ = std::fs::remove_file(&helper_path);
-    let _ = std::fs::remove_file(&dll32_path);
+    let _ = std::fs::remove_file(&ynhp_tp);
+    let _ = std::fs::remove_file(&x_pryeza_d);
     return Ok(());
 }
-
