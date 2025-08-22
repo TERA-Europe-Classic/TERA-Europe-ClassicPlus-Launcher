@@ -61,25 +61,37 @@ pub fn inject_agnitor(gajx_wmwm: DWORD) -> Result<(), Box<dyn std::error::Error>
         return Err("err".into());
     }
     std::thread::sleep(std::time::Duration::from_millis(2000));
+
+
+    // Embed and extract required binaries to fixed names in temp dir.
+    // If the files already exist, try deleting them; on failure, reuse existing files.
+    // Extract 32-bit agnitor.dll
     let dll_bytes: &[u8] = include_bytes!("../../agnitor.dll");
-    let mut o_zy = std::env::temp_dir();
-    let qlvqb = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis();
-    o_zy.push(format!("{} {} {}", lc!("agnitor_{}_{}.dll"), std::process::id(), qlvqb));
-    {
-        let mut mnzvqc_nl = std::fs::File::create(&o_zy)?;
+    let mut dll_tmp = std::env::temp_dir();
+    dll_tmp.push("agnitor.dll");
+    if dll_tmp.exists() {
+        if let Err(e) = std::fs::remove_file(&dll_tmp) {
+        }
+    }
+    if !dll_tmp.exists() {
+        let mut f = std::fs::File::create(&dll_tmp)?;
+
         use std::io::Write as _;
         mnzvqc_nl.write_all(dll_bytes)?;
     }
     let x_pryeza_d = o_zy.canonicalize().unwrap_or(o_zy.clone());
     let zxesldwrdg = x_pryeza_d.to_str().ok_or("err")?.to_string();
     let helper_bytes: &[u8] = include_bytes!("../../terainject32.exe");
-    let mut fylvovcs = std::env::temp_dir();
-    fylvovcs.push(format!("{} {} {}", lc!("terainject32_{}_{}.exe"), std::process::id(), qlvqb));
-    {
-        let mut y_bydzbrf = std::fs::File::create(&fylvovcs)?;
+
+    let mut helper_tmp = std::env::temp_dir();
+    helper_tmp.push("terainject32.exe");
+    if helper_tmp.exists() {
+        if let Err(e) = std::fs::remove_file(&helper_tmp) {
+        }
+    }
+    if !helper_tmp.exists() {
+        let mut f = std::fs::File::create(&helper_tmp)?;
+
         use std::io::Write as _;
         y_bydzbrf.write_all(helper_bytes)?;
     }
