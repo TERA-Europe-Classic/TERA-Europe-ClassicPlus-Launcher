@@ -1,3 +1,4 @@
+use log::{error, info};
 use std::process::Command;
 use winapi::um::processthreadsapi::GetCurrentProcessId;
 use winapi::{
@@ -10,6 +11,8 @@ use winapi::{
         },
     },
 };
+use std::io::Write;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Find process ID by name
 pub fn find_process_by_name(process_name: &str) -> Option<DWORD> {
@@ -69,12 +72,37 @@ pub fn inject_agnitor(game_pid: DWORD) -> Result<(), Box<dyn std::error::Error>>
     // Wait a moment for the game process to fully initialize
     std::thread::sleep(std::time::Duration::from_millis(2000));
 
-    // Resolve paths
-    let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-    let dll32_path = manifest_dir.join("agnitor.dll");
+    // Embed and extract required binaries to temporary files at runtime
+    // Extract 32-bit agnitor.dll
+    let dll_bytes: &[u8] = include_bytes!("../../agnitor.dll");
+    let mut dll_tmp = std::env::temp_dir();
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    dll_tmp.push(format!("agnitor_{}_{}.dll", std::process::id(), now_ms));
+    {
+        let mut f = std::fs::File::create(&dll_tmp)?;
+        use std::io::Write as _;
+        f.write_all(dll_bytes)?;
+    }
+    let dll32_path = dll_tmp.canonicalize().unwrap_or(dll_tmp.clone());
     let dll32_str = dll32_path.to_str().ok_or("err")?.to_string();
-    let helper_path = manifest_dir.join("terainject32.exe");
 
+    // Extract 32-bit helper terainject32.exe
+    let helper_bytes: &[u8] = include_bytes!("../../terainject32.exe");
+    let mut helper_tmp = std::env::temp_dir();
+    helper_tmp.push(format!(
+        "terainject32_{}_{}.exe",
+        std::process::id(),
+        now_ms
+    ));
+    {
+        let mut f = std::fs::File::create(&helper_tmp)?;
+        use std::io::Write as _;
+        f.write_all(helper_bytes)?;
+    }
+    let helper_path = helper_tmp.canonicalize().unwrap_or(helper_tmp.clone());
     let helper_str = helper_path.to_str().ok_or("err")?;
 
     let status = Command::new(helper_str)
@@ -83,10 +111,15 @@ pub fn inject_agnitor(game_pid: DWORD) -> Result<(), Box<dyn std::error::Error>>
         .status()?;
 
     if !status.success() {
+        // Cleanup temp files best-effort before returning error
+        let _ = std::fs::remove_file(&helper_path);
+        let _ = std::fs::remove_file(&dll32_path);
         return Err("err".into());
     }
 
-    // No cleanup needed when loading from manifest dir
+    // Best-effort cleanup of temp files after successful injection
+    let _ = std::fs::remove_file(&helper_path);
+    let _ = std::fs::remove_file(&dll32_path);
     return Ok(());
 }
 
