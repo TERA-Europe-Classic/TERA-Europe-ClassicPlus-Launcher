@@ -7,5 +7,5 @@
         "REGISTER_ACTION_URL": "https://auth.tera-europe.net/accountApi/RegisterNewAccount",
         "HASH_FILE_URL": "https://web.tera-germany.de/classic/hash-file.json",
         "FILE_SERVER_URL": "https://dl.tera-europe.net/TERAClassic/",
-        "SERVER_LIST_URL": "https://auth.tera-europe.net/serverApi/ListServers"
+        "SERVER_LIST_URL": "https://web.tera-germany.de/classic/serverlist.json"
 }

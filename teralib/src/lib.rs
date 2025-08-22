@@ -1,5 +1,6 @@
 
 pub mod game;
+pub mod injection;
 
 pub use game::{
     run_game,
@@ -11,4 +12,5 @@ pub use game::{
     TeraLogger,
 };
 pub mod global_credentials;
+pub use injection::{inject_agnitor};
 pub mod config;
