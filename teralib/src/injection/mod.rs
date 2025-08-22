@@ -72,16 +72,17 @@ pub fn inject_agnitor(game_pid: DWORD) -> Result<(), Box<dyn std::error::Error>>
     // Wait a moment for the game process to fully initialize
     std::thread::sleep(std::time::Duration::from_millis(2000));
 
-    // Embed and extract required binaries to temporary files at runtime
+    // Embed and extract required binaries to fixed names in temp dir.
+    // If the files already exist, try deleting them; on failure, reuse existing files.
     // Extract 32-bit agnitor.dll
     let dll_bytes: &[u8] = include_bytes!("../../agnitor.dll");
     let mut dll_tmp = std::env::temp_dir();
-    let now_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis();
-    dll_tmp.push(format!("agnitor_{}_{}.dll", std::process::id(), now_ms));
-    {
+    dll_tmp.push("agnitor.dll");
+    if dll_tmp.exists() {
+        if let Err(e) = std::fs::remove_file(&dll_tmp) {
+        }
+    }
+    if !dll_tmp.exists() {
         let mut f = std::fs::File::create(&dll_tmp)?;
         use std::io::Write as _;
         f.write_all(dll_bytes)?;
@@ -92,12 +93,12 @@ pub fn inject_agnitor(game_pid: DWORD) -> Result<(), Box<dyn std::error::Error>>
     // Extract 32-bit helper terainject32.exe
     let helper_bytes: &[u8] = include_bytes!("../../terainject32.exe");
     let mut helper_tmp = std::env::temp_dir();
-    helper_tmp.push(format!(
-        "terainject32_{}_{}.exe",
-        std::process::id(),
-        now_ms
-    ));
-    {
+    helper_tmp.push("terainject32.exe");
+    if helper_tmp.exists() {
+        if let Err(e) = std::fs::remove_file(&helper_tmp) {
+        }
+    }
+    if !helper_tmp.exists() {
         let mut f = std::fs::File::create(&helper_tmp)?;
         use std::io::Write as _;
         f.write_all(helper_bytes)?;
