@@ -1,6 +1,9 @@
 
 pub mod game;
 pub mod injection;
+#[macro_use]
+extern crate litcrypt;
+use_litcrypt!();
 
 pub use game::{
     run_game,
