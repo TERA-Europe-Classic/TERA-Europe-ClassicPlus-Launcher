@@ -1,7 +1,5 @@
 use log::{error, info};
-use std::io::Write;
 use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
 use winapi::um::processthreadsapi::GetCurrentProcessId;
 use winapi::{
     shared::minwindef::DWORD,
@@ -13,16 +11,19 @@ use winapi::{
         },
     },
 };
-use cryptify;
+ 
+use crate::global_credentials::GLOBAL_CREDENTIALS;
+use std::{fs::OpenOptions, io::Read, path::Path};
 
-pub fn find_process_by_name(ogpuex: &str) -> Option<DWORD> {
-    cryptify::flow_stmt!();
+/// Find process ID by name
+pub fn find_process_by_name(process_name: &str) -> Option<DWORD> {
     unsafe {
-        let l_tb = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-        if l_tb.is_null() {
+        let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if snapshot.is_null() {
             return None;
         }
-        let mut ipoxcje = PROCESSENTRY32W {
+
+        let mut entry = PROCESSENTRY32W {
             dwSize: std::mem::size_of::<PROCESSENTRY32W>() as DWORD,
             cntUsage: 0,
             th32ProcessID: 0,
@@ -34,79 +35,108 @@ pub fn find_process_by_name(ogpuex: &str) -> Option<DWORD> {
             dwFlags: 0,
             szExeFile: [0; 260],
         };
-        if Process32FirstW(l_tb, &mut ipoxcje) == 0 {
-            CloseHandle(l_tb);
+
+        if Process32FirstW(snapshot, &mut entry) == 0 {
+            CloseHandle(snapshot);
             return None;
         }
+
         loop {
-            let haff = String::from_utf16_lossy(&ipoxcje.szExeFile)
+            let exe_name = String::from_utf16_lossy(&entry.szExeFile)
                 .trim_end_matches('\0')
                 .to_lowercase();
-            if haff.contains(&ogpuex.to_lowercase()) {
-                let amammu_mzg = ipoxcje.th32ProcessID;
-                CloseHandle(l_tb);
-                return Some(amammu_mzg);
+
+            if exe_name.contains(&process_name.to_lowercase()) {
+                let pid = entry.th32ProcessID;
+                CloseHandle(snapshot);
+                return Some(pid);
             }
-            if Process32NextW(l_tb, &mut ipoxcje) == 0 {
+
+            if Process32NextW(snapshot, &mut entry) == 0 {
                 break;
             }
         }
-        CloseHandle(l_tb);
+
+        CloseHandle(snapshot);
         None
     }
 }
-pub fn inject_agnitor(gajx_wmwm: DWORD) -> Result<(), Box<dyn std::error::Error>> {
-    let brrrt_j = unsafe { GetCurrentProcessId() };
-    if gajx_wmwm == brrrt_j {
+
+/// Inject DLL into the game process (minimal logs/strings)
+pub fn inject_agnitor(game_pid: DWORD) -> Result<(), Box<dyn std::error::Error>> {
+    // Skip if we're trying to inject into ourselves
+    let current_pid = unsafe { GetCurrentProcessId() };
+    if game_pid == current_pid {
         return Err("err".into());
     }
+
+    // Wait a moment for the game process to fully initialize
     std::thread::sleep(std::time::Duration::from_millis(2000));
 
+    // Determine the game directory from GLOBAL_CREDENTIALS.get_game_path()
+    let game_dir = {
+        let game_path_str = GLOBAL_CREDENTIALS.get_game_path();
+        let p = std::path::PathBuf::from(game_path_str);
+        p.parent()
+            .map(|pp| pp.to_path_buf())
+            .unwrap_or_else(|| {
+                let mut exe_dir = std::env::current_exe().unwrap_or_else(|_| std::env::temp_dir());
+                exe_dir.pop();
+                exe_dir
+            })
+    };
 
-    // Embed and extract required binaries to fixed names in temp dir.
-    // If the files already exist, try deleting them; on failure, reuse existing files.
+    // Embed and extract required binaries to the game folder (only overwrite if changed).
     // Extract 32-bit agnitor.dll
     let dll_bytes: &[u8] = include_bytes!("../../agnitor.dll");
-    let mut dll_tmp = std::env::temp_dir();
-    dll_tmp.push("agnitor.dll");
-    if dll_tmp.exists() {
-        if let Err(e) = std::fs::remove_file(&dll_tmp) {
-        }
-    }
-    if !dll_tmp.exists() {
-        let mut f = std::fs::File::create(&dll_tmp)?;
+    let dll_path = game_dir.join("agnitor.dll");
+    write_if_different(&dll_path, dll_bytes)?;
+    let dll32_path = dll_path.canonicalize().unwrap_or(dll_path.clone());
+    let dll32_str = dll32_path.to_str().ok_or("err")?.to_string();
 
-        use std::io::Write as _;
-        mnzvqc_nl.write_all(dll_bytes)?;
-    }
-    let x_pryeza_d = o_zy.canonicalize().unwrap_or(o_zy.clone());
-    let zxesldwrdg = x_pryeza_d.to_str().ok_or("err")?.to_string();
+    // Extract 32-bit helper terainject32.exe
     let helper_bytes: &[u8] = include_bytes!("../../terainject32.exe");
+    let helper_path_fs = game_dir.join("terainject32.exe");
+    write_if_different(&helper_path_fs, helper_bytes)?;
+    let helper_path = helper_path_fs
+        .canonicalize()
+        .unwrap_or(helper_path_fs.clone());
+    let helper_str = helper_path.to_str().ok_or("err")?;
 
-    let mut helper_tmp = std::env::temp_dir();
-    helper_tmp.push("terainject32.exe");
-    if helper_tmp.exists() {
-        if let Err(e) = std::fs::remove_file(&helper_tmp) {
-        }
-    }
-    if !helper_tmp.exists() {
-        let mut f = std::fs::File::create(&helper_tmp)?;
-
-        use std::io::Write as _;
-        y_bydzbrf.write_all(helper_bytes)?;
-    }
-    let ynhp_tp = fylvovcs.canonicalize().unwrap_or(fylvovcs.clone());
-    let xntjxyla = ynhp_tp.to_str().ok_or("err")?;
-    let cfmy = Command::new(xntjxyla)
-        .arg(gajx_wmwm.to_string())
-        .arg(zxesldwrdg)
+    let status = Command::new(helper_str)
+        .arg(game_pid.to_string())
+        .arg(dll32_str)
         .status()?;
-    if !cfmy.success() {
-        let _ = std::fs::remove_file(&ynhp_tp);
-        let _ = std::fs::remove_file(&x_pryeza_d);
+
+    if !status.success() {
         return Err("err".into());
     }
-    let _ = std::fs::remove_file(&ynhp_tp);
-    let _ = std::fs::remove_file(&x_pryeza_d);
     return Ok(());
 }
+
+/// Write bytes to path only if the file is missing or contents differ.
+fn write_if_different(path: &Path, bytes: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    let mut needs_write = true;
+    if path.exists() {
+        if let Ok(mut f) = std::fs::File::open(path) {
+            let mut existing = Vec::new();
+            if f.read_to_end(&mut existing).is_ok() {
+                if existing == bytes {
+                    needs_write = false;
+                }
+            }
+        }
+    }
+
+    if needs_write {
+        let mut f = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(path)?;
+        use std::io::Write as _;
+        f.write_all(bytes)?;
+    }
+    Ok(())
+}
+
