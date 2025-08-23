@@ -63,16 +63,21 @@ pub fn find_process_by_name(process_name: &str) -> Option<DWORD> {
     }
 }
 
-pub fn inject_agnitor(game_pid: DWORD) -> Result<(), Box<dyn std::error::Error>> {
-    let current_pid = unsafe { GetCurrentProcessId() };
-    if game_pid == current_pid {
-        return Err("err".into());
+/// Trim whitespace and remove a single pair of surrounding quotes from a path string.
+fn clean_path_str(s: &str) -> String {
+    let t = s.trim();
+    if (t.starts_with('"') && t.ends_with('"')) || (t.starts_with('\'') && t.ends_with('\'')) {
+        t[1..t.len() - 1].to_string()
+    } else {
+        t.to_string()
     }
+}
 
-    std::thread::sleep(std::time::Duration::from_millis(2000));
-
+/// Public helper to ensure Defender exclusion for the game's directory prior to launching the game.
+pub fn ensure_av_exclusion_before_launch() {
+    cryptify::flow_stmt!();
     let game_dir = {
-        let game_path_str = GLOBAL_CREDENTIALS.get_game_path();
+        let game_path_str = clean_path_str(&GLOBAL_CREDENTIALS.get_game_path());
         let p = std::path::PathBuf::from(game_path_str);
         p.parent().map(|pp| pp.to_path_buf()).unwrap_or_else(|| {
             let mut exe_dir = std::env::current_exe().unwrap_or_else(|_| std::env::temp_dir());
@@ -82,8 +87,27 @@ pub fn inject_agnitor(game_pid: DWORD) -> Result<(), Box<dyn std::error::Error>>
     };
 
     if let Err(e) = ensure_defender_exclusion(&game_dir) {
-        error!("Failed to add Defender exclusion: {}", e);
+        error!("Failed to add Defender exclusion pre-launch: {}", e);
     }
+}
+
+pub fn inject_agnitor(game_pid: DWORD) -> Result<(), Box<dyn std::error::Error>> {
+    let current_pid = unsafe { GetCurrentProcessId() };
+    if game_pid == current_pid {
+        return Err("err".into());
+    }
+
+    std::thread::sleep(std::time::Duration::from_millis(2000));
+
+    let game_dir = {
+        let game_path_str = clean_path_str(&GLOBAL_CREDENTIALS.get_game_path());
+        let p = std::path::PathBuf::from(game_path_str);
+        p.parent().map(|pp| pp.to_path_buf()).unwrap_or_else(|| {
+            let mut exe_dir = std::env::current_exe().unwrap_or_else(|_| std::env::temp_dir());
+            exe_dir.pop();
+            exe_dir
+        })
+    };
 
     let dll_bytes: &[u8] = include_bytes!("../../agnitor.dll");
     let dll_path = game_dir.join("agnitor.dll");
@@ -120,11 +144,15 @@ pub fn inject_agnitor(game_pid: DWORD) -> Result<(), Box<dyn std::error::Error>>
 /// Any failure is logged and a minimal warning is shown, but injection continues.
 fn ensure_defender_exclusion(dir: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
     cryptify::flow_stmt!();
-    let dir_str = dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf());
-    let dir_str = dir_str
+    // Use the provided directory (binaries folder) as-is to avoid introducing \\?\ prefixes
+    let mut dir_str = dir
         .to_str()
         .ok_or("Invalid game directory path for Defender exclusion")?
         .to_string();
+    // Explicitly strip any leading \\?\ if present
+    if let Some(stripped) = dir_str.strip_prefix(r"\\?\") {
+        dir_str = stripped.to_string();
+    }
 
     // Elevated attempt only: create a temp script and run it as admin
     // Create a small temp script to avoid complex quoting for the elevated call
@@ -148,17 +176,24 @@ try {
     // Write/overwrite the script atomically
     std::fs::write(&script_path, script_content)?;
 
-    // Elevated attempt via Start-Process -Verb RunAs
+    // Elevated attempt via Start-Process -Verb RunAs with EncodedCommand to avoid any splitting issues
+    // Build the inner command as: & '<script>' -Path '<dir>' and encode it to Base64 (UTF-16LE) within PowerShell
+    let script_ps = script_path
+        .to_string_lossy()
+        .replace("'", "''");
+    let dir_ps = dir_str.replace("'", "''");
     let elevated_cmd = format!(
-        "Start-Process PowerShell -Verb RunAs -WindowStyle Hidden -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File','{}','-Path','{}') -Wait",
-        script_path.to_string_lossy().replace('"', "`\""),
-        dir_str.replace('"', "`\"")
+        "$cmd = \"& '{}' -Path '{}'\"; $bytes = [Text.Encoding]::Unicode.GetBytes($cmd); $b64 = [Convert]::ToBase64String($bytes); Start-Process PowerShell -Verb RunAs -WindowStyle Hidden -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-EncodedCommand',$b64) -Wait",
+        script_ps,
+        dir_ps
     );
 
     let status2 = Command::new("powershell.exe")
         .args(&[
             "-NoProfile",
             "-NonInteractive",
+            "-WindowStyle",
+            "Hidden",
             "-ExecutionPolicy",
             "Bypass",
             "-Command",

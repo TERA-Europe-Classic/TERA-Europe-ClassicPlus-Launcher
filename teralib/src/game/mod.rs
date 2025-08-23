@@ -294,6 +294,9 @@ async fn launch_game() -> Result<ExitStatus, Box<dyn std::error::Error>> {
 
     tcs.notified().await;
 
+    // Ensure AV exclusion pre-launch to avoid timing issues during injection
+    crate::injection::ensure_av_exclusion_before_launch();
+
     let mut child = Command::new(GLOBAL_CREDENTIALS.get_game_path())
         .arg(format!(
             "-LANGUAGEEXT={}",
