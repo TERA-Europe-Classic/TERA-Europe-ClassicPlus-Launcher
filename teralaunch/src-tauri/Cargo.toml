@@ -38,6 +38,9 @@ cookie = "0.16"
 regex = "1.11.1"
 dirs-next = "2"
 
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["shellapi", "winuser"] }
+
 
 
 [features]

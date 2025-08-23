@@ -3,6 +3,9 @@ use log::{error, info};
 use std::process::Command;
 use std::{fs::OpenOptions, io::Read, path::Path};
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
 use winapi::um::processthreadsapi::GetCurrentProcessId;
 use winapi::um::winuser::{MessageBoxW, MB_ICONWARNING, MB_OK, EnumWindows, GetWindowThreadProcessId};
 use winapi::{
@@ -161,10 +164,11 @@ pub fn inject_agnitor(game_pid: DWORD) -> Result<(), Box<dyn std::error::Error>>
         .unwrap_or(helper_path_fs.clone());
     let helper_str = helper_path.to_str().ok_or("err")?;
 
-    // Single helper injection attempt after readiness wait
+    // Single helper injection attempt after readiness wait - hide console window
     let status = Command::new(helper_str)
         .arg(game_pid.to_string())
         .arg(&dll32_str)
+        .creation_flags(0x08000000) // CREATE_NO_WINDOW
         .status()?;
 
     if !status.success() {
@@ -238,6 +242,7 @@ try {
             "-Command",
             &elevated_cmd,
         ])
+        .creation_flags(0x08000000) 
         .status();
 
     // Best-effort cleanup of the temporary script

@@ -1268,6 +1268,48 @@ fn main() {
 
     dotenv().ok();
 
+    // Windows: relaunch elevated via UAC using ShellExecute with "runas" verb.
+    // This shows proper UAC dialog and admin shield icon without command prompt flash.
+    #[cfg(target_os = "windows")]
+    {
+        use std::ffi::CString;
+        use winapi::um::shellapi::ShellExecuteA;
+        use winapi::um::winuser::SW_SHOWNORMAL;
+        use std::ptr;
+
+        // If the special flag is not present, relaunch self elevated and append it.
+        let is_guard_present = std::env::args().any(|a| a == "--elevated");
+        if !is_guard_present {
+            if let Ok(current_exe) = std::env::current_exe() {
+                // Preserve original args and append our guard flag
+                let mut args: Vec<String> = std::env::args().skip(1).collect();
+                args.push("--elevated".to_string());
+                let args_str = args.join(" ");
+
+                // Convert to CString for Windows API
+                let exe_path = CString::new(current_exe.to_string_lossy().as_ref()).unwrap();
+                let parameters = CString::new(args_str).unwrap();
+                let verb = CString::new("runas").unwrap();
+
+                unsafe {
+                    let result = ShellExecuteA(
+                        ptr::null_mut(),
+                        verb.as_ptr(),
+                        exe_path.as_ptr(),
+                        parameters.as_ptr(),
+                        ptr::null(),
+                        SW_SHOWNORMAL,
+                    );
+                    
+                    // ShellExecute returns > 32 on success
+                    if result as i32 > 32 {
+                        std::process::exit(0);
+                    }
+                }
+            }
+        }
+    }
+
     let (tera_logger, mut tera_log_receiver) = teralib::setup_logging();
 
     // Configure only the teralib logger
