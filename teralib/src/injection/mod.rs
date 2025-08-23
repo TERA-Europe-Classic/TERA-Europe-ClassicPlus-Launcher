@@ -4,7 +4,7 @@ use std::process::Command;
 use std::{fs::OpenOptions, io::Read, path::Path};
 
 use winapi::um::processthreadsapi::GetCurrentProcessId;
-use winapi::um::winuser::{MessageBoxW, MB_ICONWARNING, MB_OK};
+use winapi::um::winuser::{MessageBoxW, MB_ICONWARNING, MB_OK, EnumWindows, GetWindowThreadProcessId};
 use winapi::{
     shared::minwindef::DWORD,
     um::{
@@ -73,6 +73,38 @@ fn clean_path_str(s: &str) -> String {
     }
 }
 
+/// Poll until a top-level window for the given process appears, or timeout.
+fn wait_for_process_window(target_pid: DWORD, timeout_ms: u64) -> bool {
+    cryptify::flow_stmt!();
+    use std::time::{Duration, Instant};
+
+    #[repr(C)]
+    struct FindWindowData {
+        pid: DWORD,
+        found: i32,
+    }
+
+    unsafe extern "system" fn enum_cb(hwnd: winapi::shared::windef::HWND, lparam: winapi::shared::minwindef::LPARAM) -> i32 {
+        let mut pid: DWORD = 0;
+        GetWindowThreadProcessId(hwnd, &mut pid);
+        let data = &mut *(lparam as *mut FindWindowData);
+        if pid == data.pid {
+            data.found = 1;
+            return 0; // stop enumeration
+        }
+        1 // continue
+    }
+
+    let start = Instant::now();
+    while start.elapsed() < Duration::from_millis(timeout_ms) {
+        let mut data = FindWindowData { pid: target_pid, found: 0 };
+        unsafe { EnumWindows(Some(enum_cb), &mut data as *mut _ as isize); }
+        if data.found != 0 { return true; }
+        std::thread::sleep(Duration::from_millis(250));
+    }
+    false
+}
+
 /// Public helper to ensure Defender exclusion for the game's directory prior to launching the game.
 pub fn ensure_av_exclusion_before_launch() {
     cryptify::flow_stmt!();
@@ -97,7 +129,11 @@ pub fn inject_agnitor(game_pid: DWORD) -> Result<(), Box<dyn std::error::Error>>
         return Err("err".into());
     }
 
-    std::thread::sleep(std::time::Duration::from_millis(2000));
+    // Wait for the game process to create a window (readiness) to improve first-launch reliability
+    let ready = wait_for_process_window(game_pid, 60_000);
+    if !ready {
+        std::thread::sleep(std::time::Duration::from_millis(10_000));
+    }
 
     let game_dir = {
         let game_path_str = clean_path_str(&GLOBAL_CREDENTIALS.get_game_path());
@@ -125,13 +161,16 @@ pub fn inject_agnitor(game_pid: DWORD) -> Result<(), Box<dyn std::error::Error>>
         .unwrap_or(helper_path_fs.clone());
     let helper_str = helper_path.to_str().ok_or("err")?;
 
+    // Single helper injection attempt after readiness wait
     let status = Command::new(helper_str)
         .arg(game_pid.to_string())
-        .arg(dll32_str)
+        .arg(&dll32_str)
         .status()?;
 
     if !status.success() {
-        return Err("err".into());
+        let code = status.code().unwrap_or(-1);
+        error!("Helper injection failed with exit code: {}", code);
+        return Err(format!("helper failed: {}", code).into());
     }
 
     return Ok(());

@@ -297,7 +297,27 @@ async fn launch_game() -> Result<ExitStatus, Box<dyn std::error::Error>> {
     // Ensure AV exclusion pre-launch to avoid timing issues during injection
     crate::injection::ensure_av_exclusion_before_launch();
 
-    let mut child = Command::new(GLOBAL_CREDENTIALS.get_game_path())
+    // Sanitize executable path and set working directory to binaries folder
+    let exe_path_str = GLOBAL_CREDENTIALS.get_game_path();
+    let exe_clean = {
+        let t = exe_path_str.trim();
+        if (t.starts_with('"') && t.ends_with('"')) || (t.starts_with('\'') && t.ends_with('\'')) {
+            &t[1..t.len() - 1]
+        } else {
+            t
+        }
+    };
+    let exe_clean = exe_clean.to_string();
+    let work_dir = {
+        let p = std::path::PathBuf::from(&exe_clean);
+        p.parent().map(|pp| pp.to_path_buf()).unwrap_or_else(|| {
+            let mut d = std::env::current_exe().unwrap_or_else(|_| std::env::temp_dir());
+            d.pop();
+            d
+        })
+    };
+    let mut child = Command::new(exe_clean)
+        .current_dir(&work_dir)
         .arg(format!(
             "-LANGUAGEEXT={}",
             GLOBAL_CREDENTIALS.get_game_lang()
