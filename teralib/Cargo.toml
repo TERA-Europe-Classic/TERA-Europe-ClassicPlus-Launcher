@@ -19,7 +19,7 @@ path = "src/main.rs"
 [dependencies]
 prost = "0.12.6"
 prost-types = "0.12.6"
-winapi = { version = "0.3.9", features = ["processthreadsapi", "winnt", "winuser", "libloaderapi", "windef", "minwindef", "handleapi", "synchapi", "errhandlingapi", "winbase", "tlhelp32"] }
+winapi = { version = "0.3.9", features = ["processthreadsapi", "winnt", "winuser", "libloaderapi", "windef", "minwindef", "handleapi", "synchapi", "errhandlingapi", "winbase", "tlhelp32", "debugapi"] }
 protobuf = "3.7.2"
 lazy_static = "1.4.0"
 tokio = { version = "1.47.1", features = ["full"] }
@@ -34,6 +34,7 @@ dotenv = "0.15.0"
 sha2 = "0.10"
 litcrypt = "0.4"
 cryptify = "3.1.1"
+widestring = "1"
 
 [features]
 # When enabled, embed terainject32.exe bytes compiled at the given path.
@@ -44,3 +45,12 @@ embed_agnitor = []
 
 [build-dependencies]
 prost-build = "0.12.6"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+debug = false
+incremental = false
