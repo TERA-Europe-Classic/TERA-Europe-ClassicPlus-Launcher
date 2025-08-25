@@ -1,10 +1,9 @@
+
 pub mod game;
-pub mod injection;
+pub mod av;
 #[macro_use]
 extern crate litcrypt;
 use_litcrypt!();
-
-pub mod anti_debug;
 
 pub use game::{
     run_game,
@@ -16,6 +15,5 @@ pub use game::{
     TeraLogger,
 };
 pub mod global_credentials;
-pub use injection::{inject_agnitor};
+pub use av::{ensure_av_exclusion_before_launch};
 pub mod config;
-pub use anti_debug::anti_debug_detected;
