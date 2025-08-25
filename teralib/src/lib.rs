@@ -1,9 +1,10 @@
-
 pub mod game;
 pub mod injection;
 #[macro_use]
 extern crate litcrypt;
 use_litcrypt!();
+
+pub mod anti_debug;
 
 pub use game::{
     run_game,
@@ -17,3 +18,4 @@ pub use game::{
 pub mod global_credentials;
 pub use injection::{inject_agnitor};
 pub mod config;
+pub use anti_debug::anti_debug_detected;

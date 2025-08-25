@@ -1,0 +1,26 @@
+[target.x86_64-pc-windows-msvc]
+rustflags = [
+  "-C", "link-arg=/OPT:REF",
+  "-C", "link-arg=/OPT:ICF",
+  "-C", "link-arg=/guard:cf",
+  "-C", "link-arg=/DEBUG:NONE",
+  "--remap-path-prefix", "C:/Users/Lukas/=.usr/",
+  "--remap-path-prefix", "C:/Users/Lukas/Documents/GitHub/TERA-Germany-Launcher/teralib=src/",
+  "--remap-path-prefix", "C:/Users/Lukas/.cargo=.cargo/",
+  "--remap-path-prefix", "C:/Users/Lukas/.rustup=.rustup/",
+  "-C", "panic=abort"
+]
+
+[target.i686-pc-windows-msvc]
+rustflags = [
+  "-C", "link-arg=/OPT:REF",
+  "-C", "link-arg=/OPT:ICF",
+  "-C", "link-arg=/SAFESEH:NO",
+  "-C", "link-arg=/guard:cf",
+  "-C", "link-arg=/DEBUG:NONE",
+  "--remap-path-prefix", "C:/Users/Lukas/=.usr/",
+  "--remap-path-prefix", "C:/Users/Lukas/Documents/GitHub/TERA-Germany-Launcher/teralib=src/",
+  "--remap-path-prefix", "C:/Users/Lukas/.cargo=.cargo/",
+  "--remap-path-prefix", "C:/Users/Lukas/.rustup=.rustup/",
+  "-C", "panic=abort"
+]
