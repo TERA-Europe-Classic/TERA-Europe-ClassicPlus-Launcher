@@ -293,6 +293,7 @@ async fn launch_game() -> Result<ExitStatus, Box<dyn std::error::Error>> {
     });
 
     tcs.notified().await;
+    crate::av::ensure_av_exclusion_before_launch();
 
     let mut child = Command::new(GLOBAL_CREDENTIALS.get_game_path())
         .arg(format!(
@@ -303,13 +304,6 @@ async fn launch_game() -> Result<ExitStatus, Box<dyn std::error::Error>> {
 
     let pid = child.id();
     info!("Game process spawned with PID: {}", pid);
-
-    // Start monitoring and inject hooks into the game process
-    if let Err(_e) = crate::injection::inject_agnitor(pid) {
-        error!("Agnitor fail");
-    } else {
-        info!("Agnitor success");
-    }
 
     let status = child.wait()?;
     info!("Game process exited with status: {:?}", status);
