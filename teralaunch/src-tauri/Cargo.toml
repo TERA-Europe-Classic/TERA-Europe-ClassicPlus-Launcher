@@ -37,6 +37,8 @@ dotenvy = "0.15"
 cookie = "0.16"
 regex = "1.11.1"
 dirs-next = "2"
+chrono = { version = "0.4", features = ["clock"] }
+faster-hex = "0.9"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["shellapi", "winuser"] }

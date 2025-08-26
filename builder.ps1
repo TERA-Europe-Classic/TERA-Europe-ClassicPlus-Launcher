@@ -1,7 +1,7 @@
 # ===============================
 # * TERA Germany Launcher Builder (All-in-One)
 # ===============================
-$projectPath = "C:\TERALauncher\Crimson\TERA-Launcher\teralaunch"
+$projectPath = Join-Path $PSScriptRoot "teralaunch"
 $nsisPath = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
 $licenseFile = Join-Path $projectPath "license.txt"
 $npmCheck = Get-Command npm -ErrorAction SilentlyContinue

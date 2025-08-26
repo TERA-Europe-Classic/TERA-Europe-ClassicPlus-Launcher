@@ -6,7 +6,8 @@ use std::env;
 use std::fs::{self, File, remove_file};
 use std::io::{BufReader, Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Once, RwLock};
+use std::sync::{Arc, RwLock};
+
 use std::sync::atomic::{AtomicU64, AtomicUsize, AtomicBool, Ordering};
 use std::time::{Duration, Instant, SystemTime};
 use std::process::Command;
@@ -14,15 +15,16 @@ use std::process::Command;
 // Third-party imports
 use dotenvy::dotenv;
 use log::{LevelFilter, error, info};
+
 use tokio::sync::{watch, Mutex, mpsc};
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncWriteExt, AsyncReadExt};
+use tokio::net::TcpStream;
 use rayon::prelude::*;
 use tokio::runtime::Runtime;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tauri::{Manager};
-use tauri::api::dialog::FileDialogBuilder;
-use teralib::{get_game_status_receiver, run_game, reset_global_state};
+use teralib::{get_game_status_receiver, run_game, reset_global_state, subscribe_game_events};
 use teralib::config::get_config_value;
 use reqwest::Client;
 use lazy_static::lazy_static;
@@ -32,8 +34,6 @@ use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use walkdir::WalkDir;
 use reqwest::header::{USER_AGENT};
-use regex::Regex;
-
 
 // Struct definitions
 #[derive(Serialize, Deserialize)]
@@ -56,6 +56,12 @@ struct LoginResponse {
     user_name: String,
     #[serde(rename = "AuthKey")]
     auth_key: String,
+}
+
+#[tauri::command]
+fn is_debug() -> bool {
+    // True in dev builds (cargo tauri dev). False in release/installer builds.
+    cfg!(debug_assertions)
 }
 
 #[derive(Serialize)]
@@ -142,6 +148,8 @@ struct GameState {
 lazy_static! {
     static ref HASH_CACHE: Mutex<HashMap<String, CachedFileInfo>> = Mutex::new(HashMap::new());
     static ref CANCEL_DOWNLOAD: AtomicBool = AtomicBool::new(false);
+    // Holds the running mirror reader task so we can abort/stop it
+    static ref MIRROR_TASK: Mutex<Option<tokio::task::JoinHandle<()>>> = Mutex::new(None);
 }
 
 
@@ -942,6 +950,82 @@ async fn get_game_status(state: tauri::State<'_, GameState>) -> Result<bool, Str
 }
 
 #[tauri::command]
+async fn start_mirror_tap(window: tauri::Window, host: String, port: u16) -> Result<(), String> {
+    let addr = format!("{}:{}", host, port);
+    info!("[MIRROR] Connecting to {}", addr);
+
+    // Abort any previous task
+    if let Some(old) = MIRROR_TASK.lock().await.take() { old.abort(); }
+
+    let mut stream = TcpStream::connect(&addr).await.map_err(|e| format!("connect error: {}", e))?;
+
+    // Send mirror hello signature
+    let hello = b"AGNIMIRR";
+    stream.write_all(hello).await.map_err(|e| format!("write hello error: {}", e))?;
+    info!("[MIRROR] Sent hello to {}", addr);
+
+    // Send bind JSON with session ticket (auth_key)
+    let ticket = {
+        let guard = GLOBAL_AUTH_INFO.read().unwrap();
+        guard.auth_key.clone()
+    };
+    if !ticket.is_empty() {
+        let bind = serde_json::json!({
+            "version": 1,
+            "bind": { "ticket": ticket }
+        });
+        let mut line = bind.to_string().into_bytes();
+        line.push(b'\n');
+        if let Err(e) = stream.write_all(&line).await { let _ = window.emit("log_message", format!("[MIRROR] bind send error: {}", e)); }
+    } else {
+        let _ = window.emit("log_message", "[MIRROR] Warning: no ticket available for mirror bind".to_string());
+    }
+
+    // Spawn background task to read continuously
+    let mut reader = stream;
+    let handle = tokio::spawn(async move {
+        let mut buf = vec![0u8; 65536];
+        loop {
+            match reader.read(&mut buf).await {
+                Ok(0) => {
+                    let _ = window.emit("log_message", "[MIRROR] Connection closed by server");
+                    break;
+                }
+                Ok(n) => {
+                    let ts = chrono::Local::now();
+                    let hex = faster_hex::hex_string(&buf[..n]);
+                    let payload = serde_json::json!({
+                        "ts": ts.to_string(),
+                        "len": n,
+                        "hex": hex,
+                    });
+                    let _ = window.emit("mirror_packet", payload);
+                }
+                Err(e) => {
+                    let _ = window.emit("log_message", format!("[MIRROR] Read error: {}", e));
+                    break;
+                }
+            }
+        }
+    });
+
+    *MIRROR_TASK.lock().await = Some(handle);
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn stop_mirror_tap() -> Result<(), String> {
+    if let Some(handle) = MIRROR_TASK.lock().await.take() {
+        info!("[MIRROR] Stopping mirror tap");
+        handle.abort();
+    } else {
+        info!("[MIRROR] stop requested, but no active mirror task");
+    }
+    Ok(())
+}
+
+#[tauri::command]
 async fn handle_launch_game(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, GameState>
@@ -988,6 +1072,7 @@ async fn handle_launch_game(
         }
 
         info!("run_game reached");
+
         match
             run_game(
                 &account_name,
@@ -1270,45 +1355,45 @@ fn main() {
 
     // Windows: relaunch elevated via UAC using ShellExecute with "runas" verb.
     // This shows proper UAC dialog and admin shield icon without command prompt flash.
-    #[cfg(target_os = "windows")]
-    {
-        use std::ffi::CString;
-        use winapi::um::shellapi::ShellExecuteA;
-        use winapi::um::winuser::SW_SHOWNORMAL;
-        use std::ptr;
+    // #[cfg(target_os = "windows")]
+    // {
+    //     use std::ffi::CString;
+    //     use winapi::um::shellapi::ShellExecuteA;
+    //     use winapi::um::winuser::SW_SHOWNORMAL;
+    //     use std::ptr;
 
-        // If the special flag is not present, relaunch self elevated and append it.
-        let is_guard_present = std::env::args().any(|a| a == "--elevated");
-        if !is_guard_present {
-            if let Ok(current_exe) = std::env::current_exe() {
-                // Preserve original args and append our guard flag
-                let mut args: Vec<String> = std::env::args().skip(1).collect();
-                args.push("--elevated".to_string());
-                let args_str = args.join(" ");
+    //     // If the special flag is not present, relaunch self elevated and append it.
+    //     let is_guard_present = std::env::args().any(|a| a == "--elevated");
+    //     if !is_guard_present {
+    //         if let Ok(current_exe) = std::env::current_exe() {
+    //             // Preserve original args and append our guard flag
+    //             let mut args: Vec<String> = std::env::args().skip(1).collect();
+    //             args.push("--elevated".to_string());
+    //             let args_str = args.join(" ");
 
-                // Convert to CString for Windows API
-                let exe_path = CString::new(current_exe.to_string_lossy().as_ref()).unwrap();
-                let parameters = CString::new(args_str).unwrap();
-                let verb = CString::new("runas").unwrap();
+    //             // Convert to CString for Windows API
+    //             let exe_path = CString::new(current_exe.to_string_lossy().as_ref()).unwrap();
+    //             let parameters = CString::new(args_str).unwrap();
+    //             let verb = CString::new("runas").unwrap();
 
-                unsafe {
-                    let result = ShellExecuteA(
-                        ptr::null_mut(),
-                        verb.as_ptr(),
-                        exe_path.as_ptr(),
-                        parameters.as_ptr(),
-                        ptr::null(),
-                        SW_SHOWNORMAL,
-                    );
+    //             unsafe {
+    //                 let result = ShellExecuteA(
+    //                     ptr::null_mut(),
+    //                     verb.as_ptr(),
+    //                     exe_path.as_ptr(),
+    //                     parameters.as_ptr(),
+    //                     ptr::null(),
+    //                     SW_SHOWNORMAL,
+    //                 );
                     
-                    // ShellExecute returns > 32 on success
-                    if result as i32 > 32 {
-                        std::process::exit(0);
-                    }
-                }
-            }
-        }
-    }
+    //                 // ShellExecute returns > 32 on success
+    //                 if result as i32 > 32 {
+    //                     std::process::exit(0);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     let (tera_logger, mut tera_log_receiver) = teralib::setup_logging();
 
@@ -1386,12 +1471,38 @@ fn main() {
                 cancel_downloads,
                 set_logging,
                 update_launcher,
+                start_mirror_tap,
+                stop_mirror_tap,
+                is_debug,
             ]
         )
+        .setup(|app| {
+            // Subscribe to S1/WM_COPYDATA game events from teralib and forward to frontend
+            let app_handle = app.handle();
+            tauri::async_runtime::spawn(async move {
+                let mut rx = subscribe_game_events();
+                loop {
+                    match rx.recv().await {
+                        Ok((code, _payload)) => {
+                            // Forward to all windows as a simple numeric code
+                            let _ = app_handle.emit_all("s1_event", code);
+                            let _ = app_handle.emit_all("log_message", format!("[S1] event {} forwarded", code));
+                        }
+                        Err(e) => {
+                            let _ = app_handle.emit_all("log_message", format!("[S1] recv error: {}", e));
+                            // On lagging error, continue; on closed, break
+                            if matches!(e, tokio::sync::broadcast::error::RecvError::Closed) { break; }
+                        }
+                    }
+                }
+            });
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
 
+// ... (rest of the code remains the same)
 #[cfg(test)]
 mod tests {
     use super::*;

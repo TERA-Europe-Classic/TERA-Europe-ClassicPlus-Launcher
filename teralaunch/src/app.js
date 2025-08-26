@@ -40,6 +40,44 @@ const App = {
         FRA: "FRENCH",
         RUS: "RUSSIAN",
     },
+
+    // Opens a dedicated Mirror window (mirror.html)
+    openMirrorWindow() {
+        try {
+            // Reuse existing window if already opened
+            const label = "mirror";
+            let existing = WebviewWindow.getByLabel ? WebviewWindow.getByLabel(label) : null;
+            if (existing) {
+                existing.setFocus();
+                return;
+            }
+            const win = new WebviewWindow(label, {
+                title: "Mirror Logs",
+                width: 900,
+                height: 600,
+                url: "mirror.html",
+                resizable: true,
+            });
+            win.once("tauri://created", () => {
+                console.log("Mirror window created");
+            });
+            win.once("tauri://error", (e) => {
+                console.error("Failed to create mirror window", e);
+            });
+        } catch (e) {
+            console.error("openMirrorWindow error", e);
+        }
+    },
+
+    // Ctrl+Alt+M to open mirror window
+    setupMirrorWindowShortcut() {
+        window.addEventListener("keydown", (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === "m") {
+                e.preventDefault();
+                this.openMirrorWindow();
+            }
+        });
+    },
     launchGameBtn: null,
     statusEl: null,
     loadingModal: null,
@@ -148,6 +186,18 @@ const App = {
             this.setupHeaderLinks();
             this.Router.setupEventListeners();
             await this.Router.navigate();
+            // Determine debug mode from backend and gate mirror features
+            try {
+                const debug = await invoke("is_debug");
+                window.__DEBUG__ = !!debug;
+                if (window.__DEBUG__) {
+                    this.setupMirrorListeners();
+                    this.setupMirrorTapShortcut();
+                    this.setupMirrorWindowShortcut();
+                }
+            } catch (e) {
+                console.warn("Failed to query is_debug:", e);
+            }
             this.sendStoredAuthInfoToBackend();
             this.setupMutationObserver();
             await this.checkLauncherUpdate();
@@ -288,9 +338,16 @@ const App = {
             this.updateUIForGameStatus(isRunning);
         });
 
-        listen("game_ended", () => {
+        listen("game_ended", async () => {
             console.log("Game has ended");
             this.updateUIForGameStatus(false);
+            // Ensure mirror is stopped when game ends
+            try {
+                await invoke("stop_mirror_tap");
+                console.log("[MIRROR] Stopped on game_ended");
+            } catch (e) {
+                console.warn("[MIRROR] stop on game_ended failed", e);
+            }
         });
     },
 
@@ -352,6 +409,194 @@ const App = {
             }
         });
 
+    },
+
+    // Mirror: set up listeners and lightweight console
+    setupMirrorListeners() {
+        this.ensureMirrorConsole();
+
+        // Console logger
+        this.mirrorLog = (text) => {
+            try {
+                const el = this.ensureMirrorConsole();
+                const row = document.createElement("div");
+                row.className = "mirror-row mirror-log";
+                row.textContent = `[LOG] ${text}`;
+                el.appendChild(row);
+                el.scrollTop = el.scrollHeight;
+            } catch (e) {
+                // Fallback to console if UI not ready
+                console.log("[MIRROR-LOG]", text);
+            }
+        };
+        // Start guards
+        let mirrorStarted = false;
+        let scheduledStart = null;
+        const scheduleStartOnce = async () => {
+            if (mirrorStarted) return;
+            if (scheduledStart) return;
+            // Start slightly late to ensure ticket bind path is ready
+            scheduledStart = setTimeout(async () => {
+                scheduledStart = null;
+                if (mirrorStarted) return;
+                try {
+                    const { host, port } = getPreferredTarget();
+                    await invoke("start_mirror_tap", { host, port });
+                    mirrorStarted = true;
+                    this.mirrorLog(`[MIRROR] Started (late bind) on ${host}:${port}`);
+                    this.ensureMirrorConsole();
+                } catch (e) {
+                    this.mirrorLog(`[MIRROR] start failed: ${e}`);
+                }
+            }, 600);
+        };
+        const stopIfRunning = async (reason) => {
+            try {
+                await invoke("stop_mirror_tap");
+            } catch (e) {
+                // ignore
+            }
+            mirrorStarted = false;
+            if (scheduledStart) { clearTimeout(scheduledStart); scheduledStart = null; }
+            this.mirrorLog(`[MIRROR] Stopped${reason ? ` (${reason})` : ""}`);
+        };
+        // Remember last target provided by IPC (server selected by user)
+        const setLastTarget = (host, port) => {
+            try {
+                if (host) localStorage.setItem("mirror_host", host);
+                if (port) localStorage.setItem("mirror_port", String(port));
+                window.__S1LastHost = host;
+                window.__S1LastPort = port;
+            } catch {}
+        };
+        const getPreferredTarget = () => {
+            const host = window.__S1LastHost || localStorage.getItem("mirror_host") || "127.0.0.1";
+            const port = parseInt(window.__S1LastPort || localStorage.getItem("mirror_port") || "7801", 10) || 7801;
+            return { host, port };
+        };
+
+        // IPC: game integration provides host/port
+        window.__S1OnConnect = (host, port) => {
+            this.mirrorLog(`[IPC] OnConnect host/port received: ${host}:${port}`);
+            setLastTarget(host, port);
+        };
+
+        // IPC bridge: call this from client integration when S1 event fires
+        window.__S1OnEvent = async (code) => {
+            try {
+                this.mirrorLog(`[IPC] S1 event: ${code}`);
+                // Start late and only once: prefer EnteredLobby(1004) or EnteredWorld(1011)
+                if (code === 1004) {
+                    await scheduleStartOnce();
+                }
+                // Stop on LeftWorld(1013)/GameExit(1020)/GameCrash(1021)
+                if (code === 1013 || code === 1020 || code === 1021) {
+                    await stopIfRunning(`event ${code}`);
+                }
+            } catch (e) {
+                this.mirrorLog(`[IPC] S1 handler error: ${e}`);
+            }
+        };
+        // Forward broadcasted S1 events
+        listen("s1_event", (event) => {
+            const code = event && event.payload;
+            if (typeof code === "number") {
+                try {
+                    window.__S1OnEvent && window.__S1OnEvent(code);
+                } catch (e) {
+                    this.mirrorLog(`[S1] forward error: ${e}`);
+                }
+            } else {
+                this.mirrorLog(`[S1] invalid event payload: ${JSON.stringify(event && event.payload)}`);
+            }
+        });
+        listen("mirror_packet", (event) => {
+            const { ts, len, hex } = event.payload || {};
+            const el = this.ensureMirrorConsole();
+            const row = document.createElement("div");
+            row.className = "mirror-row";
+            row.textContent = `[${ts || ""}] len=${len || 0} data=${hex || ""}`;
+            el.appendChild(row);
+            el.scrollTop = el.scrollHeight;
+        });
+
+        // Pipe backend textual logs into console
+        listen("log_message", (event) => {
+            const msg = typeof event.payload === "string" ? event.payload : JSON.stringify(event.payload);
+            this.mirrorLog(msg);
+        });
+    },
+
+    // Mirror shortcut: Ctrl+M to start/restart
+    setupMirrorTapShortcut() {
+        window.addEventListener("keydown", async (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "m") {
+                e.preventDefault();
+                try {
+                    const host = prompt("Mirror host", localStorage.getItem("mirror_host") || "127.0.0.1");
+                    if (!host) return;
+                    const portStr = prompt("Server port", localStorage.getItem("mirror_port") || "7801");
+                    if (!portStr) return;
+                    const port = parseInt(portStr, 10) || 7801;
+                    localStorage.setItem("mirror_host", host);
+                    localStorage.setItem("mirror_port", String(port));
+                    await invoke("start_mirror_tap", { host, port });
+                    this.showCustomNotification(`Mirror tap started on ${host}:${port} (Ctrl+M to restart)`, "info");
+                    this.ensureMirrorConsole();
+                } catch (err) {
+                    console.error("Failed to start mirror tap:", err);
+                    this.showCustomNotification(`Failed to start mirror: ${err}`, "error");
+                }
+            }
+            // Ctrl+Shift+M toggles mirror console visibility
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "m") {
+                e.preventDefault();
+                const el = this.ensureMirrorConsole();
+                el.style.display = (el.style.display === "none") ? "block" : "none";
+            }
+        });
+    },
+
+    // Create or return mirror console element
+    ensureMirrorConsole() {
+        let el = document.getElementById("mirror-console");
+        if (!el) {
+            el = document.createElement("div");
+            el.id = "mirror-console";
+            el.style.cssText = [
+                "position:fixed",
+                "bottom:12px",
+                "right:12px",
+                "width:520px",
+                "max-height:260px",
+                "overflow:auto",
+                "font-family:monospace",
+                "font-size:11px",
+                "background:rgba(0,0,0,0.70)",
+                "backdrop-filter: blur(2px)",
+                "color:#d6f5d6",
+                "padding:6px 8px",
+                "border:1px solid rgba(255,255,255,0.15)",
+                "border-radius:6px",
+                "box-shadow:0 4px 12px rgba(0,0,0,0.45)",
+                "z-index:99999",
+            ].join("; ");
+            document.body.appendChild(el);
+            const hdr = document.createElement("div");
+            hdr.textContent = "Mirror Console (plaintext). Ctrl+M start | Ctrl+Shift+M show/hide";
+            hdr.style.cssText = "font-weight:bold; color:#a8ffa8; margin-bottom:4px;";
+            const tools = document.createElement("div");
+            tools.style.cssText = "position:absolute; top:4px; right:8px;";
+            const btn = document.createElement("button");
+            btn.textContent = "×";
+            btn.title = "Hide (Ctrl+Shift+M)";
+            btn.style.cssText = "background:transparent; color:#a8ffa8; border:none; font-size:16px; cursor:pointer;";
+            btn.addEventListener("click", () => { el.style.display = "none"; });
+            tools.appendChild(btn);
+            el.appendChild(tools);
+            el.appendChild(hdr);
+        }
+        return el;
     },
 
     // Function to handle the first launch

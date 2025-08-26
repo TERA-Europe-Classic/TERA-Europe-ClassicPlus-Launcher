@@ -25,7 +25,7 @@ use std::{
 };
 use tokio::{
     runtime::Runtime,
-    sync::{mpsc as other_mpsc, watch, Notify},
+    sync::{mpsc as other_mpsc, watch, Notify, broadcast},
 };
 use winapi::{
     shared::{
@@ -86,6 +86,18 @@ static GAME_STATUS_SENDER: Lazy<watch::Sender<bool>> = Lazy::new(|| {
     let (tx, _) = watch::channel(false);
     tx
 });
+
+/// Broadcast channel for S1/WM_COPYDATA events (event_id, payload bytes)
+static GAME_EVT_TX: Lazy<broadcast::Sender<(usize, Vec<u8>)>> = Lazy::new(|| {
+    // buffer size 64 should be sufficient for our event rate
+    let (tx, _rx) = broadcast::channel(64);
+    tx
+});
+
+/// Subscribe to game events (event_id, payload bytes)
+pub fn subscribe_game_events() -> broadcast::Receiver<(usize, Vec<u8>)> {
+    GAME_EVT_TX.subscribe()
+}
 
 // Struct definitions
 #[derive(Clone, Copy)]
@@ -430,6 +442,9 @@ unsafe extern "system" fn wnd_proc(
                 3 => handle_session_ticket_request(w_param, h_wnd),
                 5 => handle_server_list_request(w_param, h_wnd as usize),
                 7 => handle_enter_lobby_or_world(w_param, h_wnd, payload),
+                // Notify subscribers of raw event 7 with payload as-is
+                // (handlers below will also emit more specific events)
+                
                 1000 => handle_game_start(w_param, h_wnd, payload),
                 1001..=1016 => handle_game_event(w_param, h_wnd, event_id, payload),
                 1020 => handle_game_exit(w_param, h_wnd, payload),
@@ -703,10 +718,12 @@ unsafe fn handle_enter_lobby_or_world(recipient: WPARAM, sender: HWND, payload: 
     if payload.is_empty() {
         on_lobby_entered();
         send_response_message(recipient, sender, 8, &[]);
+        let _ = GAME_EVT_TX.send((1004, Vec::new())); // EnteredLobby
     } else {
         let world_name = String::from_utf8_lossy(payload);
         on_world_entered(&world_name);
         send_response_message(recipient, sender, 8, payload);
+        let _ = GAME_EVT_TX.send((1011, payload.to_vec())); // EnteredWorld
     }
 }
 
@@ -744,6 +761,7 @@ unsafe fn handle_game_start(_recipient: WPARAM, _sender: HWND, _payload: &[u8]) 
 /// * `_payload` - The payload associated with the game event (unused).
 unsafe fn handle_game_event(_recipient: WPARAM, _sender: HWND, event_id: usize, _payload: &[u8]) {
     info!("Game event {} received", event_id);
+    let _ = GAME_EVT_TX.send((event_id, Vec::new()));
 }
 
 /// Handles the game exit event.
@@ -761,6 +779,7 @@ unsafe fn handle_game_event(_recipient: WPARAM, _sender: HWND, event_id: usize, 
 /// * `_payload` - The payload associated with the game exit event (unused).
 unsafe fn handle_game_exit(_recipient: WPARAM, _sender: HWND, _payload: &[u8]) {
     info!("Game ended");
+    let _ = GAME_EVT_TX.send((1020, Vec::new()));
 }
 
 /// Handles the game crash event.
@@ -778,6 +797,7 @@ unsafe fn handle_game_exit(_recipient: WPARAM, _sender: HWND, _payload: &[u8]) {
 /// * `_payload` - The payload associated with the game crash event (unused).
 unsafe fn handle_game_crash(_recipient: WPARAM, _sender: HWND, _payload: &[u8]) {
     error!("Game crash detected");
+    let _ = GAME_EVT_TX.send((1021, Vec::new()));
 }
 
 /// Logs the event of entering the lobby.
