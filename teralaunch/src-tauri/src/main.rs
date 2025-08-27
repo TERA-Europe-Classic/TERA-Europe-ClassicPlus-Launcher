@@ -1,5 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod mirror;
+mod s1_events;
+
 // Standard library imports
 use std::collections::{HashMap, HashSet};
 use std::env;
@@ -23,7 +26,9 @@ use rayon::prelude::*;
 use tokio::runtime::Runtime;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tauri::{Manager};
+use tauri::Manager;
+use tauri::WindowEvent;
+use rayon::iter::{ParallelBridge, IntoParallelRefIterator, ParallelIterator, IndexedParallelIterator};
 use teralib::{get_game_status_receiver, run_game, reset_global_state, subscribe_game_events};
 use teralib::config::get_config_value;
 use reqwest::Client;
@@ -34,6 +39,10 @@ use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use walkdir::WalkDir;
 use reqwest::header::{USER_AGENT};
+ 
+use crate::mirror::client::{start_mirror_client, stop_mirror_client};
+use crate::mirror::broadcaster::start_broadcast_server;
+use crate::s1_events::S1Event;
 
 // Struct definitions
 #[derive(Serialize, Deserialize)]
@@ -56,6 +65,14 @@ struct LoginResponse {
     user_name: String,
     #[serde(rename = "AuthKey")]
     auth_key: String,
+}
+
+// Set the mirror connection target (host, port) from the UI before game/lobby entry
+#[tauri::command]
+async fn set_mirror_target(host: String, port: u16) -> Result<(), String> {
+    let mut target = crate::mirror::MIRROR_TARGET.lock().await;
+    *target = Some((host, port));
+    Ok(())
 }
 
 #[tauri::command]
@@ -148,8 +165,6 @@ struct GameState {
 lazy_static! {
     static ref HASH_CACHE: Mutex<HashMap<String, CachedFileInfo>> = Mutex::new(HashMap::new());
     static ref CANCEL_DOWNLOAD: AtomicBool = AtomicBool::new(false);
-    // Holds the running mirror reader task so we can abort/stop it
-    static ref MIRROR_TASK: Mutex<Option<tokio::task::JoinHandle<()>>> = Mutex::new(None);
 }
 
 
@@ -220,6 +235,7 @@ fn save_cache_to_disk(cache: &HashMap<String, CachedFileInfo>) -> Result<(), Str
     file.write_all(serialized.as_bytes()).map_err(|e| e.to_string())?;
     Ok(())
 }
+
 
 fn load_cache_from_disk() -> Result<HashMap<String, CachedFileInfo>, String> {
     let cache_path = get_cache_file_path()?;
@@ -564,7 +580,7 @@ async fn check_update_required(window: tauri::Window) -> Result<bool, String> {
 
 #[tauri::command]
 async fn update_file(
-    app_handle: tauri::AppHandle,
+    _app_handle: tauri::AppHandle,
     window: tauri::Window,
     file_info: FileInfo,
     total_files: usize,
@@ -601,7 +617,7 @@ async fn update_file(
     }
     let mut file = tokio::fs::File::create(&file_path).await.map_err(|e| e.to_string())?;
 
-    let mut req = client.get(&corrected_url);
+    let req = client.get(&corrected_url);
 
     let res = req.send().await.map_err(|e| e.to_string())?;
 
@@ -949,81 +965,6 @@ async fn get_game_status(state: tauri::State<'_, GameState>) -> Result<bool, Str
     Ok(status || is_launching)
 }
 
-#[tauri::command]
-async fn start_mirror_tap(window: tauri::Window, host: String, port: u16) -> Result<(), String> {
-    let addr = format!("{}:{}", host, port);
-    info!("[MIRROR] Connecting to {}", addr);
-
-    // Abort any previous task
-    if let Some(old) = MIRROR_TASK.lock().await.take() { old.abort(); }
-
-    let mut stream = TcpStream::connect(&addr).await.map_err(|e| format!("connect error: {}", e))?;
-
-    // Send mirror hello signature
-    let hello = b"AGNIMIRR";
-    stream.write_all(hello).await.map_err(|e| format!("write hello error: {}", e))?;
-    info!("[MIRROR] Sent hello to {}", addr);
-
-    // Send bind JSON with session ticket (auth_key)
-    let ticket = {
-        let guard = GLOBAL_AUTH_INFO.read().unwrap();
-        guard.auth_key.clone()
-    };
-    if !ticket.is_empty() {
-        let bind = serde_json::json!({
-            "version": 1,
-            "bind": { "ticket": ticket }
-        });
-        let mut line = bind.to_string().into_bytes();
-        line.push(b'\n');
-        if let Err(e) = stream.write_all(&line).await { let _ = window.emit("log_message", format!("[MIRROR] bind send error: {}", e)); }
-    } else {
-        let _ = window.emit("log_message", "[MIRROR] Warning: no ticket available for mirror bind".to_string());
-    }
-
-    // Spawn background task to read continuously
-    let mut reader = stream;
-    let handle = tokio::spawn(async move {
-        let mut buf = vec![0u8; 65536];
-        loop {
-            match reader.read(&mut buf).await {
-                Ok(0) => {
-                    let _ = window.emit("log_message", "[MIRROR] Connection closed by server");
-                    break;
-                }
-                Ok(n) => {
-                    let ts = chrono::Local::now();
-                    let hex = faster_hex::hex_string(&buf[..n]);
-                    let payload = serde_json::json!({
-                        "ts": ts.to_string(),
-                        "len": n,
-                        "hex": hex,
-                    });
-                    let _ = window.emit("mirror_packet", payload);
-                }
-                Err(e) => {
-                    let _ = window.emit("log_message", format!("[MIRROR] Read error: {}", e));
-                    break;
-                }
-            }
-        }
-    });
-
-    *MIRROR_TASK.lock().await = Some(handle);
-
-    Ok(())
-}
-
-#[tauri::command]
-async fn stop_mirror_tap() -> Result<(), String> {
-    if let Some(handle) = MIRROR_TASK.lock().await.take() {
-        info!("[MIRROR] Stopping mirror tap");
-        handle.abort();
-    } else {
-        info!("[MIRROR] stop requested, but no active mirror task");
-    }
-    Ok(())
-}
 
 #[tauri::command]
 async fn handle_launch_game(
@@ -1097,6 +1038,11 @@ async fn handle_launch_game(
         info!("Emitting game_ended event");
         if let Err(e) = app_handle_clone.emit_all("game_ended", ()) {
             error!("Failed to emit game_ended event: {:?}", e);
+        }
+
+        // Stop mirror client when the game ends to clean up background tasks
+        if let Err(e) = stop_mirror_client().await {
+            error!("Failed to stop mirror client after game end: {}", e);
         }
 
         let mut is_launching = is_launching_clone.lock().await;
@@ -1355,45 +1301,45 @@ fn main() {
 
     // Windows: relaunch elevated via UAC using ShellExecute with "runas" verb.
     // This shows proper UAC dialog and admin shield icon without command prompt flash.
-    // #[cfg(target_os = "windows")]
-    // {
-    //     use std::ffi::CString;
-    //     use winapi::um::shellapi::ShellExecuteA;
-    //     use winapi::um::winuser::SW_SHOWNORMAL;
-    //     use std::ptr;
+    #[cfg(target_os = "windows")]
+    {
+        use std::ffi::CString;
+        use winapi::um::shellapi::ShellExecuteA;
+        use winapi::um::winuser::SW_SHOWNORMAL;
+        use std::ptr;
 
-    //     // If the special flag is not present, relaunch self elevated and append it.
-    //     let is_guard_present = std::env::args().any(|a| a == "--elevated");
-    //     if !is_guard_present {
-    //         if let Ok(current_exe) = std::env::current_exe() {
-    //             // Preserve original args and append our guard flag
-    //             let mut args: Vec<String> = std::env::args().skip(1).collect();
-    //             args.push("--elevated".to_string());
-    //             let args_str = args.join(" ");
+        // If the special flag is not present, relaunch self elevated and append it.
+        let is_guard_present = std::env::args().any(|a| a == "--elevated");
+        if !is_guard_present {
+            if let Ok(current_exe) = std::env::current_exe() {
+                // Preserve original args and append our guard flag
+                let mut args: Vec<String> = std::env::args().skip(1).collect();
+                args.push("--elevated".to_string());
+                let args_str = args.join(" ");
 
-    //             // Convert to CString for Windows API
-    //             let exe_path = CString::new(current_exe.to_string_lossy().as_ref()).unwrap();
-    //             let parameters = CString::new(args_str).unwrap();
-    //             let verb = CString::new("runas").unwrap();
+                // Convert to CString for Windows API
+                let exe_path = CString::new(current_exe.to_string_lossy().as_ref()).unwrap();
+                let parameters = CString::new(args_str).unwrap();
+                let verb = CString::new("runas").unwrap();
 
-    //             unsafe {
-    //                 let result = ShellExecuteA(
-    //                     ptr::null_mut(),
-    //                     verb.as_ptr(),
-    //                     exe_path.as_ptr(),
-    //                     parameters.as_ptr(),
-    //                     ptr::null(),
-    //                     SW_SHOWNORMAL,
-    //                 );
+                unsafe {
+                    let result = ShellExecuteA(
+                        ptr::null_mut(),
+                        verb.as_ptr(),
+                        exe_path.as_ptr(),
+                        parameters.as_ptr(),
+                        ptr::null(),
+                        SW_SHOWNORMAL,
+                    );
                     
-    //                 // ShellExecute returns > 32 on success
-    //                 if result as i32 > 32 {
-    //                     std::process::exit(0);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
+                    // ShellExecute returns > 32 on success
+                    if result as i32 > 32 {
+                        std::process::exit(0);
+                    }
+                }
+            }
+        }
+    }
 
     let (tera_logger, mut tera_log_receiver) = teralib::setup_logging();
 
@@ -1432,9 +1378,6 @@ fn main() {
             let app_handle = app.handle();
             info!("Tauri setup started");
 
-            #[cfg(debug_assertions)]
-            window.open_devtools();
-
             // Spawn an asynchronous task to receive logs from the channel and send them to the frontend
             tauri::async_runtime::spawn(async move {
                 while let Some(log_message) = log_receiver.recv().await {
@@ -1442,9 +1385,70 @@ fn main() {
                 }
             });
 
+            // Start localhost broadcast server (127.0.0.1:7802) and keep it running
+            start_broadcast_server(&app.handle());
+
+            // Health check to ensure broadcast server stays running
+            let app_handle_broadcaster = app.handle();
+            tauri::async_runtime::spawn(async move {
+                let mut interval = tokio::time::interval(Duration::from_secs(30));
+                loop {
+                    interval.tick().await;
+                    start_broadcast_server(&app_handle_broadcaster); // Restart if needed
+                }
+            });
+
+            // Subscribe to S1/WM_COPYDATA game events from teralib and forward to frontend
+            let app_handle_events = app.handle();
+            tauri::async_runtime::spawn(async move {
+                let mut rx = subscribe_game_events();
+                loop {
+                    match rx.recv().await {
+                        Ok((code, _payload)) => {
+                            let event = S1Event::from(code);
+                            
+                            // Handle mirror client lifecycle based on S1 events
+                            if event.should_stop_mirror_client() {
+                                if let Err(e) = stop_mirror_client().await {
+                                    let _ = app_handle_events.emit_all("log_message", format!("[S1] Failed to stop mirror client: {}", e));
+                                }
+                            } else if event.should_start_mirror_client() {
+                                // Use UI-provided target if set; otherwise fallback to provided remote server
+                                let (host, port) = {
+                                    if let Some((h, p)) = crate::mirror::MIRROR_TARGET.lock().await.clone() {
+                                        (h, p)
+                                    } else {
+                                        ("88.99.102.111".to_string(), 9000)
+                                    }
+                                };
+                                if let Err(e) = start_mirror_client(app_handle_events.get_window("main").unwrap(), host, port).await {
+                                    let _ = app_handle_events.emit_all("log_message", format!("[S1] Failed to start mirror client: {}", e));
+                                }
+                            }
+                            
+                            let _ = app_handle_events.emit_all("s1_event", code);
+                        }
+                        Err(e) => {
+                            let _ = app_handle_events.emit_all("log_message", format!("[S1] recv error: {}", e));
+                            if matches!(e, tokio::sync::broadcast::error::RecvError::Closed) { break; }
+                        }
+                    }
+                }
+            });
+
+            // Ensure mirror client is stopped when the main window is closing
+            let window_for_close = window.clone();
+            window_for_close.on_window_event(|event| {
+                if let WindowEvent::CloseRequested { .. } = event {
+                    tauri::async_runtime::spawn(async move {
+                        if let Err(e) = stop_mirror_client().await {
+                            error!("Failed to stop mirror client on window close: {}", e);
+                        }
+                    });
+                }
+            });
+
             info!("Tauri setup completed");
-
-
             Ok(())
         })
         .invoke_handler(
@@ -1471,33 +1475,12 @@ fn main() {
                 cancel_downloads,
                 set_logging,
                 update_launcher,
-                start_mirror_tap,
-                stop_mirror_tap,
+                start_mirror_client,
+                stop_mirror_client,
+                set_mirror_target,
                 is_debug,
             ]
         )
-        .setup(|app| {
-            // Subscribe to S1/WM_COPYDATA game events from teralib and forward to frontend
-            let app_handle = app.handle();
-            tauri::async_runtime::spawn(async move {
-                let mut rx = subscribe_game_events();
-                loop {
-                    match rx.recv().await {
-                        Ok((code, _payload)) => {
-                            // Forward to all windows as a simple numeric code
-                            let _ = app_handle.emit_all("s1_event", code);
-                            let _ = app_handle.emit_all("log_message", format!("[S1] event {} forwarded", code));
-                        }
-                        Err(e) => {
-                            let _ = app_handle.emit_all("log_message", format!("[S1] recv error: {}", e));
-                            // On lagging error, continue; on closed, break
-                            if matches!(e, tokio::sync::broadcast::error::RecvError::Closed) { break; }
-                        }
-                    }
-                }
-            });
-            Ok(())
-        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

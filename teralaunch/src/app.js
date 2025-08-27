@@ -41,43 +41,6 @@ const App = {
         RUS: "RUSSIAN",
     },
 
-    // Opens a dedicated Mirror window (mirror.html)
-    openMirrorWindow() {
-        try {
-            // Reuse existing window if already opened
-            const label = "mirror";
-            let existing = WebviewWindow.getByLabel ? WebviewWindow.getByLabel(label) : null;
-            if (existing) {
-                existing.setFocus();
-                return;
-            }
-            const win = new WebviewWindow(label, {
-                title: "Mirror Logs",
-                width: 900,
-                height: 600,
-                url: "mirror.html",
-                resizable: true,
-            });
-            win.once("tauri://created", () => {
-                console.log("Mirror window created");
-            });
-            win.once("tauri://error", (e) => {
-                console.error("Failed to create mirror window", e);
-            });
-        } catch (e) {
-            console.error("openMirrorWindow error", e);
-        }
-    },
-
-    // Ctrl+Alt+M to open mirror window
-    setupMirrorWindowShortcut() {
-        window.addEventListener("keydown", (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === "m") {
-                e.preventDefault();
-                this.openMirrorWindow();
-            }
-        });
-    },
     launchGameBtn: null,
     statusEl: null,
     loadingModal: null,
@@ -186,18 +149,15 @@ const App = {
             this.setupHeaderLinks();
             this.Router.setupEventListeners();
             await this.Router.navigate();
-            // Determine debug mode from backend and gate mirror features
+            // Determine debug mode from backend (for logging/flags)
             try {
                 const debug = await invoke("is_debug");
                 window.__DEBUG__ = !!debug;
-                if (window.__DEBUG__) {
-                    this.setupMirrorListeners();
-                    this.setupMirrorTapShortcut();
-                    this.setupMirrorWindowShortcut();
-                }
             } catch (e) {
                 console.warn("Failed to query is_debug:", e);
             }
+            // Always enable mirror listeners in both debug and release builds
+            this.setupMirrorListeners();
             this.sendStoredAuthInfoToBackend();
             this.setupMutationObserver();
             await this.checkLauncherUpdate();
@@ -341,9 +301,10 @@ const App = {
         listen("game_ended", async () => {
             console.log("Game has ended");
             this.updateUIForGameStatus(false);
+            // Do not auto-close/open logs modal anymore
             // Ensure mirror is stopped when game ends
             try {
-                await invoke("stop_mirror_tap");
+                await invoke("stop_mirror_client");
                 console.log("[MIRROR] Stopped on game_ended");
             } catch (e) {
                 console.warn("[MIRROR] stop on game_ended failed", e);
@@ -404,6 +365,10 @@ const App = {
             if (consoleEl) {
                 const div = document.createElement("div");
                 div.textContent = event.payload;
+                div.style.userSelect = "text";
+                div.style.webkitUserSelect = "text";
+                div.style.mozUserSelect = "text";
+                div.style.msUserSelect = "text";
                 consoleEl.appendChild(div);
                 consoleEl.scrollTop = consoleEl.scrollHeight;
             }
@@ -411,53 +376,28 @@ const App = {
 
     },
 
-    // Mirror: set up listeners and lightweight console
+    // Mirror: set up listeners for debug mode
     setupMirrorListeners() {
-        this.ensureMirrorConsole();
-
-        // Console logger
-        this.mirrorLog = (text) => {
-            try {
-                const el = this.ensureMirrorConsole();
-                const row = document.createElement("div");
-                row.className = "mirror-row mirror-log";
-                row.textContent = `[LOG] ${text}`;
-                el.appendChild(row);
-                el.scrollTop = el.scrollHeight;
-            } catch (e) {
-                // Fallback to console if UI not ready
-                console.log("[MIRROR-LOG]", text);
-            }
-        };
         // Start guards
         let mirrorStarted = false;
-        let scheduledStart = null;
-        const scheduleStartOnce = async () => {
+        const bindMirrorRemote = async () => {
             if (mirrorStarted) return;
-            if (scheduledStart) return;
-            // Start slightly late to ensure ticket bind path is ready
-            scheduledStart = setTimeout(async () => {
-                scheduledStart = null;
-                if (mirrorStarted) return;
-                try {
-                    const { host, port } = getPreferredTarget();
-                    await invoke("start_mirror_tap", { host, port });
-                    mirrorStarted = true;
-                    this.mirrorLog(`[MIRROR] Started (late bind) on ${host}:${port}`);
-                    this.ensureMirrorConsole();
-                } catch (e) {
-                    this.mirrorLog(`[MIRROR] start failed: ${e}`);
-                }
-            }, 600);
-        };
-        const stopIfRunning = async (reason) => {
             try {
-                await invoke("stop_mirror_tap");
+                const { host, port } = getPreferredTarget();
+                await invoke("start_mirror_client", { host, port });
+                mirrorStarted = true;
+                this.mirrorLog(`[MIRROR] Started on ${host}:${port}`);
+            } catch (e) {
+                this.mirrorLog(`[MIRROR] start failed: ${e}`);
+            }
+        };
+        const stopMirrorIfRunning = async (reason) => {
+            try {
+                await invoke("stop_mirror_client");
             } catch (e) {
                 // ignore
             }
             mirrorStarted = false;
-            if (scheduledStart) { clearTimeout(scheduledStart); scheduledStart = null; }
             this.mirrorLog(`[MIRROR] Stopped${reason ? ` (${reason})` : ""}`);
         };
         // Remember last target provided by IPC (server selected by user)
@@ -485,13 +425,13 @@ const App = {
         window.__S1OnEvent = async (code) => {
             try {
                 this.mirrorLog(`[IPC] S1 event: ${code}`);
-                // Start late and only once: prefer EnteredLobby(1004) or EnteredWorld(1011)
-                if (code === 1004) {
-                    await scheduleStartOnce();
+                // Start mirror on EnteringLobby(1003)
+                if (code === 1003) {
+                    await bindMirrorRemote();
                 }
-                // Stop on LeftWorld(1013)/GameExit(1020)/GameCrash(1021)
-                if (code === 1013 || code === 1020 || code === 1021) {
-                    await stopIfRunning(`event ${code}`);
+                // Stop on GameExit(1020)/GameCrash(1021)
+                if (code === 1020 || code === 1021) {
+                    await stopMirrorIfRunning(`event ${code}`);
                 }
             } catch (e) {
                 this.mirrorLog(`[IPC] S1 handler error: ${e}`);
@@ -510,15 +450,7 @@ const App = {
                 this.mirrorLog(`[S1] invalid event payload: ${JSON.stringify(event && event.payload)}`);
             }
         });
-        listen("mirror_packet", (event) => {
-            const { ts, len, hex } = event.payload || {};
-            const el = this.ensureMirrorConsole();
-            const row = document.createElement("div");
-            row.className = "mirror-row";
-            row.textContent = `[${ts || ""}] len=${len || 0} data=${hex || ""}`;
-            el.appendChild(row);
-            el.scrollTop = el.scrollHeight;
-        });
+        // Mirror packet logging removed - use main log window instead
 
         // Pipe backend textual logs into console
         listen("log_message", (event) => {
@@ -527,77 +459,8 @@ const App = {
         });
     },
 
-    // Mirror shortcut: Ctrl+M to start/restart
-    setupMirrorTapShortcut() {
-        window.addEventListener("keydown", async (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "m") {
-                e.preventDefault();
-                try {
-                    const host = prompt("Mirror host", localStorage.getItem("mirror_host") || "127.0.0.1");
-                    if (!host) return;
-                    const portStr = prompt("Server port", localStorage.getItem("mirror_port") || "7801");
-                    if (!portStr) return;
-                    const port = parseInt(portStr, 10) || 7801;
-                    localStorage.setItem("mirror_host", host);
-                    localStorage.setItem("mirror_port", String(port));
-                    await invoke("start_mirror_tap", { host, port });
-                    this.showCustomNotification(`Mirror tap started on ${host}:${port} (Ctrl+M to restart)`, "info");
-                    this.ensureMirrorConsole();
-                } catch (err) {
-                    console.error("Failed to start mirror tap:", err);
-                    this.showCustomNotification(`Failed to start mirror: ${err}`, "error");
-                }
-            }
-            // Ctrl+Shift+M toggles mirror console visibility
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "m") {
-                e.preventDefault();
-                const el = this.ensureMirrorConsole();
-                el.style.display = (el.style.display === "none") ? "block" : "none";
-            }
-        });
-    },
+    
 
-    // Create or return mirror console element
-    ensureMirrorConsole() {
-        let el = document.getElementById("mirror-console");
-        if (!el) {
-            el = document.createElement("div");
-            el.id = "mirror-console";
-            el.style.cssText = [
-                "position:fixed",
-                "bottom:12px",
-                "right:12px",
-                "width:520px",
-                "max-height:260px",
-                "overflow:auto",
-                "font-family:monospace",
-                "font-size:11px",
-                "background:rgba(0,0,0,0.70)",
-                "backdrop-filter: blur(2px)",
-                "color:#d6f5d6",
-                "padding:6px 8px",
-                "border:1px solid rgba(255,255,255,0.15)",
-                "border-radius:6px",
-                "box-shadow:0 4px 12px rgba(0,0,0,0.45)",
-                "z-index:99999",
-            ].join("; ");
-            document.body.appendChild(el);
-            const hdr = document.createElement("div");
-            hdr.textContent = "Mirror Console (plaintext). Ctrl+M start | Ctrl+Shift+M show/hide";
-            hdr.style.cssText = "font-weight:bold; color:#a8ffa8; margin-bottom:4px;";
-            const tools = document.createElement("div");
-            tools.style.cssText = "position:absolute; top:4px; right:8px;";
-            const btn = document.createElement("button");
-            btn.textContent = "×";
-            btn.title = "Hide (Ctrl+Shift+M)";
-            btn.style.cssText = "background:transparent; color:#a8ffa8; border:none; font-size:16px; cursor:pointer;";
-            btn.addEventListener("click", () => { el.style.display = "none"; });
-            tools.appendChild(btn);
-            el.appendChild(tools);
-            el.appendChild(hdr);
-        }
-        return el;
-    },
 
     // Function to handle the first launch
     async handleFirstLaunch() {
@@ -735,7 +598,7 @@ const App = {
             if (toggleLogsLink) {
                 toggleLogsLink.addEventListener("click", (evt) => {
                     evt.preventDefault();
-                    this.toggleLogs();
+                    this.openLogsModal();
                 });
             }
         }
@@ -2288,6 +2151,40 @@ const App = {
         );
     },
 
+    // Logs modal helpers
+    openLogsModal() {
+        const modal = document.getElementById("log-modal");
+        if (!modal) {
+            console.error("Log modal not found");
+            return;
+        }
+        this.toggleModal("log-modal", true);
+        const closeBtn = modal.querySelector(".log-modal-close");
+        if (closeBtn) {
+            closeBtn.onclick = (e) => {
+                e.preventDefault();
+                this.closeLogsModal();
+            };
+        }
+    },
+    closeLogsModal() {
+        this.toggleModal("log-modal", false);
+    },
+    
+    toggleLogsModal() {
+        const modal = document.getElementById("log-modal");
+        if (!modal) {
+            console.error("Log modal not found");
+            return;
+        }
+        const isVisible = modal.classList.contains("show");
+        if (isVisible) {
+            this.closeLogsModal();
+        } else {
+            this.openLogsModal();
+        }
+    },
+
     /**
      * Toggles the display of the hash file progress modal.
      * @param {boolean} show Whether to show or hide the modal.
@@ -2755,12 +2652,90 @@ const App = {
         const viewLogsBtn = document.getElementById("view-logs");
         const logModal = document.getElementById("log-modal");
         const logClose = document.querySelector(".log-modal-close");
+        const copyLogsBtn = document.getElementById("copy-logs-btn");
+        const exportLogsBtn = document.getElementById("export-logs-btn");
+        
         if (viewLogsBtn && logModal && logClose) {
             viewLogsBtn.addEventListener("click", (e) => {
                 e.preventDefault();
-                logModal.style.display = "block";
+                this.openLogsModal();
             });
-            logClose.addEventListener("click", () => (logModal.style.display = "none"));
+            logClose.addEventListener("click", (e) => {
+                e.preventDefault();
+                this.closeLogsModal();
+            });
+        }
+        
+        if (copyLogsBtn) {
+            copyLogsBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                const logConsole = document.getElementById("log-console");
+                if (logConsole) {
+                    const logText = Array.from(logConsole.children)
+                        .map(div => div.textContent)
+                        .join('\n');
+                    
+                    navigator.clipboard.writeText(logText).then(() => {
+                        copyLogsBtn.textContent = "Copied!";
+                        copyLogsBtn.style.background = "#27ae60";
+                        setTimeout(() => {
+                            copyLogsBtn.textContent = "Copy All Logs";
+                            copyLogsBtn.style.background = "#3498db";
+                        }, 2000);
+                    }).catch(err => {
+                        console.error('Failed to copy logs:', err);
+                        copyLogsBtn.textContent = "Copy Failed";
+                        copyLogsBtn.style.background = "#e74c3c";
+                        setTimeout(() => {
+                            copyLogsBtn.textContent = "Copy All Logs";
+                            copyLogsBtn.style.background = "#3498db";
+                        }, 2000);
+                    });
+                }
+            });
+        }
+        
+        if (exportLogsBtn) {
+            exportLogsBtn.addEventListener("click", async (e) => {
+                e.preventDefault();
+                const logConsole = document.getElementById("log-console");
+                if (logConsole) {
+                    const logText = Array.from(logConsole.children)
+                        .map(div => div.textContent)
+                        .join('\n');
+                    
+                    try {
+                        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                        const defaultFilename = `tera-launcher-logs-${timestamp}.txt`;
+                        
+                        const filePath = await window.__TAURI__.dialog.save({
+                            defaultPath: defaultFilename,
+                            filters: [{
+                                name: 'Text Files',
+                                extensions: ['txt']
+                            }]
+                        });
+                        
+                        if (filePath) {
+                            await window.__TAURI__.fs.writeTextFile(filePath, logText);
+                            exportLogsBtn.textContent = "Exported!";
+                            exportLogsBtn.style.background = "#27ae60";
+                            setTimeout(() => {
+                                exportLogsBtn.textContent = "Export to File";
+                                exportLogsBtn.style.background = "#27ae60";
+                            }, 2000);
+                        }
+                    } catch (err) {
+                        console.error('Failed to export logs:', err);
+                        exportLogsBtn.textContent = "Export Failed";
+                        exportLogsBtn.style.background = "#e74c3c";
+                        setTimeout(() => {
+                            exportLogsBtn.textContent = "Export to File";
+                            exportLogsBtn.style.background = "#27ae60";
+                        }, 2000);
+                    }
+                }
+            });
         }
     },
 
