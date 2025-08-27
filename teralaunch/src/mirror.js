@@ -39,7 +39,7 @@
     localStorage.setItem('mirror_host', host);
     localStorage.setItem('mirror_port', String(port));
     try {
-      await invoke('start_mirror_tap', { host, port });
+      await invoke('start_mirror_client', { host, port });
       appendSys(`Started mirror on ${host}:${port}`);
     } catch (e) {
       appendSys(`Error: ${e}`);

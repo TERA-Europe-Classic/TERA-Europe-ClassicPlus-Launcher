@@ -94,6 +94,9 @@ static GAME_EVT_TX: Lazy<broadcast::Sender<(usize, Vec<u8>)>> = Lazy::new(|| {
     tx
 });
 
+/// Tracks whether an exit/crash event (1020/1021) has already been signaled for the current run.
+static EXIT_EVENT_SENT: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
+
 /// Subscribe to game events (event_id, payload bytes)
 pub fn subscribe_game_events() -> broadcast::Receiver<(usize, Vec<u8>)> {
     GAME_EVT_TX.subscribe()
@@ -282,6 +285,9 @@ async fn launch_game() -> Result<ExitStatus, Box<dyn std::error::Error>> {
     GAME_STATUS_SENDER.send(true).unwrap();
     info!("Game status set to running");
 
+    // Reset exit/crash signaling state for this run
+    EXIT_EVENT_SENT.store(false, Ordering::SeqCst);
+
     info!(
         "Launching game for account: {}",
         GLOBAL_CREDENTIALS.get_account_name()
@@ -319,6 +325,20 @@ async fn launch_game() -> Result<ExitStatus, Box<dyn std::error::Error>> {
 
     let status = child.wait()?;
     info!("Game process exited with status: {:?}", status);
+
+    // Fallback: if no WM_COPYDATA-based exit/crash (1020/1021) was received,
+    // synthesize one based on process exit status so downstream listeners (UI/mirror)
+    // behave consistently on force-close/kill.
+    if !EXIT_EVENT_SENT.load(Ordering::SeqCst) {
+        if status.success() {
+            let _ = GAME_EVT_TX.send((1020, Vec::new())); // GameExit
+            info!("Synthesized GameExit (1020) event after process exit");
+        } else {
+            let _ = GAME_EVT_TX.send((1021, Vec::new())); // GameCrash
+            error!("Synthesized GameCrash (1021) event after abnormal process exit");
+        }
+        EXIT_EVENT_SENT.store(true, Ordering::SeqCst);
+    }
 
     GAME_RUNNING.store(false, Ordering::SeqCst);
     GAME_STATUS_SENDER.send(false).unwrap();
@@ -780,6 +800,7 @@ unsafe fn handle_game_event(_recipient: WPARAM, _sender: HWND, event_id: usize, 
 unsafe fn handle_game_exit(_recipient: WPARAM, _sender: HWND, _payload: &[u8]) {
     info!("Game ended");
     let _ = GAME_EVT_TX.send((1020, Vec::new()));
+    EXIT_EVENT_SENT.store(true, Ordering::SeqCst);
 }
 
 /// Handles the game crash event.
@@ -798,6 +819,7 @@ unsafe fn handle_game_exit(_recipient: WPARAM, _sender: HWND, _payload: &[u8]) {
 unsafe fn handle_game_crash(_recipient: WPARAM, _sender: HWND, _payload: &[u8]) {
     error!("Game crash detected");
     let _ = GAME_EVT_TX.send((1021, Vec::new()));
+    EXIT_EVENT_SENT.store(true, Ordering::SeqCst);
 }
 
 /// Logs the event of entering the lobby.

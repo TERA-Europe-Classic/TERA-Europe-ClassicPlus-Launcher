@@ -76,7 +76,10 @@
         "FOLDER_NOT_FOUND": "Dossier introuvable.",
         "GAME_LAUNCH_ERROR": "Erreur lors du lancement du jeu: ",
         "SETTINGS_GAME_FOLDER": "Dossier du jeu",
-        "SETTINGS_VERSION_INFO": "Informations sur la version"
+        "SETTINGS_VERSION_INFO": "Informations sur la version",
+        "CHECK_REPAIR_FILES": "Vérifier et réparer les fichiers",
+        "GAME_DIRECTORY": "Répertoire du jeu",
+        "LOGOUT": "Déconnexion"
     },
     "EUR": {
         "LOGIN_TITLE": "Login",
@@ -154,7 +157,10 @@
         "FOLDER_NOT_FOUND": "Folder not found.",
         "GAME_LAUNCH_ERROR": "Error launching game: ",
         "SETTINGS_GAME_FOLDER": "Game Folder",
-        "SETTINGS_VERSION_INFO": "Version Info"
+        "SETTINGS_VERSION_INFO": "Version Info",
+        "CHECK_REPAIR_FILES": "Check & Repair Files",
+        "GAME_DIRECTORY": "Game Directory",
+        "LOGOUT": "Logout"
     },
     "RUS": {
         "LOGIN_TITLE": "Вход",
@@ -232,7 +238,10 @@
         "FOLDER_NOT_FOUND": "Папка не найдена.",
         "GAME_LAUNCH_ERROR": "Ошибка при запуске игры: ",
         "SETTINGS_GAME_FOLDER": "Папка игры",
-        "SETTINGS_VERSION_INFO": "Информация о версии"
+        "SETTINGS_VERSION_INFO": "Информация о версии",
+        "CHECK_REPAIR_FILES": "Проверить и восстановить файлы",
+        "GAME_DIRECTORY": "Каталог игры",
+        "LOGOUT": "Выйти"
     },
     "GER": {
         "LOGIN_TITLE": "Anmelden",
@@ -310,6 +319,9 @@
         "FOLDER_NOT_FOUND": "Ordner nicht gefunden.",
         "GAME_LAUNCH_ERROR": "Fehler beim Starten des Spiels: ",
         "SETTINGS_GAME_FOLDER": "Spieleordner",
-        "SETTINGS_VERSION_INFO": "Versionsinfo"
+        "SETTINGS_VERSION_INFO": "Versionsinfo",
+        "CHECK_REPAIR_FILES": "Dateien prüfen und reparieren",
+        "GAME_DIRECTORY": "Spielverzeichnis",
+        "LOGOUT": "Abmelden"
     }
 }
