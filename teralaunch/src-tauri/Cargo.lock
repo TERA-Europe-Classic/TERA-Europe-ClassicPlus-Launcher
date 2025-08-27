@@ -625,8 +625,10 @@ checksum = "c469d952047f47f91b68d1cba3f10d63c11d73e4636f24f08daf0278abf01c4d"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
+ "js-sys",
  "num-traits",
  "serde",
+ "wasm-bindgen",
  "windows-link",
 ]
 
@@ -1328,6 +1330,15 @@ checksum = "8be9f3dfaaffdae2972880079a491a1a8bb7cbed0b8dd7a347f668b4150a3b93"
 dependencies = [
  "event-listener",
  "pin-project-lite",
+]
+
+[[package]]
+name = "faster-hex"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2a2b11eda1d40935b26cf18f6833c526845ae8c41e58d09af6adeb6f0269183"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -5089,11 +5100,13 @@ dependencies = [
 name = "tera-europe-launcher"
 version = "1.1.5"
 dependencies = [
+ "chrono",
  "cookie 0.16.2",
  "devtools",
  "dirs-next",
  "dotenvy",
  "env_logger 0.10.2",
+ "faster-hex",
  "flate2",
  "futures-util",
  "indicatif",
