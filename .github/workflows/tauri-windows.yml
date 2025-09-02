@@ -1,0 +1,64 @@
+name: Build Tauri (Windows, v1)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      # Provided via GitHub Secrets
+      TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+      TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install NSIS
+        run: choco install nsis -y
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            **/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install Cargo Tauri CLI v1
+        run: cargo install --locked tauri-cli@^1
+
+      - name: Run builder.ps1
+        working-directory: .
+        run: |
+          Get-ChildItem -Path . -Name
+          Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+          ./builder.ps1
+
+      - name: Upload NSIS installer
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nsis-installer
+          path: |
+            teralaunch/src-tauri/target/release/bundle/nsis/*.exe
+
+      - name: Upload NSIS updater zip
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nsis-updater-zip
+          path: |
+            teralaunch/src-tauri/target/release/bundle/nsis/*.nsis.zip
+
+      # MSI uploads removed – only NSIS artifacts are handled

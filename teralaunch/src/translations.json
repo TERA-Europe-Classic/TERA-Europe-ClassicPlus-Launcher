@@ -79,7 +79,8 @@
         "SETTINGS_VERSION_INFO": "Informations sur la version",
         "CHECK_REPAIR_FILES": "Vérifier et réparer les fichiers",
         "GAME_DIRECTORY": "Répertoire du jeu",
-        "LOGOUT": "Déconnexion"
+        "LOGOUT": "Déconnexion",
+        "CHECK_LAUNCHER_UPDATE": "Vérifier la mise à jour du lanceur"
     },
     "EUR": {
         "LOGIN_TITLE": "Login",
@@ -160,7 +161,8 @@
         "SETTINGS_VERSION_INFO": "Version Info",
         "CHECK_REPAIR_FILES": "Check & Repair Files",
         "GAME_DIRECTORY": "Game Directory",
-        "LOGOUT": "Logout"
+        "LOGOUT": "Logout",
+        "CHECK_LAUNCHER_UPDATE": "Check Launcher Update"
     },
     "RUS": {
         "LOGIN_TITLE": "Вход",
@@ -241,7 +243,8 @@
         "SETTINGS_VERSION_INFO": "Информация о версии",
         "CHECK_REPAIR_FILES": "Проверить и восстановить файлы",
         "GAME_DIRECTORY": "Каталог игры",
-        "LOGOUT": "Выйти"
+        "LOGOUT": "Выйти",
+        "CHECK_LAUNCHER_UPDATE": "Проверить обновление лаунчера"
     },
     "GER": {
         "LOGIN_TITLE": "Anmelden",
@@ -322,6 +325,7 @@
         "SETTINGS_VERSION_INFO": "Versionsinfo",
         "CHECK_REPAIR_FILES": "Dateien prüfen und reparieren",
         "GAME_DIRECTORY": "Spielverzeichnis",
-        "LOGOUT": "Abmelden"
+        "LOGOUT": "Abmelden",
+        "CHECK_LAUNCHER_UPDATE": "Launcher-Update prüfen"
     }
 }

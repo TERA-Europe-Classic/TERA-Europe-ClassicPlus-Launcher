@@ -16,6 +16,14 @@
                 "open": true
             }
         },
+        "updater": {
+            "active": true,
+            "endpoints": [
+                "http://localhost:8443/latest.json"
+            ],
+            "dialog": true,
+            "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlBQTIxRUFBNUU3RTRDMzUKUldRMVRINWVxaDZpbWdQVnp6SzJRZ2pFekU3dGpZaEFyYmZPWHFGRkJuUEo0VUZWZlg3ZEVRZnQK"
+        },
         "windows": [
             {
                 "title": "TERA-Europe-Launcher",
@@ -26,6 +34,7 @@
                 "transparent": true,
                 "center": true,
                 "contentProtected": false,
+                "visible": false,
                 "url": "index.html"
             }
         ],
@@ -34,7 +43,7 @@
         },
         "bundle": {
             "active": true,
-            "targets": "all",
+            "targets": ["nsis", "updater"],
             "identifier": "crazy-esports",
             "publisher": "Crazy-eSports",
             "icon": [
