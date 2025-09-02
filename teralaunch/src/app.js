@@ -361,19 +361,61 @@ const App = {
 
     setupLogListener() {
         listen("log_message", (event) => {
-            const consoleEl = document.getElementById("log-console");
-            if (consoleEl) {
-                const div = document.createElement("div");
-                div.textContent = event.payload;
-                div.style.userSelect = "text";
-                div.style.webkitUserSelect = "text";
-                div.style.mozUserSelect = "text";
-                div.style.msUserSelect = "text";
-                consoleEl.appendChild(div);
-                consoleEl.scrollTop = consoleEl.scrollHeight;
-            }
+            const msg = typeof event.payload === "string" ? event.payload : JSON.stringify(event.payload);
+            this.mirrorLog(msg);
         });
 
+    },
+
+    // Append a line into the logs console used by mirror and backend messages
+    mirrorLog(message) {
+        try {
+            const consoleEl = document.getElementById("log-console");
+            if (!consoleEl) return;
+            // Lightweight dedupe: drop immediate duplicates
+            const now = Date.now();
+            if (
+                this.state.lastLogMessage === String(message ?? "") &&
+                now - (this.state.lastLogTime || 0) < 100
+            ) {
+                return;
+            }
+            this.state.lastLogMessage = String(message ?? "");
+            this.state.lastLogTime = now;
+            const div = document.createElement("div");
+            div.textContent = String(message ?? "");
+            div.style.userSelect = "text";
+            div.style.webkitUserSelect = "text";
+            div.style.mozUserSelect = "text";
+            div.style.msUserSelect = "text";
+            consoleEl.appendChild(div);
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        } catch (e) {
+            console.warn("mirrorLog failed:", e);
+        }
+    },
+
+    // Open/close Logs modal from the settings menu
+    openLogsModal() {
+        const modal = document.getElementById("log-modal");
+        if (!modal) {
+            console.error("Log modal not found");
+            return;
+        }
+        modal.style.display = "block";
+        const closeBtn = modal.querySelector(".log-modal-close");
+        if (closeBtn) {
+            closeBtn.onclick = (e) => {
+                e.preventDefault();
+                this.closeLogsModal();
+            };
+        }
+    },
+
+    closeLogsModal() {
+        const modal = document.getElementById("log-modal");
+        if (!modal) return;
+        modal.style.display = "none";
     },
 
     // Mirror: set up listeners for debug mode
@@ -447,21 +489,12 @@ const App = {
                     this.mirrorLog(`[S1] forward error: ${e}`);
                 }
             } else {
-                this.mirrorLog(`[S1] invalid event payload: ${JSON.stringify(event && event.payload)}`);
+                // Ignore malformed payloads
             }
         });
-        // Mirror packet logging removed - use main log window instead
 
-        // Pipe backend textual logs into console
-        listen("log_message", (event) => {
-            const msg = typeof event.payload === "string" ? event.payload : JSON.stringify(event.payload);
-            this.mirrorLog(msg);
-        });
     },
-
-    
-
-
+ 
     // Function to handle the first launch
     async handleFirstLaunch() {
         console.log("First time launch detected");
