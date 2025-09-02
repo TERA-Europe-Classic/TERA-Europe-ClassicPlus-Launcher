@@ -410,12 +410,56 @@ const App = {
                 this.closeLogsModal();
             };
         }
+        const copyBtn = modal.querySelector('#copy-logs-btn');
+        if (copyBtn) {
+            copyBtn.onclick = async (e) => {
+                e.preventDefault();
+                try {
+                    await this.copyLogsToClipboard();
+                } catch (err) {
+                    console.error('Copy logs failed:', err);
+                }
+            };
+        }
     },
 
     closeLogsModal() {
         const modal = document.getElementById("log-modal");
         if (!modal) return;
         modal.style.display = "none";
+    },
+
+    // Copy all logs in the log modal to system clipboard
+    async copyLogsToClipboard() {
+        const consoleEl = document.getElementById('log-console');
+        if (!consoleEl) {
+            this.showCustomNotification('No logs to copy', 'error');
+            return;
+        }
+        // Prefer collecting child lines to preserve line breaks
+        const lines = Array.from(consoleEl.children || []).map((n) => n.textContent || '');
+        const text = (lines.length ? lines : [consoleEl.textContent || '']).join('\n');
+
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                // Fallback for older environments
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.top = '-1000px';
+                document.body.appendChild(ta);
+                ta.focus();
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }
+            this.showCustomNotification('Logs copied to clipboard', 'success');
+        } catch (e) {
+            this.showCustomNotification('Failed to copy logs', 'error');
+            throw e;
+        }
     },
 
     // Mirror: set up listeners for debug mode
