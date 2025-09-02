@@ -730,8 +730,18 @@ unsafe fn handle_session_ticket_request(recipient: WPARAM, sender: HWND) {
 /// * `sender` - The sender's window handle as a usize.
 unsafe fn handle_server_list_request(recipient: WPARAM, sender: usize) {
     let runtime = Runtime::new().expect("Failed to create Tokio runtime");
-    let server_list_data =
-        runtime.block_on(async { get_server_list().await.expect("Failed to get server list") });
+    let server_list_data = runtime.block_on(async { 
+        match get_server_list().await {
+            Ok(data) => {
+                info!("Server list request successful, {} bytes", data.len());
+                data
+            }
+            Err(e) => {
+                error!("Failed to get server list: {}", e);
+                panic!("Failed to get server list: {}", e);
+            }
+        }
+    });
     send_response_message(recipient, sender as HWND, 6, &server_list_data);
 }
 
@@ -865,6 +875,7 @@ fn on_world_entered(world_name: &str) {
 /// A Result containing a Vec<u8> of the encoded server list on success, or an error on failure.
 async fn get_server_list() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let url = config::get_config_value("SERVER_LIST_URL");
+    info!("Fetching server list from: {}", url);
     let client = reqwest::Client::new();
     let response = client
         .get(url)
@@ -873,11 +884,14 @@ async fn get_server_list() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         .await?;
 
     if !response.status().is_success() {
+        error!("Unsuccessful HTTP response: {}", response.status());
         return Err(format!("Unsuccessful HTTP response: {}", response.status()).into());
     }
 
     let json: Value = response.json().await?;
+    info!("Server list JSON received, parsing...");
     let server_list = parse_server_list_json(&json)?;
+    info!("Server list parsed successfully, {} servers total", server_list.servers.len());
 
     let mut buf = Vec::new();
     server_list.encode(&mut buf)?;
@@ -983,11 +997,15 @@ fn parse_server_list_json(json: &Value) -> Result<ServerList, Box<dyn std::error
 
         let unavailable_message = server["unavailable_message"].as_str().unwrap_or("");
 
+        // Format server names with (0) suffix like Enterance does
+        let formatted_name = format!("{}(0)", name);
+        let formatted_title = format!("{}(0)", title);
+        
         let server_info = ServerInfo {
             id: server_id,
-            name: utf16_to_bytes(&name),
+            name: utf16_to_bytes(&formatted_name),
             category: utf16_to_bytes(category),
-            title: utf16_to_bytes(&title),
+            title: utf16_to_bytes(&formatted_title),
             queue: utf16_to_bytes(queue),
             population: utf16_to_bytes(population),
             address,
@@ -999,8 +1017,46 @@ fn parse_server_list_json(json: &Value) -> Result<ServerList, Box<dyn std::error
         server_list.servers.push(server_info);
     }
 
-    server_list.last_server_id = player_last_server_id;
-    server_list.sort_criterion = 3;
+    // Use Enterance's approach: hardcoded last_server_id and format server names with (0) suffix
+    server_list.last_server_id = 2800;
+    server_list.sort_criterion = json["sort_criterion"].as_u64().unwrap_or(3) as u32;
+    // Add configured relay servers to the server list
+    let relay_servers = config::get_relay_servers();
+    for relay in relay_servers {
+        let relay_id = relay["id"].as_u64().unwrap_or(9999) as u32;
+        let relay_name = relay["name"].as_str().unwrap_or("Relay Server");
+        let relay_address_str = relay["address"].as_str().unwrap_or("127.0.0.1");
+        let relay_port = relay["port"].as_u64().unwrap_or(7801) as u32;
+        let relay_category = relay["category"].as_str().unwrap_or("Relay");
+        let relay_title = relay["title"].as_str().unwrap_or("Relay Server");
+        let relay_queue = relay["queue"].as_str().unwrap_or("no");
+        let relay_population = relay["population"].as_str().unwrap_or("Online");
+        let relay_available = relay["available"].as_u64().unwrap_or(1) != 0;
+        let relay_unavailable_msg = relay["unavailable_message"].as_str().unwrap_or("");
+        
+        let relay_address = ipv4_to_u32(relay_address_str);
+        
+        let relay_server = ServerInfo {
+            id: relay_id,
+            name: utf16_to_bytes(relay_name),
+            category: utf16_to_bytes(relay_category),
+            title: utf16_to_bytes(relay_title),
+            queue: utf16_to_bytes(relay_queue),
+            population: utf16_to_bytes(relay_population),
+            address: relay_address,
+            port: relay_port,
+            available: if relay_available { 1 } else { 0 },
+            unavailable_message: utf16_to_bytes(relay_unavailable_msg),
+            host: Vec::new(),
+        };
+        
+        server_list.servers.push(relay_server);
+        info!("Added relay server: {} ({}:{})", relay_name, relay_address_str, relay_port);
+    }
+
+    // Keep original last_server_id from JSON for proper display
+    // server_list.last_server_id = json["last_server_id"].as_u64().unwrap_or(0) as u32;
+    // server_list.sort_criterion = 2;
 
     Ok(server_list)
 }

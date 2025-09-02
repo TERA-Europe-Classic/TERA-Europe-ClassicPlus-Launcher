@@ -15,3 +15,10 @@ pub fn get_config_value(key: &str) -> String {
         .unwrap_or_else(|| panic!("{} must be set in config.json", key))
         .to_string()
 }
+
+pub fn get_relay_servers() -> Vec<Value> {
+    CONFIG_JSON["RELAY_SERVERS"]
+        .as_array()
+        .unwrap_or(&vec![])
+        .clone()
+}
