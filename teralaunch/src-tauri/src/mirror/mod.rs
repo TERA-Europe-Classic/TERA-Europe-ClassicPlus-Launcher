@@ -1,4 +1,5 @@
 pub mod client;
+pub mod crypto;
 pub mod broadcaster;
 
 use lazy_static::lazy_static;
