@@ -1,0 +1,6 @@
+# Build-time configuration for the TERA Launcher mirror client.
+# Provide the mirror PSK as a 64-hex-character string (32 bytes).
+# This value is obfuscated and embedded into the compiled binary by build.rs.
+
+[mirror]
+psk_hex = "9f6c2a9f0b6b2f9c7e3d2a1b0f6e9c8d9a7b6c5d4e3f2a1b0c9d8e7f6a5b4c30"

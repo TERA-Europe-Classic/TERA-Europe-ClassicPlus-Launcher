@@ -29,39 +29,49 @@ async fn run_broadcast_server_loop(
     tx: tokio::sync::broadcast::Sender<std::sync::Arc<[u8]>>
 ) {
     let bind_addr = "127.0.0.1:7802";
-    
+
+    // Single bind attempt at startup
+    let listener = match TcpListener::bind(bind_addr).await {
+        Ok(listener) => {
+            let _ = app_handle.emit_all(
+                "log_message",
+                format!("[BROADCAST-SERVER] Listening on {}", bind_addr),
+            );
+            listener
+        }
+        Err(e) => {
+            let _ = app_handle.emit_all(
+                "log_message",
+                format!("[BROADCAST-SERVER] Bind failed on {}: {}", bind_addr, e),
+            );
+            return; // do not retry
+        }
+    };
+
     loop {
-        let listener = match TcpListener::bind(bind_addr).await {
-            Ok(listener) => {
-                let _ = app_handle.emit_all("log_message", format!("[BROADCAST-SERVER] Listening on {}", bind_addr));
-                listener
+        let (socket, _addr) = match listener.accept().await {
+            Ok((socket, addr)) => {
+                let _ = app_handle.emit_all(
+                    "log_message",
+                    format!("[BROADCAST-SERVER] Client connected: {}", addr),
+                );
+                (socket, addr)
             }
             Err(e) => {
-                let _ = app_handle.emit_all("log_message", format!("[BROADCAST-SERVER] Bind failed on {}: {}. Retrying in 3s...", bind_addr, e));
-                tokio::time::sleep(Duration::from_secs(3)).await;
+                let _ = app_handle.emit_all(
+                    "log_message",
+                    format!("[BROADCAST-SERVER] Accept error: {}", e),
+                );
+                tokio::time::sleep(Duration::from_millis(200)).await;
                 continue;
             }
         };
 
-        loop {
-            let (socket, _addr) = match listener.accept().await {
-                Ok((socket, addr)) => {
-                    let _ = app_handle.emit_all("log_message", format!("[BROADCAST-SERVER] Client connected: {}", addr));
-                    (socket, addr)
-                }
-                Err(e) => {
-                    let _ = app_handle.emit_all("log_message", format!("[BROADCAST-SERVER] Accept error: {}", e));
-                    tokio::time::sleep(Duration::from_millis(200)).await;
-                    continue;
-                }
-            };
-
-            let rx = tx.subscribe();
-            let app_handle_inner = app_handle.clone();
-            tauri::async_runtime::spawn(async move {
-                handle_client_connection(socket, rx, app_handle_inner).await;
-            });
-        }
+        let rx = tx.subscribe();
+        let app_handle_inner = app_handle.clone();
+        tauri::async_runtime::spawn(async move {
+            handle_client_connection(socket, rx, app_handle_inner).await;
+        });
     }
 }
 

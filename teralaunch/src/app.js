@@ -361,36 +361,112 @@ const App = {
 
     setupLogListener() {
         listen("log_message", (event) => {
-            const consoleEl = document.getElementById("log-console");
-            if (consoleEl) {
-                const div = document.createElement("div");
-                div.textContent = event.payload;
-                div.style.userSelect = "text";
-                div.style.webkitUserSelect = "text";
-                div.style.mozUserSelect = "text";
-                div.style.msUserSelect = "text";
-                consoleEl.appendChild(div);
-                consoleEl.scrollTop = consoleEl.scrollHeight;
-            }
+            const msg = typeof event.payload === "string" ? event.payload : JSON.stringify(event.payload);
+            this.mirrorLog(msg);
         });
 
+    },
+
+    // Append a line into the logs console used by mirror and backend messages
+    mirrorLog(message) {
+        try {
+            const consoleEl = document.getElementById("log-console");
+            if (!consoleEl) return;
+            // Lightweight dedupe: drop immediate duplicates
+            const now = Date.now();
+            if (
+                this.state.lastLogMessage === String(message ?? "") &&
+                now - (this.state.lastLogTime || 0) < 100
+            ) {
+                return;
+            }
+            this.state.lastLogMessage = String(message ?? "");
+            this.state.lastLogTime = now;
+            const div = document.createElement("div");
+            div.textContent = String(message ?? "");
+            div.style.userSelect = "text";
+            div.style.webkitUserSelect = "text";
+            div.style.mozUserSelect = "text";
+            div.style.msUserSelect = "text";
+            consoleEl.appendChild(div);
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        } catch (e) {
+            console.warn("mirrorLog failed:", e);
+        }
+    },
+
+    // Open/close Logs modal from the settings menu
+    openLogsModal() {
+        const modal = document.getElementById("log-modal");
+        if (!modal) {
+            console.error("Log modal not found");
+            return;
+        }
+        modal.style.display = "block";
+        const closeBtn = modal.querySelector(".log-modal-close");
+        if (closeBtn) {
+            closeBtn.onclick = (e) => {
+                e.preventDefault();
+                this.closeLogsModal();
+            };
+        }
+        const copyBtn = modal.querySelector('#copy-logs-btn');
+        if (copyBtn) {
+            copyBtn.onclick = async (e) => {
+                e.preventDefault();
+                try {
+                    await this.copyLogsToClipboard();
+                } catch (err) {
+                    console.error('Copy logs failed:', err);
+                }
+            };
+        }
+    },
+
+    closeLogsModal() {
+        const modal = document.getElementById("log-modal");
+        if (!modal) return;
+        modal.style.display = "none";
+    },
+
+    // Copy all logs in the log modal to system clipboard
+    async copyLogsToClipboard() {
+        const consoleEl = document.getElementById('log-console');
+        if (!consoleEl) {
+            this.showCustomNotification('No logs to copy', 'error');
+            return;
+        }
+        // Prefer collecting child lines to preserve line breaks
+        const lines = Array.from(consoleEl.children || []).map((n) => n.textContent || '');
+        const text = (lines.length ? lines : [consoleEl.textContent || '']).join('\n');
+
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                // Fallback for older environments
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.top = '-1000px';
+                document.body.appendChild(ta);
+                ta.focus();
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }
+            this.showCustomNotification('Logs copied to clipboard', 'success');
+        } catch (e) {
+            this.showCustomNotification('Failed to copy logs', 'error');
+            throw e;
+        }
     },
 
     // Mirror: set up listeners for debug mode
     setupMirrorListeners() {
         // Start guards
         let mirrorStarted = false;
-        const bindMirrorRemote = async () => {
-            if (mirrorStarted) return;
-            try {
-                const { host, port } = getPreferredTarget();
-                await invoke("start_mirror_client", { host, port });
-                mirrorStarted = true;
-                this.mirrorLog(`[MIRROR] Started on ${host}:${port}`);
-            } catch (e) {
-                this.mirrorLog(`[MIRROR] start failed: ${e}`);
-            }
-        };
+        // Mirror detection handled by Rust backend
         const stopMirrorIfRunning = async (reason) => {
             try {
                 await invoke("stop_mirror_client");
@@ -425,11 +501,7 @@ const App = {
         window.__S1OnEvent = async (code) => {
             try {
                 this.mirrorLog(`[IPC] S1 event: ${code}`);
-                // Start mirror on EnteringLobby(1003)
-                if (code === 1003) {
-                    await bindMirrorRemote();
-                }
-                // Stop on GameExit(1020)/GameCrash(1021)
+                // Stop mirror on GameExit(1020)/GameCrash(1021)
                 if (code === 1020 || code === 1021) {
                     await stopMirrorIfRunning(`event ${code}`);
                 }
@@ -441,27 +513,12 @@ const App = {
         listen("s1_event", (event) => {
             const code = event && event.payload;
             if (typeof code === "number") {
-                try {
-                    window.__S1OnEvent && window.__S1OnEvent(code);
-                } catch (e) {
-                    this.mirrorLog(`[S1] forward error: ${e}`);
-                }
-            } else {
-                this.mirrorLog(`[S1] invalid event payload: ${JSON.stringify(event && event.payload)}`);
+                this.mirrorLog(`[S1] Event: ${code}`);
             }
         });
-        // Mirror packet logging removed - use main log window instead
 
-        // Pipe backend textual logs into console
-        listen("log_message", (event) => {
-            const msg = typeof event.payload === "string" ? event.payload : JSON.stringify(event.payload);
-            this.mirrorLog(msg);
-        });
     },
-
-    
-
-
+ 
     // Function to handle the first launch
     async handleFirstLaunch() {
         console.log("First time launch detected");
