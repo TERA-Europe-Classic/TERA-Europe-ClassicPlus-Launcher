@@ -14,6 +14,7 @@ pub use game::{
     enable_file_logging,
     TeraLogger,
     subscribe_game_events,
+    get_last_spawned_pid,
 };
 
 pub mod global_credentials;

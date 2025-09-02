@@ -109,7 +109,7 @@ impl S1Event {
     /// Returns true if this event should trigger starting the mirror client
     pub fn should_start_mirror_client(&self) -> bool {
         matches!(self,
-            S1Event::EnteringLobby
+            S1Event::EnteredLobby
         )
     }
 }

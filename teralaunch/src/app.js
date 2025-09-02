@@ -466,17 +466,7 @@ const App = {
     setupMirrorListeners() {
         // Start guards
         let mirrorStarted = false;
-        const bindMirrorRemote = async () => {
-            if (mirrorStarted) return;
-            try {
-                const { host, port } = getPreferredTarget();
-                await invoke("start_mirror_client", { host, port });
-                mirrorStarted = true;
-                this.mirrorLog(`[MIRROR] Started on ${host}:${port}`);
-            } catch (e) {
-                this.mirrorLog(`[MIRROR] start failed: ${e}`);
-            }
-        };
+        // Mirror detection handled by Rust backend
         const stopMirrorIfRunning = async (reason) => {
             try {
                 await invoke("stop_mirror_client");
@@ -511,11 +501,7 @@ const App = {
         window.__S1OnEvent = async (code) => {
             try {
                 this.mirrorLog(`[IPC] S1 event: ${code}`);
-                // Start mirror on EnteringLobby(1003)
-                if (code === 1003) {
-                    await bindMirrorRemote();
-                }
-                // Stop on GameExit(1020)/GameCrash(1021)
+                // Stop mirror on GameExit(1020)/GameCrash(1021)
                 if (code === 1020 || code === 1021) {
                     await stopMirrorIfRunning(`event ${code}`);
                 }
@@ -527,13 +513,7 @@ const App = {
         listen("s1_event", (event) => {
             const code = event && event.payload;
             if (typeof code === "number") {
-                try {
-                    window.__S1OnEvent && window.__S1OnEvent(code);
-                } catch (e) {
-                    this.mirrorLog(`[S1] forward error: ${e}`);
-                }
-            } else {
-                // Ignore malformed payloads
+                this.mirrorLog(`[S1] Event: ${code}`);
             }
         });
 

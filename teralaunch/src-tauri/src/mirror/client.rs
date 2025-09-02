@@ -16,14 +16,14 @@ pub async fn start_mirror_client(window: tauri::Window, host: String, port: u16)
 
     let tx = PACKET_BROADCAST_TX.clone();
     let handle = tokio::spawn(async move {
-        let _ = window.emit("log_message", format!("[MIRROR] Starting tap for {}", addr));
+        let _ = window.emit("log_message", format!("Starting mirror client for {}", addr));
 
         match connect_and_process(&window, &addr, &tx).await {
             Ok(_) => {
-                let _ = window.emit("log_message", "[MIRROR] Connection ended normally");
+                let _ = window.emit("log_message", "Mirror connection ended normally");
             }
             Err(e) => {
-                let _ = window.emit("log_message", format!("[MIRROR] Connection failed: {}", e));
+                let _ = window.emit("log_message", format!("Mirror connection failed: {}", e));
             }
         }
     });
@@ -39,7 +39,7 @@ async fn connect_and_process(
 ) -> Result<(), String> {
     // Connect to proxy server
     let mut stream = TcpStream::connect(addr).await.map_err(|e| format!("connect error: {}", e))?;
-    let _ = window.emit("log_message", format!("[MIRROR] Connected to {}", addr));
+    let _ = window.emit("log_message", format!("Connected to mirror server {}", addr));
 
     // Send hello and auth
     stream.write_all(b"AGNIMIRR").await.map_err(|e| format!("hello error: {}", e))?;
@@ -78,7 +78,7 @@ async fn connect_and_process(
 
                     // Validate frame size to prevent buffer overflow from corrupted data
                     if frame_total > 65536 {
-                        let _ = window.emit("log_message", format!("[MIRROR] Invalid frame size {}, clearing buffer", frame_total));
+                        let _ = window.emit("log_message", format!("Invalid frame size {}, clearing buffer", frame_total));
                         acc.clear(); // Clear corrupted buffer
                         break;
                     }
@@ -88,7 +88,7 @@ async fn connect_and_process(
                     let opcode = u16::from_le_bytes([acc[pos + 3], acc[pos + 4]]);
                     let payload = &acc[pos + 5..pos + 5 + payload_len];
 
-                    let _ = window.emit("log_message", format!("[MIRROR] Packet dir={} ({}), frame_len={} (no-transport), tera_len={} , opcode={} (dec:{} 0x{:04X}), payload_len={}", dir, if dir == 1 { "C2S" } else if dir == 2 { "S2C" } else { "?" }, frame_total, tera_len, opcode, opcode, opcode, payload.len()));
+                    // Verbose packet logging disabled for production
 
                     let mut out = Vec::with_capacity(frame_total);
                     out.push(dir);
@@ -107,7 +107,7 @@ async fn connect_and_process(
                 
                 // Prevent buffer from growing indefinitely with incomplete data
                 if acc.len() > 65536 { // 64KB limit for incomplete packets
-                    let _ = window.emit("log_message", "[MIRROR] Buffer too large, clearing incomplete data");
+                    let _ = window.emit("log_message", "Buffer too large, clearing incomplete data");
                     acc.clear();
                 }
             }
