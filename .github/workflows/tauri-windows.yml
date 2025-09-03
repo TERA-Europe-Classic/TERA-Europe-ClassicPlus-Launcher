@@ -1,0 +1,109 @@
+name: Build Tauri (Windows, v1)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'teralaunch/src-tauri/tauri.conf.json'
+    tags:
+      - 'v*'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      # Provided via GitHub Secrets
+      TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+      TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install NSIS
+        run: choco install nsis -y
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            **/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install Cargo Tauri CLI v1
+        run: cargo install --locked tauri-cli@^1
+
+      - name: Determine version from tauri.conf.json
+        id: ver
+        run: |
+          $json = Get-Content 'teralaunch/src-tauri/tauri.conf.json' -Raw | ConvertFrom-Json
+          $v = $json.package.version
+          echo "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Check if tag exists
+        id: tagcheck
+        run: |
+          git fetch --tags --force
+          $tag = "v${{ steps.ver.outputs.version }}"
+          $exists = git tag -l $tag
+          if ($exists) { echo "exists=true" >> $env:GITHUB_OUTPUT } else { echo "exists=false" >> $env:GITHUB_OUTPUT }
+
+      - name: Run builder.ps1
+        working-directory: .
+        run: |
+          Get-ChildItem -Path . -Name
+          Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+          ./builder.ps1
+
+      - name: Upload NSIS installer
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nsis-installer
+          path: |
+            teralaunch/src-tauri/target/release/bundle/nsis/*.exe
+
+      - name: Upload NSIS updater zip
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nsis-updater-zip
+          path: |
+            teralaunch/src-tauri/target/release/bundle/nsis/*.nsis.zip
+
+      - name: Upload NSIS updater signature
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nsis-updater-signature
+          path: |
+            teralaunch/src-tauri/target/release/bundle/nsis/*.nsis.zip.sig
+
+      - name: Create GitHub Release on version bump
+        if: steps.tagcheck.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: TERA-Europe-Launcher v${{ steps.ver.outputs.version }}
+          body: |
+            Automated release for version ${{ steps.ver.outputs.version }}.
+          draft: false
+          prerelease: false
+          files: |
+            teralaunch/src-tauri/target/release/bundle/nsis/*.exe
+            teralaunch/src-tauri/target/release/bundle/nsis/*.nsis.zip
+            teralaunch/src-tauri/target/release/bundle/nsis/*.nsis.zip.sig
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

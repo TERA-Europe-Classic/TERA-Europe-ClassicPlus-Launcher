@@ -133,6 +133,9 @@ const App = {
      */
     async init() {
         try {
+            // Perform a pre-launch auto update before showing the window
+            await this.prelaunchAutoUpdate();
+
             this.disableContextMenu();
             const savedTheme = localStorage.getItem("theme");
             if (savedTheme === "light") {
@@ -160,6 +163,7 @@ const App = {
             this.setupMirrorListeners();
             this.sendStoredAuthInfoToBackend();
             this.setupMutationObserver();
+
             await this.checkLauncherUpdate();
 
             this.checkAuthentication();
@@ -365,6 +369,64 @@ const App = {
             this.mirrorLog(msg);
         });
 
+    },
+
+    // Minimal Tauri App self-updater (separate from game patcher)
+    // Uses Tauri v1 global API available on window.__TAURI__
+    async checkAppUpdate(silent = false, auto = false) {
+        try {
+            const updater = window.__TAURI__?.updater;
+            const process = window.__TAURI__?.process;
+            if (!updater || !process) {
+                console.warn("Tauri updater API not available");
+                return;
+            }
+            const { shouldUpdate, manifest } = await updater.checkUpdate();
+            if (shouldUpdate) {
+                if (auto) {
+                    await this.installAppUpdate();
+                } else {
+                    const next = await ask(
+                        `Update ${manifest?.version || ""} available. Install now?`,
+                        { title: "Launcher Update", type: "info" }
+                    );
+                    if (next) {
+                        await this.installAppUpdate();
+                    }
+                }
+            } else {
+                if (!silent) this.showCustomNotification("You are on the latest launcher.", "success");
+            }
+        } catch (e) {
+            console.error("checkAppUpdate failed", e);
+            if (!silent) this.showCustomNotification("Update check failed.", "error");
+        }
+    },
+
+    // Pre-launch auto update: perform a silent check and auto-install before showing the window
+    async prelaunchAutoUpdate() {
+        try {
+            // If an update is available this will install and relaunch; otherwise it returns
+            await this.checkAppUpdate(true, true);
+        } catch (e) {
+            // Do not block startup if updater fails
+            console.warn("prelaunchAutoUpdate failed", e);
+        } finally {
+            try { await appWindow.show(); } catch {}
+        }
+    },
+
+    async installAppUpdate() {
+        try {
+            const updater = window.__TAURI__?.updater;
+            const process = window.__TAURI__?.process;
+            if (!updater || !process) return;
+            await updater.installUpdate();
+            await process.relaunch();
+        } catch (e) {
+            console.error("installAppUpdate failed", e);
+            this.showCustomNotification("Update installation failed.", "error");
+        }
     },
 
     // Append a line into the logs console used by mirror and backend messages
@@ -674,6 +736,15 @@ const App = {
                 });
             }
         });
+
+        // Wire: Check Launcher Update
+        const checkLauncherUpdate = document.getElementById("check-launcher-update");
+        if (checkLauncherUpdate) {
+            checkLauncherUpdate.addEventListener("click", async (e) => {
+                e.preventDefault();
+                await this.checkAppUpdate(false);
+            });
+        }
     },
 
     // Function to complete the first launch process
