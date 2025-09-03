@@ -997,9 +997,9 @@ fn parse_server_list_json(json: &Value) -> Result<ServerList, Box<dyn std::error
 
         let unavailable_message = server["unavailable_message"].as_str().unwrap_or("");
 
-        // Format server names with (0) suffix like Enterance does
-        let formatted_name = format!("{}(0)", name);
-        let formatted_title = format!("{}(0)", title);
+        // Do not add character count suffix; keep original names exactly as provided
+        let formatted_name = name.clone();
+        let formatted_title = name.clone();
         
         let server_info = ServerInfo {
             id: server_id,
