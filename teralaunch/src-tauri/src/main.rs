@@ -20,8 +20,11 @@ use std::process::Command;
 use dotenvy::dotenv;
 use log::{LevelFilter, error, info};
 
-use tokio::sync::{watch, Mutex, mpsc};
+use tokio::sync::{watch, Mutex, mpsc, Semaphore};
+use tokio::task::JoinSet;
 use tokio::io::AsyncWriteExt;
+use tokio::io::AsyncReadExt;
+use tokio::io::BufWriter;
 use tokio::runtime::Runtime;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -37,7 +40,7 @@ use sha2::{Sha256, Digest};
 use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use walkdir::WalkDir;
-use reqwest::header::{USER_AGENT};
+use reqwest::header::{USER_AGENT, RANGE};
 
 use crate::mirror::client::{start_mirror_client, stop_mirror_client};
 use crate::mirror::broadcaster::start_broadcast_server;
@@ -166,6 +169,9 @@ lazy_static! {
     static ref HASH_CACHE: Mutex<HashMap<String, CachedFileInfo>> = Mutex::new(HashMap::new());
     static ref CANCEL_DOWNLOAD: AtomicBool = AtomicBool::new(false);
 }
+
+static GLOBAL_DOWNLOADED_BYTES: AtomicU64 = AtomicU64::new(0);
+static CURRENT_FILE_NAME: RwLock<String> = RwLock::new(String::new());
 
 
 /* fn get_config_value(key: &str) -> String {
@@ -540,7 +546,18 @@ fn get_game_path() -> Result<PathBuf, String> {
 
 
 #[tauri::command]
-fn save_game_path_to_config(path: String) -> Result<(), String> {
+async fn save_game_path_to_config(path: String, window: tauri::Window, app_handle: tauri::AppHandle) -> Result<(), String> {
+    // Capture previous path before writing, so we can detect actual changes
+    let prev_path_string = get_game_path()
+        .ok()
+        .and_then(|p| p.to_str().map(|s| s.to_string()));
+
+    // Simple path normalizer to compare semantically equal paths
+    let normalize = |s: &str| -> String {
+        let mut t = s.replace('\\', "/");
+        while t.ends_with('/') { t.pop(); }
+        t.to_lowercase()
+    };
     let config_path = find_config_file().ok_or("Config file not found")?;
     let mut conf = Ini::load_from_file(&config_path).map_err(|e|
         format!("Failed to load config: {}", e)
@@ -549,6 +566,36 @@ fn save_game_path_to_config(path: String) -> Result<(), String> {
     conf.with_section(Some("game")).set("path", &path);
 
     conf.write_to_file(&config_path).map_err(|e| format!("Failed to write config: {}", e))?;
+
+    // Only interrupt/recheck when path actually changed
+    let should_refresh = match &prev_path_string {
+        Some(prev) => normalize(prev) != normalize(&path),
+        None => true,
+    };
+
+    if should_refresh {
+        // Interrupt any ongoing downloads
+        CANCEL_DOWNLOAD.store(true, Ordering::SeqCst);
+        let window_clone = window.clone();
+        let app_handle_clone = app_handle.clone();
+
+        // Run file check and download (if needed) in background so UI stays responsive
+        tauri::async_runtime::spawn(async move {
+            // Give any in-flight tasks a brief moment to observe cancellation
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            // Perform file check for the new path and download missing files
+            match get_files_to_update(window_clone.clone()).await {
+                Ok(files) => {
+                    if !files.is_empty() {
+                        let _ = download_all_files(app_handle_clone, window_clone, files).await;
+                    }
+                }
+                Err(e) => {
+                    let _ = window_clone.emit("error", e);
+                }
+            }
+        });
+    }
 
     Ok(())
 }
@@ -586,8 +633,13 @@ async fn update_file(
     total_files: usize,
     current_file_index: usize,
     total_size: u64,
-    downloaded_size: u64,
 ) -> Result<u64, String> {
+    // Update the current file name for global progress tracking
+    {
+        let mut current_file = CURRENT_FILE_NAME.write().unwrap();
+        *current_file = file_info.path.clone();
+    }
+    
     let game_path = get_game_path()?;
     let file_path = game_path.join(&file_info.path);
 
@@ -601,6 +653,11 @@ async fn update_file(
 
     let client = reqwest::Client::builder()
         .no_proxy()
+        .timeout(Duration::from_secs(300)) // 5 minute timeout
+        .connect_timeout(Duration::from_secs(30)) // 30 second connect timeout
+        .tcp_keepalive(Duration::from_secs(60)) // Keep connections alive
+        .pool_max_idle_per_host(20) // More connection pooling
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -615,89 +672,181 @@ async fn update_file(
     if file_path.exists() {
         tokio::fs::remove_file(&file_path).await.map_err(|e| e.to_string())?;
     }
-    let mut file = tokio::fs::File::create(&file_path).await.map_err(|e| e.to_string())?;
-
-    let req = client.get(&corrected_url);
-
-    let res = req.send().await.map_err(|e| e.to_string())?;
+    let file_handle = tokio::fs::File::create(&file_path).await.map_err(|e| e.to_string())?;
+    let mut file = BufWriter::with_capacity(1024 * 1024, file_handle); // 1MB buffer
 
     let file_size = file_info.size;
-    let mut downloaded: u64 = 0;
-    let mut stream = res.bytes_stream();
-    let start_time = Instant::now();
-    let mut last_update = Instant::now();
 
-    info!("Downloading file: {}", file_info.path);
+    // Thresholds for chunked parallelism
+    const CHUNK_MIN_SIZE: u64 = 16 * 1024 * 1024; // 16 MB
+    const PART_SIZE: u64 = 32 * 1024 * 1024; // 32 MB
+    const MAX_PARTS: usize = 32;
 
-    while let Some(chunk_result) = stream.next().await {
-        if CANCEL_DOWNLOAD.load(Ordering::SeqCst) {
-            return Err("cancelled".into());
-        }
-        let chunk = chunk_result.map_err(|e| e.to_string())?;
-        file.write_all(&chunk).await.map_err(|e| e.to_string())?;
-        downloaded += chunk.len() as u64;
+    info!("Downloading file: {} ({} bytes)", file_info.path, file_size);
+    let download_start = Instant::now();
+    let mut bytes_written: u64 = 0;
 
-        let now = Instant::now();
-        if now.duration_since(last_update) >= Duration::from_millis(100) || downloaded == file_size {
-            let elapsed = now.duration_since(start_time);
-            let speed = if elapsed.as_secs() > 0 { downloaded / elapsed.as_secs() } else { downloaded };
+    if file_size >= CHUNK_MIN_SIZE {
+        // Check if server supports range requests; fallback if not
+        let range_probe = client
+            .get(&corrected_url)
+            .header(RANGE, "bytes=0-0")
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        let supports_range = range_probe.status() == reqwest::StatusCode::PARTIAL_CONTENT
+            || range_probe.headers().get("content-range").is_some();
 
-            let total_downloaded = downloaded_size + downloaded;
-            let progress_payload = ProgressPayload {
-                file_name: file_info.path.clone(),
-                progress: (downloaded as f64 / file_size as f64) * 100.0,
-                speed: speed as f64,
-                downloaded_bytes: total_downloaded,
-                total_bytes: total_size,
-                total_files,
-                elapsed_time: elapsed.as_secs_f64(),
-                current_file_index,
-            };
+        if !supports_range {
+            info!("Server does not support range requests. Falling back to single-stream for {}", file_info.path);
+            // Single-stream fallback
+            let res = client
+                .get(&corrected_url)
+                .header("Accept-Encoding", "gzip, deflate, br")
+                .header("Connection", "keep-alive")
+                .header("Cache-Control", "no-cache")
+                .send()
+                .await
+                .map_err(|e| e.to_string())?
+                .error_for_status()
+                .map_err(|e| e.to_string())?;
 
-            info!(
-                "Current file: {}, Download speed: {}/s, Progress: {:.2}%",
-                file_info.path,
-                format_bytes(speed),
-                progress_payload.progress
-            );
+            let mut downloaded: u64 = 0;
+            let mut stream = res.bytes_stream();
+            let start_time = Instant::now();
+            let mut last_update = Instant::now();
 
-            if let Err(e) = window.emit("download_progress", &progress_payload) {
-                error!("Failed to emit download_progress event: {}", e);
+            while let Some(chunk_result) = stream.next().await {
+                if CANCEL_DOWNLOAD.load(Ordering::SeqCst) { return Err("cancelled".into()); }
+                let chunk = chunk_result.map_err(|e| e.to_string())?;
+                file.write_all(&chunk).await.map_err(|e| e.to_string())?;
+                let len = chunk.len() as u64;
+                downloaded += len;
+                GLOBAL_DOWNLOADED_BYTES.fetch_add(len, Ordering::SeqCst);
+
+                let now = Instant::now();
             }
-            last_update = now;
+            bytes_written = downloaded;
+        } else {
+        // Perform chunked parallel download using HTTP ranges into temp parts
+        let num_parts = std::cmp::max(1, std::cmp::min(MAX_PARTS as u64, (file_size + PART_SIZE - 1) / PART_SIZE) as usize);
+        let mut join_set: JoinSet<Result<(), String>> = JoinSet::new();
+
+        for part_idx in 0..num_parts {
+            if CANCEL_DOWNLOAD.load(Ordering::SeqCst) { return Err("cancelled".into()); }
+
+            let start = (part_idx as u64) * PART_SIZE;
+            let mut end = ((part_idx as u64 + 1) * PART_SIZE).saturating_sub(1);
+            if end >= file_size { end = file_size - 1; }
+
+            let part_url = corrected_url.clone();
+            let window_cl = window.clone();
+            let part_path = file_path.with_extension(format!("part{}", part_idx));
+            let file_name = file_info.path.clone();
+
+            join_set.spawn(async move {
+                let client = reqwest::Client::builder()
+                    .no_proxy()
+                    .timeout(Duration::from_secs(300))
+                    .connect_timeout(Duration::from_secs(30))
+                    .tcp_keepalive(Duration::from_secs(60))
+                    .pool_max_idle_per_host(20)
+                    .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                    .build()
+                    .map_err(|e| e.to_string())?;
+                let range_header = format!("bytes={}-{}", start, end);
+                let res = client
+                    .get(&part_url)
+                    .header(RANGE, range_header)
+                    .header("Accept-Encoding", "gzip, deflate, br")
+                    .header("Connection", "keep-alive")
+                    .header("Cache-Control", "no-cache")
+                    .send()
+                    .await
+                    .map_err(|e| e.to_string())?
+                    .error_for_status()
+                    .map_err(|e| e.to_string())?;
+
+                let mut stream = res.bytes_stream();
+                let mut part_file = BufWriter::with_capacity(1024 * 1024,
+                    tokio::fs::File::create(&part_path).await.map_err(|e| e.to_string())?
+                );
+                let mut last_update = Instant::now();
+                let mut part_downloaded: u64 = 0;
+                let start_time = Instant::now();
+
+                while let Some(chunk_result) = stream.next().await {
+                    if CANCEL_DOWNLOAD.load(Ordering::SeqCst) { return Err("cancelled".into()); }
+                    let chunk = chunk_result.map_err(|e| e.to_string())?;
+                    part_file.write_all(&chunk).await.map_err(|e| e.to_string())?;
+                    let len = chunk.len() as u64;
+                    part_downloaded += len;
+                    GLOBAL_DOWNLOADED_BYTES.fetch_add(len, Ordering::SeqCst);
+
+                    let now = Instant::now();
+                }
+
+                part_file.flush().await.map_err(|e| e.to_string())?;
+                Ok(())
+            });
         }
 
-        tokio::time::sleep(Duration::from_millis(1)).await;
+        while let Some(res) = join_set.join_next().await {
+            match res {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => return Err(e),
+                Err(e) => return Err(format!("Join error: {}", e)),
+            }
+        }
+
+        // Assemble parts
+        for part_idx in 0..num_parts {
+            let part_path = file_path.with_extension(format!("part{}", part_idx));
+            let mut part_f = tokio::fs::File::open(&part_path).await.map_err(|e| e.to_string())?;
+            let mut buf = vec![0u8; 64 * 1024];
+            loop {
+                let n = part_f.read(&mut buf).await.map_err(|e| e.to_string())?;
+                if n == 0 { break; }
+                file.write_all(&buf[..n]).await.map_err(|e| e.to_string())?;
+            }
+            tokio::fs::remove_file(&part_path).await.ok();
+        }
+        bytes_written = file_size;
+        }
+    } else {
+        // Single-stream download
+        let req = client.get(&corrected_url);
+        let res = req
+            .send()
+            .await
+            .map_err(|e| e.to_string())?
+            .error_for_status()
+            .map_err(|e| e.to_string())?;
+
+        let mut downloaded: u64 = 0;
+        let mut stream = res.bytes_stream();
+        let start_time = Instant::now();
+        let mut last_update = Instant::now();
+
+        while let Some(chunk_result) = stream.next().await {
+            if CANCEL_DOWNLOAD.load(Ordering::SeqCst) { return Err("cancelled".into()); }
+            let chunk = chunk_result.map_err(|e| e.to_string())?;
+            file.write_all(&chunk).await.map_err(|e| e.to_string())?;
+            let len = chunk.len() as u64;
+            downloaded += len;
+            GLOBAL_DOWNLOADED_BYTES.fetch_add(len, Ordering::SeqCst);
+
+            let now = Instant::now();
+        }
+        bytes_written = downloaded;
     }
 
     file.flush().await.map_err(|e| e.to_string())?;
 
-    // Verify the downloaded file matches the expected hash
-    let downloaded_hash = tokio::task::spawn_blocking(move || {
-        calculate_file_hash(&file_path)
-    }).await.map_err(|e| e.to_string())??;
-    if downloaded_hash != file_info.hash {
-        return Err(format!("Hash mismatch for file: {}", file_info.path));
-    }
-
-    // Emit a final event for this file
-    let final_progress_payload = ProgressPayload {
-        file_name: file_info.path.clone(),
-        progress: 100.0,
-        speed: 0.0,
-        downloaded_bytes: downloaded_size + downloaded,
-        total_bytes: total_size,
-        total_files,
-        elapsed_time: start_time.elapsed().as_secs_f64(),
-        current_file_index,
-    };
-    if let Err(e) = window.emit("download_progress", &final_progress_payload) {
-        error!("Failed to emit final download_progress event: {}", e);
-    }
 
     info!("File download completed: {}", file_info.path);
 
-    Ok(downloaded)
+    Ok(bytes_written)
 }
 
 fn format_bytes(bytes: u64) -> String {
@@ -730,36 +879,119 @@ async fn download_all_files(
         return Ok(vec![]);
     }
 
-    let mut downloaded_sizes = Vec::with_capacity(total_files);
-    let mut downloaded_size: u64 = 0;
-
+    let mut results: Vec<Option<u64>> = vec![None; total_files];
+    let mut files_by_index: Vec<Option<FileInfo>> = vec![None; total_files];
+    GLOBAL_DOWNLOADED_BYTES.store(0, Ordering::SeqCst);
     CANCEL_DOWNLOAD.store(false, Ordering::SeqCst);
+
+    const MAX_CONCURRENT_DOWNLOADS: usize = 16;
+    let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_DOWNLOADS));
+    let global_start = Instant::now();
+
+    // Emit a smooth global progress tick to stabilize UI speed/ETA
+    {
+        let window_tick = window.clone();
+        let total_bytes_tick = total_size;
+        let total_files_tick = total_files;
+        tauri::async_runtime::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_millis(500));
+            loop {
+                interval.tick().await;
+                let d = GLOBAL_DOWNLOADED_BYTES.load(Ordering::SeqCst);
+                let elapsed = global_start.elapsed();
+                let speed = if elapsed.as_secs() > 0 { d / elapsed.as_secs() } else { 0 };
+                let current_file_name = {
+                    let current_file = CURRENT_FILE_NAME.read().unwrap();
+                    current_file.clone()
+                };
+                
+                let payload = ProgressPayload {
+                    file_name: current_file_name,
+                    progress: if total_bytes_tick > 0 { (d as f64 / total_bytes_tick as f64) * 100.0 } else { 0.0 },
+                    speed: speed as f64,
+                    downloaded_bytes: d,
+                    total_bytes: total_bytes_tick,
+                    total_files: total_files_tick,
+                    elapsed_time: elapsed.as_secs_f64(),
+                    current_file_index: 0,
+                };
+                let _ = window_tick.emit("global_download_progress", &payload);
+                if d >= total_bytes_tick || CANCEL_DOWNLOAD.load(Ordering::SeqCst) {
+                    break;
+                }
+            }
+        });
+    }
+    let mut join_set: JoinSet<(usize, Result<u64, String>)> = JoinSet::new();
 
     for (index, file_info) in files_to_update.into_iter().enumerate() {
         if CANCEL_DOWNLOAD.load(Ordering::SeqCst) {
             let _ = window.emit("download_cancelled", ());
             break;
         }
+        files_by_index[index] = Some(file_info.clone());
+        let permit = semaphore.clone().acquire_owned().await.map_err(|e| e.to_string())?;
+        let app_handle_cl = app_handle.clone();
+        let window_cl = window.clone();
+        let file_info_cl = file_info.clone();
+        join_set.spawn(async move {
+            let _permit = permit;
+            let res = update_file(
+                app_handle_cl,
+                window_cl,
+                file_info_cl,
+                total_files,
+                index + 1,
+                total_size,
+            ).await;
+            (index, res)
+        });
+    }
 
-        let file_size = match update_file(
-            app_handle.clone(),
-            window.clone(),
-            file_info,
-            total_files,
-            index + 1,
-            total_size,
-            downloaded_size
-        ).await {
-            Ok(size) => size,
-            Err(e) if e == "cancelled" => {
-                let _ = window.emit("download_cancelled", ());
-                break;
+    while let Some(jr) = join_set.join_next().await {
+        match jr {
+            Ok((idx, Ok(sz))) => {
+                results[idx] = Some(sz);
             }
-            Err(e) => return Err(e),
-        };
+            Ok((_idx, Err(e))) => {
+                if e == "cancelled" {
+                    let _ = window.emit("download_cancelled", ());
+                    CANCEL_DOWNLOAD.store(true, Ordering::SeqCst);
+                    break;
+                } else {
+                    return Err(e);
+                }
+            }
+            Err(e) => return Err(format!("Join error: {}", e)),
+        }
+    }
 
-        downloaded_size += file_size;
-        downloaded_sizes.push(file_size);
+    let downloaded_sizes: Vec<u64> = results.into_iter().filter_map(|x| x).collect();
+
+    if !CANCEL_DOWNLOAD.load(Ordering::SeqCst) {
+        // Post-download verification of files that completed
+        for (idx, maybe_size) in downloaded_sizes.iter().enumerate() {
+            let _ = maybe_size; // size not needed for verification
+        }
+        for (idx, maybe_file) in files_by_index.into_iter().enumerate() {
+            // Only verify files that finished successfully
+            // (we used results before moving it; so check via downloaded_sizes length wouldn't align by idx)
+            // Instead, recompute: if handler returned Some for this idx we already moved results, so we can't check here.
+            // To avoid confusion, re-run a cheap metadata check: if the file exists, verify hash.
+            if CANCEL_DOWNLOAD.load(Ordering::SeqCst) { break; }
+            if maybe_file.is_none() { continue; }
+            let file_info = maybe_file.unwrap();
+            let game_path = get_game_path()?;
+            let file_path = game_path.join(&file_info.path);
+            if !file_path.exists() { continue; }
+            let expected_hash = file_info.hash.clone();
+            let calc = tokio::task::spawn_blocking(move || {
+                calculate_file_hash(&file_path)
+            }).await.map_err(|e| e.to_string())??;
+            if calc != expected_hash {
+                return Err(format!("Hash mismatch after download for file: {}", file_info.path));
+            }
+        }
     }
 
     if CANCEL_DOWNLOAD.load(Ordering::SeqCst) {
