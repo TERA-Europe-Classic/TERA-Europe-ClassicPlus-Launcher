@@ -930,7 +930,7 @@ span#current-file {
 
 .tr-time {
     color: #bdc2d3;
-    min-width: 64px;
+    min-width: 120px;
 }
 
 .download-speed {
@@ -943,6 +943,17 @@ span#current-file {
     bottom: 10px;
     left: 50%;
     transform: translate(-50%, 0);
+}
+
+/* Keep numeric labels from shifting by using tabular figures and reserving width */
+.dl-speed-number,
+.tr-time {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1, 'lnum' 1;
+}
+
+.speed-value-container {
+    min-width: 120px;
 }
 .move-up-15px {
     transform: translate(-50%, 0);

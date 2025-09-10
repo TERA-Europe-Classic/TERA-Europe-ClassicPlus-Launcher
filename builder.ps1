@@ -67,11 +67,48 @@ if (-Not (Test-Path $nsisPath)) {
 $resolvedKey = $null
 $resolvedPwd = $null
 
+# Helper: read values from .env files
+function Get-DotEnvValue {
+    param(
+        [string]$FilePath,
+        [string]$Key
+    )
+    if (-Not (Test-Path $FilePath)) { return $null }
+    try {
+        foreach ($line in Get-Content -LiteralPath $FilePath) {
+            if ($null -eq $line -or $line.Trim().StartsWith('#') -or [string]::IsNullOrWhiteSpace($line)) { continue }
+            $parts = $line -split '=', 2
+            if ($parts.Length -ne 2) { continue }
+            $k = $parts[0].Trim()
+            if ($k -ne $Key) { continue }
+            $v = $parts[1].Trim()
+            # Strip surrounding quotes if present
+            if (($v.StartsWith('"') -and $v.EndsWith('"')) -or ($v.StartsWith("'") -and $v.EndsWith("'"))) {
+                $v = $v.Substring(1, $v.Length - 2)
+            }
+            return $v
+        }
+    } catch {}
+    return $null
+}
+
+# Potential .env locations (repo root, app root, src-tauri)
+$dotenvCandidates = @(
+    (Join-Path $PSScriptRoot ".env"),
+    (Join-Path $projectPath ".env"),
+    (Join-Path (Join-Path $projectPath "src-tauri") ".env")
+)
+
 # Precedence: Inline > Files > Existing Env
 if ($null -ne $PrivateKeyInline -and -not [string]::IsNullOrWhiteSpace($PrivateKeyInline)) {
     $resolvedKey = $PrivateKeyInline
 } elseif (Test-Path (Join-Path $PSScriptRoot "tauri_private_key.txt")) {
     $resolvedKey = Get-Content (Join-Path $PSScriptRoot "tauri_private_key.txt") -Raw
+} elseif (-not $resolvedKey) {
+    foreach ($envFile in $dotenvCandidates) {
+        $val = Get-DotEnvValue -FilePath $envFile -Key 'TAURI_PRIVATE_KEY'
+        if ($val) { $resolvedKey = $val; break }
+    }
 } elseif ($env:TAURI_PRIVATE_KEY) {
     $resolvedKey = $env:TAURI_PRIVATE_KEY
 }
@@ -80,6 +117,11 @@ if ($null -ne $PrivateKeyPasswordInline -and -not [string]::IsNullOrWhiteSpace($
     $resolvedPwd = $PrivateKeyPasswordInline
 } elseif (Test-Path (Join-Path $PSScriptRoot "tauri_private_key_password.txt")) {
     $resolvedPwd = Get-Content (Join-Path $PSScriptRoot "tauri_private_key_password.txt") -Raw
+} elseif (-not $resolvedPwd) {
+    foreach ($envFile in $dotenvCandidates) {
+        $val = Get-DotEnvValue -FilePath $envFile -Key 'TAURI_KEY_PASSWORD'
+        if ($val) { $resolvedPwd = $val; break }
+    }
 } elseif ($env:TAURI_KEY_PASSWORD) {
     $resolvedPwd = $env:TAURI_KEY_PASSWORD
 }

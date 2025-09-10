@@ -133,9 +133,6 @@ const App = {
      */
     async init() {
         try {
-            // Perform a pre-launch auto update before showing the window
-            await this.prelaunchAutoUpdate();
-
             this.disableContextMenu();
             const savedTheme = localStorage.getItem("theme");
             if (savedTheme === "light") {
@@ -334,17 +331,49 @@ const App = {
      */
     setupUpdateListeners() {
         listen("download_progress", this.handleDownloadProgress.bind(this));
+        // Stabilized global progress for speed/ETA and total bar
+        listen("global_download_progress", (event) => {
+            const p = event?.payload;
+            if (!p) return;
+            const now = Date.now();
+            const totalDownloadedBytes = p.downloaded_bytes || 0;
+            const totalSize = p.total_bytes || this.state.totalSize || 0;
+            const elapsed = p.elapsed_time || 0;
+            const globalSpeed = elapsed > 0 ? totalDownloadedBytes / elapsed : 0;
+            const timeRemaining = this.calculateGlobalTimeRemaining(
+                totalDownloadedBytes,
+                totalSize,
+                globalSpeed,
+            );
+
+            console.log("Global progress - current mode:", this.state.currentUpdateMode, "downloaded:", totalDownloadedBytes, "total:", totalSize);
+
+            // Only update progress data, don't touch currentUpdateMode
+            this.setState({
+                currentProgress: totalSize > 0 ? Math.min(100, (totalDownloadedBytes / totalSize) * 100) : 0,
+                currentSpeed: globalSpeed,
+                downloadedSize: totalDownloadedBytes,
+                totalDownloadedBytes: totalDownloadedBytes,
+                totalSize: totalSize,
+                timeRemaining: timeRemaining,
+                currentFileName: p.file_name || "",
+                lastProgressUpdate: now,
+            });
+
+            // Force a UI refresh so Speed/ETA labels update immediately
+            this.updateUI();
+        });
         listen("file_check_progress", this.handleFileCheckProgress.bind(this));
         listen("file_check_completed", this.handleFileCheckCompleted.bind(this));
         listen("download_complete", () => {
-            this.setState({
-                isDownloadComplete: true,
-                currentProgress: 100,
-                currentUpdateMode: "complete",
-            });
+            // Finalize via unified completion path
+            this.handleCompletion();
         });
         listen("download_cancelled", () => {
-            this.setState({ currentUpdateMode: "ready" });
+            // Treat cancellation from the backend as a paused download
+            this.setState({ currentUpdateMode: "paused", isUpdateAvailable: true });
+            this.updateLaunchGameButton(true);
+            this.updateUI();
         });
     },
 
@@ -400,19 +429,6 @@ const App = {
         } catch (e) {
             console.error("checkAppUpdate failed", e);
             if (!silent) this.showCustomNotification("Update check failed.", "error");
-        }
-    },
-
-    // Pre-launch auto update: perform a silent check and auto-install before showing the window
-    async prelaunchAutoUpdate() {
-        try {
-            // If an update is available this will install and relaunch; otherwise it returns
-            await this.checkAppUpdate(true, true);
-        } catch (e) {
-            // Do not block startup if updater fails
-            console.warn("prelaunchAutoUpdate failed", e);
-        } finally {
-            try { await appWindow.show(); } catch {}
         }
     },
 
@@ -855,8 +871,21 @@ const App = {
             timeRemaining,
         });
 
+        // Smooth the displayed file name to the most active file over a short window
+        if (!this._activeFileWindow) this._activeFileWindow = [];
+        const nowTs = Date.now();
+        // keep last 1.5s samples
+        this._activeFileWindow.push({ t: nowTs, name: file_name });
+        this._activeFileWindow = this._activeFileWindow.filter((s) => nowTs - s.t <= 1500);
+        // mode: pick the most frequent name in window
+        const freq = {};
+        for (const s of this._activeFileWindow) freq[s.name] = (freq[s.name] || 0) + 1;
+        let topName = file_name;
+        let topCount = 0;
+        for (const k in freq) { if (freq[k] > topCount) { topCount = freq[k]; topName = k; } }
+
         this.setState({
-            currentFileName: file_name,
+            currentFileName: topName,
             currentProgress: Math.min(
                 100,
                 (totalDownloadedBytes / this.state.totalSize) * 100,
@@ -922,11 +951,16 @@ const App = {
             total_time_seconds,
             average_time_per_file_ms,
         } = event.payload;
+        // Mark file check done; only complete if there is nothing to download
+        const hasUpdates = (files_to_update ?? 0) > 0;
         this.setState({
             isFileCheckComplete: true,
-            currentUpdateMode: "complete",
+            isUpdateAvailable: hasUpdates,
+            currentUpdateMode: hasUpdates ? "complete" : this.state.currentUpdateMode,
         });
-        this.handleCompletion();
+        if (!hasUpdates) {
+            this.handleCompletion();
+        }
     },
 
     /**
@@ -996,15 +1030,6 @@ const App = {
             return; // Exit the function because we don't need to update other elements
         }
 
-        if (elements.timeRemaining) {
-            const timeText =
-                this.state.currentUpdateMode === "download"
-                    ? this.formatTime(this.state.timeRemaining)
-                    : "";
-            console.log("Formatted time:", timeText);
-            elements.timeRemaining.textContent = timeText || "Calculating...";
-        }
-
         this.updateTextContents(elements);
         this.updateProgressBar(elements);
         this.updateDownloadInfo(elements);
@@ -1050,18 +1075,26 @@ const App = {
      */
     updateProgressBar(elements) {
         const progress = Math.min(100, this.calculateProgress());
+        console.log("updateProgressBar - Progress:", progress);
+        console.log("updateProgressBar - Current update mode:", this.state.currentUpdateMode);
+        console.log("updateProgressBar - Is update available:", this.state.isUpdateAvailable);
+        
         if (elements.progressPercentage) {
-            if (this.state.currentUpdateMode === "ready") {
+            const showPct = this.state.isUpdateAvailable && (this.state.currentUpdateMode === "download" || this.state.currentUpdateMode === "paused");
+            console.log("updateProgressBar - Show percentage:", showPct);
+            if (!showPct) {
                 elements.progressPercentage.style.display = "none";
                 elements.currentFile.style.display = "none";
             } else {
                 elements.progressPercentage.style.display = "inline";
                 elements.progressPercentage.textContent = `(${Math.round(progress)}%)`;
                 elements.currentFile.style.display = "flex !important";
+                console.log("updateProgressBar - Percentage text set to:", elements.progressPercentage.textContent);
             }
         }
         if (elements.progressPercentageDiv) {
-            if (this.state.currentUpdateMode === "ready") {
+            const showBar = this.state.isUpdateAvailable && (this.state.currentUpdateMode === "download" || this.state.currentUpdateMode === "paused");
+            if (!showBar) {
                 elements.currentFile.style.display = "none";
             } else {
                 elements.progressPercentageDiv.style.width = `${progress}%`;
@@ -1077,37 +1110,39 @@ const App = {
      *      timeRemaining: The element to display the time remaining.
      */
     updateDownloadInfo(elements) {
-        console.log("Current update mode:", this.state.currentUpdateMode);
-        console.log("Current speed:", this.state.currentSpeed);
-        console.log("Time remaining:", this.state.timeRemaining);
+        console.log("updateDownloadInfo - Current update mode:", this.state.currentUpdateMode);
+        console.log("updateDownloadInfo - Current speed:", this.state.currentSpeed);
+        console.log("updateDownloadInfo - Time remaining:", this.state.timeRemaining);
+        console.log("updateDownloadInfo - Downloaded size:", this.state.downloadedSize);
+        console.log("updateDownloadInfo - Total size:", this.state.totalSize);
 
         if (elements.downloadSpeed) {
             const speedText =
                 this.state.currentUpdateMode === "download"
                     ? this.formatSpeed(this.state.currentSpeed)
                     : "";
-            console.log("Formatted speed:", speedText);
+            console.log("updateDownloadInfo - Formatted speed:", speedText);
             elements.downloadSpeed.textContent = speedText;
             console.log(
-                "Download speed element updated:",
+                "updateDownloadInfo - Download speed element updated:",
                 elements.downloadSpeed.textContent,
             );
         } else {
-            console.log("Download speed element not found");
+            console.log("updateDownloadInfo - Download speed element not found");
         }
         if (elements.timeRemaining) {
             const timeText =
                 this.state.currentUpdateMode === "download"
                     ? this.formatTime(this.state.timeRemaining)
                     : "";
-            console.log("Formatted time:", timeText);
+            console.log("updateDownloadInfo - Formatted time:", timeText);
             elements.timeRemaining.textContent = timeText;
             console.log(
-                "Time remaining element updated:",
+                "updateDownloadInfo - Time remaining element updated:",
                 elements.timeRemaining.textContent,
             );
         } else {
-            console.log("Time remaining element not found");
+            console.log("updateDownloadInfo - Time remaining element not found");
         }
     },
 
@@ -1132,6 +1167,9 @@ const App = {
         switch (this.state.currentUpdateMode) {
             case "file_check":
                 return this.t("VERIFYING_FILES");
+            case "paused":
+                // Reuse existing string to avoid translations; prevents showing READY text
+                return this.t("DOWNLOADING_FILES");
             case "download":
                 return this.t("DOWNLOADING_FILES");
             case "complete":
@@ -1180,11 +1218,9 @@ const App = {
     getStatusText() {
         if (this.state.isDownloadComplete) return this.t("DOWNLOAD_COMPLETE");
         if (!this.state.isUpdateAvailable) return this.t("NO_UPDATE_REQUIRED");
-        return this.t(
-            this.state.currentUpdateMode === "file_check"
-                ? "VERIFYING_FILES"
-                : "DOWNLOADING_FILES",
-        );
+        if (this.state.currentUpdateMode === "file_check") return this.t("VERIFYING_FILES");
+        // Treat paused as ongoing download for the status banner
+        return this.t("DOWNLOADING_FILES");
     },
 
     /**
@@ -1197,6 +1233,10 @@ const App = {
         const showDownloadInfo =
             this.state.isUpdateAvailable &&
             this.state.currentUpdateMode === "download";
+
+        console.log("updateElementsVisibility - Show download info:", showDownloadInfo);
+        console.log("updateElementsVisibility - Is update available:", this.state.isUpdateAvailable);
+        console.log("updateElementsVisibility - Current update mode:", this.state.currentUpdateMode);
 
         if (elements.currentFile)
             elements.currentFile.style.display = this.state.isUpdateAvailable
@@ -1222,19 +1262,41 @@ const App = {
                     ? "inline"
                     : "none";
         }
-        if (elements.downloadSpeed)
+        if (elements.downloadSpeed) {
             elements.downloadSpeed.style.display = showDownloadInfo
                 ? "inline"
                 : "none";
-        if (elements.timeRemaining)
+            console.log("updateElementsVisibility - Download speed display:", elements.downloadSpeed.style.display);
+        }
+        if (elements.timeRemaining) {
             elements.timeRemaining.style.display = showDownloadInfo
                 ? "inline"
                 : "none";
+            console.log("updateElementsVisibility - Time remaining display:", elements.timeRemaining.style.display);
+        }
+
+        // Also toggle the Speed:/Time remaining: labels themselves
+        const speedLabel = document.querySelector(".dl-speed-string");
+        if (speedLabel) {
+            speedLabel.style.display = showDownloadInfo ? "inline" : "none";
+            console.log("updateElementsVisibility - Speed label display:", speedLabel.style.display);
+        }
+        const timeLabel = document.querySelector(".tr-string");
+        if (timeLabel) {
+            timeLabel.style.display = showDownloadInfo ? "inline" : "none";
+            console.log("updateElementsVisibility - Time label display:", timeLabel.style.display);
+        }
 
         const pauseBtn = document.querySelector(".btn-pause");
         if (pauseBtn) {
-            pauseBtn.style.display =
-                this.state.currentUpdateMode === "download" ? "flex" : "none";
+            const show = this.state.currentUpdateMode === "download" || this.state.currentUpdateMode === "paused";
+            pauseBtn.style.display = show ? "flex" : "none";
+            const icon = pauseBtn.querySelector("img");
+            if (icon) {
+                icon.src = this.state.currentUpdateMode === "paused" ? "./assets/vector-3.svg" : "./assets/pause-icon.svg";
+                icon.alt = this.state.currentUpdateMode === "paused" ? "Resume" : "Pause";
+            }
+            pauseBtn.title = this.state.currentUpdateMode === "paused" ? this.t("RESUME") : this.t("PAUSE");
         }
     },
 
@@ -1461,6 +1523,7 @@ const App = {
             console.log("Updates are disabled, skipping patch system");
             return;
         }
+        let pausedDuringDownload = false;
         try {
             // Disable the game launch button and language selector at the start of the process
             this.updateLaunchGameButton(true);
@@ -1477,6 +1540,12 @@ const App = {
             const downloadedSizes = await invoke("download_all_files", {
                 filesToUpdate: filesToUpdate,
             });
+
+            // If user paused during the backend call, stop here without completing
+            if (this.state.currentUpdateMode === "paused") {
+                pausedDuringDownload = true;
+                return;
+            }
 
             let totalDownloadedSize = 0;
             let lastUpdateTime = Date.now();
@@ -1514,14 +1583,22 @@ const App = {
                 lastDownloadedSize = totalDownloadedSize;
             }
 
-            this.handleCompletion();
+            // Do not mark completion here; wait for backend "download_complete" event
+            if (this.state.currentUpdateMode === "paused") {
+                pausedDuringDownload = true;
+            }
         } catch (error) {
             console.error("Error during update:", error);
             this.showErrorMessage(this.t("UPDATE_ERROR_MESSAGE"));
         } finally {
-            // Re-enable the game launch button and language selector at the end of the process
-            this.updateLaunchGameButton(false);
-            this.toggleLanguageSelector(true);
+            // Re-enable controls only if not paused
+            if (!pausedDuringDownload && this.state.currentUpdateMode !== "paused") {
+                this.updateLaunchGameButton(false);
+                this.toggleLanguageSelector(true);
+            } else {
+                // Keep launch disabled while paused
+                this.updateLaunchGameButton(true);
+            }
         }
     },
 
@@ -1918,10 +1995,10 @@ const App = {
      * @memberof App
      */
     updateLaunchGameButton(disabled) {
-        if (this.launchGameBtn) {
-            this.launchGameBtn.disabled = disabled;
-            this.launchGameBtn.classList.toggle("disabled", disabled);
-        }
+        if (!this.launchGameBtn) return;
+        const shouldDisable = disabled || this.state.currentUpdateMode === "download" || this.state.currentUpdateMode === "paused";
+        this.launchGameBtn.disabled = shouldDisable;
+        this.launchGameBtn.classList.toggle("disabled", shouldDisable);
     },
 
     /**
@@ -2766,7 +2843,9 @@ const App = {
 
         const pauseButton = document.querySelector(".btn-pause");
         if (pauseButton) {
-            pauseButton.addEventListener("click", () => this.stopDownloads());
+            pauseButton.addEventListener("click", () => {
+                this.togglePauseResume();
+            });
         }
 
         const themeBtn = document.getElementById("toggle-theme");
@@ -3539,6 +3618,56 @@ const App = {
             await invoke("cancel_downloads");
         } catch (error) {
             console.error("Failed to stop downloads:", error);
+        }
+    },
+
+    async togglePauseResume() {
+        console.log("togglePauseResume called, current mode:", this.state.currentUpdateMode);
+        // If currently downloading -> pause (cancel tokens, but will resume from temp files)
+        if (this.state.currentUpdateMode === "download") {
+            try {
+                console.log("Pausing download...");
+                await invoke("cancel_downloads");
+                this.setState({ 
+                    currentUpdateMode: "paused",
+                    lastProgressUpdate: null,
+                    downloadStartTime: null,
+                    speedHistory: [],
+                    currentSpeed: 0,
+                });
+                this.updateLaunchGameButton(true);
+                console.log("Download paused, mode set to:", this.state.currentUpdateMode);
+            } catch (e) {
+                console.error("pause failed", e);
+            }
+            return;
+        }
+        // If paused -> resume
+        if (this.state.currentUpdateMode === "paused") {
+            try {
+                console.log("Resuming download...");
+                // Re-run download for remaining files by checking again
+                const filesToUpdate = await invoke("get_files_to_update");
+                if (filesToUpdate && filesToUpdate.length > 0) {
+                    console.log("Setting mode to download, files to update:", filesToUpdate.length);
+                    this.setState({ 
+                        currentUpdateMode: "download",
+                        isUpdateAvailable: true,
+                        downloadStartTime: Date.now(),
+                        lastProgressUpdate: null,
+                        speedHistory: [],
+                    });
+                    console.log("Mode set to:", this.state.currentUpdateMode);
+                    console.log("isUpdateAvailable set to:", this.state.isUpdateAvailable);
+                    await this.runPatchSystem(filesToUpdate);
+                } else {
+                    // Nothing to download anymore; finalize state
+                    this.handleCompletion();
+                }
+            } catch (e) {
+                console.error("resume failed", e);
+            }
+            return;
         }
     },
 
