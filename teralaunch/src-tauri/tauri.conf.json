@@ -34,7 +34,7 @@
                 "transparent": true,
                 "center": true,
                 "contentProtected": false,
-                "visible": true,
+                "visible": false,
                 "url": "index.html"
             }
         ],

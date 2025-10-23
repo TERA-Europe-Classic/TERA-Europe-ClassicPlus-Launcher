@@ -1608,6 +1608,41 @@ fn main() {
             let app_handle = app.handle();
             info!("Tauri setup started");
 
+            // Ensure window stays hidden until updater check completes
+            let _ = window.hide();
+
+            // Run updater before showing the UI
+            let app_handle_for_update = app.handle();
+            tauri::async_runtime::spawn(async move {
+                let mut should_show_window = true;
+                match app_handle_for_update.updater().check().await {
+                    Ok(update) => {
+                        if update.is_update_available() {
+                            match update.download_and_install().await {
+                                Ok(_status) => {
+                                    // On success the process may exit/restart depending on platform
+                                    // so we avoid showing the window here.
+                                    should_show_window = false;
+                                }
+                                Err(e) => {
+                                    error!("Updater failed: {}", e);
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        error!("Failed to check updates: {}", e);
+                    }
+                }
+
+                if should_show_window {
+                    if let Some(win) = app_handle_for_update.get_window("main") {
+                        let _ = win.show();
+                        let _ = win.set_focus();
+                    }
+                }
+            });
+
             // Spawn an asynchronous task to receive logs from the channel and send them to the frontend
             tauri::async_runtime::spawn(async move {
                 while let Some(log_message) = log_receiver.recv().await {
