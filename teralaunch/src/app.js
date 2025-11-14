@@ -689,7 +689,7 @@ const App = {
             startBtn.addEventListener("click", (e) => {
                 e.preventDefault();
                 this.openExternal(
-                    "https://crazy-esports.com/forum/index.php?board/19-tera-germany-de/"
+                    "https://forum.crazy-esports.com/forum/board/42-tera-europe-classic/"
                 );
             });
         }
@@ -741,7 +741,7 @@ const App = {
         const links = [
             { id: "discord-button", url: "https://discord.gg/DARHAaNBYS" },
             { id: "support-button", url: "https://helpdesk.crazy-esports.com" },
-            { id: "privacy-link", url: "https://crazy-esports.com/index.php?datenschutzerklaerung/" },
+            { id: "privacy-link", url: "https://forum.crazy-esports.com/index.php?datenschutzerklaerung/" },
         ];
         links.forEach((link) => {
             const el = document.getElementById(link.id);

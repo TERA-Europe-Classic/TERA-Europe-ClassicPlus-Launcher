@@ -10,7 +10,7 @@ This document outlines the desired layout and functional requirements for the TE
   - `Settings` (opens a menu)
   - `Support`
 - **Language selector** in the top right corner offering German (DE), English (EN), French (FR) and Russian (RU). Switching language should not require restarting the launcher.
-- **Privacy link** placed in the upper right corner that directs users to: <https://crazy-esports.com/index.php?datenschutzerklaerung/>.
+- **Privacy link** placed in the upper right corner that directs users to: <https://forum.crazy-esports.com/index.php?datenschutzerklaerung/>.
 - A **large central banner** (for example displaying the TERA Europe logo).
 - **Three info tiles** positioned below the banner as well as **one tile on the right** side of the banner.
 - A **footer** at the bottom of the window.
