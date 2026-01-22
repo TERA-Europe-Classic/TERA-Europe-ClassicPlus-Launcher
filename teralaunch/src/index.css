@@ -715,6 +715,17 @@ table {
     font-weight: 600;
 }
 
+.size-progress {
+    margin-left: 8px;
+    font-weight: 500;
+    color: #3498db;
+}
+
+.size-separator {
+    margin: 0 2px;
+    color: #8c93a9;
+}
+
 .content-parent {
     display: flex;
     flex-direction: column;
