@@ -1,124 +1,94 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
+function getVisibilityState(state) {
+    const isDownloading = state.currentUpdateMode === 'download';
+    const isPaused = state.currentUpdateMode === 'paused';
+    const showDownloadInfo = state.isUpdateAvailable && (isDownloading || isPaused);
+    return { isDownloading, isPaused, showDownloadInfo };
+}
+
+function shouldShowProgress(state) {
+    return state.isUpdateAvailable && state.currentUpdateMode !== 'ready';
+}
+
 describe('Visibility Logic', () => {
     describe('updateElementsVisibility', () => {
         it('shows elements during download', () => {
-            const state = {
+            const { isDownloading, isPaused, showDownloadInfo } = getVisibilityState({
                 currentUpdateMode: 'download',
                 isUpdateAvailable: true,
-            };
-
-            const isDownloading = state.currentUpdateMode === 'download';
-            const isPaused = state.currentUpdateMode === 'paused';
-            const showDownloadInfo = state.isUpdateAvailable && (isDownloading || isPaused);
-
+            });
             expect(showDownloadInfo).toBe(true);
             expect(isDownloading).toBe(true);
             expect(isPaused).toBe(false);
         });
 
         it('shows size info but hides speed during pause', () => {
-            const state = {
+            const { isDownloading, isPaused, showDownloadInfo } = getVisibilityState({
                 currentUpdateMode: 'paused',
                 isUpdateAvailable: true,
-            };
-
-            const isDownloading = state.currentUpdateMode === 'download';
-            const isPaused = state.currentUpdateMode === 'paused';
-            const showDownloadInfo = state.isUpdateAvailable && (isDownloading || isPaused);
-
+            });
             expect(showDownloadInfo).toBe(true);
             expect(isDownloading).toBe(false);
             expect(isPaused).toBe(true);
         });
 
         it('hides all download info when no update available', () => {
-            const state = {
+            const { showDownloadInfo } = getVisibilityState({
                 currentUpdateMode: 'download',
                 isUpdateAvailable: false,
-            };
-
-            const isDownloading = state.currentUpdateMode === 'download';
-            const showDownloadInfo = state.isUpdateAvailable && isDownloading;
-
+            });
             expect(showDownloadInfo).toBe(false);
         });
 
         it('hides all during file_check', () => {
-            const state = {
+            const { showDownloadInfo } = getVisibilityState({
                 currentUpdateMode: 'file_check',
                 isUpdateAvailable: true,
-            };
-
-            const isDownloading = state.currentUpdateMode === 'download';
-            const isPaused = state.currentUpdateMode === 'paused';
-            const showDownloadInfo = state.isUpdateAvailable && (isDownloading || isPaused);
-
+            });
             expect(showDownloadInfo).toBe(false);
         });
 
         it('hides all during complete', () => {
-            const state = {
+            const { showDownloadInfo } = getVisibilityState({
                 currentUpdateMode: 'complete',
                 isUpdateAvailable: false,
-            };
-
-            const isDownloading = state.currentUpdateMode === 'download';
-            const isPaused = state.currentUpdateMode === 'paused';
-            const showDownloadInfo = state.isUpdateAvailable && (isDownloading || isPaused);
-
+            });
             expect(showDownloadInfo).toBe(false);
         });
     });
 
     describe('Progress percentage visibility', () => {
         it('shows during download mode', () => {
-            const state = {
-                isUpdateAvailable: true,
-                currentUpdateMode: 'download',
-            };
-
-            const show = state.isUpdateAvailable && state.currentUpdateMode !== 'ready';
-            expect(show).toBe(true);
+            expect(shouldShowProgress({ isUpdateAvailable: true, currentUpdateMode: 'download' })).toBe(true);
         });
 
         it('hides during ready mode', () => {
-            const state = {
-                isUpdateAvailable: true,
-                currentUpdateMode: 'ready',
-            };
-
-            const show = state.isUpdateAvailable && state.currentUpdateMode !== 'ready';
-            expect(show).toBe(false);
+            expect(shouldShowProgress({ isUpdateAvailable: true, currentUpdateMode: 'ready' })).toBe(false);
         });
 
         it('hides when no update available', () => {
-            const state = {
-                isUpdateAvailable: false,
-                currentUpdateMode: 'download',
-            };
-
-            const show = state.isUpdateAvailable && state.currentUpdateMode !== 'ready';
-            expect(show).toBe(false);
+            expect(shouldShowProgress({ isUpdateAvailable: false, currentUpdateMode: 'download' })).toBe(false);
         });
     });
 });
 
 describe('Pause Button Logic', () => {
-    it('shows pause icon during download', () => {
-        const isPaused = false;
-        const icon = isPaused ? './assets/vector-3.svg' : './assets/pause-icon.svg';
-        const alt = isPaused ? 'Resume' : 'Pause';
+    function getPauseButtonState(isPaused) {
+        return {
+            icon: isPaused ? './assets/vector-3.svg' : './assets/pause-icon.svg',
+            alt: isPaused ? 'Resume' : 'Pause',
+        };
+    }
 
+    it('shows pause icon during download', () => {
+        const { icon, alt } = getPauseButtonState(false);
         expect(icon).toBe('./assets/pause-icon.svg');
         expect(alt).toBe('Pause');
     });
 
     it('shows play icon when paused', () => {
-        const isPaused = true;
-        const icon = isPaused ? './assets/vector-3.svg' : './assets/pause-icon.svg';
-        const alt = isPaused ? 'Resume' : 'Pause';
-
+        const { icon, alt } = getPauseButtonState(true);
         expect(icon).toBe('./assets/vector-3.svg');
         expect(alt).toBe('Resume');
     });
@@ -192,16 +162,17 @@ describe('Toggle Language Selector', () => {
 });
 
 describe('Modal Toggle', () => {
+    function toggleModal(modal, show) {
+        modal.classList.toggle('show', show);
+        modal.style.display = show ? 'block' : 'none';
+    }
+
     it('shows modal', () => {
         const modal = {
             classList: { toggle: vi.fn(), contains: vi.fn(() => false) },
             style: { display: '' },
         };
-
-        const show = true;
-        modal.classList.toggle('show', show);
-        modal.style.display = show ? 'block' : 'none';
-
+        toggleModal(modal, true);
         expect(modal.classList.toggle).toHaveBeenCalledWith('show', true);
         expect(modal.style.display).toBe('block');
     });
@@ -211,11 +182,7 @@ describe('Modal Toggle', () => {
             classList: { toggle: vi.fn(), contains: vi.fn(() => true) },
             style: { display: 'block' },
         };
-
-        const show = false;
-        modal.classList.toggle('show', show);
-        modal.style.display = show ? 'block' : 'none';
-
+        toggleModal(modal, false);
         expect(modal.classList.toggle).toHaveBeenCalledWith('show', false);
         expect(modal.style.display).toBe('none');
     });
@@ -272,22 +239,17 @@ describe('Loading Indicator', () => {
 });
 
 describe('Game Status', () => {
+    const t = (key) => key;
+    function getStatusText(isRunning) {
+        return isRunning ? t('GAME_STATUS_RUNNING') : t('GAME_STATUS_NOT_RUNNING');
+    }
+
     it('returns running status text', () => {
-        const isRunning = true;
-        const t = (key) => key;
-
-        const statusText = isRunning ? t('GAME_STATUS_RUNNING') : t('GAME_STATUS_NOT_RUNNING');
-
-        expect(statusText).toBe('GAME_STATUS_RUNNING');
+        expect(getStatusText(true)).toBe('GAME_STATUS_RUNNING');
     });
 
     it('returns not running status text', () => {
-        const isRunning = false;
-        const t = (key) => key;
-
-        const statusText = isRunning ? t('GAME_STATUS_RUNNING') : t('GAME_STATUS_NOT_RUNNING');
-
-        expect(statusText).toBe('GAME_STATUS_NOT_RUNNING');
+        expect(getStatusText(false)).toBe('GAME_STATUS_NOT_RUNNING');
     });
 });
 
@@ -385,19 +347,20 @@ describe('Config Path Error', () => {
 });
 
 describe('Login Response Parsing', () => {
+    function isLoginSuccess(response) {
+        return response && response.Return && response.Msg === 'success';
+    }
+
+    function getErrorMessage(response) {
+        return response ? (response.Msg || 'LOGIN_ERROR') : 'LOGIN_ERROR';
+    }
+
     it('parses successful login response', () => {
         const response = {
-            Return: {
-                AuthKey: 'test-key',
-                UserNo: '123',
-                CharacterCount: '5',
-                Permission: '2',
-            },
+            Return: { AuthKey: 'test-key', UserNo: '123', CharacterCount: '5', Permission: '2' },
             Msg: 'success',
         };
-
-        const isSuccess = response && response.Return && response.Msg === 'success';
-        expect(isSuccess).toBe(true);
+        expect(isLoginSuccess(response)).toBe(true);
 
         const formatted = {
             AuthKey: response.Return.AuthKey,
@@ -406,79 +369,74 @@ describe('Login Response Parsing', () => {
             Permission: Number(response.Return.Permission),
             Privilege: 0,
         };
-
         expect(formatted.AuthKey).toBe('test-key');
         expect(formatted.UserNo).toBe(123);
         expect(formatted.Permission).toBe(2);
     });
 
-    it('handles failed login', () => {
-        const response = {
-            Msg: 'INVALID_CREDENTIALS',
-        };
+    it('handles failed login with error message', () => {
+        const response = { Msg: 'INVALID_CREDENTIALS' };
+        expect(isLoginSuccess(response)).toBeFalsy();
+        expect(getErrorMessage(response)).toBe('INVALID_CREDENTIALS');
+    });
 
-        const isSuccess = response && response.Return && response.Msg === 'success';
-        expect(isSuccess).toBeFalsy();
-
-        const errorMessage = response ? response.Msg || 'LOGIN_ERROR' : 'LOGIN_ERROR';
-        expect(errorMessage).toBe('INVALID_CREDENTIALS');
+    it('handles failed login without error message', () => {
+        const response = {};
+        expect(isLoginSuccess(response)).toBeFalsy();
+        expect(getErrorMessage(response)).toBe('LOGIN_ERROR');
     });
 
     it('handles null response', () => {
-        const response = null;
-
-        const isSuccess = response && response.Return && response.Msg === 'success';
-        expect(isSuccess).toBeFalsy();
+        expect(isLoginSuccess(null)).toBeFalsy();
+        expect(getErrorMessage(null)).toBe('LOGIN_ERROR');
     });
 });
 
 describe('Update Check Flags', () => {
-    it('tracks login update check', () => {
-        const state = {
-            updateCheckPerformedOnLogin: false,
-            updateCheckPerformedOnRefresh: false,
-        };
+    function isCheckNeeded(state, isLogin) {
+        return isLogin ? !state.updateCheckPerformedOnLogin : !state.updateCheckPerformedOnRefresh;
+    }
 
-        const isLogin = true;
-        const checkNeeded = isLogin
-            ? !state.updateCheckPerformedOnLogin
-            : !state.updateCheckPerformedOnRefresh;
-
-        expect(checkNeeded).toBe(true);
-
+    function markCheckPerformed(state, isLogin) {
         if (isLogin) {
             state.updateCheckPerformedOnLogin = true;
-        }
-
-        const checkNeededAfter = isLogin
-            ? !state.updateCheckPerformedOnLogin
-            : !state.updateCheckPerformedOnRefresh;
-
-        expect(checkNeededAfter).toBe(false);
-    });
-
-    it('tracks refresh update check', () => {
-        const state = {
-            updateCheckPerformedOnLogin: false,
-            updateCheckPerformedOnRefresh: false,
-        };
-
-        const isLogin = false;
-        const checkNeeded = isLogin
-            ? !state.updateCheckPerformedOnLogin
-            : !state.updateCheckPerformedOnRefresh;
-
-        expect(checkNeeded).toBe(true);
-
-        if (!isLogin) {
+        } else {
             state.updateCheckPerformedOnRefresh = true;
         }
+    }
 
-        const checkNeededAfter = isLogin
-            ? !state.updateCheckPerformedOnLogin
-            : !state.updateCheckPerformedOnRefresh;
+    it('needs check on login when not performed', () => {
+        const state = { updateCheckPerformedOnLogin: false, updateCheckPerformedOnRefresh: false };
+        expect(isCheckNeeded(state, true)).toBe(true);
+    });
 
-        expect(checkNeededAfter).toBe(false);
+    it('does not need check on login when already performed', () => {
+        const state = { updateCheckPerformedOnLogin: true, updateCheckPerformedOnRefresh: false };
+        expect(isCheckNeeded(state, true)).toBe(false);
+    });
+
+    it('needs check on refresh when not performed', () => {
+        const state = { updateCheckPerformedOnLogin: false, updateCheckPerformedOnRefresh: false };
+        expect(isCheckNeeded(state, false)).toBe(true);
+    });
+
+    it('does not need check on refresh when already performed', () => {
+        const state = { updateCheckPerformedOnLogin: false, updateCheckPerformedOnRefresh: true };
+        expect(isCheckNeeded(state, false)).toBe(false);
+    });
+
+    it('marks login check as performed', () => {
+        const state = { updateCheckPerformedOnLogin: false, updateCheckPerformedOnRefresh: false };
+        markCheckPerformed(state, true);
+        expect(state.updateCheckPerformedOnLogin).toBe(true);
+        expect(state.updateCheckPerformedOnRefresh).toBe(false);
+    });
+
+    it('marks refresh check as performed', () => {
+        const state = { updateCheckPerformedOnLogin: false, updateCheckPerformedOnRefresh: false };
+        markCheckPerformed(state, false);
+        expect(state.updateCheckPerformedOnLogin).toBe(false);
+        expect(state.updateCheckPerformedOnRefresh).toBe(true);
     });
 });
 

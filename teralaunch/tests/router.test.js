@@ -365,4 +365,20 @@ describe('Router Edge Cases', () => {
         await Router.navigate('home');
         expect(Router.isTransitioning).toBe(false);
     });
+
+    it('handles routing errors gracefully', async () => {
+        mockApp.state.isAuthenticated = true;
+        mockApp.loadAsyncContent.mockRejectedValueOnce(new Error('Load failed'));
+        Router.currentRoute = null;
+        await Router.navigate('home');
+        const appElement = document.getElementById('app');
+        expect(appElement.innerHTML).toContain('LOADING_ERROR');
+    });
+
+    it('sets up event listeners', () => {
+        const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
+        Router.setupEventListeners();
+        expect(addEventListenerSpy).toHaveBeenCalledWith('hashchange', expect.any(Function));
+        addEventListenerSpy.mockRestore();
+    });
 });

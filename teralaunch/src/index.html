@@ -208,9 +208,7 @@
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
-                const data = await response.json();
-                console.log(data);
-                return data;
+                return await response.json();
             } catch (error) {
                 console.error('There was a problem with the News fetch operation:', error);
             }

@@ -26,7 +26,6 @@ const createRouter = (App) => ({
      */
     async navigate(route = null) {
         if (this.isTransitioning) {
-            console.log('Transition already in progress, ignoring');
             return;
         }
 
@@ -62,23 +61,19 @@ const createRouter = (App) => ({
      */
     async determineRoute(route) {
         route = route || window.location.hash.replace('#', '') || 'home';
-        console.log('Requested route:', route);
 
         // Check authentication asynchronously
         await App.checkAuthentication();
 
-        if (this.routes[route].protected && !App.state.isAuthenticated) {
-            console.log('Route is protected and user is not authenticated, redirecting to login');
+        if (this.routes[route]?.protected && !App.state.isAuthenticated) {
             return 'login';
         }
 
         if (route === 'login' && App.state.isAuthenticated) {
-            console.log('User is already authenticated, redirecting to home');
             return 'home';
         }
 
         if (this.currentRoute === route) {
-            console.log('Already on this route, ignoring');
             return null;
         }
 
@@ -94,8 +89,7 @@ const createRouter = (App) => ({
         return this.routes[route] !== undefined;
     },
 
-    handleInvalidRoute(app, route) {
-        console.log('Route not found:', route);
+    handleInvalidRoute(app) {
         app.innerHTML = `<div class="page"><h1>${App.t('PAGE_NOT_FOUND')}</h1></div>`;
     },
 
@@ -127,17 +121,8 @@ const createRouter = (App) => ({
         await App.updateAllTranslations();
     },
 
-    /**
-     * Loads the content for the specified route.
-     * @param {string} route - The route to load content for.
-     * @returns {Promise<string>} The loaded content as a string.
-     */
     async loadRouteContent(route) {
-        console.log('Loading content for route:', route);
-        const content = await App.loadAsyncContent(this.routes[route].file);
-        console.log('Content loaded:', content.substring(0, 100) + '...');
-        console.log(content)
-        return content;
+        return App.loadAsyncContent(this.routes[route].file);
     },
 
     async simulateLoadingDelay() {
@@ -181,7 +166,6 @@ const createRouter = (App) => ({
      */
     async initializeNewRoute(route) {
         if (this.routes[route].init) {
-            console.log('Initializing route:', route);
             await App[this.routes[route].init]();
         }
     },
