@@ -112,11 +112,7 @@ lazy_static! {
 
 
 
-/* const CONFIG: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/config/config.json"));
 
-lazy_static::lazy_static! {
-    static ref CONFIG_JSON: Value = serde_json::from_str(CONFIG).expect("Failed to parse config");
-} */
 
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -174,9 +170,7 @@ static GLOBAL_DOWNLOADED_BYTES: AtomicU64 = AtomicU64::new(0);
 static CURRENT_FILE_NAME: RwLock<String> = RwLock::new(String::new());
 
 
-/* fn get_config_value(key: &str) -> String {
-    CONFIG_JSON[key].as_str().expect(&format!("{} must be set in config.json", key)).to_string()
-} */
+
 
 fn is_ignored(path: &Path, game_path: &Path, ignored_paths: &HashSet<&str>) -> bool {
     let relative_path = path.strip_prefix(game_path).unwrap().to_str().unwrap().replace("\\", "/");
@@ -199,7 +193,7 @@ fn is_ignored(path: &Path, game_path: &Path, ignored_paths: &HashSet<&str>) -> b
 async fn get_server_hash_file() -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
     let res = client
-        .get(get_hash_file_url())
+        .get(get_config_value("HASH_FILE_URL"))
         .send().await
         .map_err(|e| e.to_string())?;
     let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
@@ -318,13 +312,6 @@ async fn update_launcher(download_url: String) -> Result<(), String> {
     std::process::exit(0);
 }
 
-fn get_hash_file_url() -> String {
-    get_config_value("HASH_FILE_URL")
-}
-
-fn get_files_server_url() -> String {
-    get_config_value("FILE_SERVER_URL")
-}
 
 fn find_config_file() -> Option<PathBuf> {
     use dirs_next::config_dir;
@@ -384,21 +371,6 @@ fn load_config() -> Result<(PathBuf, String), String> {
     Ok((game_path, game_lang))
 }
 
-/* fn save_config(game_path: &Path, game_lang: &str) -> Result<(), String> {
-    let config_path = find_config_file().ok_or("Config file not found")?;
-    let mut conf = Ini::new();
-
-    conf.with_section(Some("game")).set("path", game_path.to_str().ok_or("Invalid game path")?);
-    conf.with_section(Some("game")).set("lang", game_lang);
-
-    let mut file = std::fs::File
-        ::create(&config_path)
-        .map_err(|e| format!("Failed to create config file: {}", e))?;
-
-    conf.write_to(&mut file).map_err(|e| format!("Failed to write config: {}", e))?;
-
-    Ok(())
-} */
 
 
 
@@ -1519,7 +1491,7 @@ async fn check_server_connection() -> Result<bool, String> {
         .build()
         .map_err(|e| e.to_string())?;
 
-    match client.get(get_files_server_url()).send().await {
+    match client.get(get_config_value("FILE_SERVER_URL")).send().await {
         Ok(response) => Ok(response.status().is_success()),
         Err(e) => Err(e.to_string()),
     }

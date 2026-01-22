@@ -971,7 +971,7 @@ fn parse_server_list_json(json: &Value) -> Result<ServerList, Box<dyn std::error
             .as_str()
             .ok_or("Missing or invalid 'name' field")?
             .to_string();
-        let title = server["title"].as_str().unwrap_or("").to_string();
+        let _title = server["title"].as_str().unwrap_or("").to_string();
         let category = server["category"].as_str().unwrap_or("");
         let queue = server["queue"].as_str().unwrap_or("");
         let population = server["population"].as_str().unwrap_or("");
