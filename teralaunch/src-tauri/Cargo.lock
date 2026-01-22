@@ -3641,7 +3641,7 @@ checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
 
 [[package]]
 name = "plist"
-version = "1.7.4"
+version = "1.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3af6b589e163c5a788fab00ce0c0366f6efbb9959c2f9874b224936af7fce7e1"
 dependencies = [
@@ -5286,7 +5286,7 @@ dependencies = [
 
 [[package]]
 name = "tera-europe-launcher"
-version = "1.7.4"
+version = "1.7.5"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
