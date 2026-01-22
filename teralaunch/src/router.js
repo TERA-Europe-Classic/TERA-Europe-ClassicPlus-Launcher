@@ -94,7 +94,7 @@ const createRouter = (App) => ({
         return this.routes[route] !== undefined;
     },
 
-    handleInvalidRoute(app) {
+    handleInvalidRoute(app, route) {
         console.log('Route not found:', route);
         app.innerHTML = `<div class="page"><h1>${App.t('PAGE_NOT_FOUND')}</h1></div>`;
     },

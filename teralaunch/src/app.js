@@ -347,8 +347,6 @@ const App = {
                 globalSpeed,
             );
 
-            console.log("Global progress - current mode:", this.state.currentUpdateMode, "downloaded:", totalDownloadedBytes, "total:", totalSize);
-
             // Only update progress data, don't touch currentUpdateMode
             this.setState({
                 currentProgress: totalSize > 0 ? Math.min(100, (totalDownloadedBytes / totalSize) * 100) : 0,
@@ -836,8 +834,6 @@ const App = {
             current_file_index,
         } = event.payload;
 
-        console.log("Received download progress event:", event.payload);
-
         // Ensure totalSize is initialized correctly (preserve larger value for resumed downloads)
         if (this.state.totalSize === undefined || this.state.totalSize === 0) {
             this.state.totalSize = total_bytes;
@@ -872,6 +868,10 @@ const App = {
         const nowTs = Date.now();
         this._activeFileWindow.push({ t: nowTs, name: file_name });
         this._activeFileWindow = this._activeFileWindow.filter((s) => nowTs - s.t <= 1500);
+        // Cap at 100 entries to prevent unbounded growth in edge cases
+        if (this._activeFileWindow.length > 100) {
+            this._activeFileWindow = this._activeFileWindow.slice(-100);
+        }
         const freq = {};
         for (const s of this._activeFileWindow) freq[s.name] = (freq[s.name] || 0) + 1;
         let topName = file_name;
@@ -892,8 +892,6 @@ const App = {
             lastProgressUpdate: now,
             lastDownloadedBytes: totalDownloadedBytes,
         });
-
-        console.log("Updated state:", this.state);
     },
 
     /**
@@ -1063,13 +1061,9 @@ const App = {
      */
     updateProgressBar(elements) {
         const progress = Math.min(100, this.calculateProgress());
-        console.log("updateProgressBar - Progress:", progress);
-        console.log("updateProgressBar - Current update mode:", this.state.currentUpdateMode);
-        console.log("updateProgressBar - Is update available:", this.state.isUpdateAvailable);
         
         if (elements.progressPercentage) {
             const showPct = this.state.isUpdateAvailable && (this.state.currentUpdateMode === "download" || this.state.currentUpdateMode === "paused");
-            console.log("updateProgressBar - Show percentage:", showPct);
             if (!showPct) {
                 elements.progressPercentage.style.display = "none";
                 elements.currentFile.style.display = "none";
@@ -1077,7 +1071,6 @@ const App = {
                 elements.progressPercentage.style.display = "inline";
                 elements.progressPercentage.textContent = `(${Math.round(progress)}%)`;
                 elements.currentFile.style.display = "flex !important";
-                console.log("updateProgressBar - Percentage text set to:", elements.progressPercentage.textContent);
             }
         }
         if (elements.progressPercentageDiv) {
@@ -1098,39 +1091,19 @@ const App = {
      *      timeRemaining: The element to display the time remaining.
      */
     updateDownloadInfo(elements) {
-        console.log("updateDownloadInfo - Current update mode:", this.state.currentUpdateMode);
-        console.log("updateDownloadInfo - Current speed:", this.state.currentSpeed);
-        console.log("updateDownloadInfo - Time remaining:", this.state.timeRemaining);
-        console.log("updateDownloadInfo - Downloaded size:", this.state.downloadedSize);
-        console.log("updateDownloadInfo - Total size:", this.state.totalSize);
-
         if (elements.downloadSpeed) {
             const speedText =
                 this.state.currentUpdateMode === "download"
                     ? this.formatSpeed(this.state.currentSpeed)
                     : "";
-            console.log("updateDownloadInfo - Formatted speed:", speedText);
             elements.downloadSpeed.textContent = speedText;
-            console.log(
-                "updateDownloadInfo - Download speed element updated:",
-                elements.downloadSpeed.textContent,
-            );
-        } else {
-            console.log("updateDownloadInfo - Download speed element not found");
         }
         if (elements.timeRemaining) {
             const timeText =
                 this.state.currentUpdateMode === "download"
                     ? this.formatTime(this.state.timeRemaining)
                     : "";
-            console.log("updateDownloadInfo - Formatted time:", timeText);
             elements.timeRemaining.textContent = timeText;
-            console.log(
-                "updateDownloadInfo - Time remaining element updated:",
-                elements.timeRemaining.textContent,
-            );
-        } else {
-            console.log("updateDownloadInfo - Time remaining element not found");
         }
     },
 
@@ -1422,6 +1395,8 @@ const App = {
             return;
         }
 
+        // Reset state first, then set file_check mode (order matters to avoid race condition)
+        this.resetState();
         this.setState({
             isCheckingForUpdates: true,
             currentUpdateMode: "file_check",
@@ -1431,7 +1406,6 @@ const App = {
         this.toggleLanguageSelector(false);
 
         try {
-            this.resetState();
 
             const filesToUpdate = await invoke("get_files_to_update");
 
@@ -2173,11 +2147,6 @@ const App = {
      * @memberof App
      */
     calculateGlobalTimeRemaining(totalDownloadedBytes, totalSize, speed) {
-        console.log("Calculating global time remaining:", {
-            totalDownloadedBytes,
-            totalSize,
-            speed,
-        });
         if (
             !isFinite(speed) ||
             speed <= 0 ||
@@ -2185,36 +2154,25 @@ const App = {
             !isFinite(totalSize) ||
             totalDownloadedBytes >= totalSize
         ) {
-            console.log("Invalid input for global time remaining calculation");
             return 0;
         }
-        let bytesRemaining = totalSize - totalDownloadedBytes;
-
-        let averageSpeed = this.calculateAverageSpeed(speed);
-
-        let secondsRemaining = bytesRemaining / averageSpeed;
-        console.log("Calculated time remaining:", secondsRemaining);
-        return Math.min(secondsRemaining, 30 * 24 * 60 * 60); // Limit to 30 days maximum
+        const bytesRemaining = totalSize - totalDownloadedBytes;
+        const averageSpeed = this.calculateAverageSpeed(speed);
+        if (averageSpeed <= 0) return 0;
+        const secondsRemaining = bytesRemaining / averageSpeed;
+        return Math.min(secondsRemaining, 30 * 24 * 60 * 60);
     },
 
     // Updated calculateAverageSpeed method
     calculateAverageSpeed(currentSpeed) {
-        // Add current speed to history
         this.state.speedHistory.push(currentSpeed);
 
-        // Limit history size
         if (this.state.speedHistory.length > this.state.speedHistoryMaxLength) {
-            this.state.speedHistory.shift(); // Remove oldest value
+            this.state.speedHistory.shift();
         }
 
-        // Calculate average speed
         const sum = this.state.speedHistory.reduce((acc, speed) => acc + speed, 0);
-        const averageSpeed = sum / this.state.speedHistory.length;
-
-        console.log("Speed history:", this.state.speedHistory);
-        console.log("Average speed:", averageSpeed);
-
-        return averageSpeed;
+        return sum / this.state.speedHistory.length;
     },
 
     /**
