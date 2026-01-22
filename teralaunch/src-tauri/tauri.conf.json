@@ -1,66 +1,59 @@
 {
-    "build": {
-        "devPath": "../src",
-        "distDir": "../src",
-        "withGlobalTauri": true
+  "build": {
+    "devPath": "../src",
+    "distDir": "../src",
+    "withGlobalTauri": true
+  },
+  "package": {
+    "productName": "TERA-Europe-Launcher",
+    "version": "1.7.5"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": true,
+      "shell": {
+        "all": true,
+        "open": true
+      }
     },
-    "package": {
-        "productName": "TERA-Europe-Launcher",
-        "version": "1.7.4"
+    "updater": {
+      "active": true,
+      "endpoints": ["https://web.tera-germany.de/classic/latest.json"],
+      "dialog": true,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENEOTQyQ0VBMTQyNjQ5MTMKUldRVFNTWVU2aXlVelJvK1Y3N1BkTkVHSDlka3BRMTlJT1F6K2szS2FwSnB2SXJmL0c2bFBYUnoK"
     },
-    "tauri": {
-        "allowlist": {
-            "all": true,
-            "shell": {
-                "all": true,
-                "open": true
-            }
-        },
-        "updater": {
-            "active": true,
-            "endpoints": [
-                "https://web.tera-germany.de/classic/latest.json"
-            ],
-            "dialog": true,
-            "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENEOTQyQ0VBMTQyNjQ5MTMKUldRVFNTWVU2aXlVelJvK1Y3N1BkTkVHSDlka3BRMTlJT1F6K2szS2FwSnB2SXJmL0c2bFBYUnoK"
-        },
-        "windows": [
-            {
-                "title": "TERA-Europe-Launcher",
-                "width": 1282,
-                "height": 759,
-                "resizable": false,
-                "decorations": false,
-                "transparent": true,
-                "center": true,
-                "contentProtected": false,
-                "visible": false,
-                "url": "index.html"
-            }
-        ],
-        "security": {
-            "csp": null
-        },
-        "bundle": {
-            "active": true,
-            "targets": ["nsis", "updater"],
-            "identifier": "crazy-esports",
-            "publisher": "Crazy-eSports",
-            "icon": [
-                "icons/tera_server.png",
-                "icons/tera_server.ico"
-            ],
-            "copyright": "Crazy-eSports",
-            "shortDescription": "TERA-Europe-Launcher",
-            "resources": [
-                "./src/TERA/readme.txt"
-            ],
-            "windows": {
-                "nsis": {
-                    "license": "../license.txt",
-                    "installMode": "perMachine"
-                }
-            }
+    "windows": [
+      {
+        "title": "TERA-Europe-Launcher",
+        "width": 1282,
+        "height": 759,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "center": true,
+        "contentProtected": false,
+        "visible": false,
+        "url": "index.html"
+      }
+    ],
+    "security": {
+      "csp": null
+    },
+    "bundle": {
+      "active": true,
+      "targets": ["nsis", "updater"],
+      "identifier": "crazy-esports",
+      "publisher": "Crazy-eSports",
+      "icon": ["icons/tera_server.png", "icons/tera_server.ico"],
+      "copyright": "Crazy-eSports",
+      "shortDescription": "TERA-Europe-Launcher",
+      "resources": ["./src/TERA/readme.txt"],
+      "windows": {
+        "nsis": {
+          "license": "../license.txt",
+          "installMode": "perMachine"
         }
+      }
     }
+  }
 }

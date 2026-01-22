@@ -3,3 +3,10 @@ README
 target
 /updater
 .env
+
+# Node
+node_modules/
+
+# Test coverage
+coverage/
+teralaunch/coverage/

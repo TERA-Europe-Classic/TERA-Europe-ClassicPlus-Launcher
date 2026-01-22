@@ -67,6 +67,7 @@ const App = {
         currentFileIndex: 0,
         totalFiles: 0,
         downloadedSize: 0,
+        downloadedBytesOffset: 0,
         totalSize: 0,
         currentSpeed: 0,
         timeRemaining: 0,
@@ -169,26 +170,17 @@ const App = {
                 this.updateUI();
             });
 
-            //just for debug
-            //localStorage.setItem('isFirstLaunch','true');
-
             if (this.state.isAuthenticated && this.Router.currentRoute === "home") {
-                //DER SCHEIß HIER HAT ZU LANGE GEDAUERT!!!!!!! SCHEIß ROUTES!
-                LoadStartPage()
-                //
+                LoadStartPage();
 
                 if (!UPDATE_CHECK_ENABLED) {
-                    console.log(
-                        "Updates are disabled, skipping update check and server connection",
-                    );
                     this.setState({
                         isUpdateAvailable: false,
                         isFileCheckComplete: true,
                         currentUpdateMode: "complete",
                         currentProgress: 100,
                     });
-                    this.updateUI();
-                    return; // Exit the function early if updates are disabled
+                    return;
                 }
 
                 const isConnected = await this.checkServerConnection();
@@ -234,7 +226,6 @@ const App = {
                 email,
                 password,
             });
-            console.log("Registration response", response);
             alert('Registration successful!');
             this.Router.navigate('login');
         } catch (err) {
@@ -289,7 +280,6 @@ const App = {
      */
     setupGameStatusListeners() {
         listen("game_status", async (event) => {
-            console.log("Game status update:", event.payload);
             const isRunning = event.payload === "GAME_STATUS_RUNNING";
             this.updateUIForGameStatus(isRunning);
         });
@@ -300,15 +290,12 @@ const App = {
         });
 
         listen("game_ended", async () => {
-            console.log("Game has ended");
             this.updateUIForGameStatus(false);
-            // Do not auto-close/open logs modal anymore
             // Ensure mirror is stopped when game ends
             try {
                 await invoke("stop_mirror_client");
-                console.log("[MIRROR] Stopped on game_ended");
             } catch (e) {
-                console.warn("[MIRROR] stop on game_ended failed", e);
+                // Mirror stop failed - ignore
             }
         });
     },
@@ -346,8 +333,6 @@ const App = {
                 globalSpeed,
             );
 
-            console.log("Global progress - current mode:", this.state.currentUpdateMode, "downloaded:", totalDownloadedBytes, "total:", totalSize);
-
             // Only update progress data, don't touch currentUpdateMode
             this.setState({
                 currentProgress: totalSize > 0 ? Math.min(100, (totalDownloadedBytes / totalSize) * 100) : 0,
@@ -360,8 +345,7 @@ const App = {
                 lastProgressUpdate: now,
             });
 
-            // Force a UI refresh so Speed/ETA labels update immediately
-            this.updateUI();
+
         });
         listen("file_check_progress", this.handleFileCheckProgress.bind(this));
         listen("file_check_completed", this.handleFileCheckCompleted.bind(this));
@@ -370,10 +354,8 @@ const App = {
             this.handleCompletion();
         });
         listen("download_cancelled", () => {
-            // Treat cancellation from the backend as a paused download
             this.setState({ currentUpdateMode: "paused", isUpdateAvailable: true });
             this.updateLaunchGameButton(true);
-            this.updateUI();
         });
     },
 
@@ -473,39 +455,7 @@ const App = {
         }
     },
 
-    // Open/close Logs modal from the settings menu
-    openLogsModal() {
-        const modal = document.getElementById("log-modal");
-        if (!modal) {
-            console.error("Log modal not found");
-            return;
-        }
-        modal.style.display = "block";
-        const closeBtn = modal.querySelector(".log-modal-close");
-        if (closeBtn) {
-            closeBtn.onclick = (e) => {
-                e.preventDefault();
-                this.closeLogsModal();
-            };
-        }
-        const copyBtn = modal.querySelector('#copy-logs-btn');
-        if (copyBtn) {
-            copyBtn.onclick = async (e) => {
-                e.preventDefault();
-                try {
-                    await this.copyLogsToClipboard();
-                } catch (err) {
-                    console.error('Copy logs failed:', err);
-                }
-            };
-        }
-    },
 
-    closeLogsModal() {
-        const modal = document.getElementById("log-modal");
-        if (!modal) return;
-        modal.style.display = "none";
-    },
 
     // Copy all logs in the log modal to system clipboard
     async copyLogsToClipboard() {
@@ -597,9 +547,7 @@ const App = {
 
     },
  
-    // Function to handle the first launch
     async handleFirstLaunch() {
-        console.log("First time launch detected");
         this.showFirstLaunchModal();
     },
 
@@ -835,15 +783,17 @@ const App = {
             current_file_index,
         } = event.payload;
 
-        console.log("Received download progress event:", event.payload);
-
-        // Ensure totalSize is initialized correctly
+        // Ensure totalSize is initialized correctly (preserve larger value for resumed downloads)
         if (this.state.totalSize === undefined || this.state.totalSize === 0) {
             this.state.totalSize = total_bytes;
         }
 
-        // Update total downloaded bytes
-        const totalDownloadedBytes = downloaded_bytes;
+        // Add offset for resumed downloads (bytes already downloaded before pause)
+        const offset = this.state.downloadedBytesOffset || 0;
+        const totalDownloadedBytes = downloaded_bytes + offset;
+        
+        // Use preserved totalSize if larger (for resumed downloads)
+        const effectiveTotalSize = Math.max(this.state.totalSize, total_bytes);
 
         const now = Date.now();
 
@@ -852,32 +802,25 @@ const App = {
             this.state.downloadStartTime = now;
         }
 
-        // Calculate global download speed based on elapsed time
-        const elapsedSeconds =
-            (now - this.state.downloadStartTime) / 1000;
-        const globalSpeed =
-            elapsedSeconds > 0 ? totalDownloadedBytes / elapsedSeconds : speed;
+        // Calculate speed based on current session bytes only (not including offset)
+        const elapsedSeconds = (now - this.state.downloadStartTime) / 1000;
+        const globalSpeed = elapsedSeconds > 0 ? downloaded_bytes / elapsedSeconds : speed;
 
-        // Calculate global remaining time using the global speed
         const timeRemaining = this.calculateGlobalTimeRemaining(
             totalDownloadedBytes,
-            this.state.totalSize,
+            effectiveTotalSize,
             globalSpeed,
         );
-
-        console.log("Calculated download progress:", {
-            speed,
-            totalDownloadedBytes,
-            timeRemaining,
-        });
 
         // Smooth the displayed file name to the most active file over a short window
         if (!this._activeFileWindow) this._activeFileWindow = [];
         const nowTs = Date.now();
-        // keep last 1.5s samples
         this._activeFileWindow.push({ t: nowTs, name: file_name });
         this._activeFileWindow = this._activeFileWindow.filter((s) => nowTs - s.t <= 1500);
-        // mode: pick the most frequent name in window
+        // Cap at 100 entries to prevent unbounded growth in edge cases
+        if (this._activeFileWindow.length > 100) {
+            this._activeFileWindow = this._activeFileWindow.slice(-100);
+        }
         const freq = {};
         for (const s of this._activeFileWindow) freq[s.name] = (freq[s.name] || 0) + 1;
         let topName = file_name;
@@ -886,13 +829,10 @@ const App = {
 
         this.setState({
             currentFileName: topName,
-            currentProgress: Math.min(
-                100,
-                (totalDownloadedBytes / this.state.totalSize) * 100,
-            ),
+            currentProgress: Math.min(100, (totalDownloadedBytes / effectiveTotalSize) * 100),
             currentSpeed: globalSpeed,
             downloadedSize: totalDownloadedBytes,
-            totalSize: total_bytes,
+            totalSize: effectiveTotalSize,
             totalFiles: total_files,
             currentFileIndex: current_file_index,
             totalDownloadedBytes: totalDownloadedBytes,
@@ -901,8 +841,6 @@ const App = {
             lastProgressUpdate: now,
             lastDownloadedBytes: totalDownloadedBytes,
         });
-
-        console.log("Updated state:", this.state);
     },
 
     /**
@@ -926,7 +864,6 @@ const App = {
             event.payload;
 
         this.setState({
-            isUpdateAvailable: true,
             currentFileName: current_file,
             currentProgress: Math.min(100, progress),
             currentFileIndex: current_count,
@@ -956,7 +893,7 @@ const App = {
         this.setState({
             isFileCheckComplete: true,
             isUpdateAvailable: hasUpdates,
-            currentUpdateMode: hasUpdates ? "complete" : this.state.currentUpdateMode,
+            // Don't change mode here - let checkForUpdates handle the transition
         });
         if (!hasUpdates) {
             this.handleCompletion();
@@ -1020,10 +957,8 @@ const App = {
             // Hide unnecessary elements
             if (elements.currentFile) elements.currentFile.style.display = "none";
             if (elements.filesProgress) elements.filesProgress.style.display = "none";
-            if (elements.downloadedSize && elements.downloadedSize.parentElement)
-                elements.downloadedSize.parentElement.style.display = "none";
-            if (elements.totalSize && elements.totalSize.parentElement)
-                elements.totalSize.parentElement.style.display = "none";
+            const sizeProgress = document.getElementById("size-progress");
+            if (sizeProgress) sizeProgress.style.display = "none";
             if (elements.downloadSpeed) elements.downloadSpeed.style.display = "none";
             if (elements.timeRemaining) elements.timeRemaining.style.display = "none";
 
@@ -1075,31 +1010,21 @@ const App = {
      */
     updateProgressBar(elements) {
         const progress = Math.min(100, this.calculateProgress());
-        console.log("updateProgressBar - Progress:", progress);
-        console.log("updateProgressBar - Current update mode:", this.state.currentUpdateMode);
-        console.log("updateProgressBar - Is update available:", this.state.isUpdateAvailable);
+        const showProgress = this.state.isUpdateAvailable && (this.state.currentUpdateMode === "download" || this.state.currentUpdateMode === "paused");
         
         if (elements.progressPercentage) {
-            const showPct = this.state.isUpdateAvailable && (this.state.currentUpdateMode === "download" || this.state.currentUpdateMode === "paused");
-            console.log("updateProgressBar - Show percentage:", showPct);
-            if (!showPct) {
+            if (!showProgress) {
                 elements.progressPercentage.style.display = "none";
-                elements.currentFile.style.display = "none";
             } else {
                 elements.progressPercentage.style.display = "inline";
                 elements.progressPercentage.textContent = `(${Math.round(progress)}%)`;
-                elements.currentFile.style.display = "flex !important";
-                console.log("updateProgressBar - Percentage text set to:", elements.progressPercentage.textContent);
             }
         }
-        if (elements.progressPercentageDiv) {
-            const showBar = this.state.isUpdateAvailable && (this.state.currentUpdateMode === "download" || this.state.currentUpdateMode === "paused");
-            if (!showBar) {
-                elements.currentFile.style.display = "none";
-            } else {
-                elements.progressPercentageDiv.style.width = `${progress}%`;
-                elements.currentFile.style.display = "flex !important";
-            }
+        if (elements.progressPercentageDiv && showProgress) {
+            elements.progressPercentageDiv.style.width = `${progress}%`;
+        }
+        if (elements.currentFile) {
+            elements.currentFile.style.display = showProgress ? "flex" : "none";
         }
     },
 
@@ -1110,39 +1035,19 @@ const App = {
      *      timeRemaining: The element to display the time remaining.
      */
     updateDownloadInfo(elements) {
-        console.log("updateDownloadInfo - Current update mode:", this.state.currentUpdateMode);
-        console.log("updateDownloadInfo - Current speed:", this.state.currentSpeed);
-        console.log("updateDownloadInfo - Time remaining:", this.state.timeRemaining);
-        console.log("updateDownloadInfo - Downloaded size:", this.state.downloadedSize);
-        console.log("updateDownloadInfo - Total size:", this.state.totalSize);
-
         if (elements.downloadSpeed) {
             const speedText =
                 this.state.currentUpdateMode === "download"
                     ? this.formatSpeed(this.state.currentSpeed)
                     : "";
-            console.log("updateDownloadInfo - Formatted speed:", speedText);
             elements.downloadSpeed.textContent = speedText;
-            console.log(
-                "updateDownloadInfo - Download speed element updated:",
-                elements.downloadSpeed.textContent,
-            );
-        } else {
-            console.log("updateDownloadInfo - Download speed element not found");
         }
         if (elements.timeRemaining) {
             const timeText =
                 this.state.currentUpdateMode === "download"
                     ? this.formatTime(this.state.timeRemaining)
                     : "";
-            console.log("updateDownloadInfo - Formatted time:", timeText);
             elements.timeRemaining.textContent = timeText;
-            console.log(
-                "updateDownloadInfo - Time remaining element updated:",
-                elements.timeRemaining.textContent,
-            );
-        } else {
-            console.log("updateDownloadInfo - Time remaining element not found");
         }
     },
 
@@ -1168,28 +1073,25 @@ const App = {
             case "file_check":
                 return this.t("VERIFYING_FILES");
             case "paused":
-                // Reuse existing string to avoid translations; prevents showing READY text
-                return this.t("DOWNLOADING_FILES");
             case "download":
                 return this.t("DOWNLOADING_FILES");
             case "complete":
                 if (this.state.isFileCheckComplete && !this.state.isUpdateAvailable) {
                     return this.t("NO_UPDATE_REQUIRED");
-                } else if (
-                    this.state.isFileCheckComplete &&
-                    this.state.isUpdateAvailable
-                ) {
+                }
+                if (this.state.isFileCheckComplete && this.state.isUpdateAvailable) {
                     return this.t("FILE_CHECK_COMPLETE");
-                } else if (this.state.isDownloadComplete) {
+                }
+                if (this.state.isDownloadComplete) {
                     return this.t("DOWNLOAD_COMPLETE");
-                } else if (this.state.isUpdateComplete) {
+                }
+                if (this.state.isUpdateComplete) {
                     return this.t("UPDATE_COMPLETED");
                 }
                 break;
             default:
                 return this.t("GAME_READY_TO_LAUNCH");
         }
-
         return this.t("GAME_READY_TO_LAUNCH");
     },
 
@@ -1230,13 +1132,9 @@ const App = {
      * @param {Object} elements - The elements to update.
      */
     updateElementsVisibility(elements) {
-        const showDownloadInfo =
-            this.state.isUpdateAvailable &&
-            this.state.currentUpdateMode === "download";
-
-        console.log("updateElementsVisibility - Show download info:", showDownloadInfo);
-        console.log("updateElementsVisibility - Is update available:", this.state.isUpdateAvailable);
-        console.log("updateElementsVisibility - Current update mode:", this.state.currentUpdateMode);
+        const isDownloading = this.state.currentUpdateMode === "download";
+        const isPaused = this.state.currentUpdateMode === "paused";
+        const showDownloadInfo = this.state.isUpdateAvailable && (isDownloading || isPaused);
 
         if (elements.currentFile)
             elements.currentFile.style.display = this.state.isUpdateAvailable
@@ -1246,15 +1144,9 @@ const App = {
             elements.filesProgress.style.display = this.state.isUpdateAvailable
                 ? "inline"
                 : "none";
-        if (elements.downloadedSize && elements.downloadedSize.parentElement) {
-            elements.downloadedSize.parentElement.style.display = showDownloadInfo
-                ? "inline"
-                : "none";
-        }
-        if (elements.totalSize && elements.totalSize.parentElement) {
-            elements.totalSize.parentElement.style.display = showDownloadInfo
-                ? "inline"
-                : "none";
+        const sizeProgress = document.getElementById("size-progress");
+        if (sizeProgress) {
+            sizeProgress.style.display = showDownloadInfo ? "inline" : "none";
         }
         if (elements.progressPercentage) {
             elements.progressPercentage.style.display =
@@ -1263,40 +1155,30 @@ const App = {
                     : "none";
         }
         if (elements.downloadSpeed) {
-            elements.downloadSpeed.style.display = showDownloadInfo
-                ? "inline"
-                : "none";
-            console.log("updateElementsVisibility - Download speed display:", elements.downloadSpeed.style.display);
+            elements.downloadSpeed.style.display = isDownloading ? "inline" : "none";
         }
         if (elements.timeRemaining) {
-            elements.timeRemaining.style.display = showDownloadInfo
-                ? "inline"
-                : "none";
-            console.log("updateElementsVisibility - Time remaining display:", elements.timeRemaining.style.display);
+            elements.timeRemaining.style.display = isDownloading ? "inline" : "none";
         }
 
-        // Also toggle the Speed:/Time remaining: labels themselves
         const speedLabel = document.querySelector(".dl-speed-string");
         if (speedLabel) {
-            speedLabel.style.display = showDownloadInfo ? "inline" : "none";
-            console.log("updateElementsVisibility - Speed label display:", speedLabel.style.display);
+            speedLabel.style.display = isDownloading ? "inline" : "none";
         }
         const timeLabel = document.querySelector(".tr-string");
         if (timeLabel) {
-            timeLabel.style.display = showDownloadInfo ? "inline" : "none";
-            console.log("updateElementsVisibility - Time label display:", timeLabel.style.display);
+            timeLabel.style.display = isDownloading ? "inline" : "none";
         }
 
         const pauseBtn = document.querySelector(".btn-pause");
         if (pauseBtn) {
-            const show = this.state.currentUpdateMode === "download" || this.state.currentUpdateMode === "paused";
-            pauseBtn.style.display = show ? "flex" : "none";
+            pauseBtn.style.display = showDownloadInfo ? "flex" : "none";
             const icon = pauseBtn.querySelector("img");
             if (icon) {
-                icon.src = this.state.currentUpdateMode === "paused" ? "./assets/vector-3.svg" : "./assets/pause-icon.svg";
-                icon.alt = this.state.currentUpdateMode === "paused" ? "Resume" : "Pause";
+                icon.src = isPaused ? "./assets/vector-3.svg" : "./assets/pause-icon.svg";
+                icon.alt = isPaused ? "Resume" : "Pause";
             }
-            pauseBtn.title = this.state.currentUpdateMode === "paused" ? this.t("RESUME") : this.t("PAUSE");
+            pauseBtn.title = isPaused ? this.t("RESUME") : this.t("PAUSE");
         }
     },
 
@@ -1319,6 +1201,7 @@ const App = {
             currentFileIndex: 0,
             totalFiles: 0,
             downloadedSize: 0,
+            downloadedBytesOffset: 0,
             totalSize: 0,
             currentSpeed: 0,
             timeRemaining: 0,
@@ -1361,17 +1244,17 @@ const App = {
             isDownloadComplete: true,
             currentProgress: 100,
             currentUpdateMode: "complete",
-            // Reset update flag so the game can be launched after updates
             isUpdateAvailable: false,
+            isFileCheckComplete: true,
         });
+        // Re-enable controls immediately, then transition to ready after delay
+        this.updateLaunchGameButton(false);
+        this.toggleLanguageSelector(true);
         setTimeout(() => {
             this.setState({
                 isUpdateComplete: true,
                 currentUpdateMode: "ready",
             });
-            // Re-enable the game launch button and language selector
-            this.updateLaunchGameButton(false);
-            this.toggleLanguageSelector(true);
         }, 2000);
     },
 
@@ -1384,14 +1267,12 @@ const App = {
      */
     async initializeAndCheckUpdates(isLogin = false) {
         if (!UPDATE_CHECK_ENABLED) {
-            console.log("Updates are disabled");
             this.setState({
                 isUpdateAvailable: false,
                 isFileCheckComplete: true,
                 currentUpdateMode: "complete",
                 currentProgress: 100,
             });
-            this.updateUI();
             return;
         }
 
@@ -1399,14 +1280,7 @@ const App = {
             ? !this.state.updateCheckPerformedOnLogin
             : !this.state.updateCheckPerformedOnRefresh;
 
-        if (!checkNeeded) {
-            console.log(
-                isLogin
-                    ? "Update check already performed after login"
-                    : "Update check already performed on refresh",
-            );
-            return;
-        }
+        if (!checkNeeded) return;
 
         try {
             await this.initializeHomePage();
@@ -1437,22 +1311,19 @@ const App = {
      */
     async checkForUpdates() {
         if (!UPDATE_CHECK_ENABLED) {
-            console.log("Update checks are disabled");
             this.setState({
                 isUpdateAvailable: false,
                 isFileCheckComplete: true,
                 currentUpdateMode: "complete",
                 currentProgress: 100,
             });
-            this.updateUI();
             return;
         }
 
-        if (this.state.isCheckingForUpdates) {
-            console.log("Update check already in progress");
-            return;
-        }
+        if (this.state.isCheckingForUpdates) return;
 
+        // Reset state first, then set file_check mode (order matters to avoid race condition)
+        this.resetState();
         this.setState({
             isCheckingForUpdates: true,
             currentUpdateMode: "file_check",
@@ -1462,7 +1333,6 @@ const App = {
         this.toggleLanguageSelector(false);
 
         try {
-            this.resetState();
 
             const filesToUpdate = await invoke("get_files_to_update");
 
@@ -1519,19 +1389,13 @@ const App = {
      * @returns {Promise<void>}
      */
     async runPatchSystem(filesToUpdate) {
-        if (!UPDATE_CHECK_ENABLED) {
-            console.log("Updates are disabled, skipping patch system");
-            return;
-        }
+        if (!UPDATE_CHECK_ENABLED) return;
         let pausedDuringDownload = false;
         try {
-            // Disable the game launch button and language selector at the start of the process
             this.updateLaunchGameButton(true);
             this.toggleLanguageSelector(false);
 
             if (filesToUpdate.length === 0) {
-                console.log("No update needed");
-                // Re-enable elements if no update is needed
                 this.updateLaunchGameButton(false);
                 this.toggleLanguageSelector(true);
                 return;
@@ -1613,10 +1477,7 @@ const App = {
      * @return {Promise<void>}
      */
     async login(username, password) {
-        if (this.state.isLoggingIn) {
-            console.log("A login attempt is already in progress.");
-            return;
-        }
+        if (this.state.isLoggingIn) return;
 
         this.setState({ isLoggingIn: true });
         const loginButton = document.getElementById("login-button");
@@ -1633,9 +1494,8 @@ const App = {
         }
 
         try {
-            console.log("invoke login from backend");
             const response = await invoke("login", { username, password });
-            const jsonResponse = await JSON.parse(response);
+            const jsonResponse = JSON.parse(response);
 
             if (
                 jsonResponse &&
@@ -1651,34 +1511,26 @@ const App = {
                     Privilege: 0
                 };
                 this.storeAuthInfo(jsonResponseFormatted);
-                console.log("Login success");
 
                 if (!UPDATE_CHECK_ENABLED) {
-                    console.log(
-                        "Updates are disabled, skipping update check and server connection",
-                    );
                     this.setState({
                         isUpdateAvailable: false,
                         isFileCheckComplete: true,
                         currentUpdateMode: "complete",
                         currentProgress: 100,
                     });
-                    this.updateUI();
                     await this.Router.navigate("home");
-                    LoadStartPage()
+                    LoadStartPage();
                     return;
                 }
 
-                // Check server connection after successful login
                 const isConnected = await this.checkServerConnection();
-                if (isConnected) {
-                    console.log("Login success 2");
-                    await this.initializeAndCheckUpdates(true);
-                    await this.Router.navigate("home");
-                    LoadStartPage()
-                } else {
+                if (!isConnected) {
                     throw new Error(this.t("SERVER_CONNECTION_ERROR"));
                 }
+                await this.initializeAndCheckUpdates(true);
+                await this.Router.navigate("home");
+                LoadStartPage();
             } else {
                 const errorMessage = jsonResponse
                     ? jsonResponse.Msg || this.t("LOGIN_ERROR")
@@ -1780,10 +1632,7 @@ const App = {
      * @returns {Promise<void>}
      */
     async logout() {
-        if (this.state.isLoggingOut) {
-            console.log("A logout is already in progress.");
-            return;
-        }
+        if (this.state.isLoggingOut) return;
 
         this.setState({ isLoggingOut: true });
         try {
@@ -1822,14 +1671,9 @@ const App = {
     async changeLanguage(newLang) {
         if (newLang !== this.currentLanguage) {
             this.currentLanguage = newLang;
-            await invoke("save_language_to_config", {
-                language: this.currentLanguage,
-            });
-            console.log(`Language saved to config: ${this.currentLanguage}`);
-
+            await invoke("save_language_to_config", { language: this.currentLanguage });
             await this.loadTranslations();
             await this.updateAllUIElements();
-
             const isGameRunning = await invoke("get_game_status");
             this.setState({ isGameRunning: isGameRunning });
         }
@@ -1904,17 +1748,8 @@ const App = {
      * @returns {void}
      */
     async handleLaunchGame() {
-        if (UPDATE_CHECK_ENABLED && this.state.isUpdateAvailable) {
-            console.log(
-                "Updates are available, please update before launching the game",
-            );
-
-            return;
-        }
-        if (this.state.isGameLaunching) {
-            console.log("Game launch already in progress");
-            return;
-        }
+        if (UPDATE_CHECK_ENABLED && this.state.isUpdateAvailable) return;
+        if (this.state.isGameLaunching) return;
 
         this.setState({ isGameLaunching: true });
 
@@ -1922,8 +1757,7 @@ const App = {
             this.updateUIForGameStatus(true);
             if (this.statusEl) this.statusEl.textContent = this.t("LAUNCHING_GAME");
 
-            const result = await invoke("handle_launch_game");
-            console.log("Game launch result:", result);
+            await invoke("handle_launch_game");
         } catch (error) {
             console.error("Error initiating game launch:", error);
             const game_launch_error = this.t("GAME_LAUNCH_ERROR") + error.toString();
@@ -2064,23 +1898,15 @@ const App = {
      * @memberof App
      */
     async checkServerConnection() {
-        console.log("Checking server connection");
         this.showLoadingModal(this.t("CHECKING_SERVER_CONNECTION"));
         try {
             const isConnected = await invoke("check_server_connection");
             this.hideLoadingModal();
-            if (isConnected) {
-                console.log("Server connection successful");
-            } else {
-                console.log("Server connection failed");
-            }
             return isConnected;
         } catch (error) {
             console.error("Server connection error:", error);
             this.showLoadingError(this.t("SERVER_CONNECTION_ERROR"));
             return false;
-        } finally {
-            console.log("Server connection check complete");
         }
     },
 
@@ -2204,11 +2030,6 @@ const App = {
      * @memberof App
      */
     calculateGlobalTimeRemaining(totalDownloadedBytes, totalSize, speed) {
-        console.log("Calculating global time remaining:", {
-            totalDownloadedBytes,
-            totalSize,
-            speed,
-        });
         if (
             !isFinite(speed) ||
             speed <= 0 ||
@@ -2216,36 +2037,25 @@ const App = {
             !isFinite(totalSize) ||
             totalDownloadedBytes >= totalSize
         ) {
-            console.log("Invalid input for global time remaining calculation");
             return 0;
         }
-        let bytesRemaining = totalSize - totalDownloadedBytes;
-
-        let averageSpeed = this.calculateAverageSpeed(speed);
-
-        let secondsRemaining = bytesRemaining / averageSpeed;
-        console.log("Calculated time remaining:", secondsRemaining);
-        return Math.min(secondsRemaining, 30 * 24 * 60 * 60); // Limit to 30 days maximum
+        const bytesRemaining = totalSize - totalDownloadedBytes;
+        const averageSpeed = this.calculateAverageSpeed(speed);
+        if (averageSpeed <= 0) return 0;
+        const secondsRemaining = bytesRemaining / averageSpeed;
+        return Math.min(secondsRemaining, 30 * 24 * 60 * 60);
     },
 
     // Updated calculateAverageSpeed method
     calculateAverageSpeed(currentSpeed) {
-        // Add current speed to history
         this.state.speedHistory.push(currentSpeed);
 
-        // Limit history size
         if (this.state.speedHistory.length > this.state.speedHistoryMaxLength) {
-            this.state.speedHistory.shift(); // Remove oldest value
+            this.state.speedHistory.shift();
         }
 
-        // Calculate average speed
         const sum = this.state.speedHistory.reduce((acc, speed) => acc + speed, 0);
-        const averageSpeed = sum / this.state.speedHistory.length;
-
-        console.log("Speed history:", this.state.speedHistory);
-        console.log("Average speed:", averageSpeed);
-
-        return averageSpeed;
+        return sum / this.state.speedHistory.length;
     },
 
     /**
@@ -2332,37 +2142,21 @@ const App = {
      */
     toggleModal(modalId, show, message = "") {
         const modal = document.getElementById(modalId);
-        if (!modal) {
-            console.error(`Modal with id ${modalId} not found`);
-            return;
-        }
-
-        console.log(`Toggling modal ${modalId}, show: ${show}`);
+        if (!modal) return;
 
         modal.classList.toggle("show", show);
         modal.style.display = show ? "block" : "none";
 
-        // Handle message for loading modal
         if (modalId === "loading-modal" && message) {
             const messageElement = modal.querySelector(".loading-message");
-            if (messageElement) {
-                messageElement.textContent = message;
-            }
+            if (messageElement) messageElement.textContent = message;
         }
-
-        console.log(
-            `Modal ${modalId} visibility:`,
-            modal.classList.contains("show"),
-        );
     },
 
     // Logs modal helpers
     openLogsModal() {
         const modal = document.getElementById("log-modal");
-        if (!modal) {
-            console.error("Log modal not found");
-            return;
-        }
+        if (!modal) return;
         this.toggleModal("log-modal", true);
         const closeBtn = modal.querySelector(".log-modal-close");
         if (closeBtn) {
@@ -2378,16 +2172,8 @@ const App = {
     
     toggleLogsModal() {
         const modal = document.getElementById("log-modal");
-        if (!modal) {
-            console.error("Log modal not found");
-            return;
-        }
-        const isVisible = modal.classList.contains("show");
-        if (isVisible) {
-            this.closeLogsModal();
-        } else {
-            this.openLogsModal();
-        }
+        if (!modal) return;
+        modal.classList.contains("show") ? this.closeLogsModal() : this.openLogsModal();
     },
 
     /**
@@ -2400,12 +2186,7 @@ const App = {
      */
     toggleHashProgressModal(show, message = "", isComplete = false) {
         const modal = document.getElementById("hash-file-progress-modal");
-        if (!modal) {
-            console.error("Hash file progress modal not found");
-            return;
-        }
-
-        console.log(`Toggling hash progress modal, show: ${show}`);
+        if (!modal) return;
 
         if (show) {
             modal.classList.add("show", "hash-modal-fade-in");
@@ -2454,11 +2235,6 @@ const App = {
                 },
             });
         }
-
-        console.log(
-            `Hash progress modal visibility:`,
-            modal.classList.contains("show"),
-        );
     },
 
     //method to display the loading indicator
@@ -2586,7 +2362,6 @@ const App = {
     async updateLanguageSelector() {
         try {
             this.currentLanguage = await invoke("get_language_from_config");
-            console.log(`Language loaded from config: ${this.currentLanguage}`);
 
             const selectWrapper = document.querySelector(".select-wrapper");
             const selectStyled = selectWrapper?.querySelector(".select-styled");
@@ -2691,13 +2466,11 @@ const App = {
      * @returns {void}
      */
     initLogin() {
-        console.log("Initializing login page");
         const loginButton = document.getElementById("login-button");
         const registerButton = document.getElementById("register-button");
 
         if (loginButton) {
             loginButton.addEventListener("click", async () => {
-                console.log("Login button clicked");
                 const username = document.getElementById("username").value;
                 const password = document.getElementById("password").value;
                 await this.login(username, password);
@@ -2807,22 +2580,18 @@ const App = {
             );
         }
 
-        //REPAIR CLIENT
         const repairButton = document.getElementById("check-game-files");
         if (repairButton) {
             repairButton.addEventListener("click", async (e) => {
-                console.log("Repair button clicked");
                 e.preventDefault();
                 await invoke('clear_cache');
                 await this.checkForUpdates();
             });
         }
-        //DONE
 
         const logoutButton = document.getElementById("logout-link");
         if (logoutButton) {
             logoutButton.addEventListener("click", async (e) => {
-                console.log("Logout button clicked");
                 e.preventDefault();
                 await this.logout();
             });
@@ -2971,16 +2740,10 @@ const App = {
         this.updateUIForGameStatus(isGameRunning);
     },
 
-    // Update the initUserPanel method
     initUserPanel() {
         const btnUserAvatar = document.querySelector(".btn-user-avatar");
-        const dropdownPanelWrapper = document.querySelector(
-            ".dropdown-panel-wrapper",
-        );
-        if (!btnUserAvatar || !dropdownPanelWrapper) {
-            console.warn("User panel elements not found in the DOM");
-            return;
-        }
+        const dropdownPanelWrapper = document.querySelector(".dropdown-panel-wrapper");
+        if (!btnUserAvatar || !dropdownPanelWrapper) return;
 
         // Initialize panel state
         let isPanelOpen = false;
@@ -3025,21 +2788,13 @@ const App = {
             }
         });
 
-        // Prevent closing when clicking inside the panel
         dropdownPanelWrapper.addEventListener("click", (event) => {
             event.stopPropagation();
-        });
-
-        // Add event listener to links inside the dropdown panel, deaktiviert interne links
-        dropdownPanelWrapper.addEventListener("click", (event) => {
             if (event.target.tagName === 'A' && event.target.target === '_blank') {
                 event.preventDefault();
-                const href = event.target.href;
-                window.__TAURI__.shell.open(href);
+                window.__TAURI__.shell.open(event.target.href);
             }
         });
-
-        console.log("User panel initialized");
     },
 
     /**
@@ -3055,10 +2810,7 @@ const App = {
         const versionInfo = document.getElementById("version-info");
         const tabButtons = modal ? modal.querySelectorAll(".menu-tab") : [];
 
-        if (!modal || !btn || !span || !input) {
-            console.warn("Modal elements not found in the DOM");
-            return;
-        }
+        if (!modal || !btn || !span || !input) return;
 
         this.setupModalEventListeners(modal, btn, span, input, versionInfo, tabButtons);
     },
@@ -3130,19 +2882,11 @@ const App = {
             }
         };
 
-        /**
-         * Handles the click event on the window.
-         *
-         * Checks if the target of the click event is the modal element,
-         * and if so, calls the closeModal method to close the modal.
-         * @param {MouseEvent} event The click event.
-         * @returns {void}
-         */
-        window.onclick = (event) => {
-            if (event.target == modal) {
+        window.addEventListener("click", (event) => {
+            if (event.target === modal) {
                 this.closeModal(modal);
             }
-        };
+        });
 
 
         if (versionInfo) {
@@ -3224,8 +2968,6 @@ const App = {
             this.loadingError = this.loadingModal.querySelector(".loading-error");
             this.refreshButton = this.loadingModal.querySelector("#refresh-button");
             this.quitTheApp = this.loadingModal.querySelector("#quit-button");
-        } else {
-            console.error("Loading modal elements not found in the DOM");
         }
     },
 
@@ -3262,7 +3004,6 @@ const App = {
     async saveGamePath(path) {
         try {
             await invoke("save_game_path_to_config", { path });
-            console.log("Game path saved successfully");
             if (this.state.isFirstLaunch) {
                 this.completeFirstLaunch();
                 this.showCustomNotification(
@@ -3303,7 +3044,7 @@ const App = {
             ) {
                 errorMessage = this.t("CONFIG_INI_MISSING");
             } else {
-                errorMessage = `${this.t("GAME_PATH_LOAD_ERROR")} ${error && error ? error : ""}`;
+                errorMessage = `${this.t("GAME_PATH_LOAD_ERROR")} ${error || ""}`;
             }
 
             const userResponse = await message(errorMessage, {
@@ -3436,12 +3177,9 @@ const App = {
         const targetNode = document.getElementById("dl-status-string");
         if (targetNode) {
             const config = { childList: true, subtree: true };
-            const callback = (mutationsList, observer) => {
+            const callback = (mutationsList) => {
                 for (let mutation of mutationsList) {
-                    if (mutation.type === "childList") {
-                        console.log("Mutation detected in dl-status-string");
-                        this.updateUI();
-                    }
+                    if (mutation.type === "childList") this.updateUI();
                 }
             };
             this.observer = new MutationObserver(callback);
@@ -3516,11 +3254,9 @@ const App = {
      * @returns {Promise<void>}
      */
     async generateHashFile() {
-        if (this.state.isGeneratingHashFile) {
-            console.log("Hash file generation is already in progress");
-            return;
-        }
+        if (this.state.isGeneratingHashFile) return;
 
+        let unlistenProgress = null;
         try {
             this.setState({
                 isGeneratingHashFile: true,
@@ -3540,13 +3276,12 @@ const App = {
                 this.t("INITIALIZING_HASH_GENERATION"),
             );
 
-            const unlistenProgress = await listen("hash_file_progress", (event) => {
+            unlistenProgress = await listen("hash_file_progress", (event) => {
                 const {
                     current_file,
                     progress,
                     processed_files,
                     total_files,
-                    total_size,
                 } = event.payload;
 
                 this.setState({
@@ -3559,8 +3294,7 @@ const App = {
                 this.updateHashFileProgressUI();
             });
 
-            const result = await invoke("generate_hash_file");
-            console.log("Hash file generation result:", result);
+            await invoke("generate_hash_file");
             this.toggleHashProgressModal(true, "", true);
             this.showNotification(this.t("HASH_FILE_GENERATED"), "success");
         } catch (error) {
@@ -3622,11 +3356,8 @@ const App = {
     },
 
     async togglePauseResume() {
-        console.log("togglePauseResume called, current mode:", this.state.currentUpdateMode);
-        // If currently downloading -> pause (cancel tokens, but will resume from temp files)
         if (this.state.currentUpdateMode === "download") {
             try {
-                console.log("Pausing download...");
                 await invoke("cancel_downloads");
                 this.setState({ 
                     currentUpdateMode: "paused",
@@ -3636,38 +3367,42 @@ const App = {
                     currentSpeed: 0,
                 });
                 this.updateLaunchGameButton(true);
-                console.log("Download paused, mode set to:", this.state.currentUpdateMode);
             } catch (e) {
                 console.error("pause failed", e);
             }
             return;
         }
-        // If paused -> resume
         if (this.state.currentUpdateMode === "paused") {
             try {
-                console.log("Resuming download...");
-                // Re-run download for remaining files by checking again
+                const previousTotal = this.state.totalSize || 0;
+                this.setState({ currentUpdateMode: "file_check", isCheckingForUpdates: true });
                 const filesToUpdate = await invoke("get_files_to_update");
+                this.setState({ isCheckingForUpdates: false });
+                
                 if (filesToUpdate && filesToUpdate.length > 0) {
-                    console.log("Setting mode to download, files to update:", filesToUpdate.length);
+                    const remainingSize = filesToUpdate.reduce((sum, f) => sum + (f.size || 0), 0);
+                    const alreadyDownloaded = previousTotal > 0 ? Math.max(0, previousTotal - remainingSize) : 0;
+                    const newTotalSize = previousTotal > 0 ? previousTotal : remainingSize;
+                    
                     this.setState({ 
                         currentUpdateMode: "download",
                         isUpdateAvailable: true,
+                        isFileCheckComplete: true,
                         downloadStartTime: Date.now(),
                         lastProgressUpdate: null,
                         speedHistory: [],
+                        totalFiles: filesToUpdate.length,
+                        totalSize: newTotalSize,
+                        downloadedBytesOffset: alreadyDownloaded,
                     });
-                    console.log("Mode set to:", this.state.currentUpdateMode);
-                    console.log("isUpdateAvailable set to:", this.state.isUpdateAvailable);
                     await this.runPatchSystem(filesToUpdate);
                 } else {
-                    // Nothing to download anymore; finalize state
                     this.handleCompletion();
                 }
             } catch (e) {
                 console.error("resume failed", e);
+                this.setState({ currentUpdateMode: "paused", isCheckingForUpdates: false });
             }
-            return;
         }
     },
 
@@ -3678,7 +3413,6 @@ const App = {
      * the Router's navigate method to handle the route change.
      */
     handleRouteChange() {
-        console.log("Route change detected");
         this.Router.navigate();
     },
 
@@ -3690,15 +3424,9 @@ const App = {
      * @returns {Promise<string>} The loaded content as a string.
      */
     async loadAsyncContent(file) {
-        console.log("Loading file:", file);
         const response = await fetch(file);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const content = await response.text();
-        console.log("File loaded successfully");
-
-        return content;
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return await response.text();
     },
 
     /**
