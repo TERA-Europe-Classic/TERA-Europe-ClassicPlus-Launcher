@@ -54,7 +54,32 @@ if (-not $cargoTauriCheck) {
 }
 
 # -- NSIS
-if (-Not (Test-Path $nsisPath)) {
+$makensisCheck = Get-Command makensis -ErrorAction SilentlyContinue
+
+# Potential NSIS paths
+$potentialPaths = @(
+    "${env:ProgramFiles(x86)}\NSIS\makensis.exe",
+    "${env:ProgramFiles}\NSIS\makensis.exe",
+    "C:\ProgramData\chocolatey\bin\makensis.exe"
+)
+
+$foundNsis = $false
+
+if ($makensisCheck) {
+    $foundNsis = $true
+} else {
+    foreach ($path in $potentialPaths) {
+        if (Test-Path $path) {
+            $foundNsis = $true
+            # Add to PATH for current session so tauri cli can find it
+            $nsisDir = Split-Path -Parent $path
+            $env:Path += ";$nsisDir"
+            break
+        }
+    }
+}
+
+if (-not $foundNsis) {
     Write-Host "`n[!] NSIS nicht gefunden!" -ForegroundColor $fail
     Write-Host "Bitte installiere NSIS: https://nsis.sourceforge.io/Download" -ForegroundColor $warn
     Start-Process "https://nsis.sourceforge.io/Download"
