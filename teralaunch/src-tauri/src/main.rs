@@ -1,51 +1,56 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod detect;
 mod mirror;
 mod s1_events;
-mod detect;
 
 // Standard library imports
 use std::collections::{HashMap, HashSet};
 use std::env;
-use std::fs::{self, File, remove_file};
+use std::fs::{self, remove_file, File};
 use std::io::{BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
-use std::sync::atomic::{AtomicU64, AtomicUsize, AtomicBool, Ordering};
-use std::time::{Duration, Instant, SystemTime};
 use std::process::Command;
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+use std::time::{Duration, Instant, SystemTime};
 
 // Third-party imports
 use dotenvy::dotenv;
-use log::{LevelFilter, error, info};
+use log::{error, info, LevelFilter};
 
-use tokio::sync::{watch, Mutex, mpsc, Semaphore};
-use tokio::task::JoinSet;
-use tokio::io::AsyncWriteExt;
-use tokio::io::AsyncReadExt;
-use tokio::io::BufWriter;
-use tokio::runtime::Runtime;
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-use tauri::Manager;
-use tauri::WindowEvent;
-use rayon::iter::{ParallelBridge, IntoParallelRefIterator, ParallelIterator, IndexedParallelIterator};
-use teralib::{get_game_status_receiver, run_game, reset_global_state, subscribe_game_events, get_last_spawned_pid};
-use teralib::config::get_config_value;
-use reqwest::Client;
-use lazy_static::lazy_static;
-use ini::Ini;
-use sha2::{Sha256, Digest};
 use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
+use ini::Ini;
+use lazy_static::lazy_static;
+use rayon::iter::{
+    IndexedParallelIterator, IntoParallelRefIterator, ParallelBridge, ParallelIterator,
+};
+use reqwest::header::{RANGE, USER_AGENT};
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
+use tauri::Manager;
+use tauri::WindowEvent;
+use teralib::config::get_config_value;
+use teralib::{
+    get_game_status_receiver, get_last_spawned_pid, reset_global_state, run_game,
+    subscribe_game_events,
+};
+use tokio::io::AsyncReadExt;
+use tokio::io::AsyncWriteExt;
+use tokio::io::BufWriter;
+use tokio::runtime::Runtime;
+use tokio::sync::{mpsc, watch, Mutex, Semaphore};
+use tokio::task::JoinSet;
 use walkdir::WalkDir;
-use reqwest::header::{USER_AGENT, RANGE};
 
-use crate::mirror::client::{start_mirror_client, stop_mirror_client};
-use crate::mirror::broadcaster::start_broadcast_server;
-use crate::s1_events::S1Event;
 use crate::detect::detect_remote_by_pid;
+use crate::mirror::broadcaster::start_broadcast_server;
+use crate::mirror::client::{start_mirror_client, stop_mirror_client};
+use crate::s1_events::S1Event;
 
 // Struct definitions
 #[derive(Serialize, Deserialize)]
@@ -110,17 +115,57 @@ lazy_static! {
     });
 }
 
-
-
-
-
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct FileInfo {
     path: String,
     hash: String,
     size: u64,
     url: String,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    existing_size: u64,
+}
+
+fn is_zero(v: &u64) -> bool {
+    *v == 0
+}
+
+fn resume_offset(existing_size: u64, total_size: u64) -> u64 {
+    if existing_size == 0 || total_size == 0 || existing_size >= total_size {
+        0
+    } else {
+        existing_size
+    }
+}
+
+fn compute_initial_downloaded(files: &[FileInfo], resume_override: Option<u64>) -> u64 {
+    let sum_existing: u64 = files
+        .iter()
+        .map(|f| resume_offset(f.existing_size, f.size))
+        .sum();
+    let total_size: u64 = files.iter().map(|f| f.size).sum();
+    let mut base = sum_existing;
+    if let Some(override_bytes) = resume_override {
+        if override_bytes > base {
+            base = override_bytes;
+        }
+    }
+    if total_size > 0 && base > total_size {
+        total_size
+    } else {
+        base
+    }
+}
+
+fn stall_exceeded(
+    last_bytes: u64,
+    current_bytes: u64,
+    idle_secs: u64,
+    threshold_secs: u64,
+) -> bool {
+    if current_bytes != last_bytes {
+        return false;
+    }
+    idle_secs >= threshold_secs
 }
 
 #[derive(Clone, Serialize)]
@@ -130,6 +175,7 @@ struct ProgressPayload {
     speed: f64,
     downloaded_bytes: u64,
     total_bytes: u64,
+    base_downloaded: u64,
     total_files: usize,
     elapsed_time: f64,
     current_file_index: usize,
@@ -145,7 +191,6 @@ struct FileCheckProgress {
     files_to_update: usize,
 }
 
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct CachedFileInfo {
     hash: String,
@@ -157,9 +202,7 @@ struct GameState {
     is_launching: Arc<Mutex<bool>>,
 }
 
-
 //static INIT: Once = Once::new();
-
 
 lazy_static! {
     static ref HASH_CACHE: Mutex<HashMap<String, CachedFileInfo>> = Mutex::new(HashMap::new());
@@ -169,11 +212,13 @@ lazy_static! {
 static GLOBAL_DOWNLOADED_BYTES: AtomicU64 = AtomicU64::new(0);
 static CURRENT_FILE_NAME: RwLock<String> = RwLock::new(String::new());
 
-
-
-
 fn is_ignored(path: &Path, game_path: &Path, ignored_paths: &HashSet<&str>) -> bool {
-    let relative_path = path.strip_prefix(game_path).unwrap().to_str().unwrap().replace("\\", "/");
+    let relative_path = path
+        .strip_prefix(game_path)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .replace("\\", "/");
 
     // Ignore files at the root
     if relative_path.chars().filter(|&c| c == '/').count() == 0 {
@@ -194,12 +239,12 @@ async fn get_server_hash_file() -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
     let res = client
         .get(get_config_value("HASH_FILE_URL"))
-        .send().await
+        .send()
+        .await
         .map_err(|e| e.to_string())?;
     let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
     Ok(json)
 }
-
 
 fn calculate_file_hash<P: AsRef<Path>>(path: P) -> Result<String, String> {
     let file = File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
@@ -232,17 +277,19 @@ fn save_cache_to_disk(cache: &HashMap<String, CachedFileInfo>) -> Result<(), Str
     let cache_path = get_cache_file_path()?;
     let serialized = serde_json::to_string(cache).map_err(|e| e.to_string())?;
     let mut file = File::create(cache_path).map_err(|e| e.to_string())?;
-    file.write_all(serialized.as_bytes()).map_err(|e| e.to_string())?;
+    file.write_all(serialized.as_bytes())
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
-
 
 fn load_cache_from_disk() -> Result<HashMap<String, CachedFileInfo>, String> {
     let cache_path = get_cache_file_path()?;
     let mut file = File::open(cache_path).map_err(|e| e.to_string())?;
     let mut contents = String::new();
-    file.read_to_string(&mut contents).map_err(|e| e.to_string())?;
-    let cache: HashMap<String, CachedFileInfo> = serde_json::from_str(&contents).map_err(|e| e.to_string())?;
+    file.read_to_string(&mut contents)
+        .map_err(|e| e.to_string())?;
+    let cache: HashMap<String, CachedFileInfo> =
+        serde_json::from_str(&contents).map_err(|e| e.to_string())?;
     Ok(cache)
 }
 
@@ -259,6 +306,11 @@ fn clear_cache() -> Result<(), String> {
 #[tauri::command]
 fn cancel_downloads() {
     CANCEL_DOWNLOAD.store(true, Ordering::SeqCst);
+}
+
+#[tauri::command]
+fn get_downloaded_bytes() -> u64 {
+    GLOBAL_DOWNLOADED_BYTES.load(Ordering::SeqCst)
 }
 
 #[tauri::command]
@@ -286,7 +338,9 @@ async fn update_launcher(download_url: String) -> Result<(), String> {
         .await
         .map_err(|e| e.to_string())?;
 
-    tokio::fs::write(&new_path, &bytes).await.map_err(|e| e.to_string())?;
+    tokio::fs::write(&new_path, &bytes)
+        .await
+        .map_err(|e| e.to_string())?;
 
     #[cfg(target_os = "windows")]
     {
@@ -311,7 +365,6 @@ async fn update_launcher(download_url: String) -> Result<(), String> {
 
     std::process::exit(0);
 }
-
 
 fn find_config_file() -> Option<PathBuf> {
     use dirs_next::config_dir;
@@ -356,24 +409,24 @@ fn find_config_file() -> Option<PathBuf> {
 
 fn load_config() -> Result<(PathBuf, String), String> {
     let config_path = find_config_file().ok_or("Config file not found")?;
-    let conf = Ini::load_from_file(&config_path).map_err(|e|
-        format!("Failed to load config: {}", e)
-    )?;
+    let conf =
+        Ini::load_from_file(&config_path).map_err(|e| format!("Failed to load config: {}", e))?;
 
-    let section = conf.section(Some("game")).ok_or("Game section not found in config")?;
+    let section = conf
+        .section(Some("game"))
+        .ok_or("Game section not found in config")?;
 
     let game_path = section.get("path").ok_or("Game path not found in config")?;
 
     let game_path = PathBuf::from(game_path);
 
-    let game_lang = section.get("lang").ok_or("Game language not found in config")?.to_string();
+    let game_lang = section
+        .get("lang")
+        .ok_or("Game language not found in config")?
+        .to_string();
 
     Ok((game_path, game_lang))
 }
-
-
-
-
 
 #[tauri::command]
 async fn generate_hash_file(window: tauri::Window) -> Result<String, String> {
@@ -406,7 +459,10 @@ async fn generate_hash_file(window: tauri::Window) -> Result<String, String> {
         "version.ini",
         "unins000.dat",
         "unins000.exe",
-    ].iter().cloned().collect();
+    ]
+    .iter()
+    .cloned()
+    .collect();
 
     let total_files = WalkDir::new(&game_path)
         .into_iter()
@@ -434,7 +490,12 @@ async fn generate_hash_file(window: tauri::Window) -> Result<String, String> {
             let entry = entry.map_err(|e| e.to_string())?;
             let path = entry.path();
             if path.is_file() && !is_ignored(path, &game_path, &ignored_paths) {
-                let relative_path = path.strip_prefix(&game_path).unwrap().to_str().unwrap().replace("\\", "/");
+                let relative_path = path
+                    .strip_prefix(&game_path)
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .replace("\\", "/");
                 info!("Processing file: {}", relative_path);
 
                 let contents = std::fs::read(path).map_err(|e| e.to_string())?;
@@ -450,6 +511,7 @@ async fn generate_hash_file(window: tauri::Window) -> Result<String, String> {
                     hash,
                     size,
                     url,
+                    existing_size: 0,
                 });
 
                 total_size.fetch_add(size, Ordering::Relaxed);
@@ -457,13 +519,18 @@ async fn generate_hash_file(window: tauri::Window) -> Result<String, String> {
                 progress_bar.set_position(current_processed);
 
                 let progress = (current_processed as f64 / total_files as f64) * 100.0;
-                window.emit("hash_file_progress", json!({
-                    "current_file": relative_path,
-                    "progress": progress,
-                    "processed_files": current_processed,
-                    "total_files": total_files,
-                    "total_size": total_size.load(Ordering::Relaxed)
-                })).map_err(|e| e.to_string())?;
+                window
+                    .emit(
+                        "hash_file_progress",
+                        json!({
+                            "current_file": relative_path,
+                            "progress": progress,
+                            "processed_files": current_processed,
+                            "total_files": total_files,
+                            "total_size": total_size.load(Ordering::Relaxed)
+                        }),
+                    )
+                    .map_err(|e| e.to_string())?;
             }
             Ok(())
         });
@@ -478,7 +545,8 @@ async fn generate_hash_file(window: tauri::Window) -> Result<String, String> {
     info!("Generating JSON");
     let json = serde_json::to_string(&json!({
         "files": files.lock().await.clone()
-    })).map_err(|e| e.to_string())?;
+    }))
+    .map_err(|e| e.to_string())?;
 
     info!("Writing hash file");
     let mut file = File::create(&output_path).map_err(|e| e.to_string())?;
@@ -493,7 +561,6 @@ async fn generate_hash_file(window: tauri::Window) -> Result<String, String> {
 
     Ok(format!("Hash file generated successfully. Processed {} files with a total size of {} bytes in {:?}", total_processed, total_size, duration))
 }
-
 
 #[tauri::command]
 async fn select_game_folder() -> Result<String, String> {
@@ -510,15 +577,17 @@ async fn select_game_folder() -> Result<String, String> {
     }
 }
 
-
 fn get_game_path() -> Result<PathBuf, String> {
     let (game_path, _) = load_config()?;
     Ok(game_path)
 }
 
-
 #[tauri::command]
-async fn save_game_path_to_config(path: String, window: tauri::Window, app_handle: tauri::AppHandle) -> Result<(), String> {
+async fn save_game_path_to_config(
+    path: String,
+    window: tauri::Window,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
     // Capture previous path before writing, so we can detect actual changes
     let prev_path_string = get_game_path()
         .ok()
@@ -527,17 +596,19 @@ async fn save_game_path_to_config(path: String, window: tauri::Window, app_handl
     // Simple path normalizer to compare semantically equal paths
     let normalize = |s: &str| -> String {
         let mut t = s.replace('\\', "/");
-        while t.ends_with('/') { t.pop(); }
+        while t.ends_with('/') {
+            t.pop();
+        }
         t.to_lowercase()
     };
     let config_path = find_config_file().ok_or("Config file not found")?;
-    let mut conf = Ini::load_from_file(&config_path).map_err(|e|
-        format!("Failed to load config: {}", e)
-    )?;
+    let mut conf =
+        Ini::load_from_file(&config_path).map_err(|e| format!("Failed to load config: {}", e))?;
 
     conf.with_section(Some("game")).set("path", &path);
 
-    conf.write_to_file(&config_path).map_err(|e| format!("Failed to write config: {}", e))?;
+    conf.write_to_file(&config_path)
+        .map_err(|e| format!("Failed to write config: {}", e))?;
 
     // Only interrupt/recheck when path actually changed
     let should_refresh = match &prev_path_string {
@@ -559,7 +630,8 @@ async fn save_game_path_to_config(path: String, window: tauri::Window, app_handl
             match get_files_to_update(window_clone.clone()).await {
                 Ok(files) => {
                     if !files.is_empty() {
-                        let _ = download_all_files(app_handle_clone, window_clone, files).await;
+                        let _ =
+                            download_all_files(app_handle_clone, window_clone, files, None).await;
                     }
                 }
                 Err(e) => {
@@ -611,7 +683,7 @@ async fn update_file(
         let mut current_file = CURRENT_FILE_NAME.write().unwrap();
         *current_file = file_info.path.clone();
     }
-    
+
     let game_path = get_game_path()?;
     let file_path = game_path.join(&file_info.path);
 
@@ -620,7 +692,9 @@ async fn update_file(
     //println!("FileInfo: {}", file_info.url);
 
     if let Some(parent) = file_path.parent() {
-        tokio::fs::create_dir_all(parent).await.map_err(|e| e.to_string())?;
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|e| e.to_string())?;
     }
 
     let client = reqwest::Client::builder()
@@ -638,27 +712,108 @@ async fn update_file(
         corrected_url = format!("{}{}", &corrected_url[..pos], &corrected_url[(pos + 7)..]);
     }
 
-    // When a file needs to be updated we always download it from scratch.
-    // Resuming downloads was causing issues if the server file changed because
-    // the launcher would append the new data to the old file.
-    if file_path.exists() {
-        tokio::fs::remove_file(&file_path).await.map_err(|e| e.to_string())?;
-    }
-    let file_handle = tokio::fs::File::create(&file_path).await.map_err(|e| e.to_string())?;
-    let mut file = BufWriter::with_capacity(1024 * 1024, file_handle); // 1MB buffer
-
     let file_size = file_info.size;
+    let mut resume_from = resume_offset(file_info.existing_size, file_size);
+
+    if resume_from > 0 && !file_path.exists() {
+        GLOBAL_DOWNLOADED_BYTES.fetch_sub(resume_from, Ordering::SeqCst);
+        resume_from = 0;
+    }
+
+    if resume_from == 0 && file_path.exists() {
+        tokio::fs::remove_file(&file_path)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+
+    let file_handle = if resume_from > 0 {
+        tokio::fs::OpenOptions::new()
+            .append(true)
+            .open(&file_path)
+            .await
+            .map_err(|e| e.to_string())?
+    } else {
+        tokio::fs::File::create(&file_path)
+            .await
+            .map_err(|e| e.to_string())?
+    };
+    let mut file = BufWriter::with_capacity(1024 * 1024, file_handle); // 1MB buffer
 
     // Thresholds for chunked parallelism
     const CHUNK_MIN_SIZE: u64 = 16 * 1024 * 1024; // 16 MB
     const PART_SIZE: u64 = 32 * 1024 * 1024; // 32 MB
     const MAX_PARTS: usize = 32;
+    let allow_parallel = false; // Keep downloads resumable with contiguous files.
 
     info!("Downloading file: {} ({} bytes)", file_info.path, file_size);
     let download_start = Instant::now();
     let mut bytes_written: u64 = 0;
 
-    if file_size >= CHUNK_MIN_SIZE {
+    if resume_from > 0 {
+        let range_probe = client
+            .get(&corrected_url)
+            .header(RANGE, "bytes=0-0")
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        let supports_range = range_probe.status() == reqwest::StatusCode::PARTIAL_CONTENT
+            || range_probe.headers().get("content-range").is_some();
+
+        if supports_range {
+            let range_header = format!("bytes={}-", resume_from);
+            let res = client
+                .get(&corrected_url)
+                .header(RANGE, range_header)
+                .header("Accept-Encoding", "gzip, deflate, br")
+                .header("Connection", "keep-alive")
+                .header("Cache-Control", "no-cache")
+                .send()
+                .await
+                .map_err(|e| e.to_string())?
+                .error_for_status()
+                .map_err(|e| e.to_string())?;
+
+            let status = res.status();
+            let has_content_range = res.headers().get("content-range").is_some();
+            if status != reqwest::StatusCode::PARTIAL_CONTENT && !has_content_range {
+                GLOBAL_DOWNLOADED_BYTES.fetch_sub(resume_from, Ordering::SeqCst);
+                resume_from = 0;
+                drop(file);
+                tokio::fs::remove_file(&file_path).await.ok();
+                let file_handle = tokio::fs::File::create(&file_path)
+                    .await
+                    .map_err(|e| e.to_string())?;
+                file = BufWriter::with_capacity(1024 * 1024, file_handle);
+            } else {
+                let mut downloaded: u64 = 0;
+                let mut stream = res.bytes_stream();
+
+                while let Some(chunk_result) = stream.next().await {
+                    if CANCEL_DOWNLOAD.load(Ordering::SeqCst) {
+                        return Err("cancelled".into());
+                    }
+                    let chunk = chunk_result.map_err(|e| e.to_string())?;
+                    file.write_all(&chunk).await.map_err(|e| e.to_string())?;
+                    let len = chunk.len() as u64;
+                    downloaded += len;
+                    GLOBAL_DOWNLOADED_BYTES.fetch_add(len, Ordering::SeqCst);
+                }
+                bytes_written = resume_from + downloaded;
+                return Ok(bytes_written);
+            }
+        }
+
+        GLOBAL_DOWNLOADED_BYTES.fetch_sub(resume_from, Ordering::SeqCst);
+        resume_from = 0;
+        drop(file);
+        tokio::fs::remove_file(&file_path).await.ok();
+        let file_handle = tokio::fs::File::create(&file_path)
+            .await
+            .map_err(|e| e.to_string())?;
+        file = BufWriter::with_capacity(1024 * 1024, file_handle);
+    }
+
+    if allow_parallel && file_size >= CHUNK_MIN_SIZE {
         // Check if server supports range requests; fallback if not
         let range_probe = client
             .get(&corrected_url)
@@ -670,7 +825,10 @@ async fn update_file(
             || range_probe.headers().get("content-range").is_some();
 
         if !supports_range {
-            info!("Server does not support range requests. Falling back to single-stream for {}", file_info.path);
+            info!(
+                "Server does not support range requests. Falling back to single-stream for {}",
+                file_info.path
+            );
             // Single-stream fallback
             let res = client
                 .get(&corrected_url)
@@ -689,7 +847,9 @@ async fn update_file(
             let mut last_update = Instant::now();
 
             while let Some(chunk_result) = stream.next().await {
-                if CANCEL_DOWNLOAD.load(Ordering::SeqCst) { return Err("cancelled".into()); }
+                if CANCEL_DOWNLOAD.load(Ordering::SeqCst) {
+                    return Err("cancelled".into());
+                }
                 let chunk = chunk_result.map_err(|e| e.to_string())?;
                 file.write_all(&chunk).await.map_err(|e| e.to_string())?;
                 let len = chunk.len() as u64;
@@ -700,23 +860,30 @@ async fn update_file(
             }
             bytes_written = downloaded;
         } else {
-        // Perform chunked parallel download using HTTP ranges into temp parts
-        let num_parts = std::cmp::max(1, std::cmp::min(MAX_PARTS as u64, (file_size + PART_SIZE - 1) / PART_SIZE) as usize);
-        let mut join_set: JoinSet<Result<(), String>> = JoinSet::new();
+            // Perform chunked parallel download using HTTP ranges into temp parts
+            let num_parts = std::cmp::max(
+                1,
+                std::cmp::min(MAX_PARTS as u64, (file_size + PART_SIZE - 1) / PART_SIZE) as usize,
+            );
+            let mut join_set: JoinSet<Result<(), String>> = JoinSet::new();
 
-        for part_idx in 0..num_parts {
-            if CANCEL_DOWNLOAD.load(Ordering::SeqCst) { return Err("cancelled".into()); }
+            for part_idx in 0..num_parts {
+                if CANCEL_DOWNLOAD.load(Ordering::SeqCst) {
+                    return Err("cancelled".into());
+                }
 
-            let start = (part_idx as u64) * PART_SIZE;
-            let mut end = ((part_idx as u64 + 1) * PART_SIZE).saturating_sub(1);
-            if end >= file_size { end = file_size - 1; }
+                let start = (part_idx as u64) * PART_SIZE;
+                let mut end = ((part_idx as u64 + 1) * PART_SIZE).saturating_sub(1);
+                if end >= file_size {
+                    end = file_size - 1;
+                }
 
-            let part_url = corrected_url.clone();
-            let window_cl = window.clone();
-            let part_path = file_path.with_extension(format!("part{}", part_idx));
-            let file_name = file_info.path.clone();
+                let part_url = corrected_url.clone();
+                let window_cl = window.clone();
+                let part_path = file_path.with_extension(format!("part{}", part_idx));
+                let file_name = file_info.path.clone();
 
-            join_set.spawn(async move {
+                join_set.spawn(async move {
                 let client = reqwest::Client::builder()
                     .no_proxy()
                     .timeout(Duration::from_secs(300))
@@ -761,29 +928,33 @@ async fn update_file(
                 part_file.flush().await.map_err(|e| e.to_string())?;
                 Ok(())
             });
-        }
-
-        while let Some(res) = join_set.join_next().await {
-            match res {
-                Ok(Ok(())) => {}
-                Ok(Err(e)) => return Err(e),
-                Err(e) => return Err(format!("Join error: {}", e)),
             }
-        }
 
-        // Assemble parts
-        for part_idx in 0..num_parts {
-            let part_path = file_path.with_extension(format!("part{}", part_idx));
-            let mut part_f = tokio::fs::File::open(&part_path).await.map_err(|e| e.to_string())?;
-            let mut buf = vec![0u8; 64 * 1024];
-            loop {
-                let n = part_f.read(&mut buf).await.map_err(|e| e.to_string())?;
-                if n == 0 { break; }
-                file.write_all(&buf[..n]).await.map_err(|e| e.to_string())?;
+            while let Some(res) = join_set.join_next().await {
+                match res {
+                    Ok(Ok(())) => {}
+                    Ok(Err(e)) => return Err(e),
+                    Err(e) => return Err(format!("Join error: {}", e)),
+                }
             }
-            tokio::fs::remove_file(&part_path).await.ok();
-        }
-        bytes_written = file_size;
+
+            // Assemble parts
+            for part_idx in 0..num_parts {
+                let part_path = file_path.with_extension(format!("part{}", part_idx));
+                let mut part_f = tokio::fs::File::open(&part_path)
+                    .await
+                    .map_err(|e| e.to_string())?;
+                let mut buf = vec![0u8; 64 * 1024];
+                loop {
+                    let n = part_f.read(&mut buf).await.map_err(|e| e.to_string())?;
+                    if n == 0 {
+                        break;
+                    }
+                    file.write_all(&buf[..n]).await.map_err(|e| e.to_string())?;
+                }
+                tokio::fs::remove_file(&part_path).await.ok();
+            }
+            bytes_written = file_size;
         }
     } else {
         // Single-stream download
@@ -801,7 +972,9 @@ async fn update_file(
         let mut last_update = Instant::now();
 
         while let Some(chunk_result) = stream.next().await {
-            if CANCEL_DOWNLOAD.load(Ordering::SeqCst) { return Err("cancelled".into()); }
+            if CANCEL_DOWNLOAD.load(Ordering::SeqCst) {
+                return Err("cancelled".into());
+            }
             let chunk = chunk_result.map_err(|e| e.to_string())?;
             file.write_all(&chunk).await.map_err(|e| e.to_string())?;
             let len = chunk.len() as u64;
@@ -814,7 +987,6 @@ async fn update_file(
     }
 
     file.flush().await.map_err(|e| e.to_string())?;
-
 
     info!("File download completed: {}", file_info.path);
 
@@ -838,10 +1010,12 @@ fn format_bytes(bytes: u64) -> String {
 async fn download_all_files(
     app_handle: tauri::AppHandle,
     window: tauri::Window,
-    files_to_update: Vec<FileInfo>
+    files_to_update: Vec<FileInfo>,
+    resume_downloaded: Option<u64>,
 ) -> Result<Vec<u64>, String> {
     let total_files = files_to_update.len();
     let total_size: u64 = files_to_update.iter().map(|f| f.size).sum();
+    let initial_downloaded = compute_initial_downloaded(&files_to_update, resume_downloaded);
 
     if total_files == 0 {
         info!("No files to download");
@@ -853,12 +1027,13 @@ async fn download_all_files(
 
     let mut results: Vec<Option<u64>> = vec![None; total_files];
     let mut files_by_index: Vec<Option<FileInfo>> = vec![None; total_files];
-    GLOBAL_DOWNLOADED_BYTES.store(0, Ordering::SeqCst);
+    GLOBAL_DOWNLOADED_BYTES.store(initial_downloaded, Ordering::SeqCst);
     CANCEL_DOWNLOAD.store(false, Ordering::SeqCst);
 
     const MAX_CONCURRENT_DOWNLOADS: usize = 16;
     let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_DOWNLOADS));
     let global_start = Instant::now();
+    const STALL_TIMEOUT_SECS: u64 = 120;
 
     // Emit a smooth global progress tick to stabilize UI speed/ETA
     {
@@ -867,22 +1042,53 @@ async fn download_all_files(
         let total_files_tick = total_files;
         tauri::async_runtime::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_millis(500));
+            let mut last_bytes = initial_downloaded;
+            let mut last_change = Instant::now();
             loop {
                 interval.tick().await;
                 let d = GLOBAL_DOWNLOADED_BYTES.load(Ordering::SeqCst);
                 let elapsed = global_start.elapsed();
-                let speed = if elapsed.as_secs() > 0 { d / elapsed.as_secs() } else { 0 };
+                let speed = if elapsed.as_secs() > 0 {
+                    d.saturating_sub(initial_downloaded) / elapsed.as_secs()
+                } else {
+                    0
+                };
                 let current_file_name = {
                     let current_file = CURRENT_FILE_NAME.read().unwrap();
                     current_file.clone()
                 };
-                
+
+                if d != last_bytes {
+                    last_bytes = d;
+                    last_change = Instant::now();
+                } else if stall_exceeded(
+                    last_bytes,
+                    d,
+                    last_change.elapsed().as_secs(),
+                    STALL_TIMEOUT_SECS,
+                ) {
+                    let _ = window_tick.emit(
+                        "download_error",
+                        json!({
+                            "message": "Download stalled. Please retry.",
+                            "file": current_file_name,
+                        }),
+                    );
+                    CANCEL_DOWNLOAD.store(true, Ordering::SeqCst);
+                    break;
+                }
+
                 let payload = ProgressPayload {
                     file_name: current_file_name,
-                    progress: if total_bytes_tick > 0 { (d as f64 / total_bytes_tick as f64) * 100.0 } else { 0.0 },
+                    progress: if total_bytes_tick > 0 {
+                        (d as f64 / total_bytes_tick as f64) * 100.0
+                    } else {
+                        0.0
+                    },
                     speed: speed as f64,
                     downloaded_bytes: d,
                     total_bytes: total_bytes_tick,
+                    base_downloaded: initial_downloaded,
                     total_files: total_files_tick,
                     elapsed_time: elapsed.as_secs_f64(),
                     current_file_index: 0,
@@ -902,7 +1108,11 @@ async fn download_all_files(
             break;
         }
         files_by_index[index] = Some(file_info.clone());
-        let permit = semaphore.clone().acquire_owned().await.map_err(|e| e.to_string())?;
+        let permit = semaphore
+            .clone()
+            .acquire_owned()
+            .await
+            .map_err(|e| e.to_string())?;
         let app_handle_cl = app_handle.clone();
         let window_cl = window.clone();
         let file_info_cl = file_info.clone();
@@ -915,7 +1125,8 @@ async fn download_all_files(
                 total_files,
                 index + 1,
                 total_size,
-            ).await;
+            )
+            .await;
             (index, res)
         });
     }
@@ -931,7 +1142,15 @@ async fn download_all_files(
                     CANCEL_DOWNLOAD.store(true, Ordering::SeqCst);
                     break;
                 } else {
-                    return Err(e);
+                    let message = e.clone();
+                    let _ = window.emit(
+                        "download_error",
+                        json!({
+                            "message": message,
+                            "file": ""
+                        }),
+                    );
+                    return Err(message);
                 }
             }
             Err(e) => return Err(format!("Join error: {}", e)),
@@ -950,18 +1169,32 @@ async fn download_all_files(
             // (we used results before moving it; so check via downloaded_sizes length wouldn't align by idx)
             // Instead, recompute: if handler returned Some for this idx we already moved results, so we can't check here.
             // To avoid confusion, re-run a cheap metadata check: if the file exists, verify hash.
-            if CANCEL_DOWNLOAD.load(Ordering::SeqCst) { break; }
-            if maybe_file.is_none() { continue; }
+            if CANCEL_DOWNLOAD.load(Ordering::SeqCst) {
+                break;
+            }
+            if maybe_file.is_none() {
+                continue;
+            }
             let file_info = maybe_file.unwrap();
             let game_path = get_game_path()?;
             let file_path = game_path.join(&file_info.path);
-            if !file_path.exists() { continue; }
+            if !file_path.exists() {
+                continue;
+            }
             let expected_hash = file_info.hash.clone();
-            let calc = tokio::task::spawn_blocking(move || {
-                calculate_file_hash(&file_path)
-            }).await.map_err(|e| e.to_string())??;
+            let calc = tokio::task::spawn_blocking(move || calculate_file_hash(&file_path))
+                .await
+                .map_err(|e| e.to_string())??;
             if calc != expected_hash {
-                return Err(format!("Hash mismatch after download for file: {}", file_info.path));
+                let message = format!("Hash mismatch after download for file: {}", file_info.path);
+                let _ = window.emit(
+                    "download_error",
+                    json!({
+                        "message": message,
+                        "file": file_info.path
+                    }),
+                );
+                return Err(message);
             }
         }
     }
@@ -978,7 +1211,6 @@ async fn download_all_files(
     Ok(downloaded_sizes)
 }
 
-
 #[tauri::command]
 async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, String> {
     info!("Starting get_files_to_update");
@@ -993,7 +1225,9 @@ async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, Str
     info!("Local game path: {:?}", local_game_path);
 
     info!("Attempting to read server hash file");
-    let files = server_hash_file["files"].as_array().ok_or("Invalid server hash file format")?;
+    let files = server_hash_file["files"]
+        .as_array()
+        .ok_or("Invalid server hash file format")?;
     info!("Server hash file parsed, {} files found", files.len());
 
     info!("Starting file comparison");
@@ -1001,16 +1235,20 @@ async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, Str
     let cache = Arc::new(RwLock::new(_cache));
 
     let progress_bar = ProgressBar::new(files.len() as u64);
-    progress_bar.set_style(ProgressStyle::default_bar()
-        .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} {msg}")
-        .unwrap()
-        .progress_chars("##-"));
+    progress_bar.set_style(
+        ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} {msg}")
+            .unwrap()
+            .progress_chars("##-"),
+    );
 
     let processed_count = Arc::new(AtomicUsize::new(0));
     let files_to_update_count = Arc::new(AtomicUsize::new(0));
     let total_size = Arc::new(AtomicU64::new(0));
 
-    let files_to_update: Vec<FileInfo> = files.par_iter().enumerate()
+    let files_to_update: Vec<FileInfo> = files
+        .par_iter()
+        .enumerate()
         .filter_map(|(_index, file_info)| {
             let path = file_info["path"].as_str().unwrap_or("");
             let server_hash = file_info["hash"].as_str().unwrap_or("");
@@ -1030,7 +1268,8 @@ async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, Str
                     files_to_update: files_to_update_count.load(Ordering::SeqCst),
                 };
 
-                let _ = window.emit("file_check_progress", progress_payload)
+                let _ = window
+                    .emit("file_check_progress", progress_payload)
                     .map_err(|e| {
                         error!("Error emitting file_check_progress event: {}", e);
                         e.to_string()
@@ -1047,6 +1286,7 @@ async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, Str
                     hash: server_hash.to_string(),
                     size,
                     url,
+                    existing_size: 0,
                 });
             }
 
@@ -1060,6 +1300,7 @@ async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, Str
                         hash: server_hash.to_string(),
                         size,
                         url,
+                        existing_size: 0,
                     });
                 }
             };
@@ -1084,6 +1325,7 @@ async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, Str
                     hash: server_hash.to_string(),
                     size,
                     url,
+                    existing_size: resume_offset(metadata.len(), size),
                 });
             }
 
@@ -1097,15 +1339,19 @@ async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, Str
                         hash: server_hash.to_string(),
                         size,
                         url,
+                        existing_size: resume_offset(metadata.len(), size),
                     });
                 }
             };
 
             let mut cache_write = cache.write().unwrap();
-            cache_write.insert(path.to_string(), CachedFileInfo {
-                hash: local_hash.clone(),
-                last_modified: last_modified.unwrap_or_else(SystemTime::now),
-            });
+            cache_write.insert(
+                path.to_string(),
+                CachedFileInfo {
+                    hash: local_hash.clone(),
+                    last_modified: last_modified.unwrap_or_else(SystemTime::now),
+                },
+            );
             drop(cache_write);
 
             if local_hash != server_hash {
@@ -1116,6 +1362,7 @@ async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, Str
                     hash: server_hash.to_string(),
                     size,
                     url,
+                    existing_size: resume_offset(metadata.len(), size),
                 })
             } else {
                 None
@@ -1135,10 +1382,12 @@ async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, Str
         files_to_update: files_to_update_count.load(Ordering::SeqCst),
     };
 
-    let _ = window.emit("file_check_progress", final_progress).map_err(|e| {
-        error!("Error emitting final file_check_progress event: {}", e);
-        e.to_string()
-    });
+    let _ = window
+        .emit("file_check_progress", final_progress)
+        .map_err(|e| {
+            error!("Error emitting final file_check_progress event: {}", e);
+            e.to_string()
+        });
 
     // Save the updated cache to disk
     let final_cache = cache.read().unwrap();
@@ -1147,20 +1396,25 @@ async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, Str
     }
 
     let total_time = start_time.elapsed();
-    info!("File comparison completed. Files to update: {}", files_to_update.len());
+    info!(
+        "File comparison completed. Files to update: {}",
+        files_to_update.len()
+    );
 
     // Emit a final event with complete statistics
-    let _ = window.emit("file_check_completed", json!({
-        "total_files": files.len(),
-        "files_to_update": files_to_update.len(),
-        "total_size": total_size.load(Ordering::SeqCst),
-        "total_time_seconds": total_time.as_secs(),
-        "average_time_per_file_ms": (total_time.as_millis() as f64) / (files.len() as f64)
-    }));
+    let _ = window.emit(
+        "file_check_completed",
+        json!({
+            "total_files": files.len(),
+            "files_to_update": files_to_update.len(),
+            "total_size": total_size.load(Ordering::SeqCst),
+            "total_time_seconds": total_time.as_secs(),
+            "average_time_per_file_ms": (total_time.as_millis() as f64) / (files.len() as f64)
+        }),
+    );
 
     Ok(files_to_update)
 }
-
 
 #[tauri::command]
 async fn get_game_status(state: tauri::State<'_, GameState>) -> Result<bool, String> {
@@ -1169,11 +1423,10 @@ async fn get_game_status(state: tauri::State<'_, GameState>) -> Result<bool, Str
     Ok(status || is_launching)
 }
 
-
 #[tauri::command]
 async fn handle_launch_game(
     app_handle: tauri::AppHandle,
-    state: tauri::State<'_, GameState>
+    state: tauri::State<'_, GameState>,
 ) -> Result<String, String> {
     info!("Total time: {:?}", 3);
     let mut is_launching = state.is_launching.lock().await;
@@ -1199,7 +1452,10 @@ async fn handle_launch_game(
 
     if !full_game_path.exists() {
         *is_launching = false;
-        return Err(format!("Game executable not found at: {:?}", full_game_path));
+        return Err(format!(
+            "Game executable not found at: {:?}",
+            full_game_path
+        ));
     }
 
     let full_game_path_str = full_game_path
@@ -1218,14 +1474,14 @@ async fn handle_launch_game(
 
         info!("run_game reached");
 
-        match
-            run_game(
-                &account_name,
-                &characters_count,
-                &ticket,
-                &game_lang,
-                &full_game_path_str
-            ).await
+        match run_game(
+            &account_name,
+            &characters_count,
+            &ticket,
+            &game_lang,
+            &full_game_path_str,
+        )
+        .await
         {
             Ok(exit_status) => {
                 let result = format!("Game exited with status: {:?}", exit_status);
@@ -1275,13 +1531,13 @@ fn get_language_from_config() -> Result<String, String> {
 fn save_language_to_config(language: String) -> Result<(), String> {
     info!("Attempting to save language {} to config file", language);
     let config_path = find_config_file().ok_or("Config file not found")?;
-    let mut conf = Ini::load_from_file(&config_path).map_err(|e|
-        format!("Failed to load config: {}", e)
-    )?;
+    let mut conf =
+        Ini::load_from_file(&config_path).map_err(|e| format!("Failed to load config: {}", e))?;
 
     conf.with_section(Some("game")).set("lang", &language);
 
-    conf.write_to_file(&config_path).map_err(|e| format!("Failed to write config: {}", e))?;
+    conf.write_to_file(&config_path)
+        .map_err(|e| format!("Failed to write config: {}", e))?;
 
     info!("Language successfully saved to config");
     Ok(())
@@ -1407,7 +1663,10 @@ async fn login(username: String, password: String) -> Result<String, String> {
         .await
         .map_err(|e| e.to_string())?;
 
-    let character_count_data: Value = character_count_res.json().await.map_err(|e| e.to_string())?;
+    let character_count_data: Value = character_count_res
+        .json()
+        .await
+        .map_err(|e| e.to_string())?;
     let this_character_count = character_count_data["CharacterCount"]
         .as_str()
         .ok_or("Failed to retrieve CharacterCount")?
@@ -1432,7 +1691,11 @@ async fn login(username: String, password: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn register_new_account(login: String, email: String, password: String) -> Result<String, String> {
+async fn register_new_account(
+    login: String,
+    email: String,
+    password: String,
+) -> Result<String, String> {
     if login.is_empty() || email.is_empty() || password.is_empty() {
         return Err("All fields must be provided".to_string());
     }
@@ -1497,51 +1760,50 @@ async fn check_server_connection() -> Result<bool, String> {
     }
 }
 
-
 fn main() {
     dotenv().ok();
 
-    // Windows: relaunch elevated via UAC using ShellExecute with "runas" verb.
-    // This shows proper UAC dialog and admin shield icon without command prompt flash.
-    #[cfg(target_os = "windows")]
-    {
-        use std::ffi::CString;
-        use winapi::um::shellapi::ShellExecuteA;
-        use winapi::um::winuser::SW_SHOWNORMAL;
-        use std::ptr;
+    // // Windows: relaunch elevated via UAC using ShellExecute with "runas" verb.
+    // // This shows proper UAC dialog and admin shield icon without command prompt flash.
+    // #[cfg(target_os = "windows")]
+    // {
+    //     use std::ffi::CString;
+    //     use std::ptr;
+    //     use winapi::um::shellapi::ShellExecuteA;
+    //     use winapi::um::winuser::SW_SHOWNORMAL;
 
-        // If the special flag is not present, relaunch self elevated and append it.
-        let is_guard_present = std::env::args().any(|a| a == "--elevated");
-        if !is_guard_present {
-            if let Ok(current_exe) = std::env::current_exe() {
-                // Preserve original args and append our guard flag
-                let mut args: Vec<String> = std::env::args().skip(1).collect();
-                args.push("--elevated".to_string());
-                let args_str = args.join(" ");
+    //     // If the special flag is not present, relaunch self elevated and append it.
+    //     let is_guard_present = std::env::args().any(|a| a == "--elevated");
+    //     if !is_guard_present {
+    //         if let Ok(current_exe) = std::env::current_exe() {
+    //             // Preserve original args and append our guard flag
+    //             let mut args: Vec<String> = std::env::args().skip(1).collect();
+    //             args.push("--elevated".to_string());
+    //             let args_str = args.join(" ");
 
-                // Convert to CString for Windows API
-                let exe_path = CString::new(current_exe.to_string_lossy().as_ref()).unwrap();
-                let parameters = CString::new(args_str).unwrap();
-                let verb = CString::new("runas").unwrap();
+    //             // Convert to CString for Windows API
+    //             let exe_path = CString::new(current_exe.to_string_lossy().as_ref()).unwrap();
+    //             let parameters = CString::new(args_str).unwrap();
+    //             let verb = CString::new("runas").unwrap();
 
-                unsafe {
-                    let result = ShellExecuteA(
-                        ptr::null_mut(),
-                        verb.as_ptr(),
-                        exe_path.as_ptr(),
-                        parameters.as_ptr(),
-                        ptr::null(),
-                        SW_SHOWNORMAL,
-                    );
-                    
-                    // ShellExecute returns > 32 on success
-                    if result as i32 > 32 {
-                        std::process::exit(0);
-                    }
-                }
-            }
-        }
-    }
+    //             unsafe {
+    //                 let result = ShellExecuteA(
+    //                     ptr::null_mut(),
+    //                     verb.as_ptr(),
+    //                     exe_path.as_ptr(),
+    //                     parameters.as_ptr(),
+    //                     ptr::null(),
+    //                     SW_SHOWNORMAL,
+    //                 );
+
+    //                 // ShellExecute returns > 32 on success
+    //                 if result as i32 > 32 {
+    //                     std::process::exit(0);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     let (tera_logger, mut tera_log_receiver) = teralib::setup_logging();
 
@@ -1565,15 +1827,13 @@ fn main() {
         }
     });
 
-
     let game_status_receiver = get_game_status_receiver();
     let game_state = GameState {
         status_receiver: Arc::new(Mutex::new(game_status_receiver)),
         is_launching: Arc::new(Mutex::new(false)),
     };
 
-    tauri::Builder
-        ::default()
+    tauri::Builder::default()
         .manage(game_state)
         .setup(|app| {
             let window = app.get_window("main").unwrap();
@@ -1642,10 +1902,10 @@ fn main() {
                     .enable_all()
                     .build()
                     .expect("Failed to create Tokio runtime");
-                
+
                 rt.block_on(async move {
                     let mut rx = subscribe_game_events();
-                    
+
                     loop {
                         match rx.recv().await {
                             Ok((code, _payload)) => {
@@ -1657,11 +1917,14 @@ fn main() {
                                     }
                                 } else if event.should_start_mirror_client() {
                                     let app_handle_clone = app_handle_events.clone();
-                                    
+
                                     if let Some(pid) = get_last_spawned_pid() {
-                                        if let Some((host, port)) = detect_remote_by_pid(pid).await {
+                                        if let Some((host, port)) = detect_remote_by_pid(pid).await
+                                        {
                                             if let Some(win) = app_handle_clone.get_window("main") {
-                                                if let Err(e) = start_mirror_client(win, host, port).await {
+                                                if let Err(e) =
+                                                    start_mirror_client(win, host, port).await
+                                                {
                                                     error!("Failed to start mirror client: {}", e);
                                                 }
                                             }
@@ -1671,16 +1934,14 @@ fn main() {
 
                                 let _ = app_handle_events.emit_all("s1_event", code);
                             }
-                            Err(e) => {
-                                match e {
-                                    tokio::sync::broadcast::error::RecvError::Closed => {
-                                        break;
-                                    }
-                                    tokio::sync::broadcast::error::RecvError::Lagged(skipped) => {
-                                        error!("Event receiver lagged, skipped {} events", skipped);
-                                    }
+                            Err(e) => match e {
+                                tokio::sync::broadcast::error::RecvError::Closed => {
+                                    break;
                                 }
-                            }
+                                tokio::sync::broadcast::error::RecvError::Lagged(skipped) => {
+                                    error!("Event receiver lagged, skipped {} events", skipped);
+                                }
+                            },
                         }
                     }
                 });
@@ -1701,36 +1962,35 @@ fn main() {
             info!("Tauri setup completed");
             Ok(())
         })
-        .invoke_handler(
-            tauri::generate_handler![
-                handle_launch_game,
-                get_game_status,
-                select_game_folder,
-                get_game_path_from_config,
-                save_game_path_to_config,
-                reset_launch_state,
-                clear_cache,
-                login,
-                register_new_account,
-                set_auth_info,
-                get_language_from_config,
-                save_language_to_config,
-                get_files_to_update,
-                update_file,
-                handle_logout,
-                generate_hash_file,
-                check_server_connection,
-                check_update_required,
-                download_all_files,
-                cancel_downloads,
-                set_logging,
-                update_launcher,
-                start_mirror_client,
-                stop_mirror_client,
-                set_mirror_target,
-                is_debug,
-            ]
-        )
+        .invoke_handler(tauri::generate_handler![
+            handle_launch_game,
+            get_game_status,
+            select_game_folder,
+            get_game_path_from_config,
+            save_game_path_to_config,
+            reset_launch_state,
+            clear_cache,
+            login,
+            register_new_account,
+            set_auth_info,
+            get_language_from_config,
+            save_language_to_config,
+            get_files_to_update,
+            update_file,
+            handle_logout,
+            generate_hash_file,
+            check_server_connection,
+            check_update_required,
+            download_all_files,
+            cancel_downloads,
+            get_downloaded_bytes,
+            set_logging,
+            update_launcher,
+            start_mirror_client,
+            stop_mirror_client,
+            set_mirror_target,
+            is_debug,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -1744,5 +2004,58 @@ mod tests {
     async fn test_login_with_empty_username() {
         let result = login("".to_string(), "pass".to_string()).await;
         assert_eq!(result.unwrap_err(), "Username and password cannot be empty");
+    }
+
+    #[test]
+    fn resume_offset_returns_existing_when_partial() {
+        assert_eq!(resume_offset(1024, 4096), 1024);
+    }
+
+    #[test]
+    fn resume_offset_returns_zero_when_missing_or_full() {
+        assert_eq!(resume_offset(0, 4096), 0);
+        assert_eq!(resume_offset(4096, 4096), 0);
+    }
+
+    #[test]
+    fn resume_offset_returns_zero_when_existing_exceeds_total() {
+        assert_eq!(resume_offset(8192, 4096), 0);
+    }
+
+    #[test]
+    fn compute_initial_downloaded_prefers_resume_override() {
+        let files = vec![FileInfo {
+            path: "a".to_string(),
+            hash: "h".to_string(),
+            size: 100,
+            url: "u".to_string(),
+            existing_size: 20,
+        }];
+        assert_eq!(compute_initial_downloaded(&files, Some(80)), 80);
+    }
+
+    #[test]
+    fn compute_initial_downloaded_clamps_to_total_size() {
+        let files = vec![FileInfo {
+            path: "a".to_string(),
+            hash: "h".to_string(),
+            size: 100,
+            url: "u".to_string(),
+            existing_size: 0,
+        }];
+        assert_eq!(compute_initial_downloaded(&files, Some(150)), 100);
+    }
+
+    #[test]
+    fn stall_exceeded_detects_no_progress() {
+        assert!(stall_exceeded(100, 100, 61, 60));
+        assert!(!stall_exceeded(100, 100, 30, 60));
+        assert!(!stall_exceeded(100, 120, 61, 60));
+    }
+
+    #[test]
+    fn get_downloaded_bytes_reads_global_state() {
+        GLOBAL_DOWNLOADED_BYTES.store(1234, Ordering::SeqCst);
+        assert_eq!(get_downloaded_bytes(), 1234);
     }
 }

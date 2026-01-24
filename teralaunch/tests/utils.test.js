@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { calculateRemainingSize, calculateResumeSnapshot } from '../src/utils/download.js';
+import { shouldDisableLaunch, getStatusKey, getDlStatusKey } from '../src/utils/updateState.js';
 
 function getVisibilityState(state) {
     const isDownloading = state.currentUpdateMode === 'download';
@@ -185,6 +187,65 @@ describe('Modal Toggle', () => {
         toggleModal(modal, false);
         expect(modal.classList.toggle).toHaveBeenCalledWith('show', false);
         expect(modal.style.display).toBe('none');
+    });
+});
+
+describe('Resume Size Helpers', () => {
+    it('subtracts existing bytes when computing remaining size', () => {
+        const files = [
+            { size: 100, existing_size: 20 },
+            { size: 200, existing_size: 0 },
+            { size: 50 },
+        ];
+        expect(calculateRemainingSize(files)).toBe(330);
+    });
+
+    it('uses remaining size to compute resume snapshot when total known', () => {
+        const files = [{ size: 500, existing_size: 200 }];
+        const snapshot = calculateResumeSnapshot(1000, 100, files);
+        expect(snapshot.remainingSize).toBe(300);
+        expect(snapshot.newTotalSize).toBe(1000);
+        expect(snapshot.clampedDownloaded).toBe(700);
+    });
+
+    it('falls back to previous downloaded bytes when remaining is unknown', () => {
+        const files = [{ size: 100, existing_size: 0 }];
+        const snapshot = calculateResumeSnapshot(0, 250, files);
+        expect(snapshot.newTotalSize).toBe(100);
+        expect(snapshot.clampedDownloaded).toBe(250);
+    });
+
+    it('does not decrease downloaded snapshot when computed value is lower', () => {
+        const files = [{ size: 1000, existing_size: 100 }];
+        const snapshot = calculateResumeSnapshot(0, 400, files);
+        expect(snapshot.clampedDownloaded).toBe(400);
+    });
+});
+
+describe('Update State Helpers', () => {
+    it('disables launch when update error is present', () => {
+        expect(shouldDisableLaunch({
+            disabled: false,
+            currentUpdateMode: 'ready',
+            updateError: true,
+        })).toBe(true);
+    });
+
+    it('returns update error status when error exists', () => {
+        const state = { updateError: true };
+        expect(getStatusKey(state)).toBe('UPDATE_ERROR_MESSAGE');
+        expect(getDlStatusKey({ ...state, currentUpdateMode: 'download' })).toBe('UPDATE_ERROR_MESSAGE');
+    });
+
+    it('returns downloading status during active download', () => {
+        const state = { updateError: false, isUpdateAvailable: true, currentUpdateMode: 'download' };
+        expect(getStatusKey(state)).toBe('DOWNLOADING_FILES');
+        expect(getDlStatusKey({
+            ...state,
+            isFileCheckComplete: false,
+            isUpdateAvailable: true,
+            currentUpdateMode: 'download',
+        })).toBe('DOWNLOADING_FILES');
     });
 });
 

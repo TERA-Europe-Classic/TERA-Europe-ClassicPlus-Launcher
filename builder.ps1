@@ -45,10 +45,9 @@ if (-not $rustCheck) {
     Write-Host "[OK] Rust installiert" -ForegroundColor $success
 }
 
-# -- Tauri CLI (Cargo v1)
+# -- Tauri CLI Check (Optional if using npm)
 if (-not $cargoTauriCheck) {
-    Write-Host "`n[!] Cargo Tauri CLI v1 fehlt - wird installiert..." -ForegroundColor $warn
-    cargo install --locked tauri-cli@^1
+    Write-Host "[Info] Global cargo-tauri not found, will rely on npm script."
 } else {
     Write-Host "[OK] Cargo Tauri CLI erkannt" -ForegroundColor $success
 }
@@ -156,9 +155,9 @@ if ($resolvedKey -and -not [string]::IsNullOrWhiteSpace($resolvedKey)) {
     if ($resolvedPwd -and -not [string]::IsNullOrWhiteSpace($resolvedPwd)) {
         $env:TAURI_KEY_PASSWORD = $resolvedPwd.Trim()
     }
-    Write-Host "\n[OK] Updater auto-signing aktiviert (TAURI_PRIVATE_KEY gesetzt)" -ForegroundColor $success
+    Write-Host "`n[OK] Updater auto-signing aktiviert (TAURI_PRIVATE_KEY gesetzt)" -ForegroundColor $success
 } else {
-    Write-Host "\n[!] Kein privater Signierschluessel gefunden – Bundler zeigt ggf. Hinweis, Artefakte werden trotzdem erstellt." -ForegroundColor $warn
+    Write-Host "`n[!] Kein privater Signierschluessel gefunden - Bundler zeigt ggf. Hinweis, Artefakte werden trotzdem erstellt." -ForegroundColor $warn
 }
 
 # -- Lizenzdatei schreiben (Deutsch/Englisch)
@@ -180,9 +179,26 @@ if (-Not (Test-Path $projectPath)) {
 Set-Location -Path $projectPath
 Write-Host "`nWechsle ins Projektverzeichnis: $projectPath" -ForegroundColor $success
 
-# -- Tauri Build starten (Cargo v1 CLI)
-Write-Host "`nBaue Projekt via: cargo tauri build" -ForegroundColor $warn
-cargo tauri build
+# -- Install Node Dependencies
+Write-Host "`nInstalliere Node-Abhaengigkeiten..." -ForegroundColor $warn
+npm install
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[!] npm install fehlgeschlagen" -ForegroundColor $fail
+    exit 1
+}
+
+# -- Tauri Build starten (via NPM for speed)
+Write-Host "`nBaue Projekt via: npm run tauri build" -ForegroundColor $warn
+npm run tauri build
+if ($LASTEXITCODE -ne 0) {
+    # Fallback to cargo tauri if npm fails?
+    Write-Host "[!] npm run tauri build failed. Trying cargo tauri..." -ForegroundColor $warn
+    if (-not $cargoTauriCheck) {
+        Write-Host "Installing cargo-tauri..."
+        cargo install --locked tauri-cli@^1
+    }
+    cargo tauri build
+}
 
 # -- Installer finden
 $installerPath = Join-Path $projectPath "src-tauri\target\release\bundle\nsis"
@@ -195,4 +211,3 @@ if ($setupFiles.Count -gt 0) {
 } else {
     Write-Host "`n[!] Kein Installer gefunden! Bitte tauri.conf.json pruefen." -ForegroundColor $fail
 }
-

@@ -1,3 +1,10 @@
+import { calculateResumeSnapshot } from "./utils/download.js";
+import {
+  getDlStatusKey,
+  getStatusKey,
+  shouldDisableLaunch,
+} from "./utils/updateState.js";
+
 const { invoke } = window.__TAURI__.tauri;
 const { listen } = window.__TAURI__.event;
 const { appWindow, WebviewWindow } = window.__TAURI__.window;
@@ -6,556 +13,606 @@ const { message, ask } = window.__TAURI__.dialog;
 const REQUIRED_PRIVILEGE_LEVEL = 3;
 const UPDATE_CHECK_ENABLED = true;
 const LAUNCHER_DOWNLOAD_URL =
-    "https://web.tera-germany.de/gameserver/Tera-Germany_Launcher.exe";
+  "https://web.tera-germany.de/gameserver/Tera-Germany_Launcher.exe";
 // URL that provides metadata about the latest launcher release
-const VERSION_CHECK_URL =
-    "https://web.tera-germany.de/classic/version.json";
+const VERSION_CHECK_URL = "https://web.tera-germany.de/classic/version.json";
 // Local launcher release date used for update comparisons
 const CURRENT_RELEASE_DATE = "2024-06-07";
 
 // Simple semantic version comparison
 function compareVersions(v1, v2) {
-    const parts1 = v1.split(".").map((n) => parseInt(n, 10) || 0);
-    const parts2 = v2.split(".").map((n) => parseInt(n, 10) || 0);
-    const len = Math.max(parts1.length, parts2.length);
-    for (let i = 0; i < len; i++) {
-        const a = parts1[i] || 0;
-        const b = parts2[i] || 0;
-        if (a > b) return 1;
-        if (a < b) return -1;
-    }
-    return 0;
+  const parts1 = v1.split(".").map((n) => parseInt(n, 10) || 0);
+  const parts2 = v2.split(".").map((n) => parseInt(n, 10) || 0);
+  const len = Math.max(parts1.length, parts2.length);
+  for (let i = 0; i < len; i++) {
+    const a = parts1[i] || 0;
+    const b = parts2[i] || 0;
+    if (a > b) return 1;
+    if (a < b) return -1;
+  }
+  return 0;
 }
 
-const NewsPageUpdaterJsonUrl = "https://web.tera-germany.de/classic/Launcher_StartPage_News.json"
-const PatchNotesUrl = "https://web.tera-germany.de/classic/patchnotes.json"
-const ServerStatusUrl = "https://web.tera-germany.de/classic/serverlist.json?lang=ger&sort=3"
+const NewsPageUpdaterJsonUrl =
+  "https://web.tera-germany.de/classic/Launcher_StartPage_News.json";
+const PatchNotesUrl = "https://web.tera-germany.de/classic/patchnotes.json";
+const ServerStatusUrl =
+  "https://web.tera-germany.de/classic/serverlist.json?lang=ger&sort=3";
 
 const App = {
-    translations: {},
-    currentLanguage: "GER",
-    languages: {
-        GER: "GERMAN",
-        EUR: "ENGLISH",
-        FRA: "FRENCH",
-        RUS: "RUSSIAN",
-    },
+  translations: {},
+  currentLanguage: "GER",
+  languages: {
+    GER: "GERMAN",
+    EUR: "ENGLISH",
+    FRA: "FRENCH",
+    RUS: "RUSSIAN",
+  },
 
-    launchGameBtn: null,
-    statusEl: null,
-    loadingModal: null,
-    loadingMessage: null,
-    loadingError: null,
-    refreshButton: null,
-    quitTheApp: null,
-    deferredUpdate: null,
+  launchGameBtn: null,
+  statusEl: null,
+  loadingModal: null,
+  loadingMessage: null,
+  loadingError: null,
+  refreshButton: null,
+  quitTheApp: null,
+  deferredUpdate: null,
 
-    // Global application state
-    state: {
-        lastLogMessage: null,
-        lastLogTime: 0,
-        speedHistory: [],
-        speedHistoryMaxLength: 10,
-        isUpdateAvailable: false,
-        isDownloadComplete: false,
-        lastProgressUpdate: null,
-        lastDownloadedBytes: 0,
-        downloadStartTime: null,
-        currentUpdateMode: null,
-        currentProgress: 0,
-        currentFileName: "",
-        currentFileIndex: 0,
-        totalFiles: 0,
-        downloadedSize: 0,
-        downloadedBytesOffset: 0,
-        totalSize: 0,
-        currentSpeed: 0,
-        timeRemaining: 0,
-        isLoggingIn: false,
-        isLoggingOut: false,
-        isGameRunning: false,
-        gameExecutionFailed: false,
-        updatesEnabled: true,
-        isCheckingForUpdates: false,
-        updateCheckPerformed: false,
-        isGameLaunching: false,
-        isAuthenticated: false,
-        isFileCheckComplete: false,
-        isFirstLaunch: true,
-        isGeneratingHashFile: false,
-        hashFileProgress: 0,
-        currentProcessingFile: "",
-        processedFiles: 0,
-    },
+  // Global application state
+  state: {
+    lastLogMessage: null,
+    lastLogTime: 0,
+    speedHistory: [],
+    speedHistoryMaxLength: 10,
+    isUpdateAvailable: false,
+    isDownloadComplete: false,
+    lastProgressUpdate: null,
+    lastDownloadedBytes: 0,
+    downloadStartTime: null,
+    currentUpdateMode: null,
+    currentProgress: 0,
+    currentFileName: "",
+    currentFileIndex: 0,
+    totalFiles: 0,
+    downloadedSize: 0,
+    downloadedBytesOffset: 0,
+    totalSize: 0,
+    currentSpeed: 0,
+    timeRemaining: 0,
+    isLoggingIn: false,
+    isLoggingOut: false,
+    isGameRunning: false,
+    gameExecutionFailed: false,
+    updatesEnabled: true,
+    isCheckingForUpdates: false,
+    updateCheckPerformed: false,
+    isGameLaunching: false,
+    isAuthenticated: false,
+    isFileCheckComplete: false,
+    isFirstLaunch: true,
+    isGeneratingHashFile: false,
+    hashFileProgress: 0,
+    currentProcessingFile: "",
+    processedFiles: 0,
+    isPauseRequested: false,
+    updateError: false,
+  },
 
-    /**
-     * Updates the global application state.
-     *
-     * If `newState.totalSize` is provided, it will be used to initialize the
-     * `totalSize` field in the state if it is currently undefined. If
-     * `newState.totalDownloadedBytes` is provided, it will be used to initialize
-     * the `totalDownloadedBytes` field in the state if it is currently undefined.
-     *
-     * Otherwise, the state is updated by shallow-merging `newState` into the
-     * existing state.
-     *
-     * Finally, the UI is updated by calling `this.updateUI()`.
-     *
-     * @param {Object} newState - The new state to update the application with.
-     * @param {number} [newState.totalSize] - The total size of the download.
-     * @param {number} [newState.totalDownloadedBytes] - The total number of bytes
-     *   downloaded so far.
-     */
-    setState(newState) {
-        if (
-            newState.totalSize !== undefined &&
-            this.state.totalSize === undefined
-        ) {
-            this.state.totalSize = newState.totalSize;
-        }
-        if (
-            newState.totalDownloadedBytes !== undefined &&
-            this.state.totalDownloadedBytes === undefined
-        ) {
-            this.state.totalDownloadedBytes = 0;
-        }
-        Object.assign(this.state, newState);
+  /**
+   * Updates the global application state.
+   *
+   * If `newState.totalSize` is provided, it will be used to initialize the
+   * `totalSize` field in the state if it is currently undefined. If
+   * `newState.totalDownloadedBytes` is provided, it will be used to initialize
+   * the `totalDownloadedBytes` field in the state if it is currently undefined.
+   *
+   * Otherwise, the state is updated by shallow-merging `newState` into the
+   * existing state.
+   *
+   * Finally, the UI is updated by calling `this.updateUI()`.
+   *
+   * @param {Object} newState - The new state to update the application with.
+   * @param {number} [newState.totalSize] - The total size of the download.
+   * @param {number} [newState.totalDownloadedBytes] - The total number of bytes
+   *   downloaded so far.
+   */
+  setState(newState) {
+    if (
+      newState.totalSize !== undefined &&
+      this.state.totalSize === undefined
+    ) {
+      this.state.totalSize = newState.totalSize;
+    }
+    if (
+      newState.totalDownloadedBytes !== undefined &&
+      this.state.totalDownloadedBytes === undefined
+    ) {
+      this.state.totalDownloadedBytes = 0;
+    }
+    Object.assign(this.state, newState);
+    this.updateUI();
+  },
+
+  /**
+   * Initializes the app by setting up event listeners, window controls, animations,
+   * modal elements, and navigation. It also sends stored authentication information
+   * to the backend, sets up a mutation observer, and checks if the user is authenticated.
+   * If the user is authenticated and the current route is 'home', it checks if the app
+   * is running for the first time and handles it accordingly. If the app is not running
+   * for the first time, it checks for updates. If updates are disabled, it skips the
+   * update check and server connection.
+   */
+  async init() {
+    try {
+      this.disableContextMenu();
+      const savedTheme = localStorage.getItem("theme");
+      if (savedTheme === "light") {
+        document.body.classList.add("light-mode");
+      }
+      const logsEnabled = localStorage.getItem("logsEnabled") === "true";
+      invoke("set_logging", { enabled: logsEnabled });
+      this.setupEventListeners();
+      this.setupWindowControls();
+      this.setupCustomAnimations();
+      this.initializeLoadingModalElements();
+      this.setupModalButtonEventHandlers();
+      await this.updateLanguageSelector();
+      this.setupHeaderLinks();
+      this.Router.setupEventListeners();
+      await this.Router.navigate();
+      // Determine debug mode from backend (for logging/flags)
+      try {
+        const debug = await invoke("is_debug");
+        window.__DEBUG__ = !!debug;
+      } catch (e) {
+        console.warn("Failed to query is_debug:", e);
+      }
+      // Always enable mirror listeners in both debug and release builds
+      this.setupMirrorListeners();
+      this.sendStoredAuthInfoToBackend();
+      this.setupMutationObserver();
+
+      await this.checkLauncherUpdate();
+
+      this.checkAuthentication();
+      document.addEventListener("DOMContentLoaded", () => {
+        this.resetState();
         this.updateUI();
-    },
+      });
 
-    /**
-     * Initializes the app by setting up event listeners, window controls, animations,
-     * modal elements, and navigation. It also sends stored authentication information
-     * to the backend, sets up a mutation observer, and checks if the user is authenticated.
-     * If the user is authenticated and the current route is 'home', it checks if the app
-     * is running for the first time and handles it accordingly. If the app is not running
-     * for the first time, it checks for updates. If updates are disabled, it skips the
-     * update check and server connection.
-     */
-    async init() {
+      if (this.state.isAuthenticated && this.Router.currentRoute === "home") {
+        LoadStartPage();
+
+        if (!UPDATE_CHECK_ENABLED) {
+          this.setState({
+            isUpdateAvailable: false,
+            isFileCheckComplete: true,
+            currentUpdateMode: "complete",
+            currentProgress: 100,
+          });
+          return;
+        }
+
+        const isConnected = await this.checkServerConnection();
+        if (isConnected) {
+          this.checkFirstLaunch();
+          if (this.state.isFirstLaunch) {
+            await this.handleFirstLaunch();
+          } else {
+            await this.initializeAndCheckUpdates(false);
+          }
+        } else {
+          console.error("Failed to connect to server on refresh");
+          // Handle connection error (e.g., display a message to the user)
+        }
+      }
+    } catch (error) {
+      console.error("Error during app initialization:", error);
+    }
+  },
+
+  /**
+   * Registers a new user using the provided credentials.
+   * @param {string} username - Desired username
+   * @param {string} email - User email
+   * @param {string} password - Desired password
+   * @returns {Promise<void>}
+   */
+  async register(username, email, password) {
+    const registerButton = document.getElementById("register-submit-button");
+    const errorMsg = document.getElementById("register-error-msg");
+
+    if (registerButton) {
+      registerButton.disabled = true;
+    }
+    if (errorMsg) {
+      errorMsg.style.display = "none";
+      errorMsg.style.opacity = 0;
+    }
+
+    try {
+      const response = await invoke("register_new_account", {
+        login: username,
+        email,
+        password,
+      });
+      alert("Registration successful!");
+      this.Router.navigate("login");
+    } catch (err) {
+      console.error(err);
+      if (errorMsg) {
+        errorMsg.textContent = err.message;
+        errorMsg.style.display = "flex";
+        errorMsg.style.opacity = 1;
+      }
+    } finally {
+      if (registerButton) {
+        registerButton.disabled = false;
+      }
+    }
+  },
+
+  // function to check if it's the first launch
+  checkFirstLaunch() {
+    const isFirstLaunch = localStorage.getItem("isFirstLaunch") !== "false";
+    this.setState({ isFirstLaunch });
+  },
+
+  /**
+   * Sets up event listeners to handle page loading, hash changes, game status events, update events, and errors.
+   */
+  setupEventListeners() {
+    window.addEventListener("DOMContentLoaded", () => {
+      this.handleRouteChange();
+      this.setupCustomAnimations();
+    });
+
+    window.addEventListener("hashchange", () => this.handleRouteChange());
+
+    this.setupGameStatusListeners();
+    this.setupUpdateListeners();
+    this.setupErrorListener();
+    this.setupLogListener();
+  },
+
+  /**
+   * Sets up event listeners for game status events from the game server.
+   *
+   * Listens for the following events:
+   *
+   * - `game_status`: emitted when the game status is updated. The event payload is either
+   *   `GAME_STATUS_RUNNING` or `GAME_STATUS_NOT_RUNNING`.
+   * - `game_status_changed`: emitted when the game status changes. The event payload is a
+   *   boolean indicating whether the game is running or not.
+   * - `game_ended`: emitted when the game has ended. The event payload is empty.
+   *
+   * When any of these events are received, the UI is updated to reflect the new game status.
+   */
+  setupGameStatusListeners() {
+    listen("game_status", async (event) => {
+      const isRunning = event.payload === "GAME_STATUS_RUNNING";
+      this.updateUIForGameStatus(isRunning);
+    });
+
+    listen("game_status_changed", (event) => {
+      const isRunning = event.payload;
+      this.updateUIForGameStatus(isRunning);
+    });
+
+    listen("game_ended", async () => {
+      this.updateUIForGameStatus(false);
+      // Ensure mirror is stopped when game ends
+      try {
+        await invoke("stop_mirror_client");
+      } catch (e) {
+        // Mirror stop failed - ignore
+      }
+    });
+  },
+
+  /**
+   * Sets up event listeners for update events from the game server.
+   *
+   * Listens for the following events:
+   *
+   * - `download_progress`: emitted when the download progress is updated. The event payload is a
+   *   DownloadProgress object.
+   * - `file_check_progress`: emitted when the file check progress is updated. The event payload is a
+   *   FileCheckProgress object.
+   * - `file_check_completed`: emitted when the file check is complete. The event payload is an empty
+   *   object.
+   * - `download_complete`: emitted when the download is complete. The event payload is an empty
+   *   object.
+   *
+   * When any of these events are received, the UI is updated to reflect the new download status.
+   */
+  setupUpdateListeners() {
+    listen("download_progress", this.handleDownloadProgress.bind(this));
+    // Stabilized global progress for speed/ETA and total bar
+    listen("global_download_progress", (event) => {
+      const p = event?.payload;
+      if (!p) return;
+      const now = Date.now();
+      const totalDownloadedBytes = p.downloaded_bytes || 0;
+      const totalSize = Math.max(
+        this.state.totalSize || 0,
+        p.total_bytes || 0,
+      );
+      const elapsed = p.elapsed_time || 0;
+      const baseDownloaded = p.base_downloaded || 0;
+      const sessionBytes = Math.max(0, totalDownloadedBytes - baseDownloaded);
+      const globalSpeed = elapsed > 0 ? sessionBytes / elapsed : 0;
+      const timeRemaining = this.calculateGlobalTimeRemaining(
+        totalDownloadedBytes,
+        totalSize,
+        globalSpeed,
+      );
+
+      // Only update progress data, don't touch currentUpdateMode
+      this.setState({
+        currentProgress:
+          totalSize > 0
+            ? Math.min(100, (totalDownloadedBytes / totalSize) * 100)
+            : 0,
+        currentSpeed: globalSpeed,
+        downloadedSize: totalDownloadedBytes,
+        totalDownloadedBytes: totalDownloadedBytes,
+        timeRemaining: timeRemaining,
+        currentFileName: p.file_name || "",
+        lastProgressUpdate: now,
+      });
+    });
+    listen("file_check_progress", this.handleFileCheckProgress.bind(this));
+    listen("file_check_completed", this.handleFileCheckCompleted.bind(this));
+    listen("download_complete", () => {
+      // Finalize via unified completion path
+      this.handleCompletion();
+    });
+    listen("download_error", (event) => {
+      const message =
+        event?.payload?.message || this.t("UPDATE_ERROR_MESSAGE");
+      this.setState({
+        updateError: true,
+        currentUpdateMode: "error",
+        isUpdateAvailable: true,
+        isFileCheckComplete: true,
+        isPauseRequested: false,
+      });
+      this.showErrorMessage(message);
+      this.updateLaunchGameButton(true);
+      this.toggleLanguageSelector(true);
+    });
+    listen("download_cancelled", () => {
+      (async () => {
+        let downloadedSnapshot = this.state.downloadedSize;
         try {
-            this.disableContextMenu();
-            const savedTheme = localStorage.getItem("theme");
-            if (savedTheme === "light") {
-                document.body.classList.add("light-mode");
-            }
-            const logsEnabled = localStorage.getItem("logsEnabled") === "true";
-            invoke("set_logging", { enabled: logsEnabled });
-            this.setupEventListeners();
-            this.setupWindowControls();
-            this.setupCustomAnimations();
-            this.initializeLoadingModalElements();
-            this.setupModalButtonEventHandlers();
-            await this.updateLanguageSelector();
-            this.setupHeaderLinks();
-            this.Router.setupEventListeners();
-            await this.Router.navigate();
-            // Determine debug mode from backend (for logging/flags)
-            try {
-                const debug = await invoke("is_debug");
-                window.__DEBUG__ = !!debug;
-            } catch (e) {
-                console.warn("Failed to query is_debug:", e);
-            }
-            // Always enable mirror listeners in both debug and release builds
-            this.setupMirrorListeners();
-            this.sendStoredAuthInfoToBackend();
-            this.setupMutationObserver();
-
-            await this.checkLauncherUpdate();
-
-            this.checkAuthentication();
-            document.addEventListener("DOMContentLoaded", () => {
-                this.resetState();
-                this.updateUI();
-            });
-
-            if (this.state.isAuthenticated && this.Router.currentRoute === "home") {
-                LoadStartPage();
-
-                if (!UPDATE_CHECK_ENABLED) {
-                    this.setState({
-                        isUpdateAvailable: false,
-                        isFileCheckComplete: true,
-                        currentUpdateMode: "complete",
-                        currentProgress: 100,
-                    });
-                    return;
-                }
-
-                const isConnected = await this.checkServerConnection();
-                if (isConnected) {
-                    this.checkFirstLaunch();
-                    if (this.state.isFirstLaunch) {
-                        await this.handleFirstLaunch();
-                    } else {
-                        await this.initializeAndCheckUpdates(false);
-                    }
-                } else {
-                    console.error("Failed to connect to server on refresh");
-                    // Handle connection error (e.g., display a message to the user)
-                }
-            }
-        } catch (error) {
-            console.error("Error during app initialization:", error);
-        }
-    },
-
-    /**
-     * Registers a new user using the provided credentials.
-     * @param {string} username - Desired username
-     * @param {string} email - User email
-     * @param {string} password - Desired password
-     * @returns {Promise<void>}
-     */
-    async register(username, email, password) {
-        const registerButton = document.getElementById('register-submit-button');
-        const errorMsg = document.getElementById('register-error-msg');
-
-        if (registerButton) {
-            registerButton.disabled = true;
-        }
-        if (errorMsg) {
-            errorMsg.style.display = 'none';
-            errorMsg.style.opacity = 0;
-        }
-
-        try {
-            const response = await invoke("register_new_account", {
-                login: username,
-                email,
-                password,
-            });
-            alert('Registration successful!');
-            this.Router.navigate('login');
-        } catch (err) {
-            console.error(err);
-            if (errorMsg) {
-                errorMsg.textContent = err.message;
-                errorMsg.style.display = 'flex';
-                errorMsg.style.opacity = 1;
-            }
-        } finally {
-            if (registerButton) {
-                registerButton.disabled = false;
-            }
-        }
-    },
-
-    // function to check if it's the first launch
-    checkFirstLaunch() {
-        const isFirstLaunch = localStorage.getItem("isFirstLaunch") !== "false";
-        this.setState({ isFirstLaunch });
-    },
-
-    /**
-     * Sets up event listeners to handle page loading, hash changes, game status events, update events, and errors.
-     */
-    setupEventListeners() {
-        window.addEventListener("DOMContentLoaded", () => {
-            this.handleRouteChange();
-            this.setupCustomAnimations();
-        });
-
-        window.addEventListener("hashchange", () => this.handleRouteChange());
-
-        this.setupGameStatusListeners();
-        this.setupUpdateListeners();
-        this.setupErrorListener();
-        this.setupLogListener();
-    },
-
-    /**
-     * Sets up event listeners for game status events from the game server.
-     *
-     * Listens for the following events:
-     *
-     * - `game_status`: emitted when the game status is updated. The event payload is either
-     *   `GAME_STATUS_RUNNING` or `GAME_STATUS_NOT_RUNNING`.
-     * - `game_status_changed`: emitted when the game status changes. The event payload is a
-     *   boolean indicating whether the game is running or not.
-     * - `game_ended`: emitted when the game has ended. The event payload is empty.
-     *
-     * When any of these events are received, the UI is updated to reflect the new game status.
-     */
-    setupGameStatusListeners() {
-        listen("game_status", async (event) => {
-            const isRunning = event.payload === "GAME_STATUS_RUNNING";
-            this.updateUIForGameStatus(isRunning);
-        });
-
-        listen("game_status_changed", (event) => {
-            const isRunning = event.payload;
-            this.updateUIForGameStatus(isRunning);
-        });
-
-        listen("game_ended", async () => {
-            this.updateUIForGameStatus(false);
-            // Ensure mirror is stopped when game ends
-            try {
-                await invoke("stop_mirror_client");
-            } catch (e) {
-                // Mirror stop failed - ignore
-            }
-        });
-    },
-
-    /**
-     * Sets up event listeners for update events from the game server.
-     *
-     * Listens for the following events:
-     *
-     * - `download_progress`: emitted when the download progress is updated. The event payload is a
-     *   DownloadProgress object.
-     * - `file_check_progress`: emitted when the file check progress is updated. The event payload is a
-     *   FileCheckProgress object.
-     * - `file_check_completed`: emitted when the file check is complete. The event payload is an empty
-     *   object.
-     * - `download_complete`: emitted when the download is complete. The event payload is an empty
-     *   object.
-     *
-     * When any of these events are received, the UI is updated to reflect the new download status.
-     */
-    setupUpdateListeners() {
-        listen("download_progress", this.handleDownloadProgress.bind(this));
-        // Stabilized global progress for speed/ETA and total bar
-        listen("global_download_progress", (event) => {
-            const p = event?.payload;
-            if (!p) return;
-            const now = Date.now();
-            const totalDownloadedBytes = p.downloaded_bytes || 0;
-            const totalSize = p.total_bytes || this.state.totalSize || 0;
-            const elapsed = p.elapsed_time || 0;
-            const globalSpeed = elapsed > 0 ? totalDownloadedBytes / elapsed : 0;
-            const timeRemaining = this.calculateGlobalTimeRemaining(
-                totalDownloadedBytes,
-                totalSize,
-                globalSpeed,
-            );
-
-            // Only update progress data, don't touch currentUpdateMode
-            this.setState({
-                currentProgress: totalSize > 0 ? Math.min(100, (totalDownloadedBytes / totalSize) * 100) : 0,
-                currentSpeed: globalSpeed,
-                downloadedSize: totalDownloadedBytes,
-                totalDownloadedBytes: totalDownloadedBytes,
-                totalSize: totalSize,
-                timeRemaining: timeRemaining,
-                currentFileName: p.file_name || "",
-                lastProgressUpdate: now,
-            });
-
-
-        });
-        listen("file_check_progress", this.handleFileCheckProgress.bind(this));
-        listen("file_check_completed", this.handleFileCheckCompleted.bind(this));
-        listen("download_complete", () => {
-            // Finalize via unified completion path
-            this.handleCompletion();
-        });
-        listen("download_cancelled", () => {
-            this.setState({ currentUpdateMode: "paused", isUpdateAvailable: true });
-            this.updateLaunchGameButton(true);
-        });
-    },
-
-    /**
-     * Sets up an event listener for error events from the game server.
-     *
-     * Listens for the following event:
-     *
-     * - `error`: emitted when an error occurs. The event payload is an error message string.
-     *
-     * When any of these events are received, the UI is updated to reflect the new error state.
-     */
-    setupErrorListener() {
-        listen("error", (event) => {
-            this.showErrorMessage(event.payload);
-        });
-    },
-
-    setupLogListener() {
-        listen("log_message", (event) => {
-            const msg = typeof event.payload === "string" ? event.payload : JSON.stringify(event.payload);
-            this.mirrorLog(msg);
-        });
-
-    },
-
-    // Minimal Tauri App self-updater (separate from game patcher)
-    // Uses Tauri v1 global API available on window.__TAURI__
-    async checkAppUpdate(silent = false, auto = false) {
-        try {
-            const updater = window.__TAURI__?.updater;
-            const process = window.__TAURI__?.process;
-            if (!updater || !process) {
-                console.warn("Tauri updater API not available");
-                return;
-            }
-            const { shouldUpdate, manifest } = await updater.checkUpdate();
-            if (shouldUpdate) {
-                if (auto) {
-                    await this.installAppUpdate();
-                } else {
-                    const next = await ask(
-                        `Update ${manifest?.version || ""} available. Install now?`,
-                        { title: "Launcher Update", type: "info" }
-                    );
-                    if (next) {
-                        await this.installAppUpdate();
-                    }
-                }
-            } else {
-                if (!silent) this.showCustomNotification("You are on the latest launcher.", "success");
-            }
+          downloadedSnapshot = await invoke("get_downloaded_bytes");
         } catch (e) {
-            console.error("checkAppUpdate failed", e);
-            if (!silent) this.showCustomNotification("Update check failed.", "error");
+          console.warn("Failed to query download snapshot:", e);
         }
-    },
-
-    async installAppUpdate() {
-        try {
-            const updater = window.__TAURI__?.updater;
-            const process = window.__TAURI__?.process;
-            if (!updater || !process) return;
-            await updater.installUpdate();
-            await process.relaunch();
-        } catch (e) {
-            console.error("installAppUpdate failed", e);
-            this.showCustomNotification("Update installation failed.", "error");
-        }
-    },
-
-    // Append a line into the logs console used by mirror and backend messages
-    mirrorLog(message) {
-        try {
-            const consoleEl = document.getElementById("log-console");
-            if (!consoleEl) return;
-            // Lightweight dedupe: drop immediate duplicates
-            const now = Date.now();
-            if (
-                this.state.lastLogMessage === String(message ?? "") &&
-                now - (this.state.lastLogTime || 0) < 100
-            ) {
-                return;
-            }
-            this.state.lastLogMessage = String(message ?? "");
-            this.state.lastLogTime = now;
-            const div = document.createElement("div");
-            div.textContent = String(message ?? "");
-            div.style.userSelect = "text";
-            div.style.webkitUserSelect = "text";
-            div.style.mozUserSelect = "text";
-            div.style.msUserSelect = "text";
-            consoleEl.appendChild(div);
-            consoleEl.scrollTop = consoleEl.scrollHeight;
-        } catch (e) {
-            console.warn("mirrorLog failed:", e);
-        }
-    },
-
-
-
-    // Copy all logs in the log modal to system clipboard
-    async copyLogsToClipboard() {
-        const consoleEl = document.getElementById('log-console');
-        if (!consoleEl) {
-            this.showCustomNotification('No logs to copy', 'error');
-            return;
-        }
-        // Prefer collecting child lines to preserve line breaks
-        const lines = Array.from(consoleEl.children || []).map((n) => n.textContent || '');
-        const text = (lines.length ? lines : [consoleEl.textContent || '']).join('\n');
-
-        try {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                await navigator.clipboard.writeText(text);
-            } else {
-                // Fallback for older environments
-                const ta = document.createElement('textarea');
-                ta.value = text;
-                ta.style.position = 'fixed';
-                ta.style.top = '-1000px';
-                document.body.appendChild(ta);
-                ta.focus();
-                ta.select();
-                document.execCommand('copy');
-                document.body.removeChild(ta);
-            }
-            this.showCustomNotification('Logs copied to clipboard', 'success');
-        } catch (e) {
-            this.showCustomNotification('Failed to copy logs', 'error');
-            throw e;
-        }
-    },
-
-    // Mirror: set up listeners for debug mode
-    setupMirrorListeners() {
-        // Start guards
-        let mirrorStarted = false;
-        // Mirror detection handled by Rust backend
-        const stopMirrorIfRunning = async (reason) => {
-            try {
-                await invoke("stop_mirror_client");
-            } catch (e) {
-                // ignore
-            }
-            mirrorStarted = false;
-            this.mirrorLog(`[MIRROR] Stopped${reason ? ` (${reason})` : ""}`);
-        };
-        // Remember last target provided by IPC (server selected by user)
-        const setLastTarget = (host, port) => {
-            try {
-                if (host) localStorage.setItem("mirror_host", host);
-                if (port) localStorage.setItem("mirror_port", String(port));
-                window.__S1LastHost = host;
-                window.__S1LastPort = port;
-            } catch {}
-        };
-        const getPreferredTarget = () => {
-            const host = window.__S1LastHost || localStorage.getItem("mirror_host") || "127.0.0.1";
-            const port = parseInt(window.__S1LastPort || localStorage.getItem("mirror_port") || "7801", 10) || 7801;
-            return { host, port };
-        };
-
-        // IPC: game integration provides host/port
-        window.__S1OnConnect = (host, port) => {
-            this.mirrorLog(`[IPC] OnConnect host/port received: ${host}:${port}`);
-            setLastTarget(host, port);
-        };
-
-        // IPC bridge: call this from client integration when S1 event fires
-        window.__S1OnEvent = async (code) => {
-            try {
-                this.mirrorLog(`[IPC] S1 event: ${code}`);
-                // Stop mirror on GameExit(1020)/GameCrash(1021)
-                if (code === 1020 || code === 1021) {
-                    await stopMirrorIfRunning(`event ${code}`);
-                }
-            } catch (e) {
-                this.mirrorLog(`[IPC] S1 handler error: ${e}`);
-            }
-        };
-        // Forward broadcasted S1 events
-        listen("s1_event", (event) => {
-            const code = event && event.payload;
-            if (typeof code === "number") {
-                this.mirrorLog(`[S1] Event: ${code}`);
-            }
+        this.setState({
+          currentUpdateMode: "paused",
+          isUpdateAvailable: true,
+          isPauseRequested: false,
+          downloadedSize: downloadedSnapshot,
+          downloadedBytesOffset: downloadedSnapshot,
         });
+        this.updateLaunchGameButton(true);
+      })();
+    });
+  },
 
-    },
- 
-    async handleFirstLaunch() {
-        this.showFirstLaunchModal();
-    },
+  /**
+   * Sets up an event listener for error events from the game server.
+   *
+   * Listens for the following event:
+   *
+   * - `error`: emitted when an error occurs. The event payload is an error message string.
+   *
+   * When any of these events are received, the UI is updated to reflect the new error state.
+   */
+  setupErrorListener() {
+    listen("error", (event) => {
+      this.showErrorMessage(event.payload);
+    });
+  },
 
-    // Function to show a custom modal for first launch
-    showFirstLaunchModal() {
-        const modal = document.createElement("div");
-        modal.id = "first-launch-modal";
-        modal.innerHTML = `
+  setupLogListener() {
+    listen("log_message", (event) => {
+      const msg =
+        typeof event.payload === "string"
+          ? event.payload
+          : JSON.stringify(event.payload);
+      this.mirrorLog(msg);
+    });
+  },
+
+  // Minimal Tauri App self-updater (separate from game patcher)
+  // Uses Tauri v1 global API available on window.__TAURI__
+  async checkAppUpdate(silent = false, auto = false) {
+    try {
+      const updater = window.__TAURI__?.updater;
+      const process = window.__TAURI__?.process;
+      if (!updater || !process) {
+        console.warn("Tauri updater API not available");
+        return;
+      }
+      const { shouldUpdate, manifest } = await updater.checkUpdate();
+      if (shouldUpdate) {
+        if (auto) {
+          await this.installAppUpdate();
+        } else {
+          const next = await ask(
+            `Update ${manifest?.version || ""} available. Install now?`,
+            { title: "Launcher Update", type: "info" },
+          );
+          if (next) {
+            await this.installAppUpdate();
+          }
+        }
+      } else {
+        if (!silent)
+          this.showCustomNotification(
+            "You are on the latest launcher.",
+            "success",
+          );
+      }
+    } catch (e) {
+      console.error("checkAppUpdate failed", e);
+      if (!silent) this.showCustomNotification("Update check failed.", "error");
+    }
+  },
+
+  async installAppUpdate() {
+    try {
+      const updater = window.__TAURI__?.updater;
+      const process = window.__TAURI__?.process;
+      if (!updater || !process) return;
+      await updater.installUpdate();
+      await process.relaunch();
+    } catch (e) {
+      console.error("installAppUpdate failed", e);
+      this.showCustomNotification("Update installation failed.", "error");
+    }
+  },
+
+  // Append a line into the logs console used by mirror and backend messages
+  mirrorLog(message) {
+    try {
+      const consoleEl = document.getElementById("log-console");
+      if (!consoleEl) return;
+      // Lightweight dedupe: drop immediate duplicates
+      const now = Date.now();
+      if (
+        this.state.lastLogMessage === String(message ?? "") &&
+        now - (this.state.lastLogTime || 0) < 100
+      ) {
+        return;
+      }
+      this.state.lastLogMessage = String(message ?? "");
+      this.state.lastLogTime = now;
+      const div = document.createElement("div");
+      div.textContent = String(message ?? "");
+      div.style.userSelect = "text";
+      div.style.webkitUserSelect = "text";
+      div.style.mozUserSelect = "text";
+      div.style.msUserSelect = "text";
+      consoleEl.appendChild(div);
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+    } catch (e) {
+      console.warn("mirrorLog failed:", e);
+    }
+  },
+
+  // Copy all logs in the log modal to system clipboard
+  async copyLogsToClipboard() {
+    const consoleEl = document.getElementById("log-console");
+    if (!consoleEl) {
+      this.showCustomNotification("No logs to copy", "error");
+      return;
+    }
+    // Prefer collecting child lines to preserve line breaks
+    const lines = Array.from(consoleEl.children || []).map(
+      (n) => n.textContent || "",
+    );
+    const text = (lines.length ? lines : [consoleEl.textContent || ""]).join(
+      "\n",
+    );
+
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        // Fallback for older environments
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.top = "-1000px";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      this.showCustomNotification("Logs copied to clipboard", "success");
+    } catch (e) {
+      this.showCustomNotification("Failed to copy logs", "error");
+      throw e;
+    }
+  },
+
+  // Mirror: set up listeners for debug mode
+  setupMirrorListeners() {
+    // Start guards
+    let mirrorStarted = false;
+    // Mirror detection handled by Rust backend
+    const stopMirrorIfRunning = async (reason) => {
+      try {
+        await invoke("stop_mirror_client");
+      } catch (e) {
+        // ignore
+      }
+      mirrorStarted = false;
+      this.mirrorLog(`[MIRROR] Stopped${reason ? ` (${reason})` : ""}`);
+    };
+    // Remember last target provided by IPC (server selected by user)
+    const setLastTarget = (host, port) => {
+      try {
+        if (host) localStorage.setItem("mirror_host", host);
+        if (port) localStorage.setItem("mirror_port", String(port));
+        window.__S1LastHost = host;
+        window.__S1LastPort = port;
+      } catch {}
+    };
+    const getPreferredTarget = () => {
+      const host =
+        window.__S1LastHost ||
+        localStorage.getItem("mirror_host") ||
+        "127.0.0.1";
+      const port =
+        parseInt(
+          window.__S1LastPort || localStorage.getItem("mirror_port") || "7801",
+          10,
+        ) || 7801;
+      return { host, port };
+    };
+
+    // IPC: game integration provides host/port
+    window.__S1OnConnect = (host, port) => {
+      this.mirrorLog(`[IPC] OnConnect host/port received: ${host}:${port}`);
+      setLastTarget(host, port);
+    };
+
+    // IPC bridge: call this from client integration when S1 event fires
+    window.__S1OnEvent = async (code) => {
+      try {
+        this.mirrorLog(`[IPC] S1 event: ${code}`);
+        // Stop mirror on GameExit(1020)/GameCrash(1021)
+        if (code === 1020 || code === 1021) {
+          await stopMirrorIfRunning(`event ${code}`);
+        }
+      } catch (e) {
+        this.mirrorLog(`[IPC] S1 handler error: ${e}`);
+      }
+    };
+    // Forward broadcasted S1 events
+    listen("s1_event", (event) => {
+      const code = event && event.payload;
+      if (typeof code === "number") {
+        this.mirrorLog(`[S1] Event: ${code}`);
+      }
+    });
+  },
+
+  async handleFirstLaunch() {
+    this.showFirstLaunchModal();
+  },
+
+  // Function to show a custom modal for first launch
+  showFirstLaunchModal() {
+    const modal = document.createElement("div");
+    modal.id = "first-launch-modal";
+    modal.innerHTML = `
             <div class="first-launch-modal-content">
                 <h2>${this.t("WELCOME_TO_LAUNCHER")}</h2>
                 <p>${this.t("FIRST_LAUNCH_MESSAGE")}</p>
@@ -566,2983 +623,3044 @@ const App = {
                 <button id="set-game-path-btn">${this.t("SET_GAME_PATH")}</button>
             </div>
         `;
-        document.body.appendChild(modal);
-        const languageSelect = document.getElementById("first-launch-language");
-        for (const [code, name] of Object.entries(this.languages)) {
-            const option = document.createElement("option");
-            option.value = code;
-            option.textContent = name;
-            languageSelect.appendChild(option);
-        }
-        languageSelect.value = this.currentLanguage;
+    document.body.appendChild(modal);
+    const languageSelect = document.getElementById("first-launch-language");
+    for (const [code, name] of Object.entries(this.languages)) {
+      const option = document.createElement("option");
+      option.value = code;
+      option.textContent = name;
+      languageSelect.appendChild(option);
+    }
+    languageSelect.value = this.currentLanguage;
 
-        const setGamePathBtn = document.getElementById("set-game-path-btn");
-        setGamePathBtn.addEventListener("click", async () => {
-            const newLang = languageSelect.value;
-            await this.changeLanguage(newLang);
-            this.closeFirstLaunchModal();
-            this.openGamePathSettings();
-        });
+    const setGamePathBtn = document.getElementById("set-game-path-btn");
+    setGamePathBtn.addEventListener("click", async () => {
+      const newLang = languageSelect.value;
+      await this.changeLanguage(newLang);
+      this.closeFirstLaunchModal();
+      this.openGamePathSettings();
+    });
 
-        anime({
-            targets: modal,
-            opacity: [0, 1],
-            scale: [0.9, 1],
-            duration: 300,
-            easing: "easeOutQuad",
-        });
-    },
+    anime({
+      targets: modal,
+      opacity: [0, 1],
+      scale: [0.9, 1],
+      duration: 300,
+      easing: "easeOutQuad",
+    });
+  },
 
-    // Function to close the first launch modal
-    closeFirstLaunchModal() {
-        const modal = document.getElementById("first-launch-modal");
-        anime({
-            targets: modal,
-            opacity: 0,
-            scale: 0.9,
-            duration: 300,
-            easing: "easeInQuad",
-            complete: () => {
-                modal.remove();
-            },
-        });
-    },
+  // Function to close the first launch modal
+  closeFirstLaunchModal() {
+    const modal = document.getElementById("first-launch-modal");
+    anime({
+      targets: modal,
+      opacity: 0,
+      scale: 0.9,
+      duration: 300,
+      easing: "easeInQuad",
+      complete: () => {
+        modal.remove();
+      },
+    });
+  },
 
-    // Function to open game path settings
-    openGamePathSettings() {
-        const settingsBtn = document.getElementById("openModal");
-        if (settingsBtn) {
-            settingsBtn.click();
-        }
-    },
+  // Function to open game path settings
+  openGamePathSettings() {
+    const settingsBtn = document.getElementById("openModal");
+    if (settingsBtn) {
+      settingsBtn.click();
+    }
+  },
 
-    // Opens an url in the user's default browser
-    openExternal(url) {
-        if (window.__TAURI__ && window.__TAURI__.shell && window.__TAURI__.shell.open) {
-            window.__TAURI__.shell.open(url);
-        } else {
-            window.open(url, "_blank");
-        }
-    },
+  // Opens an url in the user's default browser
+  openExternal(url) {
+    if (
+      window.__TAURI__ &&
+      window.__TAURI__.shell &&
+      window.__TAURI__.shell.open
+    ) {
+      window.__TAURI__.shell.open(url);
+    } else {
+      window.open(url, "_blank");
+    }
+  },
 
-    // Open the registration website in the user's default browser
-    async openRegisterPopup() {
-        this.openExternal('https://reg.tera-europe-classic.de/register.php');
-    },
+  // Open the registration website in the user's default browser
+  async openRegisterPopup() {
+    this.openExternal("https://reg.tera-europe-classic.de/register.php");
+  },
 
-    // Set up handlers for the header buttons and links
-    setupHeaderLinks() {
-        const startBtn = document.getElementById("start-button");
-        if (startBtn) {
-            startBtn.addEventListener("click", (e) => {
-                e.preventDefault();
-                this.openExternal(
-                    "https://forum.crazy-esports.com/forum/board/42-tera-europe-classic/"
-                );
-            });
-        }
-
-        const settingsBtn = document.getElementById("settings-button");
-        const settingsDropdown = document.getElementById("settings-dropdown-wrapper");
-        if (settingsBtn && settingsDropdown) {
-            let open = false;
-            gsap.set(settingsDropdown, { display: "none", opacity: 0, y: -10 });
-            const tl = gsap.timeline({ paused: true });
-            tl.to(settingsDropdown, {
-                duration: 0.3,
-                display: "block",
-                opacity: 1,
-                y: 0,
-                ease: "power2.out",
-            });
-            settingsBtn.addEventListener("click", (e) => {
-                e.stopPropagation();
-                if (!open) {
-                    tl.play();
-                } else {
-                    tl.reverse().then(() => gsap.set(settingsDropdown, { display: "none" }));
-                }
-                open = !open;
-            });
-            document.addEventListener("click", () => {
-                if (open) {
-                    tl.reverse().then(() => gsap.set(settingsDropdown, { display: "none" }));
-                    open = false;
-                }
-            });
-            settingsDropdown.addEventListener("click", (event) => {
-                event.stopPropagation();
-                if (event.target.tagName === 'A' && event.target.target === '_blank') {
-                    event.preventDefault();
-                    this.openExternal(event.target.href);
-                }
-            });
-            const toggleLogsLink = document.getElementById("toggle-logs");
-            if (toggleLogsLink) {
-                toggleLogsLink.addEventListener("click", (evt) => {
-                    evt.preventDefault();
-                    this.openLogsModal();
-                });
-            }
-        }
-
-        const links = [
-            { id: "discord-button", url: "https://discord.gg/DARHAaNBYS" },
-            { id: "support-button", url: "https://helpdesk.crazy-esports.com" },
-            { id: "privacy-link", url: "https://forum.crazy-esports.com/index.php?datenschutzerklaerung/" },
-        ];
-        links.forEach((link) => {
-            const el = document.getElementById(link.id);
-            if (el) {
-                el.addEventListener("click", (e) => {
-                    e.preventDefault();
-                    this.openExternal(link.url);
-                });
-            }
-        });
-
-        // Wire: Check Launcher Update
-        const checkLauncherUpdate = document.getElementById("check-launcher-update");
-        if (checkLauncherUpdate) {
-            checkLauncherUpdate.addEventListener("click", async (e) => {
-                e.preventDefault();
-                await this.checkAppUpdate(false);
-            });
-        }
-    },
-
-    // Function to complete the first launch process
-    completeFirstLaunch() {
-        localStorage.setItem("isFirstLaunch", "false");
-        this.setState({ isFirstLaunch: false });
-
-        // Proceed with update check
-        this.checkServerConnection().then((isConnected) => {
-            if (isConnected) {
-                this.initializeAndCheckUpdates(false);
-            }
-        });
-    },
-
-    // Function for custom notifications
-    showCustomNotification(message, type) {
-        const notification = document.createElement("div");
-        notification.className = `custom-notification ${type}`;
-        notification.textContent = message;
-        document.body.appendChild(notification);
-
-        anime({
-            targets: notification,
-            opacity: [0, 1],
-            translateY: [-20, 0],
-            duration: 300,
-            easing: "easeOutQuad",
-        });
-
-        setTimeout(() => {
-            anime({
-                targets: notification,
-                opacity: 0,
-                translateY: -20,
-                duration: 300,
-                easing: "easeInQuad",
-                complete: () => {
-                    notification.remove();
-                },
-            });
-        }, 5000);
-    },
-
-    /**
-     * Handles download progress events from the backend.
-     * @param {Object} event The event object from the backend.
-     * @param {Object} event.payload The payload of the event, containing the following properties:
-     *   - file_name: The name of the file being downloaded.
-     *   - progress: The percentage of the file downloaded.
-     *   - speed: The download speed in bytes per second.
-     *   - downloaded_bytes: The total number of bytes downloaded so far.
-     *   - total_bytes: The total number of bytes to download.
-     *   - total_files: The total number of files to download.
-     *   - current_file_index: The index of the current file in the list of files to download.
-     */
-    handleDownloadProgress(event) {
-        if (!event || !event.payload) {
-            console.error(
-                "Invalid event or payload received in handleDownloadProgress",
-            );
-            return;
-        }
-
-        const {
-            file_name,
-            progress,
-            speed,
-            downloaded_bytes,
-            total_bytes,
-            total_files,
-            current_file_index,
-        } = event.payload;
-
-        // Ensure totalSize is initialized correctly (preserve larger value for resumed downloads)
-        if (this.state.totalSize === undefined || this.state.totalSize === 0) {
-            this.state.totalSize = total_bytes;
-        }
-
-        // Add offset for resumed downloads (bytes already downloaded before pause)
-        const offset = this.state.downloadedBytesOffset || 0;
-        const totalDownloadedBytes = downloaded_bytes + offset;
-        
-        // Use preserved totalSize if larger (for resumed downloads)
-        const effectiveTotalSize = Math.max(this.state.totalSize, total_bytes);
-
-        const now = Date.now();
-
-        // Initialize download start time on first progress event
-        if (this.state.downloadStartTime === null) {
-            this.state.downloadStartTime = now;
-        }
-
-        // Calculate speed based on current session bytes only (not including offset)
-        const elapsedSeconds = (now - this.state.downloadStartTime) / 1000;
-        const globalSpeed = elapsedSeconds > 0 ? downloaded_bytes / elapsedSeconds : speed;
-
-        const timeRemaining = this.calculateGlobalTimeRemaining(
-            totalDownloadedBytes,
-            effectiveTotalSize,
-            globalSpeed,
+  // Set up handlers for the header buttons and links
+  setupHeaderLinks() {
+    const startBtn = document.getElementById("start-button");
+    if (startBtn) {
+      startBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        this.openExternal(
+          "https://forum.crazy-esports.com/forum/board/42-tera-europe-classic/",
         );
+      });
+    }
 
-        // Smooth the displayed file name to the most active file over a short window
-        if (!this._activeFileWindow) this._activeFileWindow = [];
-        const nowTs = Date.now();
-        this._activeFileWindow.push({ t: nowTs, name: file_name });
-        this._activeFileWindow = this._activeFileWindow.filter((s) => nowTs - s.t <= 1500);
-        // Cap at 100 entries to prevent unbounded growth in edge cases
-        if (this._activeFileWindow.length > 100) {
-            this._activeFileWindow = this._activeFileWindow.slice(-100);
-        }
-        const freq = {};
-        for (const s of this._activeFileWindow) freq[s.name] = (freq[s.name] || 0) + 1;
-        let topName = file_name;
-        let topCount = 0;
-        for (const k in freq) { if (freq[k] > topCount) { topCount = freq[k]; topName = k; } }
-
-        this.setState({
-            currentFileName: topName,
-            currentProgress: Math.min(100, (totalDownloadedBytes / effectiveTotalSize) * 100),
-            currentSpeed: globalSpeed,
-            downloadedSize: totalDownloadedBytes,
-            totalSize: effectiveTotalSize,
-            totalFiles: total_files,
-            currentFileIndex: current_file_index,
-            totalDownloadedBytes: totalDownloadedBytes,
-            timeRemaining: timeRemaining,
-            currentUpdateMode: "download",
-            lastProgressUpdate: now,
-            lastDownloadedBytes: totalDownloadedBytes,
-        });
-    },
-
-    /**
-     * Handles file check progress events from the backend.
-     * @param {Object} event The event object from the backend.
-     * @param {Object} event.payload The payload of the event, containing the following properties:
-     *   - current_file: The name of the file being checked.
-     *   - progress: The percentage of the file check completed.
-     *   - current_count: The number of files checked so far.
-     *   - total_files: The total number of files to check.
-     */
-    handleFileCheckProgress(event) {
-        if (!event || !event.payload) {
-            console.error(
-                "Invalid event or payload received in file_check_progress listener",
-            );
-            return;
-        }
-
-        const { current_file, progress, current_count, total_files } =
-            event.payload;
-
-        this.setState({
-            currentFileName: current_file,
-            currentProgress: Math.min(100, progress),
-            currentFileIndex: current_count,
-            totalFiles: total_files,
-            currentUpdateMode: "file_check",
-        });
-    },
-
-    /**
-     * Handles file check completed events from the backend.
-     * @param {Object} event The event object from the backend.
-     * @param {Object} event.payload The payload of the event, containing the following properties:
-     *   - total_files: The total number of files to check.
-     *   - files_to_update: The number of files that require an update.
-     *   - total_time_seconds: The total time taken to check all the files in seconds.
-     *   - average_time_per_file_ms: The average time taken to check each file in milliseconds.
-     */
-    handleFileCheckCompleted(event) {
-        const {
-            total_files,
-            files_to_update,
-            total_time_seconds,
-            average_time_per_file_ms,
-        } = event.payload;
-        // Mark file check done; only complete if there is nothing to download
-        const hasUpdates = (files_to_update ?? 0) > 0;
-        this.setState({
-            isFileCheckComplete: true,
-            isUpdateAvailable: hasUpdates,
-            // Don't change mode here - let checkForUpdates handle the transition
-        });
-        if (!hasUpdates) {
-            this.handleCompletion();
-        }
-    },
-
-    /**
-     * Handles update completed events from the backend.
-     * Sets the state to indicate that the update is complete.
-     */
-    handleUpdateCompleted() {
-        this.setState({
-            isUpdateComplete: true,
-            currentUpdateMode: "complete",
-        });
-    },
-
-    /**
-     * Requests an update of the UI elements by scheduling a call to updateUIElements
-     * using requestAnimationFrame. This ensures that the UI is updated as soon as
-     * possible after the state has changed, without causing unnecessary re-renders.
-     * @return {void}
-     */
-    updateUI() {
-        if (!this.deferredUpdate) {
-            this.deferredUpdate = requestAnimationFrame(() => {
-                this.updateUIElements();
-                this.deferredUpdate = null;
-            });
-        }
-    },
-
-    /**
-     * Updates the UI elements with the latest state. This function is
-     * called when the state of the application changes.
-     *
-     * @return {void}
-     */
-    updateUIElements() {
-        const elements = {
-            statusString: document.getElementById("status-string"),
-            currentFile: document.getElementById("current-file"),
-            filesProgress: document.getElementById("files-progress"),
-            downloadedSize: document.getElementById("downloaded-size"),
-            totalSize: document.getElementById("total-size"),
-            progressPercentage: document.getElementById("progress-percentage"),
-            progressPercentageDiv: document.getElementById("progress-percentage-div"),
-            downloadSpeed: document.getElementById("download-speed"),
-            timeRemaining: document.getElementById("time-remaining"),
-            dlStatusString: document.getElementById("dl-status-string"),
-        };
-
-        if (!UPDATE_CHECK_ENABLED) { //#GAMEUPDATER
-            if (elements.dlStatusString)
-                elements.dlStatusString.textContent = this.t("NO_UPDATE_REQUIRED");
-            if (elements.progressPercentage)
-                elements.progressPercentage.textContent = "(100%)";
-            if (elements.progressPercentageDiv)
-                elements.progressPercentageDiv.style.width = "100%";
-
-            // Hide unnecessary elements
-            if (elements.currentFile) elements.currentFile.style.display = "none";
-            if (elements.filesProgress) elements.filesProgress.style.display = "none";
-            const sizeProgress = document.getElementById("size-progress");
-            if (sizeProgress) sizeProgress.style.display = "none";
-            if (elements.downloadSpeed) elements.downloadSpeed.style.display = "none";
-            if (elements.timeRemaining) elements.timeRemaining.style.display = "none";
-
-            return; // Exit the function because we don't need to update other elements
-        }
-
-        this.updateTextContents(elements);
-        this.updateProgressBar(elements);
-        this.updateDownloadInfo(elements);
-        this.updateElementsVisibility(elements);
-    },
-
-    /**
-     * Updates the text content of the elements in the object with the relevant text from the state.
-     * @param {Object} elements - An object containing the elements to be updated. Can contain the following properties:
-     *      dlStatusString: The element to display the download status string.
-     *      statusString: The element to display the status string.
-     *      currentFile: The element to display the current file name.
-     *      filesProgress: The element to display the progress of the file check (e.g. 10/100).
-     *      downloadedSize: The element to display the downloaded size.
-     *      totalSize: The element to display the total size.
-     */
-    updateTextContents(elements) {
-        if (elements.dlStatusString) {
-            elements.dlStatusString.textContent = this.getDlStatusString();
-        }
-        if (elements.statusString)
-            elements.statusString.textContent = this.getStatusText();
-        if (elements.currentFile)
-            elements.currentFile.textContent = this.getFileName(
-                this.state.currentFileName,
-            );
-        if (elements.filesProgress)
-            elements.filesProgress.textContent = `(${this.state.currentFileIndex}/${this.state.totalFiles})`;
-        if (elements.downloadedSize)
-            elements.downloadedSize.textContent = this.formatSize(
-                this.state.downloadedSize,
-            );
-        if (elements.totalSize)
-            elements.totalSize.textContent = this.formatSize(this.state.totalSize);
-    },
-
-    /**
-     * Updates the progress bar elements in the object with the relevant progress.
-     * @param {Object} elements - An object containing the elements to be updated. Can contain the following properties:
-     *      progressPercentage: The element to display the progress percentage.
-     *      progressPercentageDiv: The element to display the progress bar itself.
-     *      currentFile: The element to display the current file name.
-     */
-    updateProgressBar(elements) {
-        const progress = Math.min(100, this.calculateProgress());
-        const showProgress = this.state.isUpdateAvailable && (this.state.currentUpdateMode === "download" || this.state.currentUpdateMode === "paused");
-        
-        if (elements.progressPercentage) {
-            if (!showProgress) {
-                elements.progressPercentage.style.display = "none";
-            } else {
-                elements.progressPercentage.style.display = "inline";
-                elements.progressPercentage.textContent = `(${Math.round(progress)}%)`;
-            }
-        }
-        if (elements.progressPercentageDiv && showProgress) {
-            elements.progressPercentageDiv.style.width = `${progress}%`;
-        }
-        if (elements.currentFile) {
-            elements.currentFile.style.display = showProgress ? "flex" : "none";
-        }
-    },
-
-    /**
-     * Updates the download info elements in the object with the relevant download information.
-     * @param {Object} elements - An object containing the elements to be updated. Can contain the following properties:
-     *      downloadSpeed: The element to display the download speed.
-     *      timeRemaining: The element to display the time remaining.
-     */
-    updateDownloadInfo(elements) {
-        if (elements.downloadSpeed) {
-            const speedText =
-                this.state.currentUpdateMode === "download"
-                    ? this.formatSpeed(this.state.currentSpeed)
-                    : "";
-            elements.downloadSpeed.textContent = speedText;
-        }
-        if (elements.timeRemaining) {
-            const timeText =
-                this.state.currentUpdateMode === "download"
-                    ? this.formatTime(this.state.timeRemaining)
-                    : "";
-            elements.timeRemaining.textContent = timeText;
-        }
-    },
-
-    /**
-     * Returns the current download status string based on the current update mode.
-     * This function will return the following strings based on the current update mode:
-     *      'file_check': 'VERIFYING_FILES'
-     *      'download': 'DOWNLOADING_FILES'
-     *      'complete': If the file check is complete and there is no update available, 'NO_UPDATE_REQUIRED'
-     *                  If the file check is complete and there is an update available, 'FILE_CHECK_COMPLETE'
-     *                  If the download is complete, 'DOWNLOAD_COMPLETE'
-     *                  If the update is complete, 'UPDATE_COMPLETED'
-     *      default: 'GAME_READY_TO_LAUNCH'
-     *
-     * @returns {string} The current download status string
-     */
-    getDlStatusString() {
-        if (!UPDATE_CHECK_ENABLED) {
-            return this.t("NO_UPDATE_REQUIRED");
-        }
-
-        switch (this.state.currentUpdateMode) {
-            case "file_check":
-                return this.t("VERIFYING_FILES");
-            case "paused":
-            case "download":
-                return this.t("DOWNLOADING_FILES");
-            case "complete":
-                if (this.state.isFileCheckComplete && !this.state.isUpdateAvailable) {
-                    return this.t("NO_UPDATE_REQUIRED");
-                }
-                if (this.state.isFileCheckComplete && this.state.isUpdateAvailable) {
-                    return this.t("FILE_CHECK_COMPLETE");
-                }
-                if (this.state.isDownloadComplete) {
-                    return this.t("DOWNLOAD_COMPLETE");
-                }
-                if (this.state.isUpdateComplete) {
-                    return this.t("UPDATE_COMPLETED");
-                }
-                break;
-            default:
-                return this.t("GAME_READY_TO_LAUNCH");
-        }
-        return this.t("GAME_READY_TO_LAUNCH");
-    },
-
-    /**
-     * Calculates the current progress of the update as a percentage.
-     * If there is an update available and the total size of the update is greater than 0,
-     * the progress is calculated as (downloadedSize / totalSize) * 100.
-     * Otherwise, the current progress is returned.
-     * @returns {number} The current progress as a percentage
-     */
-    calculateProgress() {
-        if (this.state.isUpdateAvailable && this.state.totalSize > 0) {
-            return (this.state.downloadedSize / this.state.totalSize) * 100;
-        }
-        return this.state.currentProgress;
-    },
-
-    /**
-     * Returns the current download status string based on the current update mode.
-     * If the download is complete, 'DOWNLOAD_COMPLETE' is returned.
-     * If there is no update available, 'NO_UPDATE_REQUIRED' is returned.
-     * If the file check is being performed, 'VERIFYING_FILES' is returned.
-     * If the download is being performed, 'DOWNLOADING_FILES' is returned.
-     * @returns {string} The current download status string
-     */
-    getStatusText() {
-        if (this.state.isDownloadComplete) return this.t("DOWNLOAD_COMPLETE");
-        if (!this.state.isUpdateAvailable) return this.t("NO_UPDATE_REQUIRED");
-        if (this.state.currentUpdateMode === "file_check") return this.t("VERIFYING_FILES");
-        // Treat paused as ongoing download for the status banner
-        return this.t("DOWNLOADING_FILES");
-    },
-
-    /**
-     * Updates the visibility of the given elements based on the current state of the download.
-     * If the download is available and the current update mode is 'download',
-     * the elements are shown. Otherwise, they are hidden.
-     * @param {Object} elements - The elements to update.
-     */
-    updateElementsVisibility(elements) {
-        const isDownloading = this.state.currentUpdateMode === "download";
-        const isPaused = this.state.currentUpdateMode === "paused";
-        const showDownloadInfo = this.state.isUpdateAvailable && (isDownloading || isPaused);
-
-        if (elements.currentFile)
-            elements.currentFile.style.display = this.state.isUpdateAvailable
-                ? "flex"
-                : "none";
-        if (elements.filesProgress)
-            elements.filesProgress.style.display = this.state.isUpdateAvailable
-                ? "inline"
-                : "none";
-        const sizeProgress = document.getElementById("size-progress");
-        if (sizeProgress) {
-            sizeProgress.style.display = showDownloadInfo ? "inline" : "none";
-        }
-        if (elements.progressPercentage) {
-            elements.progressPercentage.style.display =
-                this.state.isUpdateAvailable && this.state.currentUpdateMode !== "ready"
-                    ? "inline"
-                    : "none";
-        }
-        if (elements.downloadSpeed) {
-            elements.downloadSpeed.style.display = isDownloading ? "inline" : "none";
-        }
-        if (elements.timeRemaining) {
-            elements.timeRemaining.style.display = isDownloading ? "inline" : "none";
-        }
-
-        const speedLabel = document.querySelector(".dl-speed-string");
-        if (speedLabel) {
-            speedLabel.style.display = isDownloading ? "inline" : "none";
-        }
-        const timeLabel = document.querySelector(".tr-string");
-        if (timeLabel) {
-            timeLabel.style.display = isDownloading ? "inline" : "none";
-        }
-
-        const pauseBtn = document.querySelector(".btn-pause");
-        if (pauseBtn) {
-            pauseBtn.style.display = showDownloadInfo ? "flex" : "none";
-            const icon = pauseBtn.querySelector("img");
-            if (icon) {
-                icon.src = isPaused ? "./assets/vector-3.svg" : "./assets/pause-icon.svg";
-                icon.alt = isPaused ? "Resume" : "Pause";
-            }
-            pauseBtn.title = isPaused ? this.t("RESUME") : this.t("PAUSE");
-        }
-    },
-
-    /**
-     * Resets the state to its initial values.
-     * This function is called on various events such as the download completing, the user logging out, or the user navigating away from the page.
-     * It resets all the state fields to their default values, effectively resetting the state of the download.
-     */
-    resetState() {
-        this.setState({
-            isFileCheckComplete: false,
-            isUpdateAvailable: false,
-            isDownloadComplete: false,
-            lastProgressUpdate: null,
-            lastDownloadedBytes: 0,
-            downloadStartTime: null,
-            currentUpdateMode: null,
-            currentProgress: 0,
-            currentFileName: "",
-            currentFileIndex: 0,
-            totalFiles: 0,
-            downloadedSize: 0,
-            downloadedBytesOffset: 0,
-            totalSize: 0,
-            currentSpeed: 0,
-            timeRemaining: 0,
-            isLoggingIn: false,
-            isLoggingOut: false,
-            isGameRunning: false,
-            updateCheckPerformed: false,
-            isGeneratingHashFile: false,
-            hashFileProgress: 0,
-            currentProcessingFile: "",
-            processedFiles: 0,
-        });
-    },
-
-    toggleTheme() {
-        const body = document.body;
-        if (body.classList.contains("light-mode")) {
-            body.classList.remove("light-mode");
-            localStorage.setItem("theme", "dark");
+    const settingsBtn = document.getElementById("settings-button");
+    const settingsDropdown = document.getElementById(
+      "settings-dropdown-wrapper",
+    );
+    if (settingsBtn && settingsDropdown) {
+      let open = false;
+      gsap.set(settingsDropdown, { display: "none", opacity: 0, y: -10 });
+      const tl = gsap.timeline({ paused: true });
+      tl.to(settingsDropdown, {
+        duration: 0.3,
+        display: "block",
+        opacity: 1,
+        y: 0,
+        ease: "power2.out",
+      });
+      settingsBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (!open) {
+          tl.play();
         } else {
-            body.classList.add("light-mode");
-            localStorage.setItem("theme", "light");
+          tl.reverse().then(() =>
+            gsap.set(settingsDropdown, { display: "none" }),
+          );
         }
-    },
-
-    toggleLogs() {
-        const enabled = localStorage.getItem("logsEnabled") === "true";
-        const newValue = !enabled;
-        localStorage.setItem("logsEnabled", newValue);
-        invoke("set_logging", { enabled: newValue });
-    },
-
-    /**
-     * Handles download completion events from the backend.
-     * Sets the state to indicate that the download is complete, and after a 2 second delay, sets the state to indicate that the update is complete.
-     * Also re-enables the game launch button and language selector.
-     */
-    handleCompletion() {
-        this.setState({
-            isDownloadComplete: true,
-            currentProgress: 100,
-            currentUpdateMode: "complete",
-            isUpdateAvailable: false,
-            isFileCheckComplete: true,
+        open = !open;
+      });
+      document.addEventListener("click", () => {
+        if (open) {
+          tl.reverse().then(() =>
+            gsap.set(settingsDropdown, { display: "none" }),
+          );
+          open = false;
+        }
+      });
+      settingsDropdown.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (event.target.tagName === "A" && event.target.target === "_blank") {
+          event.preventDefault();
+          this.openExternal(event.target.href);
+        }
+      });
+      const toggleLogsLink = document.getElementById("toggle-logs");
+      if (toggleLogsLink) {
+        toggleLogsLink.addEventListener("click", (evt) => {
+          evt.preventDefault();
+          this.openLogsModal();
         });
-        // Re-enable controls immediately, then transition to ready after delay
+      }
+    }
+
+    const links = [
+      { id: "discord-button", url: "https://discord.gg/DARHAaNBYS" },
+      { id: "support-button", url: "https://helpdesk.crazy-esports.com" },
+      {
+        id: "privacy-link",
+        url: "https://forum.crazy-esports.com/index.php?datenschutzerklaerung/",
+      },
+    ];
+    links.forEach((link) => {
+      const el = document.getElementById(link.id);
+      if (el) {
+        el.addEventListener("click", (e) => {
+          e.preventDefault();
+          this.openExternal(link.url);
+        });
+      }
+    });
+
+    // Wire: Check Launcher Update
+    const checkLauncherUpdate = document.getElementById(
+      "check-launcher-update",
+    );
+    if (checkLauncherUpdate) {
+      checkLauncherUpdate.addEventListener("click", async (e) => {
+        e.preventDefault();
+        await this.checkAppUpdate(false);
+      });
+    }
+  },
+
+  // Function to complete the first launch process
+  completeFirstLaunch() {
+    localStorage.setItem("isFirstLaunch", "false");
+    this.setState({ isFirstLaunch: false });
+
+    // Proceed with update check
+    this.checkServerConnection().then((isConnected) => {
+      if (isConnected) {
+        this.initializeAndCheckUpdates(false);
+      }
+    });
+  },
+
+  // Function for custom notifications
+  showCustomNotification(message, type) {
+    const notification = document.createElement("div");
+    notification.className = `custom-notification ${type}`;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+
+    anime({
+      targets: notification,
+      opacity: [0, 1],
+      translateY: [-20, 0],
+      duration: 300,
+      easing: "easeOutQuad",
+    });
+
+    setTimeout(() => {
+      anime({
+        targets: notification,
+        opacity: 0,
+        translateY: -20,
+        duration: 300,
+        easing: "easeInQuad",
+        complete: () => {
+          notification.remove();
+        },
+      });
+    }, 5000);
+  },
+
+  /**
+   * Handles download progress events from the backend.
+   * @param {Object} event The event object from the backend.
+   * @param {Object} event.payload The payload of the event, containing the following properties:
+   *   - file_name: The name of the file being downloaded.
+   *   - progress: The percentage of the file downloaded.
+   *   - speed: The download speed in bytes per second.
+   *   - downloaded_bytes: The total number of bytes downloaded so far.
+   *   - total_bytes: The total number of bytes to download.
+   *   - total_files: The total number of files to download.
+   *   - current_file_index: The index of the current file in the list of files to download.
+   */
+  handleDownloadProgress(event) {
+    if (!event || !event.payload) {
+      console.error(
+        "Invalid event or payload received in handleDownloadProgress",
+      );
+      return;
+    }
+
+    const {
+      file_name,
+      progress,
+      speed,
+      downloaded_bytes,
+      total_bytes,
+      total_files,
+      current_file_index,
+    } = event.payload;
+
+    // Ensure totalSize is initialized correctly (preserve larger value for resumed downloads)
+    if (this.state.totalSize === undefined || this.state.totalSize === 0) {
+      this.state.totalSize = total_bytes;
+    }
+
+    // Add offset for resumed downloads (bytes already downloaded before pause)
+    const offset = this.state.downloadedBytesOffset || 0;
+    const totalDownloadedBytes = downloaded_bytes + offset;
+
+    // Use preserved totalSize if larger (for resumed downloads)
+    const effectiveTotalSize = Math.max(this.state.totalSize, total_bytes);
+
+    const now = Date.now();
+
+    // Initialize download start time on first progress event
+    if (this.state.downloadStartTime === null) {
+      this.state.downloadStartTime = now;
+    }
+
+    // Calculate speed based on current session bytes only (not including offset)
+    const elapsedSeconds = (now - this.state.downloadStartTime) / 1000;
+    const globalSpeed =
+      elapsedSeconds > 0 ? downloaded_bytes / elapsedSeconds : speed;
+
+    const timeRemaining = this.calculateGlobalTimeRemaining(
+      totalDownloadedBytes,
+      effectiveTotalSize,
+      globalSpeed,
+    );
+
+    // Smooth the displayed file name to the most active file over a short window
+    if (!this._activeFileWindow) this._activeFileWindow = [];
+    const nowTs = Date.now();
+    this._activeFileWindow.push({ t: nowTs, name: file_name });
+    this._activeFileWindow = this._activeFileWindow.filter(
+      (s) => nowTs - s.t <= 1500,
+    );
+    // Cap at 100 entries to prevent unbounded growth in edge cases
+    if (this._activeFileWindow.length > 100) {
+      this._activeFileWindow = this._activeFileWindow.slice(-100);
+    }
+    const freq = {};
+    for (const s of this._activeFileWindow)
+      freq[s.name] = (freq[s.name] || 0) + 1;
+    let topName = file_name;
+    let topCount = 0;
+    for (const k in freq) {
+      if (freq[k] > topCount) {
+        topCount = freq[k];
+        topName = k;
+      }
+    }
+
+    this.setState({
+      currentFileName: topName,
+      currentProgress: Math.min(
+        100,
+        (totalDownloadedBytes / effectiveTotalSize) * 100,
+      ),
+      currentSpeed: globalSpeed,
+      downloadedSize: totalDownloadedBytes,
+      totalFiles: total_files,
+      currentFileIndex: current_file_index,
+      totalDownloadedBytes: totalDownloadedBytes,
+      timeRemaining: timeRemaining,
+      currentUpdateMode: "download",
+      lastProgressUpdate: now,
+      lastDownloadedBytes: totalDownloadedBytes,
+    });
+  },
+
+  /**
+   * Handles file check progress events from the backend.
+   * @param {Object} event The event object from the backend.
+   * @param {Object} event.payload The payload of the event, containing the following properties:
+   *   - current_file: The name of the file being checked.
+   *   - progress: The percentage of the file check completed.
+   *   - current_count: The number of files checked so far.
+   *   - total_files: The total number of files to check.
+   */
+  handleFileCheckProgress(event) {
+    if (!event || !event.payload) {
+      console.error(
+        "Invalid event or payload received in file_check_progress listener",
+      );
+      return;
+    }
+
+    const { current_file, progress, current_count, total_files } =
+      event.payload;
+
+    this.setState({
+      currentFileName: current_file,
+      currentProgress: Math.min(100, progress),
+      currentFileIndex: current_count,
+      totalFiles: total_files,
+      currentUpdateMode: "file_check",
+    });
+  },
+
+  /**
+   * Handles file check completed events from the backend.
+   * @param {Object} event The event object from the backend.
+   * @param {Object} event.payload The payload of the event, containing the following properties:
+   *   - total_files: The total number of files to check.
+   *   - files_to_update: The number of files that require an update.
+   *   - total_time_seconds: The total time taken to check all the files in seconds.
+   *   - average_time_per_file_ms: The average time taken to check each file in milliseconds.
+   */
+  handleFileCheckCompleted(event) {
+    const {
+      total_files,
+      files_to_update,
+      total_time_seconds,
+      average_time_per_file_ms,
+    } = event.payload;
+    // Mark file check done; only complete if there is nothing to download
+    const hasUpdates = (files_to_update ?? 0) > 0;
+    this.setState({
+      isFileCheckComplete: true,
+      isUpdateAvailable: hasUpdates,
+      // Don't change mode here - let checkForUpdates handle the transition
+    });
+    if (!hasUpdates) {
+      this.handleCompletion();
+    }
+  },
+
+  /**
+   * Handles update completed events from the backend.
+   * Sets the state to indicate that the update is complete.
+   */
+  handleUpdateCompleted() {
+    this.setState({
+      isUpdateComplete: true,
+      currentUpdateMode: "complete",
+    });
+  },
+
+  /**
+   * Requests an update of the UI elements by scheduling a call to updateUIElements
+   * using requestAnimationFrame. This ensures that the UI is updated as soon as
+   * possible after the state has changed, without causing unnecessary re-renders.
+   * @return {void}
+   */
+  updateUI() {
+    if (!this.deferredUpdate) {
+      this.deferredUpdate = requestAnimationFrame(() => {
+        this.updateUIElements();
+        this.deferredUpdate = null;
+      });
+    }
+  },
+
+  /**
+   * Updates the UI elements with the latest state. This function is
+   * called when the state of the application changes.
+   *
+   * @return {void}
+   */
+  updateUIElements() {
+    const elements = {
+      statusString: document.getElementById("status-string"),
+      currentFile: document.getElementById("current-file"),
+      filesProgress: document.getElementById("files-progress"),
+      downloadedSize: document.getElementById("downloaded-size"),
+      totalSize: document.getElementById("total-size"),
+      progressPercentage: document.getElementById("progress-percentage"),
+      progressPercentageDiv: document.getElementById("progress-percentage-div"),
+      downloadSpeed: document.getElementById("download-speed"),
+      timeRemaining: document.getElementById("time-remaining"),
+      dlStatusString: document.getElementById("dl-status-string"),
+    };
+
+    if (!UPDATE_CHECK_ENABLED) {
+      //#GAMEUPDATER
+      if (elements.dlStatusString)
+        elements.dlStatusString.textContent = this.t("NO_UPDATE_REQUIRED");
+      if (elements.progressPercentage)
+        elements.progressPercentage.textContent = "(100%)";
+      if (elements.progressPercentageDiv)
+        elements.progressPercentageDiv.style.width = "100%";
+
+      // Hide unnecessary elements
+      if (elements.currentFile) elements.currentFile.style.display = "none";
+      if (elements.filesProgress) elements.filesProgress.style.display = "none";
+      const sizeProgress = document.getElementById("size-progress");
+      if (sizeProgress) sizeProgress.style.display = "none";
+      if (elements.downloadSpeed) elements.downloadSpeed.style.display = "none";
+      if (elements.timeRemaining) elements.timeRemaining.style.display = "none";
+
+      return; // Exit the function because we don't need to update other elements
+    }
+
+    this.updateTextContents(elements);
+    this.updateProgressBar(elements);
+    this.updateDownloadInfo(elements);
+    this.updateElementsVisibility(elements);
+  },
+
+  /**
+   * Updates the text content of the elements in the object with the relevant text from the state.
+   * @param {Object} elements - An object containing the elements to be updated. Can contain the following properties:
+   *      dlStatusString: The element to display the download status string.
+   *      statusString: The element to display the status string.
+   *      currentFile: The element to display the current file name.
+   *      filesProgress: The element to display the progress of the file check (e.g. 10/100).
+   *      downloadedSize: The element to display the downloaded size.
+   *      totalSize: The element to display the total size.
+   */
+  updateTextContents(elements) {
+    if (elements.dlStatusString) {
+      elements.dlStatusString.textContent = this.getDlStatusString();
+    }
+    if (elements.statusString)
+      elements.statusString.textContent = this.getStatusText();
+    if (elements.currentFile)
+      elements.currentFile.textContent = this.getFileName(
+        this.state.currentFileName,
+      );
+    if (elements.filesProgress)
+      elements.filesProgress.textContent = `(${this.state.currentFileIndex}/${this.state.totalFiles})`;
+    if (elements.downloadedSize)
+      elements.downloadedSize.textContent = this.formatSize(
+        this.state.downloadedSize,
+      );
+    if (elements.totalSize)
+      elements.totalSize.textContent = this.formatSize(this.state.totalSize);
+  },
+
+  /**
+   * Updates the progress bar elements in the object with the relevant progress.
+   * @param {Object} elements - An object containing the elements to be updated. Can contain the following properties:
+   *      progressPercentage: The element to display the progress percentage.
+   *      progressPercentageDiv: The element to display the progress bar itself.
+   *      currentFile: The element to display the current file name.
+   */
+  updateProgressBar(elements) {
+    const progress = Math.min(100, this.calculateProgress());
+    const showProgress =
+      this.state.isUpdateAvailable &&
+      (this.state.currentUpdateMode === "download" ||
+        this.state.currentUpdateMode === "paused");
+
+    if (elements.progressPercentage) {
+      if (!showProgress) {
+        elements.progressPercentage.style.display = "none";
+      } else {
+        elements.progressPercentage.style.display = "inline";
+        elements.progressPercentage.textContent = `(${Math.round(progress)}%)`;
+      }
+    }
+    if (elements.progressPercentageDiv && showProgress) {
+      elements.progressPercentageDiv.style.width = `${progress}%`;
+    }
+    if (elements.currentFile) {
+      elements.currentFile.style.display = showProgress ? "flex" : "none";
+    }
+    const sizeProgress = document.getElementById("size-progress");
+    if (sizeProgress) {
+      sizeProgress.style.display = showProgress ? "flex" : "none";
+    }
+  },
+
+  /**
+   * Updates the download info elements in the object with the relevant download information.
+   * @param {Object} elements - An object containing the elements to be updated. Can contain the following properties:
+   *      downloadSpeed: The element to display the download speed.
+   *      timeRemaining: The element to display the time remaining.
+   */
+  updateDownloadInfo(elements) {
+    if (elements.downloadSpeed) {
+      const speedText =
+        this.state.currentUpdateMode === "download"
+          ? this.formatSpeed(this.state.currentSpeed)
+          : "";
+      elements.downloadSpeed.textContent = speedText;
+    }
+    if (elements.timeRemaining) {
+      const timeText =
+        this.state.currentUpdateMode === "download"
+          ? this.formatTime(this.state.timeRemaining)
+          : "";
+      elements.timeRemaining.textContent = timeText;
+    }
+  },
+
+  /**
+   * Returns the current download status string based on the current update mode.
+   * This function will return the following strings based on the current update mode:
+   *      'file_check': 'VERIFYING_FILES'
+   *      'download': 'DOWNLOADING_FILES'
+   *      'complete': If the file check is complete and there is no update available, 'NO_UPDATE_REQUIRED'
+   *                  If the file check is complete and there is an update available, 'FILE_CHECK_COMPLETE'
+   *                  If the download is complete, 'DOWNLOAD_COMPLETE'
+   *                  If the update is complete, 'UPDATE_COMPLETED'
+   *      default: 'GAME_READY_TO_LAUNCH'
+   *
+   * @returns {string} The current download status string
+   */
+  getDlStatusString() {
+    if (!UPDATE_CHECK_ENABLED) {
+      return this.t("NO_UPDATE_REQUIRED");
+    }
+    return this.t(getDlStatusKey(this.state));
+  },
+
+  /**
+   * Calculates the current progress of the update as a percentage.
+   * If there is an update available and the total size of the update is greater than 0,
+   * the progress is calculated as (downloadedSize / totalSize) * 100.
+   * Otherwise, the current progress is returned.
+   * @returns {number} The current progress as a percentage
+   */
+  calculateProgress() {
+    if (this.state.isUpdateAvailable && this.state.totalSize > 0) {
+      return (this.state.downloadedSize / this.state.totalSize) * 100;
+    }
+    return this.state.currentProgress;
+  },
+
+  /**
+   * Returns the current download status string based on the current update mode.
+   * If the download is complete, 'DOWNLOAD_COMPLETE' is returned.
+   * If there is no update available, 'NO_UPDATE_REQUIRED' is returned.
+   * If the file check is being performed, 'VERIFYING_FILES' is returned.
+   * If the download is being performed, 'DOWNLOADING_FILES' is returned.
+   * @returns {string} The current download status string
+   */
+  getStatusText() {
+    return this.t(getStatusKey(this.state));
+  },
+
+  /**
+   * Updates the visibility of the given elements based on the current state of the download.
+   * If the download is available and the current update mode is 'download',
+   * the elements are shown. Otherwise, they are hidden.
+   * @param {Object} elements - The elements to update.
+   */
+  updateElementsVisibility(elements) {
+    const isDownloading = this.state.currentUpdateMode === "download";
+    const isPaused = this.state.currentUpdateMode === "paused";
+    const showDownloadInfo =
+      this.state.isUpdateAvailable &&
+      (isDownloading || isPaused) &&
+      !this.state.updateError;
+
+    if (elements.currentFile)
+      elements.currentFile.style.display = this.state.isUpdateAvailable
+        ? "flex"
+        : "none";
+    if (elements.filesProgress)
+      elements.filesProgress.style.display = this.state.isUpdateAvailable
+        ? "inline"
+        : "none";
+
+    if (elements.progressPercentage) {
+      elements.progressPercentage.style.display =
+        this.state.isUpdateAvailable &&
+        this.state.currentUpdateMode !== "ready" &&
+        !this.state.updateError
+          ? "inline"
+          : "none";
+    }
+    if (elements.downloadSpeed) {
+      elements.downloadSpeed.style.display = isDownloading ? "inline" : "none";
+    }
+    if (elements.timeRemaining) {
+      elements.timeRemaining.style.display = isDownloading ? "inline" : "none";
+    }
+
+    const speedLabel = document.querySelector(".dl-speed-string");
+    if (speedLabel) {
+      speedLabel.style.display = isDownloading ? "inline" : "none";
+    }
+    const timeLabel = document.querySelector(".tr-string");
+    if (timeLabel) {
+      timeLabel.style.display = isDownloading ? "inline" : "none";
+    }
+
+    const pauseBtn = document.querySelector(".btn-pause");
+    if (pauseBtn) {
+      pauseBtn.style.display = showDownloadInfo ? "flex" : "none";
+      pauseBtn.style.pointerEvents = this.state.isPauseRequested
+        ? "none"
+        : "auto";
+      const icon = pauseBtn.querySelector("img");
+      if (icon) {
+        icon.src = isPaused
+          ? "./assets/vector-3.svg"
+          : "./assets/pause-icon.svg";
+        icon.alt = isPaused ? "Resume" : "Pause";
+      }
+      pauseBtn.title = isPaused ? this.t("RESUME") : this.t("PAUSE");
+    }
+  },
+
+  /**
+   * Resets the state to its initial values.
+   * This function is called on various events such as the download completing, the user logging out, or the user navigating away from the page.
+   * It resets all the state fields to their default values, effectively resetting the state of the download.
+   */
+  resetState() {
+    this.setState({
+      isFileCheckComplete: false,
+      isUpdateAvailable: false,
+      isDownloadComplete: false,
+      lastProgressUpdate: null,
+      lastDownloadedBytes: 0,
+      downloadStartTime: null,
+      currentUpdateMode: null,
+      currentProgress: 0,
+      currentFileName: "",
+      currentFileIndex: 0,
+      totalFiles: 0,
+      downloadedSize: 0,
+      downloadedBytesOffset: 0,
+      totalSize: 0,
+      currentSpeed: 0,
+      timeRemaining: 0,
+      isLoggingIn: false,
+      isLoggingOut: false,
+      isGameRunning: false,
+      updateCheckPerformed: false,
+      isGeneratingHashFile: false,
+      hashFileProgress: 0,
+      currentProcessingFile: "",
+      processedFiles: 0,
+      isPauseRequested: false,
+      updateError: false,
+    });
+  },
+
+  toggleTheme() {
+    const body = document.body;
+    if (body.classList.contains("light-mode")) {
+      body.classList.remove("light-mode");
+      localStorage.setItem("theme", "dark");
+    } else {
+      body.classList.add("light-mode");
+      localStorage.setItem("theme", "light");
+    }
+  },
+
+  toggleLogs() {
+    const enabled = localStorage.getItem("logsEnabled") === "true";
+    const newValue = !enabled;
+    localStorage.setItem("logsEnabled", newValue);
+    invoke("set_logging", { enabled: newValue });
+  },
+
+  /**
+   * Handles download completion events from the backend.
+   * Sets the state to indicate that the download is complete, and after a 2 second delay, sets the state to indicate that the update is complete.
+   * Also re-enables the game launch button and language selector.
+   */
+  handleCompletion() {
+    this.setState({
+      isDownloadComplete: true,
+      currentProgress: 100,
+      currentUpdateMode: "complete",
+      isUpdateAvailable: false,
+      isFileCheckComplete: true,
+    });
+    // Re-enable controls immediately, then transition to ready after delay
+    this.updateLaunchGameButton(false);
+    this.toggleLanguageSelector(true);
+    setTimeout(() => {
+      this.setState({
+        isUpdateComplete: true,
+        currentUpdateMode: "ready",
+      });
+    }, 2000);
+  },
+
+  /**
+   * Initializes the home page and checks for updates if needed.
+   * If the first launch flag is set, it handles the first launch by generating the hash file.
+   * If not, it checks for updates and sets the state accordingly.
+   * If an error occurs during initialization and update check, it logs the error but does not display it to the user.
+   * @param {boolean} [isLogin=false] Whether the update check is triggered by a login action.
+   */
+  async initializeAndCheckUpdates(isLogin = false) {
+    if (!UPDATE_CHECK_ENABLED) {
+      this.setState({
+        isUpdateAvailable: false,
+        isFileCheckComplete: true,
+        currentUpdateMode: "complete",
+        currentProgress: 100,
+      });
+      return;
+    }
+
+    const checkNeeded = isLogin
+      ? !this.state.updateCheckPerformedOnLogin
+      : !this.state.updateCheckPerformedOnRefresh;
+
+    if (!checkNeeded) return;
+
+    try {
+      await this.initializeHomePage();
+      this.checkFirstLaunch();
+      if (this.state.isFirstLaunch) {
+        await this.handleFirstLaunch();
+      } else {
+        await this.checkForUpdates();
+      }
+
+      if (isLogin) {
+        this.setState({ updateCheckPerformedOnLogin: true });
+      } else {
+        this.setState({ updateCheckPerformedOnRefresh: true });
+      }
+    } catch (error) {
+      console.error("Error during initialization and update check:", error);
+      // Handle the error (e.g., display a message to the user)
+    }
+  },
+
+  /**
+   * Checks for updates if needed. If no update is needed, it disables the update check button and
+   * sets the state to indicate that the update is complete. If an update is needed, it sets the
+   * state to indicate that the update is available and starts the update process.
+   * If an error occurs, it logs the error and displays an error message to the user.
+   * @param {boolean} [isLogin=false] Whether the update check is triggered by a login action.
+   */
+  async checkForUpdates() {
+    if (!UPDATE_CHECK_ENABLED) {
+      this.setState({
+        isUpdateAvailable: false,
+        isFileCheckComplete: true,
+        currentUpdateMode: "complete",
+        currentProgress: 100,
+      });
+      return;
+    }
+
+    if (this.state.isCheckingForUpdates) return;
+
+    // Reset state first, then set file_check mode (order matters to avoid race condition)
+    this.resetState();
+    this.setState({
+      isCheckingForUpdates: true,
+      currentUpdateMode: "file_check",
+    });
+    // Disable the game launch button and language selector during the check
+    this.updateLaunchGameButton(true);
+    this.toggleLanguageSelector(false);
+
+    try {
+      const filesToUpdate = await invoke("get_files_to_update");
+
+      if (filesToUpdate.length === 0) {
+        this.setState({
+          isUpdateAvailable: false,
+          isFileCheckComplete: true,
+          currentUpdateMode: "complete",
+        });
+        // Re-enable elements if no update is needed
         this.updateLaunchGameButton(false);
         this.toggleLanguageSelector(true);
         setTimeout(() => {
-            this.setState({
-                isUpdateComplete: true,
-                currentUpdateMode: "ready",
-            });
-        }, 2000);
-    },
-
-    /**
-     * Initializes the home page and checks for updates if needed.
-     * If the first launch flag is set, it handles the first launch by generating the hash file.
-     * If not, it checks for updates and sets the state accordingly.
-     * If an error occurs during initialization and update check, it logs the error but does not display it to the user.
-     * @param {boolean} [isLogin=false] Whether the update check is triggered by a login action.
-     */
-    async initializeAndCheckUpdates(isLogin = false) {
-        if (!UPDATE_CHECK_ENABLED) {
-            this.setState({
-                isUpdateAvailable: false,
-                isFileCheckComplete: true,
-                currentUpdateMode: "complete",
-                currentProgress: 100,
-            });
-            return;
-        }
-
-        const checkNeeded = isLogin
-            ? !this.state.updateCheckPerformedOnLogin
-            : !this.state.updateCheckPerformedOnRefresh;
-
-        if (!checkNeeded) return;
-
-        try {
-            await this.initializeHomePage();
-            this.checkFirstLaunch();
-            if (this.state.isFirstLaunch) {
-                await this.handleFirstLaunch();
-            } else {
-                await this.checkForUpdates();
-            }
-
-            if (isLogin) {
-                this.setState({ updateCheckPerformedOnLogin: true });
-            } else {
-                this.setState({ updateCheckPerformedOnRefresh: true });
-            }
-        } catch (error) {
-            console.error("Error during initialization and update check:", error);
-            // Handle the error (e.g., display a message to the user)
-        }
-    },
-
-    /**
-     * Checks for updates if needed. If no update is needed, it disables the update check button and
-     * sets the state to indicate that the update is complete. If an update is needed, it sets the
-     * state to indicate that the update is available and starts the update process.
-     * If an error occurs, it logs the error and displays an error message to the user.
-     * @param {boolean} [isLogin=false] Whether the update check is triggered by a login action.
-     */
-    async checkForUpdates() {
-        if (!UPDATE_CHECK_ENABLED) {
-            this.setState({
-                isUpdateAvailable: false,
-                isFileCheckComplete: true,
-                currentUpdateMode: "complete",
-                currentProgress: 100,
-            });
-            return;
-        }
-
-        if (this.state.isCheckingForUpdates) return;
-
-        // Reset state first, then set file_check mode (order matters to avoid race condition)
-        this.resetState();
+          this.setState({ currentUpdateMode: "ready" });
+        }, 1000);
+      } else {
         this.setState({
-            isCheckingForUpdates: true,
-            currentUpdateMode: "file_check",
+          isUpdateAvailable: true,
+          isFileCheckComplete: true,
+          currentUpdateMode: "complete",
+          totalFiles: filesToUpdate.length,
+          totalSize: filesToUpdate.reduce(
+            (total, file) => total + file.size,
+            0,
+          ),
         });
-        // Disable the game launch button and language selector during the check
+        setTimeout(async () => {
+          this.setState({ currentUpdateMode: "download" });
+          await this.runPatchSystem(filesToUpdate);
+        }, 2000);
+      }
+    } catch (error) {
+      console.error("Error checking for updates:", error);
+      this.resetState();
+      this.showErrorMessage(this.t("UPDATE_SERVER_UNREACHABLE"));
+      // Re-enable elements in case of error
+      this.updateLaunchGameButton(false);
+      this.toggleLanguageSelector(true);
+    } finally {
+      this.setState({ isCheckingForUpdates: false });
+    }
+  },
+
+  /**
+   * Runs the patch system to download and install updates.
+   *
+   * The method disables the game launch button and language selector at the start of the process, and
+   * re-enables them at the end of the process. If no updates are needed, the method simply returns without
+   * doing anything else. If an error occurs during the update process, the method shows an error message
+   * and re-enables the game launch button and language selector.
+   *
+   * @param {Array.<FileInfo>} filesToUpdate - The list of files to update.
+   *
+   * @returns {Promise<void>}
+   */
+  async runPatchSystem(filesToUpdate) {
+    if (!UPDATE_CHECK_ENABLED) return;
+    let pausedDuringDownload = false;
+    try {
+      this.updateLaunchGameButton(true);
+      this.toggleLanguageSelector(false);
+
+      if (filesToUpdate.length === 0) {
+        this.updateLaunchGameButton(false);
+        this.toggleLanguageSelector(true);
+        return;
+      }
+
+      const downloadedSizes = await invoke("download_all_files", {
+        filesToUpdate: filesToUpdate,
+        resumeDownloaded: this.state.downloadedSize || 0,
+      });
+
+      // If user paused during the backend call, stop here without completing
+      if (this.state.currentUpdateMode === "paused") {
+        pausedDuringDownload = true;
+        return;
+      }
+
+      let totalDownloadedSize = 0;
+      let lastUpdateTime = Date.now();
+      let lastDownloadedSize = 0;
+      for (let i = 0; i < downloadedSizes.length; i++) {
+        const fileInfo = filesToUpdate[i];
+        const downloadedSize = downloadedSizes[i];
+        totalDownloadedSize += downloadedSize;
+
+        this.setState({
+          currentFileName: fileInfo.path,
+          currentFileIndex: i + 1,
+          downloadedSize: totalDownloadedSize,
+        });
+
+        const currentTime = Date.now();
+        const timeDiff = (currentTime - lastUpdateTime) / 1000; // in seconds
+        const sizeDiff = totalDownloadedSize - lastDownloadedSize;
+        const speed = sizeDiff / timeDiff; // bytes per second
+
+        // Emit a progress event if necessary
+        this.handleDownloadProgress({
+          payload: {
+            file_name: fileInfo.path,
+            progress: (totalDownloadedSize / this.state.totalSize) * 100,
+            speed: speed,
+            downloaded_bytes: totalDownloadedSize,
+            total_bytes: this.state.totalSize,
+            total_files: this.state.totalFiles,
+            current_file_index: i + 1,
+          },
+        });
+
+        lastUpdateTime = currentTime;
+        lastDownloadedSize = totalDownloadedSize;
+      }
+
+      // Do not mark completion here; wait for backend "download_complete" event
+      if (this.state.currentUpdateMode === "paused") {
+        pausedDuringDownload = true;
+      }
+    } catch (error) {
+      console.error("Error during update:", error);
+      this.showErrorMessage(this.t("UPDATE_ERROR_MESSAGE"));
+      this.setState({
+        updateError: true,
+        currentUpdateMode: "error",
+        isUpdateAvailable: true,
+        isFileCheckComplete: true,
+      });
+    } finally {
+      // Re-enable controls only if not paused
+      if (!pausedDuringDownload && this.state.currentUpdateMode !== "paused") {
+        this.updateLaunchGameButton(false);
+        this.toggleLanguageSelector(true);
+      } else {
+        // Keep launch disabled while paused
         this.updateLaunchGameButton(true);
-        this.toggleLanguageSelector(false);
+      }
+    }
+  },
 
-        try {
+  /**
+   * Logs in to the game server using the given username and password.
+   *
+   * If a login attempt is already in progress, this function will not do anything.
+   *
+   * @param {string} username - The username to use for login
+   * @param {string} password - The password to use for login
+   *
+   * @return {Promise<void>}
+   */
+  async login(username, password) {
+    if (this.state.isLoggingIn) return;
 
-            const filesToUpdate = await invoke("get_files_to_update");
+    this.setState({ isLoggingIn: true });
+    const loginButton = document.getElementById("login-button");
+    const loginErrorMsg = document.getElementById("login-error-msg");
 
-            if (filesToUpdate.length === 0) {
-                this.setState({
-                    isUpdateAvailable: false,
-                    isFileCheckComplete: true,
-                    currentUpdateMode: "complete",
-                });
-                // Re-enable elements if no update is needed
-                this.updateLaunchGameButton(false);
-                this.toggleLanguageSelector(true);
-                setTimeout(() => {
-                    this.setState({ currentUpdateMode: "ready" });
-                }, 1000);
-            } else {
-                this.setState({
-                    isUpdateAvailable: true,
-                    isFileCheckComplete: true,
-                    currentUpdateMode: "complete",
-                    totalFiles: filesToUpdate.length,
-                    totalSize: filesToUpdate.reduce(
-                        (total, file) => total + file.size,
-                        0,
-                    ),
-                });
-                setTimeout(async () => {
-                    this.setState({ currentUpdateMode: "download" });
-                    await this.runPatchSystem(filesToUpdate);
-                }, 2000);
-            }
-        } catch (error) {
-            console.error("Error checking for updates:", error);
-            this.resetState();
-            this.showErrorMessage(this.t("UPDATE_SERVER_UNREACHABLE"));
-            // Re-enable elements in case of error
-            this.updateLaunchGameButton(false);
-            this.toggleLanguageSelector(true);
-        } finally {
-            this.setState({ isCheckingForUpdates: false });
-        }
-    },
+    if (loginButton) {
+      loginButton.disabled = true;
+      loginButton.textContent = this.t("LOGIN_IN_PROGRESS");
+    }
 
-    /**
-     * Runs the patch system to download and install updates.
-     *
-     * The method disables the game launch button and language selector at the start of the process, and
-     * re-enables them at the end of the process. If no updates are needed, the method simply returns without
-     * doing anything else. If an error occurs during the update process, the method shows an error message
-     * and re-enables the game launch button and language selector.
-     *
-     * @param {Array.<FileInfo>} filesToUpdate - The list of files to update.
-     *
-     * @returns {Promise<void>}
-     */
-    async runPatchSystem(filesToUpdate) {
-        if (!UPDATE_CHECK_ENABLED) return;
-        let pausedDuringDownload = false;
-        try {
-            this.updateLaunchGameButton(true);
-            this.toggleLanguageSelector(false);
+    if (loginErrorMsg) {
+      loginErrorMsg.style.display = "none";
+      loginErrorMsg.style.opacity = 0;
+    }
 
-            if (filesToUpdate.length === 0) {
-                this.updateLaunchGameButton(false);
-                this.toggleLanguageSelector(true);
-                return;
-            }
+    try {
+      const response = await invoke("login", { username, password });
+      const jsonResponse = JSON.parse(response);
 
-            const downloadedSizes = await invoke("download_all_files", {
-                filesToUpdate: filesToUpdate,
-            });
+      if (
+        jsonResponse &&
+        jsonResponse.Return &&
+        jsonResponse.Msg === "success"
+      ) {
+        const jsonResponseFormatted = {
+          AuthKey: jsonResponse.Return.AuthKey,
+          UserName: username,
+          UserNo: Number(jsonResponse.Return.UserNo),
+          CharacterCount: jsonResponse.Return.CharacterCount,
+          Permission: Number(jsonResponse.Return.Permission),
+          Privilege: 0,
+        };
+        this.storeAuthInfo(jsonResponseFormatted);
 
-            // If user paused during the backend call, stop here without completing
-            if (this.state.currentUpdateMode === "paused") {
-                pausedDuringDownload = true;
-                return;
-            }
-
-            let totalDownloadedSize = 0;
-            let lastUpdateTime = Date.now();
-            let lastDownloadedSize = 0;
-            for (let i = 0; i < downloadedSizes.length; i++) {
-                const fileInfo = filesToUpdate[i];
-                const downloadedSize = downloadedSizes[i];
-                totalDownloadedSize += downloadedSize;
-
-                this.setState({
-                    currentFileName: fileInfo.path,
-                    currentFileIndex: i + 1,
-                    downloadedSize: totalDownloadedSize,
-                });
-
-                const currentTime = Date.now();
-                const timeDiff = (currentTime - lastUpdateTime) / 1000; // in seconds
-                const sizeDiff = totalDownloadedSize - lastDownloadedSize;
-                const speed = sizeDiff / timeDiff; // bytes per second
-
-                // Emit a progress event if necessary
-                this.handleDownloadProgress({
-                    payload: {
-                        file_name: fileInfo.path,
-                        progress: (totalDownloadedSize / this.state.totalSize) * 100,
-                        speed: speed,
-                        downloaded_bytes: totalDownloadedSize,
-                        total_bytes: this.state.totalSize,
-                        total_files: this.state.totalFiles,
-                        current_file_index: i + 1,
-                    },
-                });
-
-                lastUpdateTime = currentTime;
-                lastDownloadedSize = totalDownloadedSize;
-            }
-
-            // Do not mark completion here; wait for backend "download_complete" event
-            if (this.state.currentUpdateMode === "paused") {
-                pausedDuringDownload = true;
-            }
-        } catch (error) {
-            console.error("Error during update:", error);
-            this.showErrorMessage(this.t("UPDATE_ERROR_MESSAGE"));
-        } finally {
-            // Re-enable controls only if not paused
-            if (!pausedDuringDownload && this.state.currentUpdateMode !== "paused") {
-                this.updateLaunchGameButton(false);
-                this.toggleLanguageSelector(true);
-            } else {
-                // Keep launch disabled while paused
-                this.updateLaunchGameButton(true);
-            }
-        }
-    },
-
-    /**
-     * Logs in to the game server using the given username and password.
-     *
-     * If a login attempt is already in progress, this function will not do anything.
-     *
-     * @param {string} username - The username to use for login
-     * @param {string} password - The password to use for login
-     *
-     * @return {Promise<void>}
-     */
-    async login(username, password) {
-        if (this.state.isLoggingIn) return;
-
-        this.setState({ isLoggingIn: true });
-        const loginButton = document.getElementById("login-button");
-        const loginErrorMsg = document.getElementById("login-error-msg");
-
-        if (loginButton) {
-            loginButton.disabled = true;
-            loginButton.textContent = this.t("LOGIN_IN_PROGRESS");
+        if (!UPDATE_CHECK_ENABLED) {
+          this.setState({
+            isUpdateAvailable: false,
+            isFileCheckComplete: true,
+            currentUpdateMode: "complete",
+            currentProgress: 100,
+          });
+          await this.Router.navigate("home");
+          LoadStartPage();
+          return;
         }
 
-        if (loginErrorMsg) {
-            loginErrorMsg.style.display = "none";
-            loginErrorMsg.style.opacity = 0;
+        const isConnected = await this.checkServerConnection();
+        if (!isConnected) {
+          throw new Error(this.t("SERVER_CONNECTION_ERROR"));
         }
-
-        try {
-            const response = await invoke("login", { username, password });
-            const jsonResponse = JSON.parse(response);
-
-            if (
-                jsonResponse &&
-                jsonResponse.Return &&
-                jsonResponse.Msg === "success"
-            ) {
-                const jsonResponseFormatted = {
-                    AuthKey: jsonResponse.Return.AuthKey,
-                    UserName: username,
-                    UserNo: Number(jsonResponse.Return.UserNo),
-                    CharacterCount: jsonResponse.Return.CharacterCount,
-                    Permission: Number(jsonResponse.Return.Permission),
-                    Privilege: 0
-                };
-                this.storeAuthInfo(jsonResponseFormatted);
-
-                if (!UPDATE_CHECK_ENABLED) {
-                    this.setState({
-                        isUpdateAvailable: false,
-                        isFileCheckComplete: true,
-                        currentUpdateMode: "complete",
-                        currentProgress: 100,
-                    });
-                    await this.Router.navigate("home");
-                    LoadStartPage();
-                    return;
-                }
-
-                const isConnected = await this.checkServerConnection();
-                if (!isConnected) {
-                    throw new Error(this.t("SERVER_CONNECTION_ERROR"));
-                }
-                await this.initializeAndCheckUpdates(true);
-                await this.Router.navigate("home");
-                LoadStartPage();
-            } else {
-                const errorMessage = jsonResponse
-                    ? jsonResponse.Msg || this.t("LOGIN_ERROR")
-                    : this.t("LOGIN_ERROR");
-                throw new Error(errorMessage);
-            }
-        } catch (error) {
-            console.error("Error during login:", error);
-            if (loginErrorMsg) {
-                const message = error && (error.message || error);
-                if (message === "INVALID_CREDENTIALS") {
-                    loginErrorMsg.textContent = this.t("LOGIN_ERROR");
-                } else if (message && typeof message === "string") {
-                    loginErrorMsg.textContent = message;
-                } else {
-                    loginErrorMsg.textContent = this.t("SERVER_CONNECTION_ERROR");
-                }
-                loginErrorMsg.style.display = "flex";
-                loginErrorMsg.style.opacity = 1;
-            }
-        } finally {
-            this.setState({ isLoggingIn: false });
-            if (loginButton) {
-                loginButton.disabled = false;
-                loginButton.textContent = this.t("LOGIN_BUTTON");
-            }
+        await this.initializeAndCheckUpdates(true);
+        await this.Router.navigate("home");
+        LoadStartPage();
+      } else {
+        const errorMessage = jsonResponse
+          ? jsonResponse.Msg || this.t("LOGIN_ERROR")
+          : this.t("LOGIN_ERROR");
+        throw new Error(errorMessage);
+      }
+    } catch (error) {
+      console.error("Error during login:", error);
+      if (loginErrorMsg) {
+        const message = error && (error.message || error);
+        if (message === "INVALID_CREDENTIALS") {
+          loginErrorMsg.textContent = this.t("LOGIN_ERROR");
+        } else if (message && typeof message === "string") {
+          loginErrorMsg.textContent = message;
+        } else {
+          loginErrorMsg.textContent = this.t("SERVER_CONNECTION_ERROR");
         }
-    },
+        loginErrorMsg.style.display = "flex";
+        loginErrorMsg.style.opacity = 1;
+      }
+    } finally {
+      this.setState({ isLoggingIn: false });
+      if (loginButton) {
+        loginButton.disabled = false;
+        loginButton.textContent = this.t("LOGIN_BUTTON");
+      }
+    }
+  },
 
-    /**
-     * Stores the authentication info in local storage and
-     * informs the backend to set the authentication info
-     * @param {Object} jsonResponse - The JSON response from the server
-     * @param {string} jsonResponse.AuthKey - The authorization key
-     * @param {string} jsonResponse.UserName - The username
-     * @param {number} jsonResponse.UserNo - The user number
-     * @param {string} jsonResponse.CharacterCount - The character count
-     * @param {number} jsonResponse.Permission - The permission level
-     * @param {number} jsonResponse.Privilege - The privilege level
-     */
-    storeAuthInfo(jsonResponse) {
-        localStorage.setItem("authKey", jsonResponse.AuthKey);
-        localStorage.setItem("userName", jsonResponse.UserName);
-        localStorage.setItem("userNo", jsonResponse.UserNo.toString());
-        localStorage.setItem(
-            "characterCount",
-            jsonResponse.CharacterCount.toString(),
+  /**
+   * Stores the authentication info in local storage and
+   * informs the backend to set the authentication info
+   * @param {Object} jsonResponse - The JSON response from the server
+   * @param {string} jsonResponse.AuthKey - The authorization key
+   * @param {string} jsonResponse.UserName - The username
+   * @param {number} jsonResponse.UserNo - The user number
+   * @param {string} jsonResponse.CharacterCount - The character count
+   * @param {number} jsonResponse.Permission - The permission level
+   * @param {number} jsonResponse.Privilege - The privilege level
+   */
+  storeAuthInfo(jsonResponse) {
+    localStorage.setItem("authKey", jsonResponse.AuthKey);
+    localStorage.setItem("userName", jsonResponse.UserName);
+    localStorage.setItem("userNo", jsonResponse.UserNo.toString());
+    localStorage.setItem(
+      "characterCount",
+      jsonResponse.CharacterCount.toString(),
+    );
+    localStorage.setItem("permission", jsonResponse.Permission.toString());
+    localStorage.setItem("privilege", jsonResponse.Privilege.toString());
+
+    invoke("set_auth_info", {
+      authKey: jsonResponse.AuthKey,
+      userName: jsonResponse.UserName,
+      userNo: jsonResponse.UserNo,
+      characterCount: jsonResponse.CharacterCount,
+    });
+
+    this.checkAuthentication();
+  },
+
+  /**
+   * Navigates to the home page and initializes it
+   *
+   * @returns {Promise<void>}
+   */
+  async initializeHomePage() {
+    this.Router.navigate("home");
+    await this.waitForHomePage();
+    await this.initHome();
+  },
+
+  /**
+   * Waits until the home page is loaded and resolves the promise
+   * @returns {Promise<void>}
+   */
+  waitForHomePage() {
+    return new Promise((resolve) => {
+      const checkDom = () => {
+        if (document.getElementById("home-page")) {
+          resolve();
+        } else {
+          setTimeout(checkDom, 100);
+        }
+      };
+      checkDom();
+    });
+  },
+
+  /**
+   * Logs out the user and resets the state
+   *
+   * This method waits until a logout is not already in progress, then
+   * sets the isLoggingOut state variable to true and calls the
+   * backend's logout handler. After the logout is successful, it
+   * removes all locally stored authentication information, resets
+   * the state, and navigates to the login page.
+   *
+   * @returns {Promise<void>}
+   */
+  async logout() {
+    if (this.state.isLoggingOut) return;
+
+    this.setState({ isLoggingOut: true });
+    try {
+      await invoke("handle_logout");
+      localStorage.removeItem("authKey");
+      localStorage.removeItem("userName");
+      localStorage.removeItem("userNo");
+      localStorage.removeItem("characterCount");
+      localStorage.removeItem("permission");
+      localStorage.removeItem("privilege");
+
+      this.setState({
+        updateCheckPerformed: false,
+        updateCheckPerformedOnLogin: false,
+        updateCheckPerformedOnRefresh: false,
+      });
+      this.Router.navigate("login");
+      this.resetState();
+      this.checkAuthentication();
+    } catch (error) {
+      console.error("Error during logout:", error);
+    } finally {
+      this.setState({ isLoggingOut: false });
+    }
+  },
+
+  /**
+   * Changes the language used in the launcher to the given language and
+   * updates the UI to reflect the new language.
+   *
+   * @param {string} newLang - The new language to use. Must be one of the
+   *     keys in the languages object.
+   *
+   * @returns {Promise<void>}
+   */
+  async changeLanguage(newLang) {
+    if (newLang !== this.currentLanguage) {
+      this.currentLanguage = newLang;
+      await invoke("save_language_to_config", {
+        language: this.currentLanguage,
+      });
+      await this.loadTranslations();
+      await this.updateAllUIElements();
+      const isGameRunning = await invoke("get_game_status");
+      this.setState({ isGameRunning: isGameRunning });
+    }
+  },
+
+  /**
+   * Updates all UI elements to reflect the current state of the launcher. This
+   * involves calling updateAllTranslations to update all the translations, and
+   * then calling updateUI to update the actual UI elements.
+   *
+   * @returns {Promise<void>}
+   */
+  async updateAllUIElements() {
+    await this.updateAllTranslations();
+    this.updateUI();
+  },
+
+  /**
+   * Updates the dynamic UI elements (i.e., the game status and the launch
+   * game button) with the current translations.
+   *
+   * @returns {void}
+   */
+  updateDynamicTranslations() {
+    if (this.statusEl) {
+      this.statusEl.textContent = this.t(
+        this.state.isGameRunning
+          ? "GAME_STATUS_RUNNING"
+          : "GAME_STATUS_NOT_RUNNING",
+      );
+    }
+    if (this.launchGameBtn) {
+      this.launchGameBtn.textContent = this.t("LAUNCH_GAME");
+    }
+  },
+
+  /**
+   * Enables or disables the language selector UI element, depending on the
+   * value of the `enable` parameter. If `enable` is true, the language selector
+   * will be enabled and the user will be able to select a language. If `enable`
+   * is false, the language selector will be disabled and the user will not be
+   * able to select a language.
+   *
+   * @param {boolean} enable If true, the language selector will be enabled.
+   *                          If false, the language selector will be disabled.
+   * @returns {void}
+   */
+  toggleLanguageSelector(enable) {
+    const selectWrapper = document.querySelector(".select-wrapper");
+    const selectStyled = selectWrapper?.querySelector(".select-styled");
+
+    if (selectWrapper && selectStyled) {
+      if (enable) {
+        selectWrapper.classList.remove("disabled");
+        selectStyled.style.pointerEvents = "auto";
+      } else {
+        selectWrapper.classList.add("disabled");
+        selectStyled.style.pointerEvents = "none";
+      }
+    }
+  },
+
+  /**
+   * Handles the game launch process. If updates are available, it prevents
+   * the game from launching until the updates are applied. If the game is
+   * already launching, it does nothing. Otherwise, it sets the game status
+   * to "launching", subscribes to logs, creates a log modal, shows the log
+   * modal, and initiates the game launch process by calling the
+   * `handle_launch_game` command. If the game launch process fails, it sets
+   * the game status to "not running" and resets the launch state.
+   *
+   * @returns {void}
+   */
+  async handleLaunchGame() {
+    if (UPDATE_CHECK_ENABLED && this.state.isUpdateAvailable) return;
+    if (this.state.isGameLaunching) return;
+
+    this.setState({ isGameLaunching: true });
+
+    try {
+      this.updateUIForGameStatus(true);
+      if (this.statusEl) this.statusEl.textContent = this.t("LAUNCHING_GAME");
+
+      await invoke("handle_launch_game");
+    } catch (error) {
+      console.error("Error initiating game launch:", error);
+      const game_launch_error = this.t("GAME_LAUNCH_ERROR") + error.toString();
+
+      await message(game_launch_error, {
+        title: this.t("ERROR"),
+        type: "error",
+      });
+      if (this.statusEl)
+        this.statusEl.textContent = this.t(
+          "GAME_LAUNCH_ERROR",
+          error.toString(),
         );
-        localStorage.setItem("permission", jsonResponse.Permission.toString());
-        localStorage.setItem("privilege", jsonResponse.Privilege.toString());
+      await invoke("reset_launch_state");
+      this.updateUIForGameStatus(false);
+      this.setState({ gameExecutionFailed: true });
+    } finally {
+      this.setState({ isGameLaunching: false });
+    }
+  },
 
-        invoke("set_auth_info", {
-            authKey: jsonResponse.AuthKey,
-            userName: jsonResponse.UserName,
-            userNo: jsonResponse.UserNo,
-            characterCount: jsonResponse.CharacterCount,
-        });
+  /**
+   * Updates the game status UI based on the current game status.
+   *
+   * The game status is retrieved by invoking the "get_game_status" command.
+   * If the command fails, an error is logged and the game status is set to
+   * "GAME_STATUS_ERROR".
+   *
+   * @memberof App
+   */
+  async updateGameStatus() {
+    try {
+      const isRunning = await invoke("get_game_status");
+      this.updateUIForGameStatus(isRunning);
+    } catch (error) {
+      console.error("Error checking game status:", error);
+      if (this.statusEl)
+        this.statusEl.textContent = this.t("GAME_STATUS_ERROR");
+    }
+  },
 
-        this.checkAuthentication();
-    },
+  /**
+   * Updates the game status UI based on the current game status.
+   *
+   * The game status element is updated to either "GAME_STATUS_RUNNING" or "GAME_STATUS_NOT_RUNNING".
+   * The launch game button is also updated to be enabled or disabled based on the game status.
+   * The language selector is toggled to be visible or hidden based on the game status.
+   *
+   * @param {boolean} isRunning - whether the game is running or not
+   * @memberof App
+   */
+  updateUIForGameStatus(isRunning) {
+    if (this.statusEl) {
+      this.statusEl.textContent = isRunning
+        ? this.t("GAME_STATUS_RUNNING")
+        : this.t("GAME_STATUS_NOT_RUNNING");
+    }
+    this.updateLaunchGameButton(isRunning);
+    this.toggleLanguageSelector(!isRunning);
+  },
 
-    /**
-     * Navigates to the home page and initializes it
-     *
-     * @returns {Promise<void>}
-     */
-    async initializeHomePage() {
-        this.Router.navigate("home");
-        await this.waitForHomePage();
-        await this.initHome();
-    },
+  /**
+   * Updates the launch game button UI based on the current game status.
+   *
+   * The launch game button is disabled or enabled based on the game status.
+   * The "disabled" class is also toggled on the button based on the game status.
+   *
+   * @param {boolean} disabled - whether the game is running or not
+   * @memberof App
+   */
+  updateLaunchGameButton(disabled) {
+    if (!this.launchGameBtn) return;
+    const shouldDisable = shouldDisableLaunch({
+      disabled,
+      currentUpdateMode: this.state.currentUpdateMode,
+      updateError: this.state.updateError,
+    });
+    this.launchGameBtn.disabled = shouldDisable;
+    this.launchGameBtn.classList.toggle("disabled", shouldDisable);
+  },
 
-    /**
-     * Waits until the home page is loaded and resolves the promise
-     * @returns {Promise<void>}
-     */
-    waitForHomePage() {
-        return new Promise((resolve) => {
-            const checkDom = () => {
-                if (document.getElementById("home-page")) {
-                    resolve();
-                } else {
-                    setTimeout(checkDom, 100);
-                }
-            };
-            checkDom();
-        });
-    },
+  /**
+   * Updates the hash file generation progress UI based on the current game status.
+   *
+   * The hash file generation progress bar, current file being processed, and progress text are updated
+   * based on the current game status. The modal title is also updated if necessary.
+   *
+   * @memberof App
+   */
+  updateHashFileProgressUI() {
+    const modal = document.getElementById("hash-file-progress-modal");
+    if (!modal || modal.style.display === "none") {
+      return; // Ne pas mettre à jour si le modal n'est pas visible
+    }
 
-    /**
-     * Logs out the user and resets the state
-     *
-     * This method waits until a logout is not already in progress, then
-     * sets the isLoggingOut state variable to true and calls the
-     * backend's logout handler. After the logout is successful, it
-     * removes all locally stored authentication information, resets
-     * the state, and navigates to the login page.
-     *
-     * @returns {Promise<void>}
-     */
-    async logout() {
-        if (this.state.isLoggingOut) return;
+    const progressBar = modal.querySelector(".hash-progress-bar");
+    const currentFileEl = modal.querySelector("#hash-file-current-file");
+    const progressTextEl = modal.querySelector("#hash-file-progress-text");
 
-        this.setState({ isLoggingOut: true });
-        try {
-            await invoke("handle_logout");
-            localStorage.removeItem("authKey");
-            localStorage.removeItem("userName");
-            localStorage.removeItem("userNo");
-            localStorage.removeItem("characterCount");
-            localStorage.removeItem("permission");
-            localStorage.removeItem("privilege");
+    if (progressBar) {
+      progressBar.style.width = `${this.state.hashFileProgress}%`;
+      progressBar.textContent = `${Math.round(this.state.hashFileProgress)}%`;
+    }
 
-            this.setState({
-                updateCheckPerformed: false,
-                updateCheckPerformedOnLogin: false,
-                updateCheckPerformedOnRefresh: false,
+    if (currentFileEl) {
+      const processingFileText = this.t("PROCESSING_FILE");
+      currentFileEl.textContent = `${processingFileText}: ${this.state.currentProcessingFile}`;
+    }
+
+    if (progressTextEl) {
+      const progressText = this.t("PROGRESS_TEXT");
+      progressTextEl.textContent = `${progressText} ${this.state.processedFiles}/${this.state.totalFiles} (${this.state.hashFileProgress.toFixed(2)}%)`;
+    }
+
+    // Mettre à jour le titre du modal si nécessaire
+    const modalTitle = modal.querySelector("h2");
+    if (modalTitle) {
+      modalTitle.textContent = this.t("GENERATING_HASH_FILE");
+    }
+  },
+
+  /**
+   * Checks if the game is currently running.
+   *
+   * @returns {Promise<boolean>} whether the game is running or not
+   * @memberof App
+   */
+  async isGameRunning() {
+    try {
+      const isRunning = await invoke("get_game_status");
+      return isRunning;
+    } catch (error) {
+      console.error("Error checking game status:", error);
+      return false;
+    }
+  },
+
+  /**
+   * Checks if the server is currently reachable.
+   *
+   * @returns {Promise<boolean>} whether the server is reachable or not
+   * @memberof App
+   */
+  async checkServerConnection() {
+    this.showLoadingModal(this.t("CHECKING_SERVER_CONNECTION"));
+    try {
+      const isConnected = await invoke("check_server_connection");
+      this.hideLoadingModal();
+      return isConnected;
+    } catch (error) {
+      console.error("Server connection error:", error);
+      this.showLoadingError(this.t("SERVER_CONNECTION_ERROR"));
+      return false;
+    }
+  },
+
+  async loadServerStatus() {
+    try {
+      const data = await fetchData(ServerStatusUrl);
+      if (data && data.servers && data.servers.length > 0) {
+        const statusEl = document.getElementById("game-status");
+        statusEl.textContent =
+          data.servers[0].available === 1 ? "Online" : "Offline";
+      }
+    } catch (e) {
+      console.error("Failed to load server status", e);
+    }
+  },
+
+  async loadPatchNotes() {
+    try {
+      const notes = await fetchData(PatchNotesUrl);
+      if (notes && notes.notes && Array.isArray(notes.notes)) {
+        const container = document.getElementById("patch-notes");
+        container.innerHTML = notes.notes.map((n) => `<p>${n}</p>`).join("");
+      }
+    } catch (e) {
+      console.error("Failed to load patch notes", e);
+    }
+  },
+
+  async checkLauncherUpdate() {
+    try {
+      const response = await fetch(VERSION_CHECK_URL);
+      if (!response.ok) {
+        return; // Do nothing when the version URL is unreachable
+      }
+      const data = await response.json();
+
+      if (
+        window.__TAURI__ &&
+        window.__TAURI__.app &&
+        window.__TAURI__.app.getVersion
+      ) {
+        const current = await window.__TAURI__.app.getVersion();
+
+        const isNewerVersion =
+          data.version && compareVersions(data.version, current) > 0;
+        const isNewerDate =
+          data.release_date &&
+          new Date(data.release_date) > new Date(CURRENT_RELEASE_DATE);
+
+        if (isNewerVersion && isNewerDate) {
+          let userConfirm = false;
+          if (typeof ask === "function") {
+            userConfirm = await ask(
+              "A new launcher version is available. Do you want to update now?",
+              { title: "Launcher Update" },
+            );
+          } else {
+            userConfirm = window.confirm(
+              "A new launcher version is available. Do you want to update now?",
+            );
+          }
+          if (userConfirm) {
+            await invoke("update_launcher", {
+              downloadUrl: LAUNCHER_DOWNLOAD_URL,
             });
-            this.Router.navigate("login");
-            this.resetState();
-            this.checkAuthentication();
-        } catch (error) {
-            console.error("Error during logout:", error);
-        } finally {
-            this.setState({ isLoggingOut: false });
+          }
         }
-    },
+      }
+    } catch (e) {
+      console.error("Launcher update check failed", e);
+    }
+  },
 
-    /**
-     * Changes the language used in the launcher to the given language and
-     * updates the UI to reflect the new language.
-     *
-     * @param {string} newLang - The new language to use. Must be one of the
-     *     keys in the languages object.
-     *
-     * @returns {Promise<void>}
-     */
-    async changeLanguage(newLang) {
+  /**
+   * Formats a given number of bytes into a human-readable size string.
+   *
+   * @param {number} bytes the number of bytes to format
+   * @returns {string} the formatted size string
+   * @memberof App
+   */
+  formatSize(bytes) {
+    if (bytes === undefined || bytes === null || isNaN(bytes)) return "0 B";
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    let size = parseFloat(bytes);
+    let unitIndex = 0;
+    while (size >= 1024 && unitIndex < units.length - 1) {
+      size /= 1024;
+      unitIndex++;
+    }
+    return `${size.toFixed(2)} ${units[unitIndex]}`;
+  },
+
+  /**
+   * Formats a given number of bytes per second into a human-readable speed string.
+   *
+   * @param {number} bytesPerSecond the number of bytes per second to format
+   * @returns {string} the formatted speed string
+   * @memberof App
+   */
+  formatSpeed(bytesPerSecond) {
+    if (!isFinite(bytesPerSecond) || bytesPerSecond < 0) return "0 B/s";
+    const units = ["B/s", "KB/s", "MB/s", "GB/s"];
+    let speed = bytesPerSecond;
+    let unitIndex = 0;
+    while (speed >= 1024 && unitIndex < units.length - 1) {
+      speed /= 1024;
+      unitIndex++;
+    }
+    return `${speed.toFixed(2)} ${units[unitIndex]}`;
+  },
+
+  /**
+   * Calculates the estimated time remaining for a download based on the total number of bytes downloaded so far, the total size of the download, and the current download speed.
+   *
+   * @param {number} totalDownloadedBytes the total number of bytes already downloaded
+   * @param {number} totalSize the total size of the download in bytes
+   * @param {number} speed the current download speed in bytes per second
+   * @returns {number} the estimated time remaining in seconds, or 0 if the input is invalid. The result is capped at 30 days maximum.
+   * @memberof App
+   */
+  calculateGlobalTimeRemaining(totalDownloadedBytes, totalSize, speed) {
+    if (
+      !isFinite(speed) ||
+      speed <= 0 ||
+      !isFinite(totalDownloadedBytes) ||
+      !isFinite(totalSize) ||
+      totalDownloadedBytes >= totalSize
+    ) {
+      return 0;
+    }
+    const bytesRemaining = totalSize - totalDownloadedBytes;
+    const averageSpeed = this.calculateAverageSpeed(speed);
+    if (averageSpeed <= 0) return 0;
+    const secondsRemaining = bytesRemaining / averageSpeed;
+    return Math.min(secondsRemaining, 30 * 24 * 60 * 60);
+  },
+
+  // Updated calculateAverageSpeed method
+  calculateAverageSpeed(currentSpeed) {
+    this.state.speedHistory.push(currentSpeed);
+
+    if (this.state.speedHistory.length > this.state.speedHistoryMaxLength) {
+      this.state.speedHistory.shift();
+    }
+
+    const sum = this.state.speedHistory.reduce((acc, speed) => acc + speed, 0);
+    return sum / this.state.speedHistory.length;
+  },
+
+  /**
+   * Format a time in seconds to a human-readable string.
+   * If the input is invalid, returns 'Calculating...'
+   * @param {number} seconds the time in seconds
+   * @returns {string} a human-readable string representation of the time
+   * @memberof App
+   */
+  formatTime(seconds) {
+    if (!isFinite(seconds) || seconds < 0) return "Calculating...";
+
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+
+    if (hours > 0) {
+      return `${hours}h ${minutes}m ${remainingSeconds}s`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${remainingSeconds}s`;
+    } else {
+      return `${remainingSeconds}s`;
+    }
+  },
+
+  /**
+   * Returns the file name from a given path, or an empty string if the path is invalid.
+   * @param {string} path the path to get the file name from
+   * @returns {string} the file name
+   * @memberof App
+   */
+  getFileName(path) {
+    return path ? path.split("\\").pop().split("/").pop() : "";
+  },
+
+  /**
+   * Shows an error message in the #error-container element for 5 seconds.
+   * If the element does not exist, does nothing.
+   * @param {string} message the error message to display
+   * @memberof App
+   */
+  showErrorMessage(message) {
+    const errorContainer = document.getElementById("error-container");
+    if (errorContainer) {
+      errorContainer.textContent = message;
+      errorContainer.style.display = "block";
+      setTimeout(() => {
+        errorContainer.style.display = "none";
+      }, 5000);
+    }
+  },
+
+  // Updated methods for loading modal
+  showLoadingModal(message) {
+    this.toggleModal("loading-modal", true, message);
+
+    // Specific handling for loading modal elements
+    if (this.loadingError) {
+      this.loadingError.textContent = "";
+      this.loadingError.style.display = "none";
+    }
+    if (this.refreshButton) {
+      this.refreshButton.style.display = "none";
+    }
+    if (this.quitTheApp) {
+      this.quitTheApp.style.display = "none";
+    }
+  },
+
+  /**
+   * Hides the loading modal.
+   * @memberof App
+   */
+  hideLoadingModal() {
+    this.toggleModal("loading-modal", false);
+  },
+
+  /**
+   * Toggles the display of a modal.
+   * @param {string} modalId The id of the modal to toggle.
+   * @param {boolean} show Whether to show or hide the modal.
+   * @param {string} [message] An optional message to display in the modal.
+   * @memberof App
+   */
+  toggleModal(modalId, show, message = "") {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+
+    modal.classList.toggle("show", show);
+    modal.style.display = show ? "block" : "none";
+
+    if (modalId === "loading-modal" && message) {
+      const messageElement = modal.querySelector(".loading-message");
+      if (messageElement) messageElement.textContent = message;
+    }
+  },
+
+  // Logs modal helpers
+  openLogsModal() {
+    const modal = document.getElementById("log-modal");
+    if (!modal) return;
+    this.toggleModal("log-modal", true);
+    const closeBtn = modal.querySelector(".log-modal-close");
+    if (closeBtn) {
+      closeBtn.onclick = (e) => {
+        e.preventDefault();
+        this.closeLogsModal();
+      };
+    }
+  },
+  closeLogsModal() {
+    this.toggleModal("log-modal", false);
+  },
+
+  toggleLogsModal() {
+    const modal = document.getElementById("log-modal");
+    if (!modal) return;
+    modal.classList.contains("show")
+      ? this.closeLogsModal()
+      : this.openLogsModal();
+  },
+
+  /**
+   * Toggles the display of the hash file progress modal.
+   * @param {boolean} show Whether to show or hide the modal.
+   * @param {string} [message] An optional message to display in the modal.
+   * @param {boolean} [isComplete=false] Whether the hash file generation is complete.
+   * If true, shows a success message and closes the modal after 5 seconds.
+   * @memberof App
+   */
+  toggleHashProgressModal(show, message = "", isComplete = false) {
+    const modal = document.getElementById("hash-file-progress-modal");
+    if (!modal) return;
+
+    if (show) {
+      modal.classList.add("show", "hash-modal-fade-in");
+      modal.style.display = "block";
+
+      // Handle message for hash file progress modal
+      const messageElement = modal.querySelector("#hash-file-progress-text");
+      if (messageElement && message) {
+        messageElement.textContent = message;
+      }
+
+      if (isComplete) {
+        // Show success message
+        const successMessage = this.t("HASH_FILE_GENERATION_COMPLETE");
+        const successElement = document.createElement("div");
+        successElement.id = "hash-success-message";
+        successElement.textContent = successMessage;
+
+        const modalContent =
+          modal.querySelector(".hash-progress-modal") || modal;
+        modalContent.appendChild(successElement);
+
+        // Wait 5 seconds, then close the modal
+        setTimeout(() => {
+          this.toggleHashProgressModal(false);
+        }, 5000);
+      }
+    } else {
+      modal.classList.remove("show", "hash-modal-fade-in");
+
+      // Use a fade-out animation
+      anime({
+        targets: modal,
+        opacity: 0,
+        duration: 500,
+        easing: "easeOutQuad",
+        complete: () => {
+          modal.style.display = "none";
+          modal.style.opacity = 1; // Reset opacity for next time
+
+          // Remove success message if it exists
+          const successElement = modal.querySelector("#hash-success-message");
+          if (successElement) {
+            successElement.remove();
+          }
+        },
+      });
+    }
+  },
+
+  //method to display the loading indicator
+  showLoadingIndicator() {
+    let loadingIndicator = document.getElementById("loading-indicator");
+    if (!loadingIndicator) {
+      loadingIndicator = document.createElement("div");
+      loadingIndicator.id = "loading-indicator";
+      loadingIndicator.innerHTML = '<div class="spinner"></div>';
+      document.body.appendChild(loadingIndicator);
+    }
+    loadingIndicator.style.display = "flex";
+  },
+
+  //method to hide the loading indicator
+  hideLoadingIndicator() {
+    const loadingIndicator = document.getElementById("loading-indicator");
+    if (loadingIndicator) {
+      loadingIndicator.style.display = "none";
+    }
+  },
+
+  /**
+   * Shows the loading error message on the loading modal.
+   * @param {string} errorMessage The error message to be displayed.
+   */
+  showLoadingError(errorMessage) {
+    const loadingModal = document.getElementById("loading-modal");
+    if (loadingModal) {
+      const errorElement = loadingModal.querySelector(".loading-error");
+      if (errorElement) {
+        errorElement.textContent = errorMessage;
+        errorElement.style.display = "block";
+      }
+
+      const refreshButton = loadingModal.querySelector("#refresh-button");
+      if (refreshButton) {
+        refreshButton.style.display = "inline-block";
+      }
+
+      const quitButton = loadingModal.querySelector("#quit-button");
+      if (quitButton) {
+        quitButton.style.display = "inline-block";
+      }
+    }
+  },
+
+  /**
+   * Shows a notification at the top of the page.
+   * @param {string} message The message to be displayed in the notification.
+   * @param {string} type The type of the notification, which will be used to determine the
+   * colour of the notification. Possible values are 'success' and 'error'.
+   */
+  showNotification(message, type) {
+    const notification = document.getElementById("notification");
+    if (notification) {
+      notification.textContent = message;
+      notification.className = `notification ${type}`;
+
+      // Show the notification
+      gsap.fromTo(
+        notification,
+        { opacity: 0, y: -20 },
+        {
+          duration: 0.5,
+          opacity: 1,
+          y: 0,
+          display: "block",
+          ease: "power2.out",
+        },
+      );
+
+      // Hide the notification after 5 seconds
+      gsap.to(notification, {
+        delay: 5,
+        duration: 0.5,
+        opacity: 0,
+        y: -20,
+        display: "none",
+        ease: "power2.in",
+      });
+    }
+  },
+
+  /**
+   * Loads the translations from a JSON file named `translations.json` at the root of the
+   * project. If any error occurs, it logs the error to the console and sets the
+   * `translations` property to an empty object.
+   *
+   * @returns {Promise<void>}
+   */
+  async loadTranslations() {
+    try {
+      const response = await fetch("translations.json");
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      this.translations = await response.json();
+    } catch (error) {
+      console.error("Error loading translations:", error);
+      this.translations = { [this.currentLanguage]: {} };
+    }
+  },
+
+  /**
+   * Returns a translated string from the current language's translations.
+   *
+   * @param {string} key The key to translate.
+   * @param {...*} args The arguments to replace in the translated string.
+   * @returns {string} The translated string.
+   */
+  t(key, ...args) {
+    const translations = this.translations[this.currentLanguage] || {};
+    let str = translations[key] || key;
+    return str.replace(/\{(\d+)\}/g, (_, index) => args[index] || "");
+  },
+
+  /**
+   * Updates the language selector with the current language from the config file.
+   * If any error occurs, it logs the error to the console and sets the
+   * `currentLanguage` property to `'EUR'`.
+   *
+   * @returns {Promise<void>}
+   */
+  async updateLanguageSelector() {
+    try {
+      this.currentLanguage = await invoke("get_language_from_config");
+
+      const selectWrapper = document.querySelector(".select-wrapper");
+      const selectStyled = selectWrapper?.querySelector(".select-styled");
+      const selectOptions = selectWrapper?.querySelector(".select-options");
+      const originalSelect = selectWrapper?.querySelector("select");
+
+      if (selectWrapper && selectStyled && selectOptions && originalSelect) {
+        this.setupLanguageOptions(selectOptions, originalSelect);
+        this.setupLanguageEventListeners(selectStyled, selectOptions);
+
+        const currentLanguageName =
+          this.languages[this.currentLanguage] || this.currentLanguage;
+        selectStyled.textContent = currentLanguageName;
+        originalSelect.value = this.currentLanguage;
+      } else {
+        console.warn("Language selector elements not found in the DOM");
+      }
+
+      await this.loadTranslations();
+      await this.updateAllTranslations();
+    } catch (error) {
+      console.error("Error updating language selector:", error);
+      this.currentLanguage = "EUR";
+      await this.loadTranslations();
+      await this.updateAllTranslations();
+    }
+  },
+
+  /**
+   * Sets up the language selector options based on the `this.languages` object.
+   *
+   * @param {HTMLElement} selectOptions - The `<ul>` element containing the language options.
+   * @param {HTMLSelectElement} originalSelect - The `<select>` element containing the language options.
+   * @returns {void}
+   */
+  setupLanguageOptions(selectOptions, originalSelect) {
+    selectOptions.innerHTML = "";
+    originalSelect.innerHTML = "";
+
+    for (const [code, name] of Object.entries(this.languages)) {
+      const option = document.createElement("option");
+      option.value = code;
+      option.textContent = name;
+      originalSelect.appendChild(option);
+
+      const li = document.createElement("li");
+      li.setAttribute("rel", code);
+      li.textContent = name;
+      selectOptions.appendChild(li);
+    }
+  },
+
+  /**
+   * Sets up event listeners on the language selector options to change the language
+   * when an option is clicked.
+   *
+   * @param {HTMLElement} selectStyled - The styled `<div>` element containing the selected language.
+   * @param {HTMLElement} selectOptions - The `<ul>` element containing the language options.
+   * @returns {void}
+   */
+  setupLanguageEventListeners(selectStyled, selectOptions) {
+    selectOptions.querySelectorAll("li").forEach((li) => {
+      li.addEventListener("click", async (e) => {
+        const newLang = e.target.getAttribute("rel");
         if (newLang !== this.currentLanguage) {
-            this.currentLanguage = newLang;
-            await invoke("save_language_to_config", { language: this.currentLanguage });
-            await this.loadTranslations();
-            await this.updateAllUIElements();
-            const isGameRunning = await invoke("get_game_status");
-            this.setState({ isGameRunning: isGameRunning });
+          await this.changeLanguage(newLang);
+          selectStyled.textContent = e.target.textContent;
         }
-    },
+      });
+    });
+  },
 
-    /**
-     * Updates all UI elements to reflect the current state of the launcher. This
-     * involves calling updateAllTranslations to update all the translations, and
-     * then calling updateUI to update the actual UI elements.
-     *
-     * @returns {Promise<void>}
-     */
-    async updateAllUIElements() {
-        await this.updateAllTranslations();
-        this.updateUI();
-    },
+  /**
+   * Updates all elements with a `data-translate` attribute by setting their text
+   * content to the translated value of the attribute's value. Also updates all
+   * elements with a `data-translate-placeholder` attribute by setting their
+   * `placeholder` attribute to the translated value of the attribute's value.
+   *
+   * This should be called after the language has been changed.
+   *
+   * @returns {Promise<void>}
+   */
+  async updateAllTranslations() {
+    document.querySelectorAll("[data-translate]").forEach((el) => {
+      const key = el.getAttribute("data-translate");
+      el.textContent = this.t(key);
+    });
 
-    /**
-     * Updates the dynamic UI elements (i.e., the game status and the launch
-     * game button) with the current translations.
-     *
-     * @returns {void}
-     */
-    updateDynamicTranslations() {
-        if (this.statusEl) {
-            this.statusEl.textContent = this.t(
-                this.state.isGameRunning
-                    ? "GAME_STATUS_RUNNING"
-                    : "GAME_STATUS_NOT_RUNNING",
-            );
-        }
-        if (this.launchGameBtn) {
-            this.launchGameBtn.textContent = this.t("LAUNCH_GAME");
-        }
-    },
+    document.querySelectorAll("[data-translate-placeholder]").forEach((el) => {
+      const key = el.getAttribute("data-translate-placeholder");
+      el.placeholder = this.t(key);
+    });
 
-    /**
-     * Enables or disables the language selector UI element, depending on the
-     * value of the `enable` parameter. If `enable` is true, the language selector
-     * will be enabled and the user will be able to select a language. If `enable`
-     * is false, the language selector will be disabled and the user will not be
-     * able to select a language.
-     *
-     * @param {boolean} enable If true, the language selector will be enabled.
-     *                          If false, the language selector will be disabled.
-     * @returns {void}
-     */
-    toggleLanguageSelector(enable) {
-        const selectWrapper = document.querySelector(".select-wrapper");
-        const selectStyled = selectWrapper?.querySelector(".select-styled");
+    this.updateDynamicTranslations();
+  },
 
-        if (selectWrapper && selectStyled) {
-            if (enable) {
-                selectWrapper.classList.remove("disabled");
-                selectStyled.style.pointerEvents = "auto";
-            } else {
-                selectWrapper.classList.add("disabled");
-                selectStyled.style.pointerEvents = "none";
-            }
-        }
-    },
+  /**
+   * Initializes the login page by adding an event listener to the login button.
+   * When the button is clicked, the `login` function is called with the values
+   * of the `username` and `password` input fields.
+   *
+   * @returns {void}
+   */
+  initLogin() {
+    const loginButton = document.getElementById("login-button");
+    const registerButton = document.getElementById("register-button");
 
-    /**
-     * Handles the game launch process. If updates are available, it prevents
-     * the game from launching until the updates are applied. If the game is
-     * already launching, it does nothing. Otherwise, it sets the game status
-     * to "launching", subscribes to logs, creates a log modal, shows the log
-     * modal, and initiates the game launch process by calling the
-     * `handle_launch_game` command. If the game launch process fails, it sets
-     * the game status to "not running" and resets the launch state.
-     *
-     * @returns {void}
-     */
-    async handleLaunchGame() {
-        if (UPDATE_CHECK_ENABLED && this.state.isUpdateAvailable) return;
-        if (this.state.isGameLaunching) return;
+    if (loginButton) {
+      loginButton.addEventListener("click", async () => {
+        const username = document.getElementById("username").value;
+        const password = document.getElementById("password").value;
+        await this.login(username, password);
+      });
+    }
 
-        this.setState({ isGameLaunching: true });
+    if (registerButton) {
+      registerButton.addEventListener("click", () => {
+        this.openRegisterPopup();
+      });
+    }
+  },
 
-        try {
-            this.updateUIForGameStatus(true);
-            if (this.statusEl) this.statusEl.textContent = this.t("LAUNCHING_GAME");
+  /**
+   * Initializes the register page by wiring up button handlers.
+   */
+  initRegister() {
+    const submitBtn = document.getElementById("register-submit-button");
+    const backBtn = document.getElementById("register-back-button");
 
-            await invoke("handle_launch_game");
-        } catch (error) {
-            console.error("Error initiating game launch:", error);
-            const game_launch_error = this.t("GAME_LAUNCH_ERROR") + error.toString();
+    if (submitBtn) {
+      submitBtn.addEventListener("click", async () => {
+        const username = document.getElementById("reg-username").value;
+        const email = document.getElementById("reg-email").value;
+        const password = document.getElementById("reg-password").value;
+        await this.register(username, email, password);
+      });
+    }
 
-            await message(game_launch_error, {
-                title: this.t("ERROR"),
-                type: "error",
-            });
-            if (this.statusEl)
-                this.statusEl.textContent = this.t(
-                    "GAME_LAUNCH_ERROR",
-                    error.toString(),
-                );
-            await invoke("reset_launch_state");
-            this.updateUIForGameStatus(false);
-            this.setState({ gameExecutionFailed: true });
-        } finally {
-            this.setState({ isGameLaunching: false });
-        }
-    },
+    if (backBtn) {
+      backBtn.addEventListener("click", () => {
+        this.Router.navigate("login");
+      });
+    }
+  },
 
-    /**
-     * Updates the game status UI based on the current game status.
-     *
-     * The game status is retrieved by invoking the "get_game_status" command.
-     * If the command fails, an error is logged and the game status is set to
-     * "GAME_STATUS_ERROR".
-     *
-     * @memberof App
-     */
-    async updateGameStatus() {
-        try {
-            const isRunning = await invoke("get_game_status");
-            this.updateUIForGameStatus(isRunning);
-        } catch (error) {
-            console.error("Error checking game status:", error);
-            if (this.statusEl)
-                this.statusEl.textContent = this.t("GAME_STATUS_ERROR");
-        }
-    },
+  /**
+   * Initializes the home page by creating a swiper slider and setting up the
+   * home page elements and event listeners.
+   *
+   * @returns {Promise<void>}
+   */
+  async initHome() {
+    const sliderContainer = document.querySelector(".slider-container");
 
-    /**
-     * Updates the game status UI based on the current game status.
-     *
-     * The game status element is updated to either "GAME_STATUS_RUNNING" or "GAME_STATUS_NOT_RUNNING".
-     * The launch game button is also updated to be enabled or disabled based on the game status.
-     * The language selector is toggled to be visible or hidden based on the game status.
-     *
-     * @param {boolean} isRunning - whether the game is running or not
-     * @memberof App
-     */
-    updateUIForGameStatus(isRunning) {
-        if (this.statusEl) {
-            this.statusEl.textContent = isRunning
-                ? this.t("GAME_STATUS_RUNNING")
-                : this.t("GAME_STATUS_NOT_RUNNING");
-        }
-        this.updateLaunchGameButton(isRunning);
-        this.toggleLanguageSelector(!isRunning);
-    },
+    const swiper = new Swiper(".news-slider", {
+      effect: "fade",
+      fadeEffect: {
+        crossFade: true,
+      },
+      speed: 1500,
+      loop: true,
+      autoplay: {
+        delay: 5000,
+        disableOnInteraction: false,
+      },
+      pagination: {
+        el: ".swiper-pagination",
+        clickable: true,
+      },
+      navigation: {
+        nextEl: ".swiper-button-next",
+        prevEl: ".swiper-button-prev",
+      },
+      on: {
+        slideChangeTransitionStart: function () {
+          sliderContainer.classList.add("pulse");
+        },
+        slideChangeTransitionEnd: function () {
+          sliderContainer.classList.remove("pulse");
+        },
+      },
+    });
 
-    /**
-     * Updates the launch game button UI based on the current game status.
-     *
-     * The launch game button is disabled or enabled based on the game status.
-     * The "disabled" class is also toggled on the button based on the game status.
-     *
-     * @param {boolean} disabled - whether the game is running or not
-     * @memberof App
-     */
-    updateLaunchGameButton(disabled) {
-        if (!this.launchGameBtn) return;
-        const shouldDisable = disabled || this.state.currentUpdateMode === "download" || this.state.currentUpdateMode === "paused";
-        this.launchGameBtn.disabled = shouldDisable;
-        this.launchGameBtn.classList.toggle("disabled", shouldDisable);
-    },
+    this.setupHomePageElements();
+    this.setupHomePageEventListeners();
+    await this.initializeHomePageComponents();
+  },
 
-    /**
-     * Updates the hash file generation progress UI based on the current game status.
-     *
-     * The hash file generation progress bar, current file being processed, and progress text are updated
-     * based on the current game status. The modal title is also updated if necessary.
-     *
-     * @memberof App
-     */
-    updateHashFileProgressUI() {
-        const modal = document.getElementById("hash-file-progress-modal");
-        if (!modal || modal.style.display === "none") {
-            return; // Ne pas mettre à jour si le modal n'est pas visible
-        }
+  /**
+   * Sets up the elements for the home page
+   *
+   * This is a one-time setup that should only be called once. It sets up the
+   * elements that are used by the home page, such as the launch game button
+   * and the game status element.
+   *
+   * @returns {void}
+   */
+  setupHomePageElements() {
+    this.launchGameBtn = document.querySelector("#launch-game-btn");
+    this.statusEl = document.querySelector("#game-status");
+  },
 
-        const progressBar = modal.querySelector(".hash-progress-bar");
-        const currentFileEl = modal.querySelector("#hash-file-current-file");
-        const progressTextEl = modal.querySelector("#hash-file-progress-text");
+  /**
+   * Sets up the event listeners for the home page
+   *
+   * This method sets up the event listeners for the home page, such as the
+   * launch game button, the logout button, the generate hash file button, and
+   * the quit button.
+   *
+   * @returns {void}
+   */
+  setupHomePageEventListeners() {
+    if (this.launchGameBtn) {
+      this.launchGameBtn.addEventListener("click", () =>
+        this.handleLaunchGame(),
+      );
+    }
 
-        if (progressBar) {
-            progressBar.style.width = `${this.state.hashFileProgress}%`;
-            progressBar.textContent = `${Math.round(this.state.hashFileProgress)}%`;
-        }
+    const repairButton = document.getElementById("check-game-files");
+    if (repairButton) {
+      repairButton.addEventListener("click", async (e) => {
+        e.preventDefault();
+        await invoke("clear_cache");
+        await this.checkForUpdates();
+      });
+    }
 
-        if (currentFileEl) {
-            const processingFileText = this.t("PROCESSING_FILE");
-            currentFileEl.textContent = `${processingFileText}: ${this.state.currentProcessingFile}`;
-        }
+    const logoutButton = document.getElementById("logout-link");
+    if (logoutButton) {
+      logoutButton.addEventListener("click", async (e) => {
+        e.preventDefault();
+        await this.logout();
+      });
+    }
 
-        if (progressTextEl) {
-            const progressText = this.t("PROGRESS_TEXT");
-            progressTextEl.textContent = `${progressText} ${this.state.processedFiles}/${this.state.totalFiles} (${this.state.hashFileProgress.toFixed(2)}%)`;
-        }
+    const generateHashFileBtn = document.getElementById("generate-hash-file");
+    if (generateHashFileBtn && this.checkPrivilegeLevel()) {
+      generateHashFileBtn.style.display = "block";
+      generateHashFileBtn.addEventListener("click", () =>
+        this.generateHashFile(),
+      );
+    }
 
-        // Mettre à jour le titre du modal si nécessaire
-        const modalTitle = modal.querySelector("h2");
-        if (modalTitle) {
-            modalTitle.textContent = this.t("GENERATING_HASH_FILE");
-        }
-    },
+    const appQuitButton = document.getElementById("app-quit");
+    if (appQuitButton) {
+      appQuitButton.addEventListener("click", () => this.appQuit());
+    }
 
-    /**
-     * Checks if the game is currently running.
-     *
-     * @returns {Promise<boolean>} whether the game is running or not
-     * @memberof App
-     */
-    async isGameRunning() {
-        try {
-            const isRunning = await invoke("get_game_status");
-            return isRunning;
-        } catch (error) {
-            console.error("Error checking game status:", error);
-            return false;
-        }
-    },
+    const pauseButton = document.querySelector(".btn-pause");
+    if (pauseButton) {
+      pauseButton.addEventListener("click", () => {
+        this.togglePauseResume();
+      });
+    }
 
-    /**
-     * Checks if the server is currently reachable.
-     *
-     * @returns {Promise<boolean>} whether the server is reachable or not
-     * @memberof App
-     */
-    async checkServerConnection() {
-        this.showLoadingModal(this.t("CHECKING_SERVER_CONNECTION"));
-        try {
-            const isConnected = await invoke("check_server_connection");
-            this.hideLoadingModal();
-            return isConnected;
-        } catch (error) {
-            console.error("Server connection error:", error);
-            this.showLoadingError(this.t("SERVER_CONNECTION_ERROR"));
-            return false;
-        }
-    },
+    const themeBtn = document.getElementById("toggle-theme");
+    if (themeBtn) {
+      themeBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        this.toggleTheme();
+      });
+    }
 
-    async loadServerStatus() {
-        try {
-            const data = await fetchData(ServerStatusUrl);
-            if (data && data.servers && data.servers.length > 0) {
-                const statusEl = document.getElementById("game-status");
-                statusEl.textContent =
-                    data.servers[0].available === 1 ? "Online" : "Offline";
-            }
-        } catch (e) {
-            console.error("Failed to load server status", e);
-        }
-    },
+    const viewLogsBtn = document.getElementById("view-logs");
+    const logModal = document.getElementById("log-modal");
+    const logClose = document.querySelector(".log-modal-close");
+    const copyLogsBtn = document.getElementById("copy-logs-btn");
+    const exportLogsBtn = document.getElementById("export-logs-btn");
 
-    async loadPatchNotes() {
-        try {
-            const notes = await fetchData(PatchNotesUrl);
-            if (notes && notes.notes && Array.isArray(notes.notes)) {
-                const container = document.getElementById("patch-notes");
-                container.innerHTML = notes.notes
-                    .map((n) => `<p>${n}</p>`)
-                    .join("");
-            }
-        } catch (e) {
-            console.error("Failed to load patch notes", e);
-        }
-    },
+    if (viewLogsBtn && logModal && logClose) {
+      viewLogsBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        this.openLogsModal();
+      });
+      logClose.addEventListener("click", (e) => {
+        e.preventDefault();
+        this.closeLogsModal();
+      });
+    }
 
-    async checkLauncherUpdate() {
-        try {
-            const response = await fetch(VERSION_CHECK_URL);
-            if (!response.ok) {
-                return; // Do nothing when the version URL is unreachable
-            }
-            const data = await response.json();
+    if (copyLogsBtn) {
+      copyLogsBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        const logConsole = document.getElementById("log-console");
+        if (logConsole) {
+          const logText = Array.from(logConsole.children)
+            .map((div) => div.textContent)
+            .join("\n");
 
-            if (
-                window.__TAURI__ &&
-                window.__TAURI__.app &&
-                window.__TAURI__.app.getVersion
-            ) {
-                const current = await window.__TAURI__.app.getVersion();
-
-                const isNewerVersion =
-                    data.version && compareVersions(data.version, current) > 0;
-                const isNewerDate =
-                    data.release_date &&
-                    new Date(data.release_date) > new Date(CURRENT_RELEASE_DATE);
-
-                if (isNewerVersion && isNewerDate) {
-                    let userConfirm = false;
-                    if (typeof ask === "function") {
-                        userConfirm = await ask(
-                            "A new launcher version is available. Do you want to update now?",
-                            { title: "Launcher Update" },
-                        );
-                    } else {
-                        userConfirm = window.confirm(
-                            "A new launcher version is available. Do you want to update now?",
-                        );
-                    }
-                    if (userConfirm) {
-                        await invoke("update_launcher", {
-                            downloadUrl: LAUNCHER_DOWNLOAD_URL,
-                        });
-                    }
-                }
-            }
-        } catch (e) {
-            console.error("Launcher update check failed", e);
-        }
-    },
-
-    /**
-     * Formats a given number of bytes into a human-readable size string.
-     *
-     * @param {number} bytes the number of bytes to format
-     * @returns {string} the formatted size string
-     * @memberof App
-     */
-    formatSize(bytes) {
-        if (bytes === undefined || bytes === null || isNaN(bytes)) return "0 B";
-        const units = ["B", "KB", "MB", "GB", "TB"];
-        let size = parseFloat(bytes);
-        let unitIndex = 0;
-        while (size >= 1024 && unitIndex < units.length - 1) {
-            size /= 1024;
-            unitIndex++;
-        }
-        return `${size.toFixed(2)} ${units[unitIndex]}`;
-    },
-
-    /**
-     * Formats a given number of bytes per second into a human-readable speed string.
-     *
-     * @param {number} bytesPerSecond the number of bytes per second to format
-     * @returns {string} the formatted speed string
-     * @memberof App
-     */
-    formatSpeed(bytesPerSecond) {
-        if (!isFinite(bytesPerSecond) || bytesPerSecond < 0) return "0 B/s";
-        const units = ["B/s", "KB/s", "MB/s", "GB/s"];
-        let speed = bytesPerSecond;
-        let unitIndex = 0;
-        while (speed >= 1024 && unitIndex < units.length - 1) {
-            speed /= 1024;
-            unitIndex++;
-        }
-        return `${speed.toFixed(2)} ${units[unitIndex]}`;
-    },
-
-    /**
-     * Calculates the estimated time remaining for a download based on the total number of bytes downloaded so far, the total size of the download, and the current download speed.
-     *
-     * @param {number} totalDownloadedBytes the total number of bytes already downloaded
-     * @param {number} totalSize the total size of the download in bytes
-     * @param {number} speed the current download speed in bytes per second
-     * @returns {number} the estimated time remaining in seconds, or 0 if the input is invalid. The result is capped at 30 days maximum.
-     * @memberof App
-     */
-    calculateGlobalTimeRemaining(totalDownloadedBytes, totalSize, speed) {
-        if (
-            !isFinite(speed) ||
-            speed <= 0 ||
-            !isFinite(totalDownloadedBytes) ||
-            !isFinite(totalSize) ||
-            totalDownloadedBytes >= totalSize
-        ) {
-            return 0;
-        }
-        const bytesRemaining = totalSize - totalDownloadedBytes;
-        const averageSpeed = this.calculateAverageSpeed(speed);
-        if (averageSpeed <= 0) return 0;
-        const secondsRemaining = bytesRemaining / averageSpeed;
-        return Math.min(secondsRemaining, 30 * 24 * 60 * 60);
-    },
-
-    // Updated calculateAverageSpeed method
-    calculateAverageSpeed(currentSpeed) {
-        this.state.speedHistory.push(currentSpeed);
-
-        if (this.state.speedHistory.length > this.state.speedHistoryMaxLength) {
-            this.state.speedHistory.shift();
-        }
-
-        const sum = this.state.speedHistory.reduce((acc, speed) => acc + speed, 0);
-        return sum / this.state.speedHistory.length;
-    },
-
-    /**
-     * Format a time in seconds to a human-readable string.
-     * If the input is invalid, returns 'Calculating...'
-     * @param {number} seconds the time in seconds
-     * @returns {string} a human-readable string representation of the time
-     * @memberof App
-     */
-    formatTime(seconds) {
-        if (!isFinite(seconds) || seconds < 0) return "Calculating...";
-
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        const remainingSeconds = Math.floor(seconds % 60);
-
-        if (hours > 0) {
-            return `${hours}h ${minutes}m ${remainingSeconds}s`;
-        } else if (minutes > 0) {
-            return `${minutes}m ${remainingSeconds}s`;
-        } else {
-            return `${remainingSeconds}s`;
-        }
-    },
-
-    /**
-     * Returns the file name from a given path, or an empty string if the path is invalid.
-     * @param {string} path the path to get the file name from
-     * @returns {string} the file name
-     * @memberof App
-     */
-    getFileName(path) {
-        return path ? path.split("\\").pop().split("/").pop() : "";
-    },
-
-    /**
-     * Shows an error message in the #error-container element for 5 seconds.
-     * If the element does not exist, does nothing.
-     * @param {string} message the error message to display
-     * @memberof App
-     */
-    showErrorMessage(message) {
-        const errorContainer = document.getElementById("error-container");
-        if (errorContainer) {
-            errorContainer.textContent = message;
-            errorContainer.style.display = "block";
-            setTimeout(() => {
-                errorContainer.style.display = "none";
-            }, 5000);
-        }
-    },
-
-    // Updated methods for loading modal
-    showLoadingModal(message) {
-        this.toggleModal("loading-modal", true, message);
-
-        // Specific handling for loading modal elements
-        if (this.loadingError) {
-            this.loadingError.textContent = "";
-            this.loadingError.style.display = "none";
-        }
-        if (this.refreshButton) {
-            this.refreshButton.style.display = "none";
-        }
-        if (this.quitTheApp) {
-            this.quitTheApp.style.display = "none";
-        }
-    },
-
-    /**
-     * Hides the loading modal.
-     * @memberof App
-     */
-    hideLoadingModal() {
-        this.toggleModal("loading-modal", false);
-    },
-
-    /**
-     * Toggles the display of a modal.
-     * @param {string} modalId The id of the modal to toggle.
-     * @param {boolean} show Whether to show or hide the modal.
-     * @param {string} [message] An optional message to display in the modal.
-     * @memberof App
-     */
-    toggleModal(modalId, show, message = "") {
-        const modal = document.getElementById(modalId);
-        if (!modal) return;
-
-        modal.classList.toggle("show", show);
-        modal.style.display = show ? "block" : "none";
-
-        if (modalId === "loading-modal" && message) {
-            const messageElement = modal.querySelector(".loading-message");
-            if (messageElement) messageElement.textContent = message;
-        }
-    },
-
-    // Logs modal helpers
-    openLogsModal() {
-        const modal = document.getElementById("log-modal");
-        if (!modal) return;
-        this.toggleModal("log-modal", true);
-        const closeBtn = modal.querySelector(".log-modal-close");
-        if (closeBtn) {
-            closeBtn.onclick = (e) => {
-                e.preventDefault();
-                this.closeLogsModal();
-            };
-        }
-    },
-    closeLogsModal() {
-        this.toggleModal("log-modal", false);
-    },
-    
-    toggleLogsModal() {
-        const modal = document.getElementById("log-modal");
-        if (!modal) return;
-        modal.classList.contains("show") ? this.closeLogsModal() : this.openLogsModal();
-    },
-
-    /**
-     * Toggles the display of the hash file progress modal.
-     * @param {boolean} show Whether to show or hide the modal.
-     * @param {string} [message] An optional message to display in the modal.
-     * @param {boolean} [isComplete=false] Whether the hash file generation is complete.
-     * If true, shows a success message and closes the modal after 5 seconds.
-     * @memberof App
-     */
-    toggleHashProgressModal(show, message = "", isComplete = false) {
-        const modal = document.getElementById("hash-file-progress-modal");
-        if (!modal) return;
-
-        if (show) {
-            modal.classList.add("show", "hash-modal-fade-in");
-            modal.style.display = "block";
-
-            // Handle message for hash file progress modal
-            const messageElement = modal.querySelector("#hash-file-progress-text");
-            if (messageElement && message) {
-                messageElement.textContent = message;
-            }
-
-            if (isComplete) {
-                // Show success message
-                const successMessage = this.t("HASH_FILE_GENERATION_COMPLETE");
-                const successElement = document.createElement("div");
-                successElement.id = "hash-success-message";
-                successElement.textContent = successMessage;
-
-                const modalContent =
-                    modal.querySelector(".hash-progress-modal") || modal;
-                modalContent.appendChild(successElement);
-
-                // Wait 5 seconds, then close the modal
-                setTimeout(() => {
-                    this.toggleHashProgressModal(false);
-                }, 5000);
-            }
-        } else {
-            modal.classList.remove("show", "hash-modal-fade-in");
-
-            // Use a fade-out animation
-            anime({
-                targets: modal,
-                opacity: 0,
-                duration: 500,
-                easing: "easeOutQuad",
-                complete: () => {
-                    modal.style.display = "none";
-                    modal.style.opacity = 1; // Reset opacity for next time
-
-                    // Remove success message if it exists
-                    const successElement = modal.querySelector("#hash-success-message");
-                    if (successElement) {
-                        successElement.remove();
-                    }
-                },
+          navigator.clipboard
+            .writeText(logText)
+            .then(() => {
+              copyLogsBtn.textContent = "Copied!";
+              copyLogsBtn.style.background = "#27ae60";
+              setTimeout(() => {
+                copyLogsBtn.textContent = "Copy All Logs";
+                copyLogsBtn.style.background = "#3498db";
+              }, 2000);
+            })
+            .catch((err) => {
+              console.error("Failed to copy logs:", err);
+              copyLogsBtn.textContent = "Copy Failed";
+              copyLogsBtn.style.background = "#e74c3c";
+              setTimeout(() => {
+                copyLogsBtn.textContent = "Copy All Logs";
+                copyLogsBtn.style.background = "#3498db";
+              }, 2000);
             });
         }
-    },
+      });
+    }
 
-    //method to display the loading indicator
-    showLoadingIndicator() {
-        let loadingIndicator = document.getElementById("loading-indicator");
-        if (!loadingIndicator) {
-            loadingIndicator = document.createElement("div");
-            loadingIndicator.id = "loading-indicator";
-            loadingIndicator.innerHTML = '<div class="spinner"></div>';
-            document.body.appendChild(loadingIndicator);
-        }
-        loadingIndicator.style.display = "flex";
-    },
+    if (exportLogsBtn) {
+      exportLogsBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        const logConsole = document.getElementById("log-console");
+        if (logConsole) {
+          const logText = Array.from(logConsole.children)
+            .map((div) => div.textContent)
+            .join("\n");
 
-    //method to hide the loading indicator
-    hideLoadingIndicator() {
-        const loadingIndicator = document.getElementById("loading-indicator");
-        if (loadingIndicator) {
-            loadingIndicator.style.display = "none";
-        }
-    },
+          try {
+            const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+            const defaultFilename = `tera-launcher-logs-${timestamp}.txt`;
 
-    /**
-     * Shows the loading error message on the loading modal.
-     * @param {string} errorMessage The error message to be displayed.
-     */
-    showLoadingError(errorMessage) {
-        const loadingModal = document.getElementById("loading-modal");
-        if (loadingModal) {
-            const errorElement = loadingModal.querySelector(".loading-error");
-            if (errorElement) {
-                errorElement.textContent = errorMessage;
-                errorElement.style.display = "block";
-            }
-
-            const refreshButton = loadingModal.querySelector("#refresh-button");
-            if (refreshButton) {
-                refreshButton.style.display = "inline-block";
-            }
-
-            const quitButton = loadingModal.querySelector("#quit-button");
-            if (quitButton) {
-                quitButton.style.display = "inline-block";
-            }
-        }
-    },
-
-    /**
-     * Shows a notification at the top of the page.
-     * @param {string} message The message to be displayed in the notification.
-     * @param {string} type The type of the notification, which will be used to determine the
-     * colour of the notification. Possible values are 'success' and 'error'.
-     */
-    showNotification(message, type) {
-        const notification = document.getElementById("notification");
-        if (notification) {
-            notification.textContent = message;
-            notification.className = `notification ${type}`;
-
-            // Show the notification
-            gsap.fromTo(
-                notification,
-                { opacity: 0, y: -20 },
+            const filePath = await window.__TAURI__.dialog.save({
+              defaultPath: defaultFilename,
+              filters: [
                 {
-                    duration: 0.5,
-                    opacity: 1,
-                    y: 0,
-                    display: "block",
-                    ease: "power2.out",
+                  name: "Text Files",
+                  extensions: ["txt"],
                 },
-            );
-
-            // Hide the notification after 5 seconds
-            gsap.to(notification, {
-                delay: 5,
-                duration: 0.5,
-                opacity: 0,
-                y: -20,
-                display: "none",
-                ease: "power2.in",
+              ],
             });
-        }
-    },
 
+            if (filePath) {
+              await window.__TAURI__.fs.writeTextFile(filePath, logText);
+              exportLogsBtn.textContent = "Exported!";
+              exportLogsBtn.style.background = "#27ae60";
+              setTimeout(() => {
+                exportLogsBtn.textContent = "Export to File";
+                exportLogsBtn.style.background = "#27ae60";
+              }, 2000);
+            }
+          } catch (err) {
+            console.error("Failed to export logs:", err);
+            exportLogsBtn.textContent = "Export Failed";
+            exportLogsBtn.style.background = "#e74c3c";
+            setTimeout(() => {
+              exportLogsBtn.textContent = "Export to File";
+              exportLogsBtn.style.background = "#27ae60";
+            }, 2000);
+          }
+        }
+      });
+    }
+  },
+
+  /**
+   * Initializes the home page components
+   *
+   * This method initializes the components on the home page, such as the game
+   * path, the user panel, the modal settings, and the game status. It also
+   * updates the UI based on the user's privileges and the game status.
+   *
+   * @returns {Promise<void>}
+   */
+  async initializeHomePageComponents() {
+    this.checkFirstLaunch();
+    if (!this.state.isFirstLaunch) {
+      await this.loadGamePath();
+    }
+    this.initUserPanel();
+    this.initModalSettings();
+    await this.updateGameStatus();
+    await this.loadServerStatus();
+    await this.loadPatchNotes();
+    this.updateUIBasedOnPrivileges();
+    this.updateUI();
+    const isGameRunning = await this.isGameRunning();
+    this.updateUIForGameStatus(isGameRunning);
+  },
+
+  initUserPanel() {
+    const btnUserAvatar = document.querySelector(".btn-user-avatar");
+    const dropdownPanelWrapper = document.querySelector(
+      ".dropdown-panel-wrapper",
+    );
+    if (!btnUserAvatar || !dropdownPanelWrapper) return;
+
+    // Initialize panel state
+    let isPanelOpen = false;
+
+    // Set up initial animation
+    gsap.set(dropdownPanelWrapper, {
+      display: "none",
+      opacity: 0,
+      y: -10,
+    });
+
+    // Create a reusable GSAP timeline
+    const tl = gsap.timeline({ paused: true });
+    tl.to(dropdownPanelWrapper, {
+      duration: 0.3,
+      display: "block",
+      opacity: 1,
+      y: 0,
+      ease: "power2.out",
+    });
+
+    // Event handler for the button
+    btnUserAvatar.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (!isPanelOpen) {
+        tl.play();
+      } else {
+        tl.reverse().then(() => {
+          gsap.set(dropdownPanelWrapper, { display: "none" });
+        });
+      }
+      isPanelOpen = !isPanelOpen;
+    });
+
+    // Close panel when clicking outside
+    document.addEventListener("click", () => {
+      if (isPanelOpen) {
+        tl.reverse().then(() => {
+          gsap.set(dropdownPanelWrapper, { display: "none" });
+        });
+        isPanelOpen = false;
+      }
+    });
+
+    dropdownPanelWrapper.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (event.target.tagName === "A" && event.target.target === "_blank") {
+        event.preventDefault();
+        window.__TAURI__.shell.open(event.target.href);
+      }
+    });
+  },
+
+  /**
+   * Initializes the modal settings by finding the required elements in the DOM and
+   * setting up event listeners for the button, close span, and input field.
+   * @returns {void}
+   */
+  initModalSettings() {
+    const modal = document.getElementById("modal");
+    const btn = document.getElementById("openModal");
+    const span = document.getElementsByClassName("close")[0];
+    const input = document.getElementById("gameFolder");
+    const versionInfo = document.getElementById("version-info");
+    const tabButtons = modal ? modal.querySelectorAll(".menu-tab") : [];
+
+    if (!modal || !btn || !span || !input) return;
+
+    this.setupModalEventListeners(
+      modal,
+      btn,
+      span,
+      input,
+      versionInfo,
+      tabButtons,
+    );
+  },
+
+  /**
+   * Sets up event listeners for the modal settings.
+   * @param {HTMLElement} modal The modal element.
+   * @param {HTMLElement} btn The button element that opens the modal.
+   * @param {HTMLElement} span The close span element that closes the modal.
+   * @param {HTMLElement} input The input field element for the game folder.
+   * @returns {void}
+   */
+  setupModalEventListeners(modal, btn, span, input, versionInfo, tabButtons) {
     /**
-     * Loads the translations from a JSON file named `translations.json` at the root of the
-     * project. If any error occurs, it logs the error to the console and sets the
-     * `translations` property to an empty object.
+     * Handles the click event for the game folder input field.
      *
+     * Opens the file dialog to select a game folder, and if a folder is selected,
+     * saves the path to the configuration file and shows a success notification.
+     * If an error occurs, shows an error notification.
      * @returns {Promise<void>}
      */
-    async loadTranslations() {
-        try {
-            const response = await fetch("translations.json");
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            this.translations = await response.json();
-        } catch (error) {
-            console.error("Error loading translations:", error);
-            this.translations = { [this.currentLanguage]: {} };
+    input.onclick = async () => {
+      try {
+        const selectedPath = await invoke("select_game_folder");
+        if (selectedPath) {
+          input.value = selectedPath;
+          await this.saveGamePath(selectedPath);
+          this.showNotification(this.t("FOLDER_SAVED_SUCCESS"), "success");
+          this.closeModal(modal);
         }
-    },
+      } catch (error) {
+        console.error("Error selecting game folder:", error);
+        this.showNotification(this.t("FOLDER_SELECTION_ERROR"), "error");
+      }
+    };
 
     /**
-     * Returns a translated string from the current language's translations.
+     * Handles the click event for the button that opens the modal.
      *
-     * @param {string} key The key to translate.
-     * @param {...*} args The arguments to replace in the translated string.
-     * @returns {string} The translated string.
-     */
-    t(key, ...args) {
-        const translations = this.translations[this.currentLanguage] || {};
-        let str = translations[key] || key;
-        return str.replace(/\{(\d+)\}/g, (_, index) => args[index] || "");
-    },
-
-    /**
-     * Updates the language selector with the current language from the config file.
-     * If any error occurs, it logs the error to the console and sets the
-     * `currentLanguage` property to `'EUR'`.
-     *
-     * @returns {Promise<void>}
-     */
-    async updateLanguageSelector() {
-        try {
-            this.currentLanguage = await invoke("get_language_from_config");
-
-            const selectWrapper = document.querySelector(".select-wrapper");
-            const selectStyled = selectWrapper?.querySelector(".select-styled");
-            const selectOptions = selectWrapper?.querySelector(".select-options");
-            const originalSelect = selectWrapper?.querySelector("select");
-
-            if (selectWrapper && selectStyled && selectOptions && originalSelect) {
-                this.setupLanguageOptions(selectOptions, originalSelect);
-                this.setupLanguageEventListeners(selectStyled, selectOptions);
-
-                const currentLanguageName =
-                    this.languages[this.currentLanguage] || this.currentLanguage;
-                selectStyled.textContent = currentLanguageName;
-                originalSelect.value = this.currentLanguage;
-            } else {
-                console.warn("Language selector elements not found in the DOM");
-            }
-
-            await this.loadTranslations();
-            await this.updateAllTranslations();
-        } catch (error) {
-            console.error("Error updating language selector:", error);
-            this.currentLanguage = "EUR";
-            await this.loadTranslations();
-            await this.updateAllTranslations();
-        }
-    },
-
-    /**
-     * Sets up the language selector options based on the `this.languages` object.
-     *
-     * @param {HTMLElement} selectOptions - The `<ul>` element containing the language options.
-     * @param {HTMLSelectElement} originalSelect - The `<select>` element containing the language options.
+     * Animates the modal to open with a fade-in effect.
      * @returns {void}
      */
-    setupLanguageOptions(selectOptions, originalSelect) {
-        selectOptions.innerHTML = "";
-        originalSelect.innerHTML = "";
+    btn.onclick = () => {
+      if (tabButtons && tabButtons.length) {
+        tabButtons[0].click();
+      }
+      gsap.to(modal, {
+        duration: 0.5,
+        display: "flex",
+        opacity: 1,
+        ease: "power2.inOut",
+      });
+    };
 
-        for (const [code, name] of Object.entries(this.languages)) {
-            const option = document.createElement("option");
-            option.value = code;
-            option.textContent = name;
-            originalSelect.appendChild(option);
-
-            const li = document.createElement("li");
-            li.setAttribute("rel", code);
-            li.textContent = name;
-            selectOptions.appendChild(li);
-        }
-    },
+    span.onclick = () => this.closeModal(modal);
 
     /**
-     * Sets up event listeners on the language selector options to change the language
-     * when an option is clicked.
+     * Handles the change event for the game folder input field.
      *
-     * @param {HTMLElement} selectStyled - The styled `<div>` element containing the selected language.
-     * @param {HTMLElement} selectOptions - The `<ul>` element containing the language options.
+     * Checks if the new value contains the string "tera" (case-insensitive),
+     * and shows a success notification if it does, or an error notification if it does not.
      * @returns {void}
      */
-    setupLanguageEventListeners(selectStyled, selectOptions) {
-        selectOptions.querySelectorAll("li").forEach((li) => {
-            li.addEventListener("click", async (e) => {
-                const newLang = e.target.getAttribute("rel");
-                if (newLang !== this.currentLanguage) {
-                    await this.changeLanguage(newLang);
-                    selectStyled.textContent = e.target.textContent;
-                }
-            });
-        });
-    },
+    input.onchange = () => {
+      if (input.value.toLowerCase().includes("tera")) {
+        this.showNotification(this.t("FOLDER_FOUND_SUCCESS"), "success");
+      } else {
+        this.showNotification(this.t("FOLDER_NOT_FOUND"), "error");
+      }
+    };
 
-    /**
-     * Updates all elements with a `data-translate` attribute by setting their text
-     * content to the translated value of the attribute's value. Also updates all
-     * elements with a `data-translate-placeholder` attribute by setting their
-     * `placeholder` attribute to the translated value of the attribute's value.
-     *
-     * This should be called after the language has been changed.
-     *
-     * @returns {Promise<void>}
-     */
-    async updateAllTranslations() {
-        document.querySelectorAll("[data-translate]").forEach((el) => {
-            const key = el.getAttribute("data-translate");
-            el.textContent = this.t(key);
-        });
+    window.addEventListener("click", (event) => {
+      if (event.target === modal) {
+        this.closeModal(modal);
+      }
+    });
 
-        document.querySelectorAll("[data-translate-placeholder]").forEach((el) => {
-            const key = el.getAttribute("data-translate-placeholder");
-            el.placeholder = this.t(key);
-        });
-
-        this.updateDynamicTranslations();
-    },
-
-    /**
-     * Initializes the login page by adding an event listener to the login button.
-     * When the button is clicked, the `login` function is called with the values
-     * of the `username` and `password` input fields.
-     *
-     * @returns {void}
-     */
-    initLogin() {
-        const loginButton = document.getElementById("login-button");
-        const registerButton = document.getElementById("register-button");
-
-        if (loginButton) {
-            loginButton.addEventListener("click", async () => {
-                const username = document.getElementById("username").value;
-                const password = document.getElementById("password").value;
-                await this.login(username, password);
-            });
-        }
-
-        if (registerButton) {
-            registerButton.addEventListener('click', () => {
-                this.openRegisterPopup();
-            });
-        }
-    },
-
-    /**
-     * Initializes the register page by wiring up button handlers.
-     */
-    initRegister() {
-        const submitBtn = document.getElementById('register-submit-button');
-        const backBtn = document.getElementById('register-back-button');
-
-        if (submitBtn) {
-            submitBtn.addEventListener('click', async () => {
-                const username = document.getElementById('reg-username').value;
-                const email = document.getElementById('reg-email').value;
-                const password = document.getElementById('reg-password').value;
-                await this.register(username, email, password);
-            });
-        }
-
-        if (backBtn) {
-            backBtn.addEventListener('click', () => {
-                this.Router.navigate('login');
-            });
-        }
-    },
-
-    /**
-     * Initializes the home page by creating a swiper slider and setting up the
-     * home page elements and event listeners.
-     *
-     * @returns {Promise<void>}
-     */
-    async initHome() {
-        const sliderContainer = document.querySelector(".slider-container");
-
-        const swiper = new Swiper(".news-slider", {
-            effect: "fade",
-            fadeEffect: {
-                crossFade: true,
-            },
-            speed: 1500,
-            loop: true,
-            autoplay: {
-                delay: 5000,
-                disableOnInteraction: false,
-            },
-            pagination: {
-                el: ".swiper-pagination",
-                clickable: true,
-            },
-            navigation: {
-                nextEl: ".swiper-button-next",
-                prevEl: ".swiper-button-prev",
-            },
-            on: {
-                slideChangeTransitionStart: function () {
-                    sliderContainer.classList.add("pulse");
-                },
-                slideChangeTransitionEnd: function () {
-                    sliderContainer.classList.remove("pulse");
-                },
-            },
-        });
-
-        this.setupHomePageElements();
-        this.setupHomePageEventListeners();
-        await this.initializeHomePageComponents();
-    },
-
-    /**
-     * Sets up the elements for the home page
-     *
-     * This is a one-time setup that should only be called once. It sets up the
-     * elements that are used by the home page, such as the launch game button
-     * and the game status element.
-     *
-     * @returns {void}
-     */
-    setupHomePageElements() {
-        this.launchGameBtn = document.querySelector("#launch-game-btn");
-        this.statusEl = document.querySelector("#game-status");
-    },
-
-    /**
-     * Sets up the event listeners for the home page
-     *
-     * This method sets up the event listeners for the home page, such as the
-     * launch game button, the logout button, the generate hash file button, and
-     * the quit button.
-     *
-     * @returns {void}
-     */
-    setupHomePageEventListeners() {
-        if (this.launchGameBtn) {
-            this.launchGameBtn.addEventListener("click", () =>
-                this.handleLaunchGame(),
-            );
-        }
-
-        const repairButton = document.getElementById("check-game-files");
-        if (repairButton) {
-            repairButton.addEventListener("click", async (e) => {
-                e.preventDefault();
-                await invoke('clear_cache');
-                await this.checkForUpdates();
-            });
-        }
-
-        const logoutButton = document.getElementById("logout-link");
-        if (logoutButton) {
-            logoutButton.addEventListener("click", async (e) => {
-                e.preventDefault();
-                await this.logout();
-            });
-        }
-
-        const generateHashFileBtn = document.getElementById("generate-hash-file");
-        if (generateHashFileBtn && this.checkPrivilegeLevel()) {
-            generateHashFileBtn.style.display = "block";
-            generateHashFileBtn.addEventListener("click", () =>
-                this.generateHashFile(),
-            );
-        }
-
-        const appQuitButton = document.getElementById("app-quit");
-        if (appQuitButton) {
-            appQuitButton.addEventListener("click", () => this.appQuit());
-        }
-
-        const pauseButton = document.querySelector(".btn-pause");
-        if (pauseButton) {
-            pauseButton.addEventListener("click", () => {
-                this.togglePauseResume();
-            });
-        }
-
-        const themeBtn = document.getElementById("toggle-theme");
-        if (themeBtn) {
-            themeBtn.addEventListener("click", (e) => {
-                e.preventDefault();
-                this.toggleTheme();
-            });
-        }
-
-        const viewLogsBtn = document.getElementById("view-logs");
-        const logModal = document.getElementById("log-modal");
-        const logClose = document.querySelector(".log-modal-close");
-        const copyLogsBtn = document.getElementById("copy-logs-btn");
-        const exportLogsBtn = document.getElementById("export-logs-btn");
-        
-        if (viewLogsBtn && logModal && logClose) {
-            viewLogsBtn.addEventListener("click", (e) => {
-                e.preventDefault();
-                this.openLogsModal();
-            });
-            logClose.addEventListener("click", (e) => {
-                e.preventDefault();
-                this.closeLogsModal();
-            });
-        }
-        
-        if (copyLogsBtn) {
-            copyLogsBtn.addEventListener("click", (e) => {
-                e.preventDefault();
-                const logConsole = document.getElementById("log-console");
-                if (logConsole) {
-                    const logText = Array.from(logConsole.children)
-                        .map(div => div.textContent)
-                        .join('\n');
-                    
-                    navigator.clipboard.writeText(logText).then(() => {
-                        copyLogsBtn.textContent = "Copied!";
-                        copyLogsBtn.style.background = "#27ae60";
-                        setTimeout(() => {
-                            copyLogsBtn.textContent = "Copy All Logs";
-                            copyLogsBtn.style.background = "#3498db";
-                        }, 2000);
-                    }).catch(err => {
-                        console.error('Failed to copy logs:', err);
-                        copyLogsBtn.textContent = "Copy Failed";
-                        copyLogsBtn.style.background = "#e74c3c";
-                        setTimeout(() => {
-                            copyLogsBtn.textContent = "Copy All Logs";
-                            copyLogsBtn.style.background = "#3498db";
-                        }, 2000);
-                    });
-                }
-            });
-        }
-        
-        if (exportLogsBtn) {
-            exportLogsBtn.addEventListener("click", async (e) => {
-                e.preventDefault();
-                const logConsole = document.getElementById("log-console");
-                if (logConsole) {
-                    const logText = Array.from(logConsole.children)
-                        .map(div => div.textContent)
-                        .join('\n');
-                    
-                    try {
-                        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                        const defaultFilename = `tera-launcher-logs-${timestamp}.txt`;
-                        
-                        const filePath = await window.__TAURI__.dialog.save({
-                            defaultPath: defaultFilename,
-                            filters: [{
-                                name: 'Text Files',
-                                extensions: ['txt']
-                            }]
-                        });
-                        
-                        if (filePath) {
-                            await window.__TAURI__.fs.writeTextFile(filePath, logText);
-                            exportLogsBtn.textContent = "Exported!";
-                            exportLogsBtn.style.background = "#27ae60";
-                            setTimeout(() => {
-                                exportLogsBtn.textContent = "Export to File";
-                                exportLogsBtn.style.background = "#27ae60";
-                            }, 2000);
-                        }
-                    } catch (err) {
-                        console.error('Failed to export logs:', err);
-                        exportLogsBtn.textContent = "Export Failed";
-                        exportLogsBtn.style.background = "#e74c3c";
-                        setTimeout(() => {
-                            exportLogsBtn.textContent = "Export to File";
-                            exportLogsBtn.style.background = "#27ae60";
-                        }, 2000);
-                    }
-                }
-            });
-        }
-    },
-
-    /**
-     * Initializes the home page components
-     *
-     * This method initializes the components on the home page, such as the game
-     * path, the user panel, the modal settings, and the game status. It also
-     * updates the UI based on the user's privileges and the game status.
-     *
-     * @returns {Promise<void>}
-     */
-    async initializeHomePageComponents() {
-        this.checkFirstLaunch();
-        if (!this.state.isFirstLaunch) {
-            await this.loadGamePath();
-        }
-        this.initUserPanel();
-        this.initModalSettings();
-        await this.updateGameStatus();
-        await this.loadServerStatus();
-        await this.loadPatchNotes();
-        this.updateUIBasedOnPrivileges();
-        this.updateUI();
-        const isGameRunning = await this.isGameRunning();
-        this.updateUIForGameStatus(isGameRunning);
-    },
-
-    initUserPanel() {
-        const btnUserAvatar = document.querySelector(".btn-user-avatar");
-        const dropdownPanelWrapper = document.querySelector(".dropdown-panel-wrapper");
-        if (!btnUserAvatar || !dropdownPanelWrapper) return;
-
-        // Initialize panel state
-        let isPanelOpen = false;
-
-        // Set up initial animation
-        gsap.set(dropdownPanelWrapper, {
-            display: "none",
-            opacity: 0,
-            y: -10,
-        });
-
-        // Create a reusable GSAP timeline
-        const tl = gsap.timeline({ paused: true });
-        tl.to(dropdownPanelWrapper, {
-            duration: 0.3,
-            display: "block",
-            opacity: 1,
-            y: 0,
-            ease: "power2.out",
-        });
-
-        // Event handler for the button
-        btnUserAvatar.addEventListener("click", (event) => {
-            event.stopPropagation();
-            if (!isPanelOpen) {
-                tl.play();
-            } else {
-                tl.reverse().then(() => {
-                    gsap.set(dropdownPanelWrapper, { display: "none" });
-                });
-            }
-            isPanelOpen = !isPanelOpen;
-        });
-
-        // Close panel when clicking outside
-        document.addEventListener("click", () => {
-            if (isPanelOpen) {
-                tl.reverse().then(() => {
-                    gsap.set(dropdownPanelWrapper, { display: "none" });
-                });
-                isPanelOpen = false;
-            }
-        });
-
-        dropdownPanelWrapper.addEventListener("click", (event) => {
-            event.stopPropagation();
-            if (event.target.tagName === 'A' && event.target.target === '_blank') {
-                event.preventDefault();
-                window.__TAURI__.shell.open(event.target.href);
-            }
-        });
-    },
-
-    /**
-     * Initializes the modal settings by finding the required elements in the DOM and
-     * setting up event listeners for the button, close span, and input field.
-     * @returns {void}
-     */
-    initModalSettings() {
-        const modal = document.getElementById("modal");
-        const btn = document.getElementById("openModal");
-        const span = document.getElementsByClassName("close")[0];
-        const input = document.getElementById("gameFolder");
-        const versionInfo = document.getElementById("version-info");
-        const tabButtons = modal ? modal.querySelectorAll(".menu-tab") : [];
-
-        if (!modal || !btn || !span || !input) return;
-
-        this.setupModalEventListeners(modal, btn, span, input, versionInfo, tabButtons);
-    },
-
-    /**
-     * Sets up event listeners for the modal settings.
-     * @param {HTMLElement} modal The modal element.
-     * @param {HTMLElement} btn The button element that opens the modal.
-     * @param {HTMLElement} span The close span element that closes the modal.
-     * @param {HTMLElement} input The input field element for the game folder.
-     * @returns {void}
-     */
-    setupModalEventListeners(modal, btn, span, input, versionInfo, tabButtons) {
-        /**
-         * Handles the click event for the game folder input field.
-         *
-         * Opens the file dialog to select a game folder, and if a folder is selected,
-         * saves the path to the configuration file and shows a success notification.
-         * If an error occurs, shows an error notification.
-         * @returns {Promise<void>}
-         */
-        input.onclick = async () => {
-            try {
-                const selectedPath = await invoke("select_game_folder");
-                if (selectedPath) {
-                    input.value = selectedPath;
-                    await this.saveGamePath(selectedPath);
-                    this.showNotification(this.t("FOLDER_SAVED_SUCCESS"), "success");
-                    this.closeModal(modal);
-                }
-            } catch (error) {
-                console.error("Error selecting game folder:", error);
-                this.showNotification(this.t("FOLDER_SELECTION_ERROR"), "error");
-            }
-        };
-
-        /**
-         * Handles the click event for the button that opens the modal.
-         *
-         * Animates the modal to open with a fade-in effect.
-         * @returns {void}
-         */
-        btn.onclick = () => {
-            if (tabButtons && tabButtons.length) {
-                tabButtons[0].click();
-            }
-            gsap.to(modal, {
-                duration: 0.5,
-                display: "flex",
-                opacity: 1,
-                ease: "power2.inOut",
-            });
-        };
-
-        span.onclick = () => this.closeModal(modal);
-
-        /**
-         * Handles the change event for the game folder input field.
-         *
-         * Checks if the new value contains the string "tera" (case-insensitive),
-         * and shows a success notification if it does, or an error notification if it does not.
-         * @returns {void}
-         */
-        input.onchange = () => {
-            if (input.value.toLowerCase().includes("tera")) {
-                this.showNotification(this.t("FOLDER_FOUND_SUCCESS"), "success");
-            } else {
-                this.showNotification(this.t("FOLDER_NOT_FOUND"), "error");
-            }
-        };
-
-        window.addEventListener("click", (event) => {
-            if (event.target === modal) {
-                this.closeModal(modal);
-            }
-        });
-
-
-        if (versionInfo) {
-            fetch("https://web.tera-germany.de/gameserver/version.json")
-                .then((r) => r.json())
-                .then((data) => {
-                    versionInfo.innerHTML = `
+    if (versionInfo) {
+      fetch("https://web.tera-germany.de/gameserver/version.json")
+        .then((r) => r.json())
+        .then((data) => {
+          versionInfo.innerHTML = `
                         <strong>${data.launcher_name}</strong><br>
                         Version: ${data.version}<br>
                         Release: ${data.release_date}<br>
                         <a href="${data.website}" target="_blank">Website</a>
                     `;
-                })
-                .catch(() => {
-                    if (window.__TAURI__ && window.__TAURI__.app && window.__TAURI__.app.getVersion) {
-                        window.__TAURI__.app.getVersion().then((v) => {
-                            versionInfo.textContent = v;
-                        });
-                    }
-                });
-        }
-
-        if (tabButtons) {
-            tabButtons.forEach((tab) => {
-                tab.onclick = () => {
-                    const section = tab.dataset.section;
-                    modal.querySelectorAll(".settings-section").forEach((sec) => {
-                        sec.classList.remove("active");
-                        sec.style.display = "none";
-                    });
-                    modal.querySelectorAll(".menu-tab").forEach((btn) => btn.classList.remove("active"));
-                    const target = document.getElementById(`settings-${section}`);
-                    if (target) {
-                        target.classList.add("active");
-                        target.style.display = "block";
-                    }
-                    tab.classList.add("active");
-                };
+        })
+        .catch(() => {
+          if (
+            window.__TAURI__ &&
+            window.__TAURI__.app &&
+            window.__TAURI__.app.getVersion
+          ) {
+            window.__TAURI__.app.getVersion().then((v) => {
+              versionInfo.textContent = v;
             });
-        }
-    },
-
-    /**
-     * Closes the given modal element with a fade-out effect.
-     *
-     * Animates the modal to fade out with a duration of 0.5 seconds,
-     * and once the animation is complete, sets the display property of the modal to "none".
-     * @param {HTMLElement} modal The modal element to close.
-     * @returns {void}
-     */
-    closeModal(modal) {
-        gsap.to(modal, {
-            duration: 0.5,
-            opacity: 0,
-            ease: "power2.inOut",
-            /**
-             * Sets the display property of the modal to "none" once the animation is complete.
-             * This is necessary because the opacity animation does not affect the display property.
-             * @this {GSAP}
-             */
-            onComplete: () => {
-                modal.style.display = "none";
-            },
+          }
         });
-    },
+    }
 
-    /**
-     * Initializes the loading modal elements.
-     *
-     * Gets the loading modal, loading message, loading error, refresh button, and quit button elements
-     * from the DOM. If any of these elements are not found, logs an error.
-     * @memberof App
-     * @returns {void}
-     */
-    initializeLoadingModalElements() {
-        this.loadingModal = document.getElementById("loading-modal");
-        if (this.loadingModal) {
-            this.loadingMessage = this.loadingModal.querySelector(".loading-message");
-            this.loadingError = this.loadingModal.querySelector(".loading-error");
-            this.refreshButton = this.loadingModal.querySelector("#refresh-button");
-            this.quitTheApp = this.loadingModal.querySelector("#quit-button");
+    if (tabButtons) {
+      tabButtons.forEach((tab) => {
+        tab.onclick = () => {
+          const section = tab.dataset.section;
+          modal.querySelectorAll(".settings-section").forEach((sec) => {
+            sec.classList.remove("active");
+            sec.style.display = "none";
+          });
+          modal
+            .querySelectorAll(".menu-tab")
+            .forEach((btn) => btn.classList.remove("active"));
+          const target = document.getElementById(`settings-${section}`);
+          if (target) {
+            target.classList.add("active");
+            target.style.display = "block";
+          }
+          tab.classList.add("active");
+        };
+      });
+    }
+  },
+
+  /**
+   * Closes the given modal element with a fade-out effect.
+   *
+   * Animates the modal to fade out with a duration of 0.5 seconds,
+   * and once the animation is complete, sets the display property of the modal to "none".
+   * @param {HTMLElement} modal The modal element to close.
+   * @returns {void}
+   */
+  closeModal(modal) {
+    gsap.to(modal, {
+      duration: 0.5,
+      opacity: 0,
+      ease: "power2.inOut",
+      /**
+       * Sets the display property of the modal to "none" once the animation is complete.
+       * This is necessary because the opacity animation does not affect the display property.
+       * @this {GSAP}
+       */
+      onComplete: () => {
+        modal.style.display = "none";
+      },
+    });
+  },
+
+  /**
+   * Initializes the loading modal elements.
+   *
+   * Gets the loading modal, loading message, loading error, refresh button, and quit button elements
+   * from the DOM. If any of these elements are not found, logs an error.
+   * @memberof App
+   * @returns {void}
+   */
+  initializeLoadingModalElements() {
+    this.loadingModal = document.getElementById("loading-modal");
+    if (this.loadingModal) {
+      this.loadingMessage = this.loadingModal.querySelector(".loading-message");
+      this.loadingError = this.loadingModal.querySelector(".loading-error");
+      this.refreshButton = this.loadingModal.querySelector("#refresh-button");
+      this.quitTheApp = this.loadingModal.querySelector("#quit-button");
+    }
+  },
+
+  /**
+   * Sets up event listeners for the refresh and quit buttons in the loading modal.
+   *
+   * If the refresh button is found, adds a click event listener that checks if the user
+   * is connected to the internet and authenticated. If both conditions are true, calls
+   * initializeAndCheckUpdates. If the quit button is found, adds a click event listener
+   * that calls appQuit.
+   * @memberof App
+   * @returns {void}
+   */
+  setupModalButtonEventHandlers() {
+    if (this.refreshButton) {
+      this.refreshButton.addEventListener("click", async () => {
+        const isConnected = await this.checkServerConnection();
+        if (isConnected && this.state.isAuthenticated) {
+          await this.initializeAndCheckUpdates();
         }
-    },
+      });
+    }
+    if (this.quitTheApp) {
+      this.quitTheApp.addEventListener("click", () => this.appQuit());
+    }
+  },
 
-    /**
-     * Sets up event listeners for the refresh and quit buttons in the loading modal.
-     *
-     * If the refresh button is found, adds a click event listener that checks if the user
-     * is connected to the internet and authenticated. If both conditions are true, calls
-     * initializeAndCheckUpdates. If the quit button is found, adds a click event listener
-     * that calls appQuit.
-     * @memberof App
-     * @returns {void}
-     */
-    setupModalButtonEventHandlers() {
-        if (this.refreshButton) {
-            this.refreshButton.addEventListener("click", async () => {
-                const isConnected = await this.checkServerConnection();
-                if (isConnected && this.state.isAuthenticated) {
-                    await this.initializeAndCheckUpdates();
-                }
-            });
-        }
-        if (this.quitTheApp) {
-            this.quitTheApp.addEventListener("click", () => this.appQuit());
-        }
-    },
+  /**
+   * Saves the game path to the config file and handles the result based on first launch state.
+   * @param {string} path - The path to the game executable.
+   * @returns {Promise<void>}
+   */
+  async saveGamePath(path) {
+    try {
+      await invoke("save_game_path_to_config", { path });
+      if (this.state.isFirstLaunch) {
+        this.completeFirstLaunch();
+        this.showCustomNotification(
+          this.t("GAME_PATH_SET_FIRST_LAUNCH"),
+          "success",
+        );
+      } else {
+        this.showCustomNotification(this.t("GAME_PATH_UPDATED"), "success");
+      }
+    } catch (error) {
+      console.error("Error saving game path:", error);
+      this.showCustomNotification(this.t("GAME_PATH_SAVE_ERROR"), "error");
+      throw error;
+    }
+  },
 
+  /**
+   * Loads the game path from the config file and sets the input field value.
+   * If an error occurs, it displays the error in a Windows system message and
+   * offers the user the option to quit the app.
+   */
+  async loadGamePath() {
+    try {
+      const path = await invoke("get_game_path_from_config");
+      const input = document.getElementById("gameFolder");
+      if (input) {
+        input.value = path;
+      }
+    } catch (error) {
+      console.error("Error loading game path:", error);
+      // Display the error in a Windows system message
+      let errorMessage;
+      if (
+        error &&
+        error.message &&
+        typeof error.message === "string" &&
+        error.message.toLowerCase().includes("src/tera_config.ini")
+      ) {
+        errorMessage = this.t("CONFIG_INI_MISSING");
+      } else {
+        errorMessage = `${this.t("GAME_PATH_LOAD_ERROR")} ${error || ""}`;
+      }
 
-    /**
-     * Saves the game path to the config file and handles the result based on first launch state.
-     * @param {string} path - The path to the game executable.
-     * @returns {Promise<void>}
-     */
-    async saveGamePath(path) {
-        try {
-            await invoke("save_game_path_to_config", { path });
-            if (this.state.isFirstLaunch) {
-                this.completeFirstLaunch();
-                this.showCustomNotification(
-                    this.t("GAME_PATH_SET_FIRST_LAUNCH"),
-                    "success",
-                );
-            } else {
-                this.showCustomNotification(this.t("GAME_PATH_UPDATED"), "success");
-            }
-        } catch (error) {
-            console.error("Error saving game path:", error);
-            this.showCustomNotification(this.t("GAME_PATH_SAVE_ERROR"), "error");
-            throw error;
-        }
-    },
+      const userResponse = await message(errorMessage, {
+        title: this.t("ERROR"),
+        type: "error",
+      });
 
-    /**
-     * Loads the game path from the config file and sets the input field value.
-     * If an error occurs, it displays the error in a Windows system message and
-     * offers the user the option to quit the app.
-     */
-    async loadGamePath() {
-        try {
-            const path = await invoke("get_game_path_from_config");
-            const input = document.getElementById("gameFolder");
-            if (input) {
-                input.value = path;
-            }
-        } catch (error) {
-            console.error("Error loading game path:", error);
-            // Display the error in a Windows system message
-            let errorMessage;
-            if (
-                error &&
-                error.message &&
-                typeof error.message === "string" &&
-                error.message.toLowerCase().includes("src/tera_config.ini")
-            ) {
-                errorMessage = this.t("CONFIG_INI_MISSING");
-            } else {
-                errorMessage = `${this.t("GAME_PATH_LOAD_ERROR")} ${error || ""}`;
-            }
+      if (userResponse) {
+        this.appQuit();
+      }
+    }
+  },
 
-            const userResponse = await message(errorMessage, {
-                title: this.t("ERROR"),
-                type: "error",
-            });
+  /**
+   * Sets up the event listeners for the window controls (minimize and close buttons)
+   * to allow the user to interact with the window.
+   */
+  setupWindowControls() {
+    const appMinimizeBtn = document.getElementById("app-minimize");
+    if (appMinimizeBtn) {
+      appMinimizeBtn.addEventListener("click", () => appWindow.minimize());
+    }
 
-            if (userResponse) {
-                this.appQuit();
-            }
-        }
-    },
+    const appCloseBtn = document.getElementById("app-close");
+    if (appCloseBtn) {
+      appCloseBtn.addEventListener("click", () => this.appQuit());
+    }
+  },
 
-    /**
-     * Sets up the event listeners for the window controls (minimize and close buttons)
-     * to allow the user to interact with the window.
-     */
-    setupWindowControls() {
-        const appMinimizeBtn = document.getElementById("app-minimize");
-        if (appMinimizeBtn) {
-            appMinimizeBtn.addEventListener("click", () => appWindow.minimize());
-        }
+  /**
+   * Sets up the custom animations for the select element (dropdown menu) to give
+   * it a nicer appearance. If the select element is not found, it does nothing.
+   */
+  setupCustomAnimations() {
+    const selectWrapper = document.querySelector(".select-wrapper");
+    if (selectWrapper) {
+      const selectStyled = selectWrapper.querySelector(".select-styled");
+      const selectOptions = selectWrapper.querySelector(".select-options");
+      const originalSelect = selectWrapper.querySelector("select");
 
-        const appCloseBtn = document.getElementById("app-close");
-        if (appCloseBtn) {
-            appCloseBtn.addEventListener("click", () => this.appQuit());
-        }
-    },
+      if (selectStyled && selectOptions && originalSelect) {
+        this.setupSelectAnimation(selectStyled, selectOptions, originalSelect);
+      }
+    }
+  },
 
-    /**
-     * Sets up the custom animations for the select element (dropdown menu) to give
-     * it a nicer appearance. If the select element is not found, it does nothing.
-     */
-    setupCustomAnimations() {
-        const selectWrapper = document.querySelector(".select-wrapper");
-        if (selectWrapper) {
-            const selectStyled = selectWrapper.querySelector(".select-styled");
-            const selectOptions = selectWrapper.querySelector(".select-options");
-            const originalSelect = selectWrapper.querySelector("select");
-
-            if (selectStyled && selectOptions && originalSelect) {
-                this.setupSelectAnimation(selectStyled, selectOptions, originalSelect);
-            }
-        }
-    },
-
-    /**
-     * Sets up the custom animations for the select element (dropdown menu) to give
-     * it a nicer appearance. If the select element is not found, it does nothing.
-     * @param {HTMLElement} selectStyled The styled select element.
-     * @param {HTMLElement} selectOptions The select options element.
-     * @param {HTMLElement} originalSelect The original select element.
-     */
-    setupSelectAnimation(selectStyled, selectOptions, originalSelect) {
-        selectStyled.addEventListener("click", (e) => {
-            e.stopPropagation();
-            selectStyled.classList.toggle("active");
-            this.animateSelectOptions(selectOptions);
-        });
-
-        selectOptions.querySelectorAll("li").forEach((option) => {
-            option.addEventListener("click", (e) => {
-                e.stopPropagation();
-                this.handleSelectOptionClick(
-                    e.target,
-                    selectStyled,
-                    selectOptions,
-                    originalSelect,
-                );
-            });
-        });
-
-        document.addEventListener("click", () => {
-            selectStyled.classList.remove("active");
-            this.animateSelectOptions(selectOptions, true);
-        });
-    },
-
-    /**
-     * Animates the display of the select options element to give it a nicer
-     * appearance. If the second argument is true, the element is hidden.
-     * @param {HTMLElement} selectOptions The select options element.
-     * @param {boolean} [hide=false] Whether to hide or show the element.
-     */
-    animateSelectOptions(selectOptions, hide = false) {
-        anime({
-            targets: selectOptions,
-            opacity: hide ? [1, 0] : [0, 1],
-            translateY: hide ? [0, -10] : [-10, 0],
-            duration: 300,
-            easing: "easeOutQuad",
-            begin: (anim) => {
-                if (!hide) selectOptions.style.display = "block";
-            },
-            complete: (anim) => {
-                if (hide) selectOptions.style.display = "none";
-            },
-        });
-    },
-
-    /**
-     * Handles a click on a select option by updating the displayed text on the
-     * styled select element and hiding the options. Also animates the select
-     * element to give it a nicer appearance.
-     * @param {HTMLElement} target The option that was clicked.
-     * @param {HTMLElement} selectStyled The styled select element.
-     * @param {HTMLElement} selectOptions The select options element.
-     * @param {HTMLSelectElement} originalSelect The original select element.
-     */
-    handleSelectOptionClick(target, selectStyled, selectOptions, originalSelect) {
-        selectStyled.textContent = target.textContent;
-        originalSelect.value = target.getAttribute("rel");
-        selectStyled.classList.remove("active");
-        this.animateSelectOptions(selectOptions, true);
-        anime({
-            targets: selectStyled,
-            scale: [1, 1.05, 1],
-            duration: 300,
-            easing: "easeInOutQuad",
-        });
-    },
-
-    /**
-     * Sets up a mutation observer to detect changes to the 'dl-status-string'
-     * element, which is used to display the download status of the game. When a
-     * mutation is detected, the UI is updated to ensure that the displayed
-     * information is correct.
-     */
-    setupMutationObserver() {
-        const targetNode = document.getElementById("dl-status-string");
-        if (targetNode) {
-            const config = { childList: true, subtree: true };
-            const callback = (mutationsList) => {
-                for (let mutation of mutationsList) {
-                    if (mutation.type === "childList") this.updateUI();
-                }
-            };
-            this.observer = new MutationObserver(callback);
-            this.observer.observe(targetNode, config);
-        }
-    },
-
-    /**
-     * Updates the visibility of the "Generate Hash File" button based on the current
-     * privilege level. If the user has the required privilege level, the button is
-     * displayed; otherwise, it is hidden.
-     */
-    updateUIBasedOnPrivileges() {
-        const generateHashFileBtn = document.getElementById("generate-hash-file");
-        if (generateHashFileBtn) {
-            generateHashFileBtn.style.display = this.checkPrivilegeLevel()
-                ? "block"
-                : "none";
-        }
-    },
-
-    /**
-     * Checks if the user is authenticated by checking for the presence of a stored
-     * authentication key in local storage. If the key is present, the user is
-     * considered authenticated, otherwise they are not.
-     */
-    checkAuthentication() {
-        this.setState({
-            isAuthenticated: localStorage.getItem("authKey") !== null,
-        });
-    },
-
-    /**
-     * Checks if the user has the required privilege level by checking if the
-     * 'privilege' key in local storage is a valid integer and greater than or
-     * equal to the value of REQUIRED_PRIVILEGE_LEVEL.
-     * @returns {boolean} True if the user has the required privilege level, false
-     * otherwise.
-     */
-    checkPrivilegeLevel() {
-        const userPrivilege = parseInt(localStorage.getItem("privilege"), 10);
-        return !isNaN(userPrivilege) && userPrivilege >= REQUIRED_PRIVILEGE_LEVEL;
-    },
-
-    /**
-     * Sends the stored authentication key, user name, user number, and character count
-     * to the backend to set the auth info.
-     * @returns {Promise<void>}
-     */
-    async sendStoredAuthInfoToBackend() {
-        const authKey = localStorage.getItem("authKey");
-        const userName = localStorage.getItem("userName");
-        const userNo = parseInt(localStorage.getItem("userNo"), 10);
-        const characterCount = localStorage.getItem("characterCount");
-
-        if (authKey && userName && userNo && characterCount) {
-            await invoke("set_auth_info", {
-                authKey,
-                userName,
-                userNo,
-                characterCount,
-            });
-        }
-    },
-
-    /**
-     * Generates a hash file for the game files. If the operation is already in
-     * progress, it will not start a new operation. It will disable the 'Generate
-     * Hash File' button until the operation is complete. It will also show a
-     * modal with a progress bar and show a notification when the operation is
-     * complete or has failed.
-     * @returns {Promise<void>}
-     */
-    async generateHashFile() {
-        if (this.state.isGeneratingHashFile) return;
-
-        let unlistenProgress = null;
-        try {
-            this.setState({
-                isGeneratingHashFile: true,
-                hashFileProgress: 0,
-                currentProcessingFile: "",
-                processedFiles: 0,
-                totalFiles: 0,
-            });
-
-            const generateHashBtn = document.getElementById("generate-hash-file");
-            if (generateHashBtn) {
-                generateHashBtn.disabled = true;
-            }
-
-            this.toggleHashProgressModal(
-                true,
-                this.t("INITIALIZING_HASH_GENERATION"),
-            );
-
-            unlistenProgress = await listen("hash_file_progress", (event) => {
-                const {
-                    current_file,
-                    progress,
-                    processed_files,
-                    total_files,
-                } = event.payload;
-
-                this.setState({
-                    hashFileProgress: progress,
-                    currentProcessingFile: current_file,
-                    processedFiles: processed_files,
-                    totalFiles: total_files,
-                });
-
-                this.updateHashFileProgressUI();
-            });
-
-            await invoke("generate_hash_file");
-            this.toggleHashProgressModal(true, "", true);
-            this.showNotification(this.t("HASH_FILE_GENERATED"), "success");
-        } catch (error) {
-            console.error("Error generating hash file:", error);
-            this.showNotification(this.t("HASH_FILE_GENERATION_ERROR"), "error");
-        } finally {
-            this.setState({
-                isGeneratingHashFile: false,
-                hashFileProgress: 0,
-                currentProcessingFile: "",
-                processedFiles: 0,
-                totalFiles: 0,
-            });
-
-            const generateHashBtn = document.getElementById("generate-hash-file");
-            if (generateHashBtn) {
-                generateHashBtn.disabled = false;
-            }
-
-            if (unlistenProgress) {
-                unlistenProgress();
-            }
-        }
-    },
-
-    /**
-     * Disable the context menu and text selection in the app window.
-     *
-     * This is needed to prevent users from selecting and copying text from the app window.
-     * It's also needed to prevent users from accessing the context menu and doing things like
-     * saving the page as a file, etc.
-     */
-    disableContextMenu() {
-        document.addEventListener("contextmenu", (e) => {
-            e.preventDefault();
-        });
-
-        document.addEventListener("selectstart", (e) => {
-            e.preventDefault();
-        });
-    },
-
-    /**
-     * Close the app window.
-     *
-     * This function is called when the app needs to be closed, such as when the user
-     * clicks the "Exit" button in the app menu.
-     */
-    appQuit() {
-        appWindow.close();
-    },
-
-    async stopDownloads() {
-        try {
-            await invoke("cancel_downloads");
-        } catch (error) {
-            console.error("Failed to stop downloads:", error);
-        }
-    },
-
-    async togglePauseResume() {
-        if (this.state.currentUpdateMode === "download") {
-            try {
-                await invoke("cancel_downloads");
-                this.setState({ 
-                    currentUpdateMode: "paused",
-                    lastProgressUpdate: null,
-                    downloadStartTime: null,
-                    speedHistory: [],
-                    currentSpeed: 0,
-                });
-                this.updateLaunchGameButton(true);
-            } catch (e) {
-                console.error("pause failed", e);
-            }
-            return;
-        }
-        if (this.state.currentUpdateMode === "paused") {
-            try {
-                const previousTotal = this.state.totalSize || 0;
-                this.setState({ currentUpdateMode: "file_check", isCheckingForUpdates: true });
-                const filesToUpdate = await invoke("get_files_to_update");
-                this.setState({ isCheckingForUpdates: false });
-                
-                if (filesToUpdate && filesToUpdate.length > 0) {
-                    const remainingSize = filesToUpdate.reduce((sum, f) => sum + (f.size || 0), 0);
-                    const alreadyDownloaded = previousTotal > 0 ? Math.max(0, previousTotal - remainingSize) : 0;
-                    const newTotalSize = previousTotal > 0 ? previousTotal : remainingSize;
-                    
-                    this.setState({ 
-                        currentUpdateMode: "download",
-                        isUpdateAvailable: true,
-                        isFileCheckComplete: true,
-                        downloadStartTime: Date.now(),
-                        lastProgressUpdate: null,
-                        speedHistory: [],
-                        totalFiles: filesToUpdate.length,
-                        totalSize: newTotalSize,
-                        downloadedBytesOffset: alreadyDownloaded,
-                    });
-                    await this.runPatchSystem(filesToUpdate);
-                } else {
-                    this.handleCompletion();
-                }
-            } catch (e) {
-                console.error("resume failed", e);
-                this.setState({ currentUpdateMode: "paused", isCheckingForUpdates: false });
-            }
-        }
-    },
-
-    /**
-     * Handles route changes.
-     *
-     * This function is called when a route change is detected. It simply calls
-     * the Router's navigate method to handle the route change.
-     */
-    handleRouteChange() {
-        this.Router.navigate();
-    },
-
-    /**
-     * Loads the content of the specified file asynchronously.
-     *
-     * @param {string} file - The file to load the content of.
-     *
-     * @returns {Promise<string>} The loaded content as a string.
-     */
-    async loadAsyncContent(file) {
-        const response = await fetch(file);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return await response.text();
-    },
-
-    /**
-     * Smoothly transitions between two pages.
-     *
-     * This function handles the process of smoothly transitioning between two
-     * pages. It does this by animating the opacity and translateX properties of
-     * the two pages. The new page is first appended to the app element, and then
-     * the current page is removed once the animation is finished.
-     *
-     * @param {HTMLElement} app - The app element.
-     * @param {HTMLElement} newPage - The new page element.
-     */
-    async smoothPageTransition(app, newPage) {
-        const currentPage = app.querySelector(".page");
-
-        newPage.style.position = "absolute";
-        newPage.style.top = "0";
-        newPage.style.left = "0";
-        newPage.style.width = "100%";
-        newPage.style.opacity = "0";
-        newPage.style.transform = "translateX(20px)";
-
-        app.appendChild(newPage);
-
-        if (currentPage) {
-            await anime({
-                targets: currentPage,
-                opacity: [1, 0],
-                translateX: [0, -20],
-                easing: "easeInOutQuad",
-                duration: 300,
-            }).finished;
-
-            currentPage.remove();
-        }
-
-        await anime({
-            targets: newPage,
-            opacity: [0, 1],
-            translateX: [20, 0],
-            easing: "easeOutQuad",
-            duration: 300,
-        }).finished;
-
-        newPage.style.position = "";
-        newPage.style.top = "";
-        newPage.style.left = "";
-        newPage.style.width = "";
-        newPage.style.transform = "";
-    },
-};
-function LoadStartPage() {
-    fetchData(NewsPageUpdaterJsonUrl).then(jsonNews => {
-        //MAINTENANCE INFO
-        if (jsonNews.WARTUNG_enabled) {
-            document.getElementById('NewsWartungImgId').style.display = 'block';
-            document.getElementById('NewsWartungTextId').style.display ='flex';
-            document.getElementById('NewsWartungTextId').textContent = jsonNews.WARTUNG_info_text;
-
-        } else {
-            document.getElementById('NewsWartungImgId').style.display = 'none';
-            document.getElementById('NewsWartungTextId').style.display = 'none';
-            document.getElementById('NewsWartungTextId').textContent = "";
-        }
-
-        //BIG NEWS TOP RIGHT
-        if (!!jsonNews.News_img_url) {
-            document.getElementById('NewsImgId').src = jsonNews.News_img_url;
-            document.getElementById('NewsSideTitleTextId').textContent = jsonNews.News_side_title_text;
-            document.getElementById('NewsTextId').textContent = jsonNews.News_side_text;
-        } else {
-            document.getElementById('NewsImgId').src = "";
-            document.getElementById('NewsTextId').textContent = "";
-        }
-        if (!!jsonNews.News_img_link_url) {
-            document.getElementById('NewsImgIdHref').href = jsonNews.News_img_link_url;
-        }
-
-        //ADVERTISEMENT LEFT
-        if (!!jsonNews.Advertisement_left_img_url) {
-            document.getElementById('AdImgId1').src = jsonNews.Advertisement_left_img_url;
-            document.getElementById('AdTextId1').textContent = jsonNews.Advertisement_left_text;
-        } else {
-            document.getElementById('AdImgId1').src = "";
-            document.getElementById('AdTextId1').textContent = "";
-        }
-        if (!!jsonNews.Advertisement_left_img_link_url) {
-            document.getElementById('AdImgId1Href').href = jsonNews.Advertisement_left_img_link_url;
-        }
-
-        //ADVERTISEMENT MIDDLE
-        if (!!jsonNews.Advertisement_mid_img_url) {
-            document.getElementById('AdImgId2').src = jsonNews.Advertisement_mid_img_url;
-            document.getElementById('AdTextId2').textContent = jsonNews.Advertisement_mid_text;
-        } else {
-            document.getElementById('AdImgId2').src = "";
-            document.getElementById('AdTextId2').textContent = "";
-        }
-        if (!!jsonNews.Advertisement_mid_img_link_url) {
-            document.getElementById('AdImgId2Href').href = jsonNews.Advertisement_mid_img_link_url;
-        }
-
-        //ADVERTISEMENT RIGHT
-        if (!!jsonNews.Advertisement_right_img_url) {
-            document.getElementById('AdImgId3').src = jsonNews.Advertisement_right_img_url;
-            document.getElementById('AdTextId3').textContent = jsonNews.Advertisement_right_text;
-        } else {
-            document.getElementById('AdImgId3').src = "";
-            document.getElementById('AdTextId3').textContent = "";
-        }
-        if (!!jsonNews.Advertisement_right_img_link_url) {
-            document.getElementById('AdImgId3Href').href = jsonNews.Advertisement_right_img_link_url;
-        }
+  /**
+   * Sets up the custom animations for the select element (dropdown menu) to give
+   * it a nicer appearance. If the select element is not found, it does nothing.
+   * @param {HTMLElement} selectStyled The styled select element.
+   * @param {HTMLElement} selectOptions The select options element.
+   * @param {HTMLElement} originalSelect The original select element.
+   */
+  setupSelectAnimation(selectStyled, selectOptions, originalSelect) {
+    selectStyled.addEventListener("click", (e) => {
+      e.stopPropagation();
+      selectStyled.classList.toggle("active");
+      this.animateSelectOptions(selectOptions);
     });
 
+    selectOptions.querySelectorAll("li").forEach((option) => {
+      option.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.handleSelectOptionClick(
+          e.target,
+          selectStyled,
+          selectOptions,
+          originalSelect,
+        );
+      });
+    });
+
+    document.addEventListener("click", () => {
+      selectStyled.classList.remove("active");
+      this.animateSelectOptions(selectOptions, true);
+    });
+  },
+
+  /**
+   * Animates the display of the select options element to give it a nicer
+   * appearance. If the second argument is true, the element is hidden.
+   * @param {HTMLElement} selectOptions The select options element.
+   * @param {boolean} [hide=false] Whether to hide or show the element.
+   */
+  animateSelectOptions(selectOptions, hide = false) {
+    anime({
+      targets: selectOptions,
+      opacity: hide ? [1, 0] : [0, 1],
+      translateY: hide ? [0, -10] : [-10, 0],
+      duration: 300,
+      easing: "easeOutQuad",
+      begin: (anim) => {
+        if (!hide) selectOptions.style.display = "block";
+      },
+      complete: (anim) => {
+        if (hide) selectOptions.style.display = "none";
+      },
+    });
+  },
+
+  /**
+   * Handles a click on a select option by updating the displayed text on the
+   * styled select element and hiding the options. Also animates the select
+   * element to give it a nicer appearance.
+   * @param {HTMLElement} target The option that was clicked.
+   * @param {HTMLElement} selectStyled The styled select element.
+   * @param {HTMLElement} selectOptions The select options element.
+   * @param {HTMLSelectElement} originalSelect The original select element.
+   */
+  handleSelectOptionClick(target, selectStyled, selectOptions, originalSelect) {
+    selectStyled.textContent = target.textContent;
+    originalSelect.value = target.getAttribute("rel");
+    selectStyled.classList.remove("active");
+    this.animateSelectOptions(selectOptions, true);
+    anime({
+      targets: selectStyled,
+      scale: [1, 1.05, 1],
+      duration: 300,
+      easing: "easeInOutQuad",
+    });
+  },
+
+  /**
+   * Sets up a mutation observer to detect changes to the 'dl-status-string'
+   * element, which is used to display the download status of the game. When a
+   * mutation is detected, the UI is updated to ensure that the displayed
+   * information is correct.
+   */
+  setupMutationObserver() {
+    const targetNode = document.getElementById("dl-status-string");
+    if (targetNode) {
+      const config = { childList: true, subtree: true };
+      const callback = (mutationsList) => {
+        for (let mutation of mutationsList) {
+          if (mutation.type === "childList") this.updateUI();
+        }
+      };
+      this.observer = new MutationObserver(callback);
+      this.observer.observe(targetNode, config);
+    }
+  },
+
+  /**
+   * Updates the visibility of the "Generate Hash File" button based on the current
+   * privilege level. If the user has the required privilege level, the button is
+   * displayed; otherwise, it is hidden.
+   */
+  updateUIBasedOnPrivileges() {
+    const generateHashFileBtn = document.getElementById("generate-hash-file");
+    if (generateHashFileBtn) {
+      generateHashFileBtn.style.display = this.checkPrivilegeLevel()
+        ? "block"
+        : "none";
+    }
+  },
+
+  /**
+   * Checks if the user is authenticated by checking for the presence of a stored
+   * authentication key in local storage. If the key is present, the user is
+   * considered authenticated, otherwise they are not.
+   */
+  checkAuthentication() {
+    this.setState({
+      isAuthenticated: localStorage.getItem("authKey") !== null,
+    });
+  },
+
+  /**
+   * Checks if the user has the required privilege level by checking if the
+   * 'privilege' key in local storage is a valid integer and greater than or
+   * equal to the value of REQUIRED_PRIVILEGE_LEVEL.
+   * @returns {boolean} True if the user has the required privilege level, false
+   * otherwise.
+   */
+  checkPrivilegeLevel() {
+    const userPrivilege = parseInt(localStorage.getItem("privilege"), 10);
+    return !isNaN(userPrivilege) && userPrivilege >= REQUIRED_PRIVILEGE_LEVEL;
+  },
+
+  /**
+   * Sends the stored authentication key, user name, user number, and character count
+   * to the backend to set the auth info.
+   * @returns {Promise<void>}
+   */
+  async sendStoredAuthInfoToBackend() {
+    const authKey = localStorage.getItem("authKey");
+    const userName = localStorage.getItem("userName");
+    const userNo = parseInt(localStorage.getItem("userNo"), 10);
+    const characterCount = localStorage.getItem("characterCount");
+
+    if (authKey && userName && userNo && characterCount) {
+      await invoke("set_auth_info", {
+        authKey,
+        userName,
+        userNo,
+        characterCount,
+      });
+    }
+  },
+
+  /**
+   * Generates a hash file for the game files. If the operation is already in
+   * progress, it will not start a new operation. It will disable the 'Generate
+   * Hash File' button until the operation is complete. It will also show a
+   * modal with a progress bar and show a notification when the operation is
+   * complete or has failed.
+   * @returns {Promise<void>}
+   */
+  async generateHashFile() {
+    if (this.state.isGeneratingHashFile) return;
+
+    let unlistenProgress = null;
+    try {
+      this.setState({
+        isGeneratingHashFile: true,
+        hashFileProgress: 0,
+        currentProcessingFile: "",
+        processedFiles: 0,
+        totalFiles: 0,
+      });
+
+      const generateHashBtn = document.getElementById("generate-hash-file");
+      if (generateHashBtn) {
+        generateHashBtn.disabled = true;
+      }
+
+      this.toggleHashProgressModal(
+        true,
+        this.t("INITIALIZING_HASH_GENERATION"),
+      );
+
+      unlistenProgress = await listen("hash_file_progress", (event) => {
+        const { current_file, progress, processed_files, total_files } =
+          event.payload;
+
+        this.setState({
+          hashFileProgress: progress,
+          currentProcessingFile: current_file,
+          processedFiles: processed_files,
+          totalFiles: total_files,
+        });
+
+        this.updateHashFileProgressUI();
+      });
+
+      await invoke("generate_hash_file");
+      this.toggleHashProgressModal(true, "", true);
+      this.showNotification(this.t("HASH_FILE_GENERATED"), "success");
+    } catch (error) {
+      console.error("Error generating hash file:", error);
+      this.showNotification(this.t("HASH_FILE_GENERATION_ERROR"), "error");
+    } finally {
+      this.setState({
+        isGeneratingHashFile: false,
+        hashFileProgress: 0,
+        currentProcessingFile: "",
+        processedFiles: 0,
+        totalFiles: 0,
+      });
+
+      const generateHashBtn = document.getElementById("generate-hash-file");
+      if (generateHashBtn) {
+        generateHashBtn.disabled = false;
+      }
+
+      if (unlistenProgress) {
+        unlistenProgress();
+      }
+    }
+  },
+
+  /**
+   * Disable the context menu and text selection in the app window.
+   *
+   * This is needed to prevent users from selecting and copying text from the app window.
+   * It's also needed to prevent users from accessing the context menu and doing things like
+   * saving the page as a file, etc.
+   */
+  disableContextMenu() {
+    document.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+    });
+
+    document.addEventListener("selectstart", (e) => {
+      e.preventDefault();
+    });
+  },
+
+  /**
+   * Close the app window.
+   *
+   * This function is called when the app needs to be closed, such as when the user
+   * clicks the "Exit" button in the app menu.
+   */
+  appQuit() {
+    appWindow.close();
+  },
+
+  async stopDownloads() {
+    try {
+      await invoke("cancel_downloads");
+    } catch (error) {
+      console.error("Failed to stop downloads:", error);
+    }
+  },
+
+  async togglePauseResume() {
+    if (this.state.currentUpdateMode === "download") {
+      try {
+        this.setState({ isPauseRequested: true });
+        await invoke("cancel_downloads");
+      } catch (e) {
+        console.error("pause failed", e);
+        this.setState({ isPauseRequested: false });
+      }
+      return;
+    }
+    if (this.state.currentUpdateMode === "paused") {
+      if (this.state.updateError) {
+        this.showErrorMessage(this.t("UPDATE_ERROR_MESSAGE"));
+        return;
+      }
+      try {
+        const previousTotal = this.state.totalSize || 0;
+        const previousDownloaded = this.state.downloadedSize || 0;
+        this.setState({
+          currentUpdateMode: "file_check",
+          isCheckingForUpdates: true,
+        });
+        const filesToUpdate = await invoke("get_files_to_update");
+        this.setState({ isCheckingForUpdates: false });
+
+        if (filesToUpdate && filesToUpdate.length > 0) {
+          const { newTotalSize, clampedDownloaded } = calculateResumeSnapshot(
+            previousTotal,
+            previousDownloaded,
+            filesToUpdate,
+          );
+
+          this.setState({
+            currentUpdateMode: "download",
+            isUpdateAvailable: true,
+            isFileCheckComplete: true,
+            downloadStartTime: Date.now(),
+            lastProgressUpdate: null,
+            speedHistory: [],
+            totalFiles: filesToUpdate.length,
+            totalSize: newTotalSize,
+            downloadedBytesOffset: clampedDownloaded,
+            downloadedSize: clampedDownloaded,
+            isPauseRequested: false,
+          });
+          await this.runPatchSystem(filesToUpdate);
+        } else {
+          this.handleCompletion();
+        }
+      } catch (e) {
+        console.error("resume failed", e);
+        this.setState({
+          currentUpdateMode: "paused",
+          isCheckingForUpdates: false,
+        });
+      }
+    }
+  },
+
+  /**
+   * Handles route changes.
+   *
+   * This function is called when a route change is detected. It simply calls
+   * the Router's navigate method to handle the route change.
+   */
+  handleRouteChange() {
+    this.Router.navigate();
+  },
+
+  /**
+   * Loads the content of the specified file asynchronously.
+   *
+   * @param {string} file - The file to load the content of.
+   *
+   * @returns {Promise<string>} The loaded content as a string.
+   */
+  async loadAsyncContent(file) {
+    const response = await fetch(file);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    return await response.text();
+  },
+
+  /**
+   * Smoothly transitions between two pages.
+   *
+   * This function handles the process of smoothly transitioning between two
+   * pages. It does this by animating the opacity and translateX properties of
+   * the two pages. The new page is first appended to the app element, and then
+   * the current page is removed once the animation is finished.
+   *
+   * @param {HTMLElement} app - The app element.
+   * @param {HTMLElement} newPage - The new page element.
+   */
+  async smoothPageTransition(app, newPage) {
+    const currentPage = app.querySelector(".page");
+
+    newPage.style.position = "absolute";
+    newPage.style.top = "0";
+    newPage.style.left = "0";
+    newPage.style.width = "100%";
+    newPage.style.opacity = "0";
+    newPage.style.transform = "translateX(20px)";
+
+    app.appendChild(newPage);
+
+    if (currentPage) {
+      await anime({
+        targets: currentPage,
+        opacity: [1, 0],
+        translateX: [0, -20],
+        easing: "easeInOutQuad",
+        duration: 300,
+      }).finished;
+
+      currentPage.remove();
+    }
+
+    await anime({
+      targets: newPage,
+      opacity: [0, 1],
+      translateX: [20, 0],
+      easing: "easeOutQuad",
+      duration: 300,
+    }).finished;
+
+    newPage.style.position = "";
+    newPage.style.top = "";
+    newPage.style.left = "";
+    newPage.style.width = "";
+    newPage.style.transform = "";
+  },
+};
+function LoadStartPage() {
+  fetchData(NewsPageUpdaterJsonUrl).then((jsonNews) => {
+    //MAINTENANCE INFO
+    if (jsonNews.WARTUNG_enabled) {
+      document.getElementById("NewsWartungImgId").style.display = "block";
+      document.getElementById("NewsWartungTextId").style.display = "flex";
+      document.getElementById("NewsWartungTextId").textContent =
+        jsonNews.WARTUNG_info_text;
+    } else {
+      document.getElementById("NewsWartungImgId").style.display = "none";
+      document.getElementById("NewsWartungTextId").style.display = "none";
+      document.getElementById("NewsWartungTextId").textContent = "";
+    }
+
+    //BIG NEWS TOP RIGHT
+    if (!!jsonNews.News_img_url) {
+      document.getElementById("NewsImgId").src = jsonNews.News_img_url;
+      document.getElementById("NewsSideTitleTextId").textContent =
+        jsonNews.News_side_title_text;
+      document.getElementById("NewsTextId").textContent =
+        jsonNews.News_side_text;
+    } else {
+      document.getElementById("NewsImgId").src = "";
+      document.getElementById("NewsTextId").textContent = "";
+    }
+    if (!!jsonNews.News_img_link_url) {
+      document.getElementById("NewsImgIdHref").href =
+        jsonNews.News_img_link_url;
+    }
+
+    //ADVERTISEMENT LEFT
+    if (!!jsonNews.Advertisement_left_img_url) {
+      document.getElementById("AdImgId1").src =
+        jsonNews.Advertisement_left_img_url;
+      document.getElementById("AdTextId1").textContent =
+        jsonNews.Advertisement_left_text;
+    } else {
+      document.getElementById("AdImgId1").src = "";
+      document.getElementById("AdTextId1").textContent = "";
+    }
+    if (!!jsonNews.Advertisement_left_img_link_url) {
+      document.getElementById("AdImgId1Href").href =
+        jsonNews.Advertisement_left_img_link_url;
+    }
+
+    //ADVERTISEMENT MIDDLE
+    if (!!jsonNews.Advertisement_mid_img_url) {
+      document.getElementById("AdImgId2").src =
+        jsonNews.Advertisement_mid_img_url;
+      document.getElementById("AdTextId2").textContent =
+        jsonNews.Advertisement_mid_text;
+    } else {
+      document.getElementById("AdImgId2").src = "";
+      document.getElementById("AdTextId2").textContent = "";
+    }
+    if (!!jsonNews.Advertisement_mid_img_link_url) {
+      document.getElementById("AdImgId2Href").href =
+        jsonNews.Advertisement_mid_img_link_url;
+    }
+
+    //ADVERTISEMENT RIGHT
+    if (!!jsonNews.Advertisement_right_img_url) {
+      document.getElementById("AdImgId3").src =
+        jsonNews.Advertisement_right_img_url;
+      document.getElementById("AdTextId3").textContent =
+        jsonNews.Advertisement_right_text;
+    } else {
+      document.getElementById("AdImgId3").src = "";
+      document.getElementById("AdTextId3").textContent = "";
+    }
+    if (!!jsonNews.Advertisement_right_img_link_url) {
+      document.getElementById("AdImgId3Href").href =
+        jsonNews.Advertisement_right_img_link_url;
+    }
+  });
 }
 
 // Create the Router and attach it to App

@@ -10,3 +10,4 @@ node_modules/
 # Test coverage
 coverage/
 teralaunch/coverage/
+.DS_Store
