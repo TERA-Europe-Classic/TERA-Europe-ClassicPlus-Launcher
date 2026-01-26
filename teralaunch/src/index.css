@@ -1450,115 +1450,6 @@ input[type="text"]::placeholder {
     }
 }
 
-#log-modal {
-    display: none;
-    position: fixed;
-    z-index: 1000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.8);
-}
-
-.log-modal-content {
-    background-color: #1e1e1e;
-    margin: 5% auto;
-    padding: 20px;
-    border-radius: 8px;
-    width: 90%;
-    max-width: 800px;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-}
-
-.log-modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-}
-
-.log-modal-header h2 {
-    color: #e0e0e0;
-    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-    margin: 0;
-}
-
-.log-modal-close {
-    color: #e0e0e0;
-    font-size: 28px;
-    font-weight: bold;
-    cursor: pointer;
-}
-
-.log-modal-close:hover {
-    color: #ffffff;
-}
-
-#log-console {
-    height: 400px;
-    overflow-y: auto;
-    background-color: #252526;
-    padding: 15px;
-    font-family: "Consolas", "Courier New", monospace;
-    font-size: 14px;
-    line-height: 1.5;
-    color: #d4d4d4;
-    border-radius: 4px;
-}
-
-#log-console::-webkit-scrollbar {
-    width: 12px;
-}
-
-#log-console::-webkit-scrollbar-track {
-    background: #1e1e1e;
-}
-
-#log-console::-webkit-scrollbar-thumb {
-    background-color: #3e3e3e;
-    border-radius: 6px;
-    border: 3px solid #1e1e1e;
-}
-
-.log-entry {
-    margin-bottom: 5px;
-}
-
-.log-entry-time {
-    color: #569cd6;
-    margin-right: 10px;
-}
-
-.log-entry-level {
-    font-weight: bold;
-    margin-right: 5px;
-}
-
-.log-entry-level.info {
-    color: #4ec9b0;
-}
-
-.log-entry-level.debug {
-    color: #dcdcaa;
-}
-
-.log-entry-level.warn {
-    color: #ce9178;
-}
-
-.log-entry-level.error {
-    color: #f44747;
-}
-
-.log-entry-level.critical {
-    color: #ff00ff;
-}
-
-.log-entry-message {
-    color: #d4d4d4;
-}
-
 @keyframes pulse {
     0% {
         box-shadow:
@@ -1877,8 +1768,7 @@ body.light-mode {
     color: #000;
 }
 
-body.light-mode .modal-content,
-body.light-mode .log-modal-content {
+body.light-mode .modal-content {
     background-color: #fff;
     color: #000;
 }

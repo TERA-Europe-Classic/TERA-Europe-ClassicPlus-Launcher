@@ -4,6 +4,7 @@ import {
   getProgressUpdateMode,
   getStatusKey,
   getUpdateErrorMessage,
+  getPathChangeResetState,
   shouldDisableLaunch,
 } from "./utils/updateState.js";
 
@@ -151,8 +152,7 @@ const App = {
       if (savedTheme === "light") {
         document.body.classList.add("light-mode");
       }
-      const logsEnabled = localStorage.getItem("logsEnabled") === "true";
-      invoke("set_logging", { enabled: logsEnabled });
+    invoke("set_logging", { enabled: false });
       this.setupEventListeners();
       this.setupWindowControls();
       this.setupCustomAnimations();
@@ -1159,12 +1159,6 @@ const App = {
     }
   },
 
-  toggleLogs() {
-    const enabled = localStorage.getItem("logsEnabled") === "true";
-    const newValue = !enabled;
-    localStorage.setItem("logsEnabled", newValue);
-    invoke("set_logging", { enabled: newValue });
-  },
 
   /**
    * Handles download completion events from the backend.
@@ -1685,8 +1679,7 @@ const App = {
    * Handles the game launch process. If updates are available, it prevents
    * the game from launching until the updates are applied. If the game is
    * already launching, it does nothing. Otherwise, it sets the game status
-   * to "launching", subscribes to logs, creates a log modal, shows the log
-   * modal, and initiates the game launch process by calling the
+   * to "launching" and initiates the game launch process by calling the
    * `handle_launch_game` command. If the game launch process fails, it sets
    * the game status to "not running" and resets the launch state.
    *
@@ -2098,31 +2091,6 @@ const App = {
       const messageElement = modal.querySelector(".loading-message");
       if (messageElement) messageElement.textContent = message;
     }
-  },
-
-  // Logs modal helpers
-  openLogsModal() {
-    const modal = document.getElementById("log-modal");
-    if (!modal) return;
-    this.toggleModal("log-modal", true);
-    const closeBtn = modal.querySelector(".log-modal-close");
-    if (closeBtn) {
-      closeBtn.onclick = (e) => {
-        e.preventDefault();
-        this.closeLogsModal();
-      };
-    }
-  },
-  closeLogsModal() {
-    this.toggleModal("log-modal", false);
-  },
-
-  toggleLogsModal() {
-    const modal = document.getElementById("log-modal");
-    if (!modal) return;
-    modal.classList.contains("show")
-      ? this.closeLogsModal()
-      : this.openLogsModal();
   },
 
   /**
@@ -2574,99 +2542,6 @@ const App = {
       });
     }
 
-    const viewLogsBtn = document.getElementById("view-logs");
-    const logModal = document.getElementById("log-modal");
-    const logClose = document.querySelector(".log-modal-close");
-    const copyLogsBtn = document.getElementById("copy-logs-btn");
-    const exportLogsBtn = document.getElementById("export-logs-btn");
-
-    if (viewLogsBtn && logModal && logClose) {
-      viewLogsBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        this.openLogsModal();
-      });
-      logClose.addEventListener("click", (e) => {
-        e.preventDefault();
-        this.closeLogsModal();
-      });
-    }
-
-    if (copyLogsBtn) {
-      copyLogsBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        const logConsole = document.getElementById("log-console");
-        if (logConsole) {
-          const logText = Array.from(logConsole.children)
-            .map((div) => div.textContent)
-            .join("\n");
-
-          navigator.clipboard
-            .writeText(logText)
-            .then(() => {
-              copyLogsBtn.textContent = "Copied!";
-              copyLogsBtn.style.background = "#27ae60";
-              setTimeout(() => {
-                copyLogsBtn.textContent = "Copy All Logs";
-                copyLogsBtn.style.background = "#3498db";
-              }, 2000);
-            })
-            .catch((err) => {
-              console.error("Failed to copy logs:", err);
-              copyLogsBtn.textContent = "Copy Failed";
-              copyLogsBtn.style.background = "#e74c3c";
-              setTimeout(() => {
-                copyLogsBtn.textContent = "Copy All Logs";
-                copyLogsBtn.style.background = "#3498db";
-              }, 2000);
-            });
-        }
-      });
-    }
-
-    if (exportLogsBtn) {
-      exportLogsBtn.addEventListener("click", async (e) => {
-        e.preventDefault();
-        const logConsole = document.getElementById("log-console");
-        if (logConsole) {
-          const logText = Array.from(logConsole.children)
-            .map((div) => div.textContent)
-            .join("\n");
-
-          try {
-            const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-            const defaultFilename = `tera-launcher-logs-${timestamp}.txt`;
-
-            const filePath = await window.__TAURI__.dialog.save({
-              defaultPath: defaultFilename,
-              filters: [
-                {
-                  name: "Text Files",
-                  extensions: ["txt"],
-                },
-              ],
-            });
-
-            if (filePath) {
-              await window.__TAURI__.fs.writeTextFile(filePath, logText);
-              exportLogsBtn.textContent = "Exported!";
-              exportLogsBtn.style.background = "#27ae60";
-              setTimeout(() => {
-                exportLogsBtn.textContent = "Export to File";
-                exportLogsBtn.style.background = "#27ae60";
-              }, 2000);
-            }
-          } catch (err) {
-            console.error("Failed to export logs:", err);
-            exportLogsBtn.textContent = "Export Failed";
-            exportLogsBtn.style.background = "#e74c3c";
-            setTimeout(() => {
-              exportLogsBtn.textContent = "Export to File";
-              exportLogsBtn.style.background = "#27ae60";
-            }, 2000);
-          }
-        }
-      });
-    }
   },
 
   /**
@@ -2979,6 +2854,13 @@ const App = {
         );
       } else {
         this.showCustomNotification(this.t("GAME_PATH_UPDATED"), "success");
+        this.setState(getPathChangeResetState());
+        this.updateLaunchGameButton(true);
+        this.toggleLanguageSelector(false);
+        const isConnected = await this.checkServerConnection();
+        if (isConnected) {
+          await this.checkForUpdates();
+        }
       }
     } catch (error) {
       console.error("Error saving game path:", error);

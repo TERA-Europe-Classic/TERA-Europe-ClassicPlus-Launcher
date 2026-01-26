@@ -6,6 +6,7 @@ import {
     getDlStatusKey,
     getProgressUpdateMode,
     getUpdateErrorMessage,
+    getPathChangeResetState,
 } from '../src/utils/updateState.js';
 
 function getVisibilityState(state) {
@@ -252,6 +253,14 @@ describe('Update State Helpers', () => {
     it('falls back when error is empty', () => {
         expect(getUpdateErrorMessage('', 'fallback')).toBe('fallback');
         expect(getUpdateErrorMessage({}, 'fallback')).toBe('fallback');
+    });
+
+    it('resets download state on path change', () => {
+        const reset = getPathChangeResetState();
+        expect(reset.currentUpdateMode).toBe('file_check');
+        expect(reset.downloadedSize).toBe(0);
+        expect(reset.totalSize).toBe(0);
+        expect(reset.updateError).toBe(false);
     });
 
     it('returns update error status when error exists', () => {

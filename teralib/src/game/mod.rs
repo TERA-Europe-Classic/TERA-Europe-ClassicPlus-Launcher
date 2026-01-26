@@ -18,14 +18,14 @@ use std::{
     ptr::null_mut,
     slice,
     sync::{
-        atomic::{AtomicBool, AtomicU32, Ordering},
+        atomic::{AtomicBool, Ordering},
         mpsc, {Arc, Mutex},
     },
     time::Duration,
 };
 use tokio::{
     runtime::Runtime,
-    sync::{mpsc as other_mpsc, watch, Notify, broadcast},
+    sync::{mpsc as other_mpsc, watch, Notify},
 };
 use winapi::{
     shared::{
@@ -87,30 +87,10 @@ static GAME_STATUS_SENDER: Lazy<watch::Sender<bool>> = Lazy::new(|| {
     tx
 });
 
-/// Broadcast channel for S1/WM_COPYDATA events (event_id, payload bytes)
-static GAME_EVT_TX: Lazy<broadcast::Sender<(usize, Vec<u8>)>> = Lazy::new(|| {
-    // Increased buffer size to 256 to reduce lag issues
-    let (tx, _rx) = broadcast::channel(256);
-    tx
-});
-
 /// Tracks whether an exit/crash event (1020/1021) has already been signaled for the current run.
 static EXIT_EVENT_SENT: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
 
-/// Stores the last spawned game PID. 0 means unknown/not set.
-static LAST_SPAWNED_PID: Lazy<AtomicU32> = Lazy::new(|| AtomicU32::new(0));
-
-/// Subscribe to game events (event_id, payload bytes)
-pub fn subscribe_game_events() -> broadcast::Receiver<(usize, Vec<u8>)> {
-    GAME_EVT_TX.subscribe()
-}
-
-/// Returns the last spawned game PID as seen by teralib.
-/// None if not set yet.
-pub fn get_last_spawned_pid() -> Option<u32> {
-    let v = LAST_SPAWNED_PID.load(Ordering::SeqCst);
-    if v == 0 { None } else { Some(v) }
-}
+// Mirror integration removed: no event broadcast or PID helpers.
 
 // Struct definitions
 #[derive(Clone, Copy)]
@@ -332,24 +312,17 @@ async fn launch_game() -> Result<ExitStatus, Box<dyn std::error::Error>> {
 
     let pid = child.id();
     info!("Game process spawned with PID: {}", pid);
-    // Record for external consumers (e.g., Tauri launcher) to resolve network endpoints without custom events
-    LAST_SPAWNED_PID.store(pid as u32, Ordering::SeqCst);
-    // Emit custom PID event (20001) so the Tauri app can detect the game's outbound connections
-    // and set the mirror target dynamically.
-    let _ = GAME_EVT_TX.send((20001, (pid as u32).to_le_bytes().to_vec()));
 
     let status = child.wait()?;
     info!("Game process exited with status: {:?}", status);
 
     // Fallback: if no WM_COPYDATA-based exit/crash (1020/1021) was received,
-    // synthesize one based on process exit status so downstream listeners (UI/mirror)
+    // synthesize one based on process exit status
     // behave consistently on force-close/kill.
     if !EXIT_EVENT_SENT.load(Ordering::SeqCst) {
         if status.success() {
-            let _ = GAME_EVT_TX.send((1020, Vec::new())); // GameExit
             info!("Synthesized GameExit (1020) event after process exit");
         } else {
-            let _ = GAME_EVT_TX.send((1021, Vec::new())); // GameCrash
             error!("Synthesized GameCrash (1021) event after abnormal process exit");
         }
         EXIT_EVENT_SENT.store(true, Ordering::SeqCst);
@@ -763,13 +736,11 @@ unsafe fn handle_enter_lobby_or_world(recipient: WPARAM, sender: HWND, payload: 
     if payload.is_empty() {
         on_lobby_entered();
         send_response_message(recipient, sender, 8, &[]);
-        let result = GAME_EVT_TX.send((1004, Vec::new())); // EnteredLobby
-        info!("Sent EnteredLobby (1004) event, receivers: {}", result.map(|r| r.to_string()).unwrap_or_else(|_| "0".to_string()));
+        info!("EnteredLobby (1004)");
     } else {
         let world_name = String::from_utf8_lossy(payload);
         on_world_entered(&world_name);
         send_response_message(recipient, sender, 8, payload);
-        let _ = GAME_EVT_TX.send((1011, payload.to_vec())); // EnteredWorld
     }
 }
 
@@ -808,9 +779,7 @@ unsafe fn handle_game_start(_recipient: WPARAM, _sender: HWND, _payload: &[u8]) 
 unsafe fn handle_game_event(_recipient: WPARAM, _sender: HWND, event_id: usize, _payload: &[u8]) {
     info!("Game event {} received", event_id);
     // Don't send 1004 events here - they're already sent by handle_enter_lobby_or_world
-    if event_id != 1004 {
-        let _ = GAME_EVT_TX.send((event_id, Vec::new()));
-    }
+    let _ = event_id;
 }
 
 /// Handles the game exit event.
@@ -828,7 +797,6 @@ unsafe fn handle_game_event(_recipient: WPARAM, _sender: HWND, event_id: usize, 
 /// * `_payload` - The payload associated with the game exit event (unused).
 unsafe fn handle_game_exit(_recipient: WPARAM, _sender: HWND, _payload: &[u8]) {
     info!("Game ended");
-    let _ = GAME_EVT_TX.send((1020, Vec::new()));
     EXIT_EVENT_SENT.store(true, Ordering::SeqCst);
 }
 
@@ -847,7 +815,6 @@ unsafe fn handle_game_exit(_recipient: WPARAM, _sender: HWND, _payload: &[u8]) {
 /// * `_payload` - The payload associated with the game crash event (unused).
 unsafe fn handle_game_crash(_recipient: WPARAM, _sender: HWND, _payload: &[u8]) {
     error!("Game crash detected");
-    let _ = GAME_EVT_TX.send((1021, Vec::new()));
     EXIT_EVENT_SENT.store(true, Ordering::SeqCst);
 }
 

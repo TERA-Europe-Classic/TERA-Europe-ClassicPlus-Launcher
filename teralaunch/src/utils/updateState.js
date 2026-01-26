@@ -33,6 +33,29 @@ export function getUpdateErrorMessage(error, fallback) {
   return fallback;
 }
 
+export function getPathChangeResetState() {
+  return {
+    isFileCheckComplete: false,
+    isUpdateAvailable: false,
+    isDownloadComplete: false,
+    lastProgressUpdate: null,
+    lastDownloadedBytes: 0,
+    downloadStartTime: null,
+    currentUpdateMode: "file_check",
+    currentProgress: 0,
+    currentFileName: "",
+    currentFileIndex: 0,
+    totalFiles: 0,
+    downloadedSize: 0,
+    downloadedBytesOffset: 0,
+    totalSize: 0,
+    currentSpeed: 0,
+    timeRemaining: 0,
+    isPauseRequested: false,
+    updateError: false,
+  };
+}
+
 export function getStatusKey(state) {
   if (state.updateError) return "UPDATE_ERROR_MESSAGE";
   if (state.isDownloadComplete) return "DOWNLOAD_COMPLETE";
