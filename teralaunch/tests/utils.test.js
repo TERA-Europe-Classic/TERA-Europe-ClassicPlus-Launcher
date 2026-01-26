@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { calculateRemainingSize, calculateResumeSnapshot } from '../src/utils/download.js';
-import { shouldDisableLaunch, getStatusKey, getDlStatusKey } from '../src/utils/updateState.js';
+import {
+    shouldDisableLaunch,
+    getStatusKey,
+    getDlStatusKey,
+    getProgressUpdateMode,
+    getUpdateErrorMessage,
+} from '../src/utils/updateState.js';
 
 function getVisibilityState(state) {
     const isDownloading = state.currentUpdateMode === 'download';
@@ -229,6 +235,23 @@ describe('Update State Helpers', () => {
             currentUpdateMode: 'ready',
             updateError: true,
         })).toBe(true);
+    });
+
+    it('keeps ready mode when progress arrives after completion', () => {
+        expect(getProgressUpdateMode({
+            currentUpdateMode: 'ready',
+            isDownloadComplete: true,
+            isUpdateAvailable: false,
+        })).toBe('ready');
+    });
+
+    it('returns backend error message when available', () => {
+        expect(getUpdateErrorMessage({ message: 'Backend failed' }, 'fallback')).toBe('Backend failed');
+    });
+
+    it('falls back when error is empty', () => {
+        expect(getUpdateErrorMessage('', 'fallback')).toBe('fallback');
+        expect(getUpdateErrorMessage({}, 'fallback')).toBe('fallback');
     });
 
     it('returns update error status when error exists', () => {

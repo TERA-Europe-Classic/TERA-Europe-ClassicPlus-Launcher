@@ -1,7 +1,9 @@
 import { calculateResumeSnapshot } from "./utils/download.js";
 import {
   getDlStatusKey,
+  getProgressUpdateMode,
   getStatusKey,
+  getUpdateErrorMessage,
   shouldDisableLaunch,
 } from "./utils/updateState.js";
 
@@ -167,12 +169,10 @@ const App = {
       } catch (e) {
         console.warn("Failed to query is_debug:", e);
       }
-      // Always enable mirror listeners in both debug and release builds
-      this.setupMirrorListeners();
       this.sendStoredAuthInfoToBackend();
       this.setupMutationObserver();
 
-      await this.checkLauncherUpdate();
+      await this.checkAppUpdate(false);
 
       this.checkAuthentication();
       document.addEventListener("DOMContentLoaded", () => {
@@ -272,7 +272,6 @@ const App = {
     this.setupGameStatusListeners();
     this.setupUpdateListeners();
     this.setupErrorListener();
-    this.setupLogListener();
   },
 
   /**
@@ -301,12 +300,6 @@ const App = {
 
     listen("game_ended", async () => {
       this.updateUIForGameStatus(false);
-      // Ensure mirror is stopped when game ends
-      try {
-        await invoke("stop_mirror_client");
-      } catch (e) {
-        // Mirror stop failed - ignore
-      }
     });
   },
 
@@ -417,16 +410,6 @@ const App = {
     });
   },
 
-  setupLogListener() {
-    listen("log_message", (event) => {
-      const msg =
-        typeof event.payload === "string"
-          ? event.payload
-          : JSON.stringify(event.payload);
-      this.mirrorLog(msg);
-    });
-  },
-
   // Minimal Tauri App self-updater (separate from game patcher)
   // Uses Tauri v1 global API available on window.__TAURI__
   async checkAppUpdate(silent = false, auto = false) {
@@ -442,8 +425,14 @@ const App = {
         if (auto) {
           await this.installAppUpdate();
         } else {
+          const notes =
+            manifest?.notes ||
+            manifest?.body ||
+            manifest?.releaseNotes ||
+            "";
+          const suffix = notes ? `\n\n${notes}` : "";
           const next = await ask(
-            `Update ${manifest?.version || ""} available. Install now?`,
+            `Update ${manifest?.version || ""} available. Install now?${suffix}`,
             { title: "Launcher Update", type: "info" },
           );
           if (next) {
@@ -476,133 +465,6 @@ const App = {
     }
   },
 
-  // Append a line into the logs console used by mirror and backend messages
-  mirrorLog(message) {
-    try {
-      const consoleEl = document.getElementById("log-console");
-      if (!consoleEl) return;
-      // Lightweight dedupe: drop immediate duplicates
-      const now = Date.now();
-      if (
-        this.state.lastLogMessage === String(message ?? "") &&
-        now - (this.state.lastLogTime || 0) < 100
-      ) {
-        return;
-      }
-      this.state.lastLogMessage = String(message ?? "");
-      this.state.lastLogTime = now;
-      const div = document.createElement("div");
-      div.textContent = String(message ?? "");
-      div.style.userSelect = "text";
-      div.style.webkitUserSelect = "text";
-      div.style.mozUserSelect = "text";
-      div.style.msUserSelect = "text";
-      consoleEl.appendChild(div);
-      consoleEl.scrollTop = consoleEl.scrollHeight;
-    } catch (e) {
-      console.warn("mirrorLog failed:", e);
-    }
-  },
-
-  // Copy all logs in the log modal to system clipboard
-  async copyLogsToClipboard() {
-    const consoleEl = document.getElementById("log-console");
-    if (!consoleEl) {
-      this.showCustomNotification("No logs to copy", "error");
-      return;
-    }
-    // Prefer collecting child lines to preserve line breaks
-    const lines = Array.from(consoleEl.children || []).map(
-      (n) => n.textContent || "",
-    );
-    const text = (lines.length ? lines : [consoleEl.textContent || ""]).join(
-      "\n",
-    );
-
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(text);
-      } else {
-        // Fallback for older environments
-        const ta = document.createElement("textarea");
-        ta.value = text;
-        ta.style.position = "fixed";
-        ta.style.top = "-1000px";
-        document.body.appendChild(ta);
-        ta.focus();
-        ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
-      }
-      this.showCustomNotification("Logs copied to clipboard", "success");
-    } catch (e) {
-      this.showCustomNotification("Failed to copy logs", "error");
-      throw e;
-    }
-  },
-
-  // Mirror: set up listeners for debug mode
-  setupMirrorListeners() {
-    // Start guards
-    let mirrorStarted = false;
-    // Mirror detection handled by Rust backend
-    const stopMirrorIfRunning = async (reason) => {
-      try {
-        await invoke("stop_mirror_client");
-      } catch (e) {
-        // ignore
-      }
-      mirrorStarted = false;
-      this.mirrorLog(`[MIRROR] Stopped${reason ? ` (${reason})` : ""}`);
-    };
-    // Remember last target provided by IPC (server selected by user)
-    const setLastTarget = (host, port) => {
-      try {
-        if (host) localStorage.setItem("mirror_host", host);
-        if (port) localStorage.setItem("mirror_port", String(port));
-        window.__S1LastHost = host;
-        window.__S1LastPort = port;
-      } catch {}
-    };
-    const getPreferredTarget = () => {
-      const host =
-        window.__S1LastHost ||
-        localStorage.getItem("mirror_host") ||
-        "127.0.0.1";
-      const port =
-        parseInt(
-          window.__S1LastPort || localStorage.getItem("mirror_port") || "7801",
-          10,
-        ) || 7801;
-      return { host, port };
-    };
-
-    // IPC: game integration provides host/port
-    window.__S1OnConnect = (host, port) => {
-      this.mirrorLog(`[IPC] OnConnect host/port received: ${host}:${port}`);
-      setLastTarget(host, port);
-    };
-
-    // IPC bridge: call this from client integration when S1 event fires
-    window.__S1OnEvent = async (code) => {
-      try {
-        this.mirrorLog(`[IPC] S1 event: ${code}`);
-        // Stop mirror on GameExit(1020)/GameCrash(1021)
-        if (code === 1020 || code === 1021) {
-          await stopMirrorIfRunning(`event ${code}`);
-        }
-      } catch (e) {
-        this.mirrorLog(`[IPC] S1 handler error: ${e}`);
-      }
-    };
-    // Forward broadcasted S1 events
-    listen("s1_event", (event) => {
-      const code = event && event.payload;
-      if (typeof code === "number") {
-        this.mirrorLog(`[S1] Event: ${code}`);
-      }
-    });
-  },
 
   async handleFirstLaunch() {
     this.showFirstLaunchModal();
@@ -744,13 +606,6 @@ const App = {
           this.openExternal(event.target.href);
         }
       });
-      const toggleLogsLink = document.getElementById("toggle-logs");
-      if (toggleLogsLink) {
-        toggleLogsLink.addEventListener("click", (evt) => {
-          evt.preventDefault();
-          this.openLogsModal();
-        });
-      }
     }
 
     const links = [
@@ -884,6 +739,11 @@ const App = {
       effectiveTotalSize,
       globalSpeed,
     );
+    const nextUpdateMode = getProgressUpdateMode({
+      currentUpdateMode: this.state.currentUpdateMode,
+      isDownloadComplete: this.state.isDownloadComplete,
+      isUpdateAvailable: this.state.isUpdateAvailable,
+    });
 
     // Smooth the displayed file name to the most active file over a short window
     if (!this._activeFileWindow) this._activeFileWindow = [];
@@ -920,7 +780,7 @@ const App = {
       currentFileIndex: current_file_index,
       totalDownloadedBytes: totalDownloadedBytes,
       timeRemaining: timeRemaining,
-      currentUpdateMode: "download",
+      currentUpdateMode: nextUpdateMode,
       lastProgressUpdate: now,
       lastDownloadedBytes: totalDownloadedBytes,
     });
@@ -1318,6 +1178,7 @@ const App = {
       currentUpdateMode: "complete",
       isUpdateAvailable: false,
       isFileCheckComplete: true,
+      updateError: false,
     });
     // Re-enable controls immediately, then transition to ready after delay
     this.updateLaunchGameButton(false);
@@ -1525,7 +1386,11 @@ const App = {
       }
     } catch (error) {
       console.error("Error during update:", error);
-      this.showErrorMessage(this.t("UPDATE_ERROR_MESSAGE"));
+      const message = getUpdateErrorMessage(
+        error,
+        this.t("UPDATE_ERROR_MESSAGE"),
+      );
+      this.showErrorMessage(message);
       this.setState({
         updateError: true,
         currentUpdateMode: "error",

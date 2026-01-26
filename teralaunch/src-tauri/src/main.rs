@@ -1006,6 +1006,32 @@ fn format_bytes(bytes: u64) -> String {
     format!("{:.2} {}", size, UNITS[unit_index])
 }
 
+fn should_auto_install_updater() -> bool {
+    match std::env::var("TERA_LAUNCHER_AUTO_UPDATE").ok().as_deref() {
+        Some("1") | Some("true") | Some("TRUE") | Some("yes") | Some("YES") => true,
+        _ => false,
+    }
+}
+
+fn is_transient_download_error(message: &str) -> bool {
+    let msg = message.to_lowercase();
+    msg.contains("timed out")
+        || msg.contains("timeout")
+        || msg.contains("connection reset")
+        || msg.contains("connection closed")
+        || msg.contains("broken pipe")
+        || msg.contains("temporarily")
+        || msg.contains("network")
+        || msg.contains("dns")
+        || msg.contains("503")
+        || msg.contains("502")
+        || msg.contains("504")
+}
+
+fn retry_delay_ms(attempt: u8) -> u64 {
+    500u64.saturating_mul(attempt as u64)
+}
+
 #[tauri::command]
 async fn download_all_files(
     app_handle: tauri::AppHandle,
@@ -1118,15 +1144,31 @@ async fn download_all_files(
         let file_info_cl = file_info.clone();
         join_set.spawn(async move {
             let _permit = permit;
-            let res = update_file(
-                app_handle_cl,
-                window_cl,
-                file_info_cl,
-                total_files,
-                index + 1,
-                total_size,
-            )
-            .await;
+            const MAX_RETRIES: u8 = 2;
+            let mut attempt: u8 = 0;
+            let res = loop {
+                let result = update_file(
+                    app_handle_cl.clone(),
+                    window_cl.clone(),
+                    file_info_cl.clone(),
+                    total_files,
+                    index + 1,
+                    total_size,
+                )
+                .await;
+
+                match result {
+                    Ok(size) => break Ok(size),
+                    Err(e) if e == "cancelled" => break Err(e),
+                    Err(e) => {
+                        attempt = attempt.saturating_add(1);
+                        if attempt > MAX_RETRIES || !is_transient_download_error(&e) {
+                            break Err(format!("{}: {}", file_info_cl.path, e));
+                        }
+                        tokio::time::sleep(Duration::from_millis(retry_delay_ms(attempt))).await;
+                    }
+                }
+            };
             (index, res)
         });
     }
@@ -1763,47 +1805,47 @@ async fn check_server_connection() -> Result<bool, String> {
 fn main() {
     dotenv().ok();
 
-    // // Windows: relaunch elevated via UAC using ShellExecute with "runas" verb.
-    // // This shows proper UAC dialog and admin shield icon without command prompt flash.
-    // #[cfg(target_os = "windows")]
-    // {
-    //     use std::ffi::CString;
-    //     use std::ptr;
-    //     use winapi::um::shellapi::ShellExecuteA;
-    //     use winapi::um::winuser::SW_SHOWNORMAL;
+    // Windows: relaunch elevated via UAC using ShellExecute with "runas" verb.
+    // This shows proper UAC dialog and admin shield icon without command prompt flash.
+    #[cfg(target_os = "windows")]
+    {
+        use std::ffi::CString;
+        use std::ptr;
+        use winapi::um::shellapi::ShellExecuteA;
+        use winapi::um::winuser::SW_SHOWNORMAL;
 
-    //     // If the special flag is not present, relaunch self elevated and append it.
-    //     let is_guard_present = std::env::args().any(|a| a == "--elevated");
-    //     if !is_guard_present {
-    //         if let Ok(current_exe) = std::env::current_exe() {
-    //             // Preserve original args and append our guard flag
-    //             let mut args: Vec<String> = std::env::args().skip(1).collect();
-    //             args.push("--elevated".to_string());
-    //             let args_str = args.join(" ");
+        // If the special flag is not present, relaunch self elevated and append it.
+        let is_guard_present = std::env::args().any(|a| a == "--elevated");
+        if !is_guard_present {
+            if let Ok(current_exe) = std::env::current_exe() {
+                // Preserve original args and append our guard flag
+                let mut args: Vec<String> = std::env::args().skip(1).collect();
+                args.push("--elevated".to_string());
+                let args_str = args.join(" ");
 
-    //             // Convert to CString for Windows API
-    //             let exe_path = CString::new(current_exe.to_string_lossy().as_ref()).unwrap();
-    //             let parameters = CString::new(args_str).unwrap();
-    //             let verb = CString::new("runas").unwrap();
+                // Convert to CString for Windows API
+                let exe_path = CString::new(current_exe.to_string_lossy().as_ref()).unwrap();
+                let parameters = CString::new(args_str).unwrap();
+                let verb = CString::new("runas").unwrap();
 
-    //             unsafe {
-    //                 let result = ShellExecuteA(
-    //                     ptr::null_mut(),
-    //                     verb.as_ptr(),
-    //                     exe_path.as_ptr(),
-    //                     parameters.as_ptr(),
-    //                     ptr::null(),
-    //                     SW_SHOWNORMAL,
-    //                 );
+                unsafe {
+                    let result = ShellExecuteA(
+                        ptr::null_mut(),
+                        verb.as_ptr(),
+                        exe_path.as_ptr(),
+                        parameters.as_ptr(),
+                        ptr::null(),
+                        SW_SHOWNORMAL,
+                    );
 
-    //                 // ShellExecute returns > 32 on success
-    //                 if result as i32 > 32 {
-    //                     std::process::exit(0);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
+                    // ShellExecute returns > 32 on success
+                    if result as i32 > 32 {
+                        std::process::exit(0);
+                    }
+                }
+            }
+        }
+    }
 
     let (tera_logger, mut tera_log_receiver) = teralib::setup_logging();
 
@@ -1840,38 +1882,43 @@ fn main() {
             let app_handle = app.handle();
             info!("Tauri setup started");
 
-            // Ensure window stays hidden until updater check completes
+            // Ensure window stays hidden until updater check completes (if auto-install is enabled)
             let _ = window.hide();
 
-            // Run updater before showing the UI
+            // Only auto-install updates when explicitly enabled via env var.
             let app_handle_for_update = app.handle();
             tauri::async_runtime::spawn(async move {
-                let mut should_show_window = true;
-                match app_handle_for_update.updater().check().await {
-                    Ok(update) => {
-                        if update.is_update_available() {
-                            match update.download_and_install().await {
-                                Ok(_status) => {
-                                    // On success the process may exit/restart depending on platform
-                                    // so we avoid showing the window here.
-                                    should_show_window = false;
-                                }
-                                Err(e) => {
-                                    error!("Updater failed: {}", e);
+                if should_auto_install_updater() {
+                    let mut should_show_window = true;
+                    match app_handle_for_update.updater().check().await {
+                        Ok(update) => {
+                            if update.is_update_available() {
+                                match update.download_and_install().await {
+                                    Ok(_status) => {
+                                        // On success the process may exit/restart depending on platform
+                                        // so we avoid showing the window here.
+                                        should_show_window = false;
+                                    }
+                                    Err(e) => {
+                                        error!("Updater failed: {}", e);
+                                    }
                                 }
                             }
                         }
+                        Err(e) => {
+                            error!("Failed to check updates: {}", e);
+                        }
                     }
-                    Err(e) => {
-                        error!("Failed to check updates: {}", e);
-                    }
-                }
 
-                if should_show_window {
-                    if let Some(win) = app_handle_for_update.get_window("main") {
-                        let _ = win.show();
-                        let _ = win.set_focus();
+                    if should_show_window {
+                        if let Some(win) = app_handle_for_update.get_window("main") {
+                            let _ = win.show();
+                            let _ = win.set_focus();
+                        }
                     }
+                } else if let Some(win) = app_handle_for_update.get_window("main") {
+                    let _ = win.show();
+                    let _ = win.set_focus();
                 }
             });
 
@@ -1999,6 +2046,9 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[tokio::test]
     async fn test_login_with_empty_username() {
@@ -2057,5 +2107,35 @@ mod tests {
     fn get_downloaded_bytes_reads_global_state() {
         GLOBAL_DOWNLOADED_BYTES.store(1234, Ordering::SeqCst);
         assert_eq!(get_downloaded_bytes(), 1234);
+    }
+
+    #[test]
+    fn transient_error_detection() {
+        assert!(is_transient_download_error("request timed out"));
+        assert!(is_transient_download_error("connection reset by peer"));
+        assert!(is_transient_download_error("HTTP 503"));
+        assert!(!is_transient_download_error("hash mismatch"));
+    }
+
+    #[test]
+    fn retry_delay_grows_by_attempt() {
+        assert_eq!(retry_delay_ms(0), 0);
+        assert_eq!(retry_delay_ms(1), 500);
+        assert_eq!(retry_delay_ms(2), 1000);
+    }
+
+    #[test]
+    fn auto_install_updater_disabled_by_default() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        std::env::remove_var("TERA_LAUNCHER_AUTO_UPDATE");
+        assert!(!should_auto_install_updater());
+    }
+
+    #[test]
+    fn auto_install_updater_enabled_with_env_var() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        std::env::set_var("TERA_LAUNCHER_AUTO_UPDATE", "true");
+        assert!(should_auto_install_updater());
+        std::env::remove_var("TERA_LAUNCHER_AUTO_UPDATE");
     }
 }

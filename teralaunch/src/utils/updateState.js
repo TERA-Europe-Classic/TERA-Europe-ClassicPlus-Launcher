@@ -8,6 +8,31 @@ export function shouldDisableLaunch({ disabled, currentUpdateMode, updateError }
   );
 }
 
+export function getProgressUpdateMode({
+  currentUpdateMode,
+  isDownloadComplete,
+  isUpdateAvailable,
+}) {
+  if (currentUpdateMode === "ready" || currentUpdateMode === "complete") {
+    return currentUpdateMode;
+  }
+  if (isDownloadComplete || isUpdateAvailable === false) {
+    return currentUpdateMode;
+  }
+  return "download";
+}
+
+export function getUpdateErrorMessage(error, fallback) {
+  if (typeof error === "string" && error.trim()) return error;
+  if (error && typeof error.message === "string" && error.message.trim())
+    return error.message;
+  if (error && typeof error.toString === "function") {
+    const text = error.toString();
+    if (typeof text === "string" && text.trim()) return text;
+  }
+  return fallback;
+}
+
 export function getStatusKey(state) {
   if (state.updateError) return "UPDATE_ERROR_MESSAGE";
   if (state.isDownloadComplete) return "DOWNLOAD_COMPLETE";
