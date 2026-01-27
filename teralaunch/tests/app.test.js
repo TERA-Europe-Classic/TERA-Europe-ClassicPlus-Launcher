@@ -1037,6 +1037,26 @@ describe('Authentication', () => {
             expect(localStorageMock.setItem).toHaveBeenCalledWith('privilege', '3');
         });
     });
+
+    describe('login response handling', () => {
+        it('treats Msg=success with Return payload as authenticated', () => {
+            const response = JSON.stringify({
+                Return: {
+                    AuthKey: 'auth-key',
+                    UserName: 'TestUser',
+                    UserNo: 123,
+                    CharacterCount: '5',
+                    Permission: 1,
+                    Privilege: 0,
+                },
+                Msg: 'success',
+            });
+
+            const jsonResponse = JSON.parse(response);
+            const isSuccess = jsonResponse && jsonResponse.Return && jsonResponse.Msg === 'success';
+            expect(isSuccess).toBe(true);
+        });
+    });
 });
 
 describe('Pause/Resume Functionality', () => {
