@@ -10,4 +10,6 @@ node_modules/
 # Test coverage
 coverage/
 teralaunch/coverage/
+.worktrees/
 .DS_Store
+.omc
