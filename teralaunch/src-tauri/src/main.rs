@@ -227,4 +227,27 @@ mod tests {
             map_path.display()
         );
     }
+
+    #[test]
+    fn no_legacy_impls_in_main() {
+        let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let main_path = manifest_dir.join("src").join("main.rs");
+        let source = std::fs::read_to_string(&main_path)
+            .expect("Failed to read main.rs for legacy check");
+        let forbidden = [
+            "fn login(",
+            "fn register_new_account(",
+            "fn download_all_files(",
+            "fn update_file(",
+            "fn handle_launch_game(",
+            "fn get_files_to_update(",
+        ];
+        for pattern in forbidden {
+            assert!(
+                !source.contains(pattern),
+                "main.rs still contains legacy implementation: {}",
+                pattern
+            );
+        }
+    }
 }
