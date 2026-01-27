@@ -232,8 +232,8 @@ mod tests {
     fn no_legacy_impls_in_main() {
         let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
         let main_path = manifest_dir.join("src").join("main.rs");
-        let source = std::fs::read_to_string(&main_path)
-            .expect("Failed to read main.rs for legacy check");
+        let source =
+            std::fs::read_to_string(&main_path).expect("Failed to read main.rs for legacy check");
         let forbidden = [
             "fn login(",
             "fn register_new_account(",

@@ -12,7 +12,7 @@ use serde_json::json;
 use crate::domain::{CONNECT_TIMEOUT_SECS, DOWNLOAD_TIMEOUT_SECS};
 use crate::infrastructure::{HttpClient, ReqwestClient};
 use crate::services::auth_service;
-use crate::state::{clear_auth_info, write_auth_info};
+use crate::state::{clear_auth_info, set_auth_info as set_auth_state};
 use crate::GameState;
 use teralib::config::get_config_value;
 
@@ -55,21 +55,22 @@ async fn login_with_client<H: HttpClient>(
     ];
 
     // Send login request
-    let login_res = client
-        .post_form(login_url, &form_data)
-        .await?;
+    let login_res = client.post_form(login_url, &form_data).await?;
 
     if login_res.status == 401 || login_res.status == 403 {
         return Err("INVALID_CREDENTIALS".to_string());
     }
 
     if !login_res.is_success() {
-        return Err(format!("Login request failed with status {}", login_res.status));
+        return Err(format!(
+            "Login request failed with status {}",
+            login_res.status
+        ));
     }
 
     let login_text = login_res.text().map_err(|e| e.to_string())?;
-    let login_status = auth_service::parse_login_response(&login_text)
-        .map_err(|e| e.to_string())?;
+    let login_status =
+        auth_service::parse_login_response(&login_text).map_err(|e| e.to_string())?;
 
     if !auth_service::is_login_successful(&login_status) {
         return Err(login_status);
@@ -173,9 +174,7 @@ async fn register_with_client<H: HttpClient>(
         "password": password
     });
 
-    let res = client
-        .post(register_url, &payload.to_string())
-        .await?;
+    let res = client.post(register_url, &payload.to_string()).await?;
 
     let text = res.text().map_err(|e| e.to_string())?;
 
@@ -220,13 +219,12 @@ pub async fn register_new_account(
 #[cfg(not(tarpaulin_include))]
 #[tauri::command]
 pub fn set_auth_info(auth_key: String, user_name: String, user_no: i32, character_count: String) {
-    {
-        let mut auth_guard = write_auth_info();
-        auth_guard.auth_key = auth_key.clone();
-        auth_guard.user_name = user_name.clone();
-        auth_guard.user_no = user_no;
-        auth_guard.character_count = character_count.clone();
-    }
+    set_auth_state(crate::domain::GlobalAuthInfo {
+        auth_key: auth_key.clone(),
+        user_name: user_name.clone(),
+        user_no,
+        character_count: character_count.clone(),
+    });
 
     // Log auth info received from frontend
     info!("Auth info set from frontend:");

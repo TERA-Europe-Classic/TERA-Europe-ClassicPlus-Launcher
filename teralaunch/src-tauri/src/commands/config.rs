@@ -66,6 +66,7 @@ fn get_game_path_from_config_with_fs<F: FileSystem>(fs: &F) -> Result<String, St
 }
 
 /// Parses the game path from INI content string.
+#[cfg(test)]
 fn parse_game_path_from_ini(content: &str) -> Result<String, String> {
     match config_service::parse_game_config(content) {
         Ok(config) => Ok(config.path.to_string_lossy().into_owned()),
@@ -98,11 +99,10 @@ pub async fn save_game_path_to_config(
         .and_then(|p| p.to_str().map(|s| s.to_string()));
 
     let config_path = find_config_file().ok_or("Config file not found")?;
-    let content = fs::read_to_string(&config_path)
-        .map_err(|e| format!("Failed to read config: {}", e))?;
+    let content =
+        fs::read_to_string(&config_path).map_err(|e| format!("Failed to read config: {}", e))?;
     let updated = config_service::update_path_in_config(&content, &path_buf)?;
-    fs::write(&config_path, updated)
-        .map_err(|e| format!("Failed to write config: {}", e))?;
+    fs::write(&config_path, updated).map_err(|e| format!("Failed to write config: {}", e))?;
 
     // Only interrupt/recheck when path actually changed
     let should_refresh = game_path_changed(prev_path_string.as_deref(), &path);
@@ -141,11 +141,10 @@ pub fn get_language_from_config() -> Result<String, String> {
 pub fn save_language_to_config(language: String) -> Result<(), String> {
     info!("Attempting to save language {} to config file", language);
     let config_path = find_config_file().ok_or("Config file not found")?;
-    let content = fs::read_to_string(&config_path)
-        .map_err(|e| format!("Failed to read config: {}", e))?;
+    let content =
+        fs::read_to_string(&config_path).map_err(|e| format!("Failed to read config: {}", e))?;
     let updated = config_service::update_language_in_config(&content, &language)?;
-    fs::write(&config_path, updated)
-        .map_err(|e| format!("Failed to write config: {}", e))?;
+    fs::write(&config_path, updated).map_err(|e| format!("Failed to write config: {}", e))?;
 
     info!("Language successfully saved to config");
     Ok(())
@@ -166,13 +165,13 @@ pub(crate) fn find_config_file() -> Option<PathBuf> {
     }
 
     let current_dir = env::current_dir().ok();
-    let exe_dir = env::current_exe().ok().and_then(|p| p.parent().map(Path::to_path_buf));
-    let legacy_config = config_service::get_legacy_config_paths(
-        current_dir.as_deref(),
-        exe_dir.as_deref(),
-    )
-    .into_iter()
-    .find(|p| p.exists());
+    let exe_dir = env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(Path::to_path_buf));
+    let legacy_config =
+        config_service::get_legacy_config_paths(current_dir.as_deref(), exe_dir.as_deref())
+            .into_iter()
+            .find(|p| p.exists());
 
     if fs::create_dir_all(&dir).is_err() {
         return None;
@@ -435,7 +434,9 @@ lang=EUR
         // Verify the file was updated
         // The ini crate will write the path with escaped backslashes
         let updated_content = mock_fs.read_to_string(Path::new(config_path)).unwrap();
-        assert!(updated_content.contains(r"D:\\NewPath") || updated_content.contains(r"D:\NewPath"));
+        assert!(
+            updated_content.contains(r"D:\\NewPath") || updated_content.contains(r"D:\NewPath")
+        );
     }
 
     #[test]
@@ -490,7 +491,9 @@ key=value
 
         let updated_content = mock_fs.read_to_string(Path::new(config_path)).unwrap();
         // Path should be updated (ini crate will write with escaped backslashes)
-        assert!(updated_content.contains(r"D:\\NewPath") || updated_content.contains(r"D:\NewPath"));
+        assert!(
+            updated_content.contains(r"D:\\NewPath") || updated_content.contains(r"D:\NewPath")
+        );
         // Language should be preserved
         assert!(updated_content.contains("EUR"));
     }
@@ -550,7 +553,10 @@ lang=EUR
         // Language should be updated
         assert!(updated_content.contains("USA"));
         // Path should be preserved
-        assert!(updated_content.contains(r"C:\\Games\\TERA") || updated_content.contains(r"C:\Games\TERA"));
+        assert!(
+            updated_content.contains(r"C:\\Games\\TERA")
+                || updated_content.contains(r"C:\Games\TERA")
+        );
     }
 
     #[test]
@@ -580,10 +586,7 @@ lang=EUR
     #[test]
     fn game_path_changed_with_backslash_forward_slash_mix() {
         // Windows accepts both, should be treated as same
-        assert!(!game_path_changed(
-            Some("C:\\Games\\TERA"),
-            "C:/Games/TERA"
-        ));
+        assert!(!game_path_changed(Some("C:\\Games\\TERA"), "C:/Games/TERA"));
     }
 
     #[test]

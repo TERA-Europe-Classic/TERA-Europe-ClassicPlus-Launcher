@@ -30,7 +30,10 @@ use tokio::sync::Mutex;
 use walkdir::WalkDir;
 
 use crate::commands::config::{get_cache_file_path, get_game_path};
-use crate::domain::{CachedFileInfo, FileCheckProgress, FileInfo, BUFFER_SIZE, CONNECT_TIMEOUT_SECS, DOWNLOAD_TIMEOUT_SECS, HTTP_POOL_MAX_IDLE_PER_HOST};
+use crate::domain::{
+    CachedFileInfo, FileCheckProgress, FileInfo, BUFFER_SIZE, CONNECT_TIMEOUT_SECS,
+    DOWNLOAD_TIMEOUT_SECS, HTTP_POOL_MAX_IDLE_PER_HOST,
+};
 use crate::infrastructure::{EventEmitter, FileSystem};
 use crate::services::hash_service;
 use crate::state::clear_hash_cache;
@@ -46,7 +49,7 @@ use teralib::config::get_config_value;
 pub fn clear_cache() -> Result<(), String> {
     // Clear the in-memory hash cache to prevent stale entries from old directory
     let _ = clear_hash_cache(); // Ignore error if lock is held
-    // Remove the disk cache file
+                                // Remove the disk cache file
     let cache_path = get_cache_file_path()?;
     if cache_path.exists() {
         remove_file(cache_path).map_err(|e| e.to_string())?;
@@ -95,7 +98,9 @@ pub async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>,
     info!("Server hash file parsed, {} files found", files.len());
 
     info!("Starting file comparison");
-    let loaded_cache = load_cache_from_disk().await.unwrap_or_else(|_| HashMap::new());
+    let loaded_cache = load_cache_from_disk()
+        .await
+        .unwrap_or_else(|_| HashMap::new());
     let cache = Arc::new(RwLock::new(loaded_cache));
 
     let progress_bar = ProgressBar::new(files.len() as u64);
@@ -122,13 +127,14 @@ pub async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>,
             let local_file_path = local_game_path.join(path);
 
             // Validate path to prevent path traversal attacks
-            let local_file_path = match validate_path_within_base(&local_game_path, &local_file_path) {
-                Ok(p) => p,
-                Err(e) => {
-                    error!("Path validation failed for {}: {}", path, e);
-                    return None; // Skip this file
-                }
-            };
+            let local_file_path =
+                match validate_path_within_base(&local_game_path, &local_file_path) {
+                    Ok(p) => p,
+                    Err(e) => {
+                        error!("Path validation failed for {}: {}", path, e);
+                        return None; // Skip this file
+                    }
+                };
 
             let current_count = processed_count.fetch_add(1, Ordering::SeqCst) + 1;
             if current_count % 100 == 0 || current_count == files.len() {
@@ -1017,12 +1023,7 @@ mod tests {
         // Directories should not be treated as files
         // MockFileSystem.exists() returns true for directories
         // but metadata will return is_file: false
-        let status = check_file_needs_update_with_fs(
-            &mock,
-            Path::new("/game/Data"),
-            "somehash",
-            0,
-        );
+        let status = check_file_needs_update_with_fs(&mock, Path::new("/game/Data"), "somehash", 0);
 
         // Directory metadata returns size 0, so size matches
         // But reading a directory as a file should fail
@@ -1292,12 +1293,8 @@ mod tests {
         let empty_hash = calculate_hash_from_bytes(b"");
         let mock = MockFileSystem::new().with_file("/empty.pak", b"");
 
-        let status = check_file_needs_update_with_fs(
-            &mock,
-            Path::new("/empty.pak"),
-            &empty_hash,
-            0,
-        );
+        let status =
+            check_file_needs_update_with_fs(&mock, Path::new("/empty.pak"), &empty_hash, 0);
 
         assert_eq!(status, FileUpdateStatus::UpToDate);
     }
@@ -1418,12 +1415,8 @@ mod tests {
         assert_eq!(status2, FileUpdateStatus::UpToDate);
 
         // Check file 3 - should be missing
-        let status3 = check_file_needs_update_with_fs(
-            &mock,
-            Path::new("/file3.pak"),
-            "anyhash",
-            100,
-        );
+        let status3 =
+            check_file_needs_update_with_fs(&mock, Path::new("/file3.pak"), "anyhash", 100);
         assert_eq!(status3, FileUpdateStatus::Missing);
     }
 
@@ -1455,12 +1448,14 @@ mod tests {
         assert!(FileUpdateStatus::SizeMismatch {
             expected: 1000,
             actual: 500
-        }.needs_update());
+        }
+        .needs_update());
 
         assert!(FileUpdateStatus::HashMismatch {
             expected: "abc123".to_string(),
             actual: "def456".to_string()
-        }.needs_update());
+        }
+        .needs_update());
 
         assert!(FileUpdateStatus::HashError("IO error".to_string()).needs_update());
     }

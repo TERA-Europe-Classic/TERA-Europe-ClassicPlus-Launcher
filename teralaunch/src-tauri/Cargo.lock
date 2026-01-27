@@ -5449,6 +5449,7 @@ dependencies = [
  "sha2",
  "tauri",
  "tauri-build",
+ "tempfile",
  "teralib",
  "thiserror 1.0.69",
  "tokio",

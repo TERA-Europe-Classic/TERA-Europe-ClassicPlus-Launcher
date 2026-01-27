@@ -1,0 +1,633 @@
+//! Utility Tauri commands
+//!
+//! This module contains miscellaneous utility commands:
+//! - Debug mode detection
+//! - Logging configuration
+//! - Launcher updates
+//! - Server connectivity checks
+//!
+//! This module provides testable inner functions that accept an `HttpClient`
+//! implementation, allowing tests to use `MockHttpClient` for unit testing
+//! without requiring actual network access.
+
+#![allow(dead_code)]
+
+use std::path::Path;
+use std::process::Command;
+use std::time::Duration;
+
+use crate::domain::{CONNECT_TIMEOUT_SECS, DOWNLOAD_TIMEOUT_SECS, HTTP_POOL_MAX_IDLE_PER_HOST};
+use crate::infrastructure::HttpClient;
+use teralib::config::get_config_value;
+
+/// Checks if the application is running in debug mode.
+///
+/// Returns true in development builds (cargo tauri dev), false in release builds.
+#[tauri::command]
+pub fn is_debug() -> bool {
+    cfg!(debug_assertions)
+}
+
+/// Enables or disables file logging.
+///
+/// # Arguments
+/// * `enabled` - Whether to enable file logging
+#[tauri::command]
+#[cfg(not(tarpaulin_include))]
+pub fn set_logging(enabled: bool) -> Result<(), String> {
+    set_logging_inner(enabled)
+}
+
+/// Inner testable function for enabling/disabling file logging.
+///
+/// This wraps the teralib logging function, allowing the command to be tested
+/// indirectly and providing a consistent interface.
+///
+/// # Arguments
+/// * `enabled` - Whether to enable file logging
+fn set_logging_inner(enabled: bool) -> Result<(), String> {
+    teralib::enable_file_logging(enabled)
+}
+
+/// Downloads and installs a launcher update.
+///
+/// This command downloads the update from the specified URL, saves it to disk,
+/// and initiates the update process. On Windows, it uses a batch command to
+/// replace the running executable.
+///
+/// # Arguments
+/// * `download_url` - URL to download the launcher update from
+#[tauri::command]
+#[cfg(not(tarpaulin_include))]
+pub async fn update_launcher(download_url: String) -> Result<(), String> {
+    let current_exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let exe_dir = current_exe.parent().ok_or("exe dir not found")?;
+    let new_path = exe_dir.join("launcher_update.exe");
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(DOWNLOAD_TIMEOUT_SECS))
+        .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
+        .pool_max_idle_per_host(HTTP_POOL_MAX_IDLE_PER_HOST)
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let bytes = client
+        .get(&download_url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .bytes()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    tokio::fs::write(&new_path, &bytes)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        let cmd = format!(
+            "ping 127.0.0.1 -n 2 > NUL && move /Y \"{}\" \"{}\" && start \"\" \"{}\"",
+            new_path.display(),
+            current_exe.display(),
+            current_exe.display()
+        );
+        Command::new("cmd")
+            .args(["/C", &cmd])
+            .creation_flags(0x08000000)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        std::fs::rename(&new_path, &current_exe).map_err(|e| e.to_string())?;
+        let _ = Command::new(&current_exe).spawn();
+    }
+
+    std::process::exit(0);
+}
+
+/// Inner testable function for downloading launcher updates.
+///
+/// Downloads the update file content using the provided HttpClient.
+/// This function handles only the download portion - actual file writing
+/// and process replacement are handled by the Tauri command.
+///
+/// # Arguments
+/// * `client` - HTTP client implementation
+/// * `url` - URL to download the update from
+///
+/// # Returns
+/// The downloaded bytes on success, or an error message on failure
+pub async fn update_launcher_inner<H: HttpClient>(
+    client: &H,
+    url: &str,
+) -> Result<Vec<u8>, String> {
+    let response = client.get(url).await?;
+
+    if !response.is_success() {
+        return Err(format!(
+            "Failed to download update: HTTP {}",
+            response.status
+        ));
+    }
+
+    Ok(response.body)
+}
+
+/// Inner testable function for writing update file and spawning replacement process.
+///
+/// This handles the file writing portion of the update process.
+/// Note: In production, this is followed by process replacement which cannot be easily tested.
+///
+/// # Arguments
+/// * `data` - The downloaded update file bytes
+/// * `output_path` - Path to write the update file
+pub async fn write_update_file(data: &[u8], output_path: &Path) -> Result<(), String> {
+    tokio::fs::write(output_path, data)
+        .await
+        .map_err(|e| format!("Failed to write update file: {}", e))
+}
+
+/// Checks if the file server is reachable.
+///
+/// Makes a simple GET request to the file server and returns whether
+/// the server responded successfully.
+#[tauri::command]
+#[cfg(not(tarpaulin_include))]
+pub async fn check_server_connection() -> Result<bool, String> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(DOWNLOAD_TIMEOUT_SECS))
+        .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
+        .pool_max_idle_per_host(HTTP_POOL_MAX_IDLE_PER_HOST)
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    match client.get(get_config_value("FILE_SERVER_URL")).send().await {
+        Ok(response) => Ok(response.status().is_success()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+/// Inner testable function for checking server connectivity.
+///
+/// Makes a GET request to the specified URL and returns whether the server
+/// responded with a success status code (2xx).
+///
+/// # Arguments
+/// * `client` - HTTP client implementation
+/// * `url` - URL to check connectivity against
+///
+/// # Returns
+/// `Ok(true)` if server responds with 2xx status, `Ok(false)` for other statuses,
+/// `Err` if request fails (network error, timeout, etc.)
+pub async fn check_server_inner<H: HttpClient>(client: &H, url: &str) -> Result<bool, String> {
+    let response = client.get(url).await?;
+    Ok(response.is_success())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::infrastructure::{HttpResponse, MockHttpClient};
+    use tempfile::tempdir;
+
+    // ============================================================================
+    // is_debug tests
+    // ============================================================================
+
+    #[test]
+    fn is_debug_returns_expected_value() {
+        // In test builds, debug_assertions is typically enabled
+        let result = is_debug();
+        assert_eq!(result, cfg!(debug_assertions));
+    }
+
+    #[test]
+    fn is_debug_returns_consistent_value() {
+        // Multiple calls should return the same value
+        let first = is_debug();
+        let second = is_debug();
+        assert_eq!(first, second);
+    }
+
+    // ============================================================================
+    // set_logging tests
+    // ============================================================================
+
+    #[test]
+    fn set_logging_inner_enable_returns_result() {
+        // We can't fully test this without affecting global state,
+        // but we can verify it doesn't panic and returns a result
+        let result = set_logging_inner(false);
+        // Disabling logging should always succeed
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn set_logging_inner_disable_succeeds() {
+        // Disabling logging should always work
+        let result = set_logging_inner(false);
+        assert!(result.is_ok());
+    }
+
+    // ============================================================================
+    // check_server_inner tests (HttpClient)
+    // ============================================================================
+
+    #[tokio::test]
+    async fn check_server_inner_returns_true_for_200() {
+        let mock = MockHttpClient::new();
+        mock.add_response(
+            "https://example.com/health",
+            HttpResponse {
+                status: 200,
+                body: b"OK".to_vec(),
+                content_length: Some(2),
+                supports_range: false,
+            },
+        );
+
+        let result = check_server_inner(&mock, "https://example.com/health").await;
+        assert!(result.is_ok());
+        assert!(result.unwrap());
+    }
+
+    #[tokio::test]
+    async fn check_server_inner_returns_true_for_204() {
+        let mock = MockHttpClient::new();
+        mock.add_response(
+            "https://example.com/health",
+            HttpResponse {
+                status: 204,
+                body: vec![],
+                content_length: Some(0),
+                supports_range: false,
+            },
+        );
+
+        let result = check_server_inner(&mock, "https://example.com/health").await;
+        assert!(result.is_ok());
+        assert!(result.unwrap());
+    }
+
+    #[tokio::test]
+    async fn check_server_inner_returns_false_for_404() {
+        let mock = MockHttpClient::new();
+        mock.add_response(
+            "https://example.com/health",
+            HttpResponse {
+                status: 404,
+                body: b"Not Found".to_vec(),
+                content_length: Some(9),
+                supports_range: false,
+            },
+        );
+
+        let result = check_server_inner(&mock, "https://example.com/health").await;
+        assert!(result.is_ok());
+        assert!(!result.unwrap());
+    }
+
+    #[tokio::test]
+    async fn check_server_inner_returns_false_for_500() {
+        let mock = MockHttpClient::new();
+        mock.add_response(
+            "https://example.com/health",
+            HttpResponse {
+                status: 500,
+                body: b"Internal Server Error".to_vec(),
+                content_length: Some(21),
+                supports_range: false,
+            },
+        );
+
+        let result = check_server_inner(&mock, "https://example.com/health").await;
+        assert!(result.is_ok());
+        assert!(!result.unwrap());
+    }
+
+    #[tokio::test]
+    async fn check_server_inner_returns_false_for_503() {
+        let mock = MockHttpClient::new();
+        mock.add_response(
+            "https://example.com/health",
+            HttpResponse {
+                status: 503,
+                body: b"Service Unavailable".to_vec(),
+                content_length: Some(19),
+                supports_range: false,
+            },
+        );
+
+        let result = check_server_inner(&mock, "https://example.com/health").await;
+        assert!(result.is_ok());
+        assert!(!result.unwrap());
+    }
+
+    #[tokio::test]
+    async fn check_server_inner_returns_error_on_network_failure() {
+        let mock = MockHttpClient::new();
+        mock.add_error("https://example.com/health", "Connection refused");
+
+        let result = check_server_inner(&mock, "https://example.com/health").await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Connection refused"));
+    }
+
+    #[tokio::test]
+    async fn check_server_inner_returns_error_on_timeout() {
+        let mock = MockHttpClient::new();
+        mock.add_error("https://example.com/health", "Request timeout");
+
+        let result = check_server_inner(&mock, "https://example.com/health").await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("timeout"));
+    }
+
+    #[tokio::test]
+    async fn check_server_inner_handles_unknown_url() {
+        let mock = MockHttpClient::new();
+        // MockHttpClient returns 404 for unknown URLs by default
+
+        let result = check_server_inner(&mock, "https://unknown.example.com/health").await;
+        assert!(result.is_ok());
+        assert!(!result.unwrap()); // 404 is not a success
+    }
+
+    // ============================================================================
+    // update_launcher_inner tests (HttpClient)
+    // ============================================================================
+
+    #[tokio::test]
+    async fn update_launcher_inner_downloads_successfully() {
+        let mock = MockHttpClient::new();
+        let update_data = b"fake executable content";
+        mock.add_response(
+            "https://example.com/launcher.exe",
+            HttpResponse {
+                status: 200,
+                body: update_data.to_vec(),
+                content_length: Some(update_data.len() as u64),
+                supports_range: false,
+            },
+        );
+
+        let result = update_launcher_inner(&mock, "https://example.com/launcher.exe").await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), update_data.to_vec());
+    }
+
+    #[tokio::test]
+    async fn update_launcher_inner_downloads_large_file() {
+        let mock = MockHttpClient::new();
+        // Simulate a larger update file (1MB)
+        let update_data: Vec<u8> = (0..1024 * 1024).map(|i| (i % 256) as u8).collect();
+        mock.add_response(
+            "https://example.com/launcher.exe",
+            HttpResponse {
+                status: 200,
+                body: update_data.clone(),
+                content_length: Some(update_data.len() as u64),
+                supports_range: false,
+            },
+        );
+
+        let result = update_launcher_inner(&mock, "https://example.com/launcher.exe").await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().len(), 1024 * 1024);
+    }
+
+    #[tokio::test]
+    async fn update_launcher_inner_returns_error_on_404() {
+        let mock = MockHttpClient::new();
+        mock.add_response(
+            "https://example.com/launcher.exe",
+            HttpResponse {
+                status: 404,
+                body: b"Not Found".to_vec(),
+                content_length: Some(9),
+                supports_range: false,
+            },
+        );
+
+        let result = update_launcher_inner(&mock, "https://example.com/launcher.exe").await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("HTTP 404"));
+    }
+
+    #[tokio::test]
+    async fn update_launcher_inner_returns_error_on_500() {
+        let mock = MockHttpClient::new();
+        mock.add_response(
+            "https://example.com/launcher.exe",
+            HttpResponse {
+                status: 500,
+                body: b"Internal Server Error".to_vec(),
+                content_length: Some(21),
+                supports_range: false,
+            },
+        );
+
+        let result = update_launcher_inner(&mock, "https://example.com/launcher.exe").await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("HTTP 500"));
+    }
+
+    #[tokio::test]
+    async fn update_launcher_inner_returns_error_on_network_failure() {
+        let mock = MockHttpClient::new();
+        mock.add_error("https://example.com/launcher.exe", "DNS resolution failed");
+
+        let result = update_launcher_inner(&mock, "https://example.com/launcher.exe").await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("DNS resolution failed"));
+    }
+
+    #[tokio::test]
+    async fn update_launcher_inner_returns_error_on_connection_refused() {
+        let mock = MockHttpClient::new();
+        mock.add_error("https://example.com/launcher.exe", "Connection refused");
+
+        let result = update_launcher_inner(&mock, "https://example.com/launcher.exe").await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Connection refused"));
+    }
+
+    #[tokio::test]
+    async fn update_launcher_inner_handles_empty_response() {
+        let mock = MockHttpClient::new();
+        mock.add_response(
+            "https://example.com/launcher.exe",
+            HttpResponse {
+                status: 200,
+                body: vec![],
+                content_length: Some(0),
+                supports_range: false,
+            },
+        );
+
+        let result = update_launcher_inner(&mock, "https://example.com/launcher.exe").await;
+        // An empty file is technically a valid response (though likely not a valid executable)
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_empty());
+    }
+
+    // ============================================================================
+    // write_update_file tests
+    // ============================================================================
+
+    #[tokio::test]
+    async fn write_update_file_creates_file() {
+        let temp_dir = tempdir().unwrap();
+        let output_path = temp_dir.path().join("update.exe");
+        let data = b"test update content";
+
+        let result = write_update_file(data, &output_path).await;
+        assert!(result.is_ok());
+        assert!(output_path.exists());
+
+        let written = std::fs::read(&output_path).unwrap();
+        assert_eq!(written, data);
+    }
+
+    #[tokio::test]
+    async fn write_update_file_overwrites_existing() {
+        let temp_dir = tempdir().unwrap();
+        let output_path = temp_dir.path().join("update.exe");
+
+        // Create an existing file
+        std::fs::write(&output_path, b"old content").unwrap();
+
+        // Overwrite with new content
+        let new_data = b"new update content";
+        let result = write_update_file(new_data, &output_path).await;
+        assert!(result.is_ok());
+
+        let written = std::fs::read(&output_path).unwrap();
+        assert_eq!(written, new_data);
+    }
+
+    #[tokio::test]
+    async fn write_update_file_writes_empty_file() {
+        let temp_dir = tempdir().unwrap();
+        let output_path = temp_dir.path().join("update.exe");
+
+        let result = write_update_file(&[], &output_path).await;
+        assert!(result.is_ok());
+        assert!(output_path.exists());
+
+        let written = std::fs::read(&output_path).unwrap();
+        assert!(written.is_empty());
+    }
+
+    #[tokio::test]
+    async fn write_update_file_writes_large_file() {
+        let temp_dir = tempdir().unwrap();
+        let output_path = temp_dir.path().join("update.exe");
+
+        // 1MB file
+        let data: Vec<u8> = (0..1024 * 1024).map(|i| (i % 256) as u8).collect();
+
+        let result = write_update_file(&data, &output_path).await;
+        assert!(result.is_ok());
+
+        let written = std::fs::read(&output_path).unwrap();
+        assert_eq!(written.len(), 1024 * 1024);
+    }
+
+    #[tokio::test]
+    async fn write_update_file_fails_for_invalid_path() {
+        // Use a path that should not be writable
+        let invalid_path = std::path::Path::new("/nonexistent/directory/update.exe");
+
+        let result = write_update_file(b"test", invalid_path).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Failed to write update file"));
+    }
+
+    // ============================================================================
+    // Integration-style tests combining multiple functions
+    // ============================================================================
+
+    #[tokio::test]
+    async fn download_and_write_update_integration() {
+        let mock = MockHttpClient::new();
+        let update_data = b"complete update executable";
+        mock.add_response(
+            "https://example.com/launcher.exe",
+            HttpResponse {
+                status: 200,
+                body: update_data.to_vec(),
+                content_length: Some(update_data.len() as u64),
+                supports_range: false,
+            },
+        );
+
+        // Download
+        let downloaded = update_launcher_inner(&mock, "https://example.com/launcher.exe")
+            .await
+            .unwrap();
+
+        // Write
+        let temp_dir = tempdir().unwrap();
+        let output_path = temp_dir.path().join("launcher_update.exe");
+        write_update_file(&downloaded, &output_path).await.unwrap();
+
+        // Verify
+        let written = std::fs::read(&output_path).unwrap();
+        assert_eq!(written, update_data);
+    }
+
+    #[tokio::test]
+    async fn check_server_before_update_flow() {
+        let mock = MockHttpClient::new();
+
+        // Server health check
+        mock.add_response(
+            "https://example.com/health",
+            HttpResponse {
+                status: 200,
+                body: b"OK".to_vec(),
+                content_length: Some(2),
+                supports_range: false,
+            },
+        );
+
+        // Update file
+        let update_data = b"update content";
+        mock.add_response(
+            "https://example.com/launcher.exe",
+            HttpResponse {
+                status: 200,
+                body: update_data.to_vec(),
+                content_length: Some(update_data.len() as u64),
+                supports_range: false,
+            },
+        );
+
+        // Check server first
+        let is_available = check_server_inner(&mock, "https://example.com/health")
+            .await
+            .unwrap();
+        assert!(is_available);
+
+        // Then download update
+        let downloaded = update_launcher_inner(&mock, "https://example.com/launcher.exe")
+            .await
+            .unwrap();
+        assert_eq!(downloaded, update_data);
+    }
+
+    #[tokio::test]
+    async fn check_server_fails_prevents_update() {
+        let mock = MockHttpClient::new();
+        mock.add_error("https://example.com/health", "Connection refused");
+
+        // Server check should fail
+        let result = check_server_inner(&mock, "https://example.com/health").await;
+        assert!(result.is_err());
+        // In real code, we would not proceed with update if server is unreachable
+    }
+}

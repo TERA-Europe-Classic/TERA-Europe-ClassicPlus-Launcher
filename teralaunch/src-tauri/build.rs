@@ -17,33 +17,43 @@ fn main() {
     let mut psk_bytes = [0u8; 32];
 
     // 1) Try build-config.toml
-    let crate_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR missing"));
+    let crate_dir =
+        PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR missing"));
     let cfg_path = crate_dir.join("build-config.toml");
     if cfg_path.exists() {
         match fs::read_to_string(&cfg_path) {
-            Ok(s) => {
-                match s.parse::<toml::Value>() {
-                    Ok(v) => {
-                        if let Some(psk_hex) = v.get("mirror").and_then(|m| m.get("psk_hex")).and_then(|t| t.as_str()) {
-                            let hex = psk_hex.trim();
-                            if hex.len() == 64 && hex.as_bytes().iter().all(|&c| c.is_ascii_hexdigit()) {
-                                for i in 0..32 {
-                                    let hi = hex.as_bytes()[2*i];
-                                    let lo = hex.as_bytes()[2*i+1];
-                                    psk_bytes[i] = (hex_nibble(hi) << 4) | hex_nibble(lo);
-                                }
-                                for b in &mut psk_bytes { *b ^= 0xB3; }
-                                psk_set = true;
-                            } else {
-                                println!("cargo:warning=build.rs: [mirror].psk_hex must be 64 hex chars");
+            Ok(s) => match s.parse::<toml::Value>() {
+                Ok(v) => {
+                    if let Some(psk_hex) = v
+                        .get("mirror")
+                        .and_then(|m| m.get("psk_hex"))
+                        .and_then(|t| t.as_str())
+                    {
+                        let hex = psk_hex.trim();
+                        if hex.len() == 64 && hex.as_bytes().iter().all(|&c| c.is_ascii_hexdigit())
+                        {
+                            for (i, byte) in psk_bytes.iter_mut().enumerate() {
+                                let hi = hex.as_bytes()[2 * i];
+                                let lo = hex.as_bytes()[2 * i + 1];
+                                *byte = (hex_nibble(hi) << 4) | hex_nibble(lo);
                             }
+                            for b in &mut psk_bytes {
+                                *b ^= 0xB3;
+                            }
+                            psk_set = true;
                         } else {
-                            println!("cargo:warning=build.rs: missing [mirror].psk_hex in build-config.toml");
+                            println!(
+                                "cargo:warning=build.rs: [mirror].psk_hex must be 64 hex chars"
+                            );
                         }
+                    } else {
+                        println!(
+                            "cargo:warning=build.rs: missing [mirror].psk_hex in build-config.toml"
+                        );
                     }
-                    Err(_) => println!("cargo:warning=build.rs: invalid build-config.toml"),
                 }
-            }
+                Err(_) => println!("cargo:warning=build.rs: invalid build-config.toml"),
+            },
             Err(_) => println!("cargo:warning=build.rs: failed to read build-config.toml"),
         }
     }
@@ -53,12 +63,14 @@ fn main() {
         if let Ok(psk_hex) = env::var("MIRROR_PSK_HEX") {
             let hex = psk_hex.trim();
             if hex.len() == 64 && hex.as_bytes().iter().all(|&c| c.is_ascii_hexdigit()) {
-                for i in 0..32 {
-                    let hi = hex.as_bytes()[2*i];
-                    let lo = hex.as_bytes()[2*i+1];
-                    psk_bytes[i] = (hex_nibble(hi) << 4) | hex_nibble(lo);
+                for (i, byte) in psk_bytes.iter_mut().enumerate() {
+                    let hi = hex.as_bytes()[2 * i];
+                    let lo = hex.as_bytes()[2 * i + 1];
+                    *byte = (hex_nibble(hi) << 4) | hex_nibble(lo);
                 }
-                for b in &mut psk_bytes { *b ^= 0xB3; }
+                for b in &mut psk_bytes {
+                    *b ^= 0xB3;
+                }
                 psk_set = true;
             } else {
                 println!("cargo:warning=build.rs: invalid MIRROR_PSK_HEX (need 64 hex chars)");
@@ -79,8 +91,7 @@ fn main() {
 pub const GEN_MIRROR_PSK_SET: bool = {};
 pub const GEN_MIRROR_PSK: [u8; 32] = {:?};
 ",
-        psk_set,
-        psk_bytes
+        psk_set, psk_bytes
     );
     fs::write(out_dir.join("mirror_cfg_gen.rs"), gen).expect("write mirror_cfg_gen.rs");
 
@@ -98,7 +109,6 @@ pub const GEN_MIRROR_PSK: [u8; 32] = {:?};
         windows = windows.app_manifest(include_str!("windows-app-manifest.xml"));
         let attrs = tauri_build::Attributes::new().windows_attributes(windows);
         tauri_build::try_build(attrs).expect("Failed to build with custom Windows manifest");
-        return;
     }
 
     #[cfg(not(target_os = "windows"))]

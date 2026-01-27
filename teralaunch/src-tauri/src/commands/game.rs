@@ -126,13 +126,15 @@ pub async fn handle_launch_game(
     info!("Total time: {:?}", 3);
     let is_running = *state.status_receiver.lock().await.borrow();
 
-    let auth_info = read_auth_info();
-    let account_name = auth_info.user_no.to_string();
-    let characters_count = auth_info.character_count.clone();
-    let ticket = auth_info.auth_key.clone();
-    let auth_key = auth_info.auth_key.clone();
-    let user_no = auth_info.user_no;
-    drop(auth_info); // Release the lock before loading config
+    let (account_name, characters_count, ticket, auth_key, user_no) = {
+        let auth_info = read_auth_info();
+        let account_name = auth_info.user_no.to_string();
+        let characters_count = auth_info.character_count.clone();
+        let ticket = auth_info.auth_key.clone();
+        let auth_key = auth_info.auth_key.clone();
+        let user_no = auth_info.user_no;
+        (account_name, characters_count, ticket, auth_key, user_no)
+    };
 
     let mut is_launching = state.is_launching.lock().await;
     game_service::validate_launch_preconditions(*is_launching, is_running, &auth_key)?;
@@ -232,7 +234,7 @@ pub async fn handle_launch_game(
 #[tauri::command]
 #[cfg(not(tarpaulin_include))]
 pub async fn get_game_status(state: tauri::State<'_, GameState>) -> Result<bool, String> {
-    let status = state.status_receiver.lock().await.borrow().clone();
+    let status = *state.status_receiver.lock().await.borrow();
     let is_launching = *state.is_launching.lock().await;
     Ok(status || is_launching)
 }
@@ -290,10 +292,7 @@ mod tests {
 
         let result = validate_auth_info(&auth_info);
         assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err(),
-            "User not authenticated (user_no is 0)"
-        );
+        assert_eq!(result.unwrap_err(), "User not authenticated (user_no is 0)");
     }
 
     #[test]
@@ -317,10 +316,7 @@ mod tests {
         let result = validate_auth_info(&auth_info);
         assert!(result.is_err());
         // Default has user_no = 0, so that error takes precedence
-        assert_eq!(
-            result.unwrap_err(),
-            "User not authenticated (user_no is 0)"
-        );
+        assert_eq!(result.unwrap_err(), "User not authenticated (user_no is 0)");
     }
 
     #[test]

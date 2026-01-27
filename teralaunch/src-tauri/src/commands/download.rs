@@ -14,7 +14,6 @@
 #![allow(dead_code)]
 
 use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -32,26 +31,27 @@ use tokio::task::JoinSet;
 use crate::commands::config::get_game_path;
 use crate::domain::{
     FileInfo, ProgressPayload, BUFFER_SIZE, BUFWRITER_CAPACITY, CHUNK_MIN_SIZE,
-    CONNECT_TIMEOUT_SECS, DOWNLOAD_TIMEOUT_SECS, HTTP_POOL_MAX_IDLE_PER_HOST, MAX_CONCURRENT_DOWNLOADS,
-    MAX_PARTS, MAX_RETRIES, PART_ASSEMBLY_BUFFER_SIZE, PART_SIZE, PROGRESS_UPDATE_MS, STALL_TIMEOUT_SECS,
+    CONNECT_TIMEOUT_SECS, DOWNLOAD_TIMEOUT_SECS, HTTP_POOL_MAX_IDLE_PER_HOST,
+    MAX_CONCURRENT_DOWNLOADS, MAX_PARTS, MAX_RETRIES, PART_ASSEMBLY_BUFFER_SIZE, PART_SIZE,
+    PROGRESS_UPDATE_MS, STALL_TIMEOUT_SECS,
 };
 use crate::infrastructure::{EventEmitter, HttpClient, HttpResponse};
 use crate::services::download_service;
 use crate::state::{
-    cancel_download, get_current_file_name, is_download_cancelled, set_current_file_name,
-    set_download_cancelled,
+    add_downloaded_bytes, cancel_download, get_current_file_name,
+    get_downloaded_bytes as state_get_downloaded_bytes, is_download_cancelled,
+    set_current_file_name, set_download_cancelled, set_downloaded_bytes, sub_downloaded_bytes,
 };
-use crate::utils::{is_transient_download_error, retry_delay_ms, stall_exceeded, validate_path_within_base};
-
-// Global download state - accessed for atomic operations
-static GLOBAL_DOWNLOADED_BYTES: AtomicU64 = AtomicU64::new(0);
+use crate::utils::{
+    is_transient_download_error, resume_offset, retry_delay_ms, stall_exceeded,
+    validate_path_within_base,
+};
 
 /// Gets the current downloaded byte count.
 #[tauri::command]
 pub fn get_downloaded_bytes() -> u64 {
-    GLOBAL_DOWNLOADED_BYTES.load(Ordering::SeqCst)
+    state_get_downloaded_bytes()
 }
-
 
 /// Cancels any ongoing downloads.
 #[tauri::command]
@@ -96,7 +96,7 @@ pub async fn download_all_files(
 
     let mut results: Vec<Option<u64>> = vec![None; total_files];
     let mut files_by_index: Vec<Option<FileInfo>> = vec![None; total_files];
-    GLOBAL_DOWNLOADED_BYTES.store(initial_downloaded, Ordering::SeqCst);
+    set_downloaded_bytes(initial_downloaded);
     set_download_cancelled(false);
 
     let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_DOWNLOADS));
@@ -113,7 +113,7 @@ pub async fn download_all_files(
             let mut last_change = Instant::now();
             loop {
                 interval.tick().await;
-                let d = GLOBAL_DOWNLOADED_BYTES.load(Ordering::SeqCst);
+                let d = state_get_downloaded_bytes();
                 let elapsed = global_start.elapsed();
                 let speed = if elapsed.as_secs() > 0 {
                     d.saturating_sub(initial_downloaded) / elapsed.as_secs()
@@ -236,11 +236,11 @@ pub async fn download_all_files(
         }
     }
 
-    let downloaded_sizes: Vec<u64> = results.into_iter().filter_map(|x| x).collect();
+    let downloaded_sizes: Vec<u64> = results.into_iter().flatten().collect();
 
     if !is_download_cancelled() {
         // Post-download verification of files that completed
-        for (_idx, maybe_file) in files_by_index.into_iter().enumerate() {
+        for maybe_file in files_by_index.into_iter() {
             if is_download_cancelled() {
                 break;
             }
@@ -333,7 +333,7 @@ pub async fn update_file(
     let mut resume_from = resume_offset(file_info.existing_size, file_size);
 
     if resume_from > 0 && !file_path.exists() {
-        GLOBAL_DOWNLOADED_BYTES.fetch_sub(resume_from, Ordering::SeqCst);
+        sub_downloaded_bytes(resume_from);
         resume_from = 0;
     }
 
@@ -389,7 +389,7 @@ pub async fn update_file(
             let status = res.status();
             let has_content_range = res.headers().get("content-range").is_some();
             if status != reqwest::StatusCode::PARTIAL_CONTENT && !has_content_range {
-                GLOBAL_DOWNLOADED_BYTES.fetch_sub(resume_from, Ordering::SeqCst);
+                sub_downloaded_bytes(resume_from);
                 resume_from = 0;
                 drop(file);
                 tokio::fs::remove_file(&file_path).await.ok();
@@ -409,14 +409,14 @@ pub async fn update_file(
                     file.write_all(&chunk).await.map_err(|e| e.to_string())?;
                     let len = chunk.len() as u64;
                     downloaded += len;
-                    GLOBAL_DOWNLOADED_BYTES.fetch_add(len, Ordering::SeqCst);
+                    add_downloaded_bytes(len);
                 }
                 bytes_written = resume_from + downloaded;
                 return Ok(bytes_written);
             }
         }
 
-        GLOBAL_DOWNLOADED_BYTES.fetch_sub(resume_from, Ordering::SeqCst);
+        sub_downloaded_bytes(resume_from);
         drop(file);
         tokio::fs::remove_file(&file_path).await.ok();
         let file_handle = tokio::fs::File::create(&file_path)
@@ -464,14 +464,14 @@ pub async fn update_file(
                 file.write_all(&chunk).await.map_err(|e| e.to_string())?;
                 let len = chunk.len() as u64;
                 downloaded += len;
-                GLOBAL_DOWNLOADED_BYTES.fetch_add(len, Ordering::SeqCst);
+                add_downloaded_bytes(len);
             }
             bytes_written = downloaded;
         } else {
             // Perform chunked parallel download using HTTP ranges into temp parts
             let num_parts = std::cmp::max(
                 1,
-                std::cmp::min(MAX_PARTS as u64, (file_size + PART_SIZE - 1) / PART_SIZE) as usize,
+                std::cmp::min(MAX_PARTS as u64, file_size.div_ceil(PART_SIZE)) as usize,
             );
             let mut join_set: JoinSet<Result<(), String>> = JoinSet::new();
 
@@ -526,7 +526,7 @@ pub async fn update_file(
                             .await
                             .map_err(|e| e.to_string())?;
                         let len = chunk.len() as u64;
-                        GLOBAL_DOWNLOADED_BYTES.fetch_add(len, Ordering::SeqCst);
+                        add_downloaded_bytes(len);
                     }
 
                     part_file.flush().await.map_err(|e| e.to_string())?;
@@ -581,7 +581,7 @@ pub async fn update_file(
             file.write_all(&chunk).await.map_err(|e| e.to_string())?;
             let len = chunk.len() as u64;
             downloaded += len;
-            GLOBAL_DOWNLOADED_BYTES.fetch_add(len, Ordering::SeqCst);
+            add_downloaded_bytes(len);
         }
         bytes_written = downloaded;
     }
@@ -791,8 +791,10 @@ pub fn emit_download_progress<E: EventEmitter>(
     let session_downloaded = params
         .downloaded_bytes
         .saturating_sub(params.base_downloaded);
-    let speed = download_service::calculate_speed(session_downloaded, params.elapsed_time.as_secs());
-    let progress = download_service::calculate_progress(params.downloaded_bytes, params.total_bytes);
+    let speed =
+        download_service::calculate_speed(session_downloaded, params.elapsed_time.as_secs());
+    let progress =
+        download_service::calculate_progress(params.downloaded_bytes, params.total_bytes);
 
     let payload = ProgressPayload {
         file_name: params.current_file_name.clone(),
@@ -901,7 +903,7 @@ mod tests {
 
     #[test]
     fn test_get_downloaded_bytes() {
-        GLOBAL_DOWNLOADED_BYTES.store(1234, Ordering::SeqCst);
+        set_downloaded_bytes(1234);
         assert_eq!(get_downloaded_bytes(), 1234);
     }
 
@@ -1312,8 +1314,7 @@ mod tests {
         let mock = MockHttpClient::new();
         mock.add_error(url, "Connection refused: network error");
 
-        let result =
-            download_file_with_client(&mock, url, &file_path, 0, || false, |_| {}).await;
+        let result = download_file_with_client(&mock, url, &file_path, 0, || false, |_| {}).await;
 
         assert!(result.is_err());
         let error = result.unwrap_err();
@@ -1341,8 +1342,7 @@ mod tests {
             },
         );
 
-        let result =
-            download_file_with_client(&mock, url, &file_path, 0, || false, |_| {}).await;
+        let result = download_file_with_client(&mock, url, &file_path, 0, || false, |_| {}).await;
 
         assert!(result.is_err());
         let error = result.unwrap_err();
@@ -1428,8 +1428,7 @@ mod tests {
             },
         );
 
-        let result =
-            download_file_with_client(&mock, url, &nested_path, 0, || false, |_| {}).await;
+        let result = download_file_with_client(&mock, url, &nested_path, 0, || false, |_| {}).await;
 
         assert!(result.is_ok(), "Should create directories: {:?}", result);
         assert!(nested_path.exists(), "File should exist at nested path");
@@ -1456,8 +1455,7 @@ mod tests {
         );
 
         // Already cancelled before download starts
-        let result =
-            download_file_with_client(&mock, url, &file_path, 0, || true, |_| {}).await;
+        let result = download_file_with_client(&mock, url, &file_path, 0, || true, |_| {}).await;
 
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "cancelled");
@@ -1480,8 +1478,7 @@ mod tests {
             },
         );
 
-        let result =
-            download_file_with_client(&mock, url, &file_path, 0, || false, |_| {}).await;
+        let result = download_file_with_client(&mock, url, &file_path, 0, || false, |_| {}).await;
 
         assert!(result.is_ok());
         let download_result = result.unwrap();
@@ -1736,12 +1733,15 @@ mod tests {
 
         // Range request returns 500 error but supports_range is true
         // This simulates a server that supports ranges but returns an error
-        mock.add_range_response("http://example.com/file.pak", HttpResponse {
-            status: 500,
-            body: b"Internal Server Error".to_vec(),
-            content_length: None,
-            supports_range: true, // This makes supports_range check pass
-        });
+        mock.add_range_response(
+            "http://example.com/file.pak",
+            HttpResponse {
+                status: 500,
+                body: b"Internal Server Error".to_vec(),
+                content_length: None,
+                supports_range: true, // This makes supports_range check pass
+            },
+        );
 
         let temp_dir = tempfile::tempdir().unwrap();
         let path = temp_dir.path().join("test.pak");
@@ -1753,7 +1753,8 @@ mod tests {
             100, // resume_from > 0 to trigger range path
             || false,
             |_| {},
-        ).await;
+        )
+        .await;
 
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("HTTP error: 500"));
@@ -1765,20 +1766,26 @@ mod tests {
         let mock = MockHttpClient::new();
 
         // Probe returns 200 (no range support) - uses get_range internally
-        mock.add_range_response("http://example.com/file.pak", HttpResponse {
-            status: 200,
-            body: vec![],
-            content_length: Some(1000),
-            supports_range: false,
-        });
+        mock.add_range_response(
+            "http://example.com/file.pak",
+            HttpResponse {
+                status: 200,
+                body: vec![],
+                content_length: Some(1000),
+                supports_range: false,
+            },
+        );
 
         // Regular GET returns 503 error
-        mock.add_response("http://example.com/file.pak", HttpResponse {
-            status: 503,
-            body: b"Service Unavailable".to_vec(),
-            content_length: None,
-            supports_range: false,
-        });
+        mock.add_response(
+            "http://example.com/file.pak",
+            HttpResponse {
+                status: 503,
+                body: b"Service Unavailable".to_vec(),
+                content_length: None,
+                supports_range: false,
+            },
+        );
 
         let temp_dir = tempfile::tempdir().unwrap();
         let path = temp_dir.path().join("test.pak");
@@ -1790,7 +1797,8 @@ mod tests {
             100, // resume_from > 0 to trigger range path
             || false,
             |_| {},
-        ).await;
+        )
+        .await;
 
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("HTTP error: 503"));
