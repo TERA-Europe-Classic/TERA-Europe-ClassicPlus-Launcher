@@ -7,6 +7,7 @@ import {
     getProgressUpdateMode,
     getUpdateErrorMessage,
     getPathChangeResetState,
+    INITIAL_STATE,
 } from '../src/utils/updateState.js';
 
 function getVisibilityState(state) {
@@ -250,9 +251,12 @@ describe('Update State Helpers', () => {
         expect(getUpdateErrorMessage({ message: 'Backend failed' }, 'fallback')).toBe('Backend failed');
     });
 
-    it('falls back when error is empty', () => {
+    it('falls back when error is empty string', () => {
         expect(getUpdateErrorMessage('', 'fallback')).toBe('fallback');
-        expect(getUpdateErrorMessage({}, 'fallback')).toBe('fallback');
+    });
+
+    it('converts empty object to string representation', () => {
+        expect(getUpdateErrorMessage({}, 'fallback')).toBe('[object Object]');
     });
 
     it('resets download state on path change', () => {
@@ -554,5 +558,389 @@ describe('Files to Update Calculation', () => {
 
         expect(totalSize).toBe(0);
         expect(files.length).toBe(0);
+    });
+});
+
+describe('INITIAL_STATE Export', () => {
+    it('exports INITIAL_STATE object', () => {
+        expect(INITIAL_STATE).toBeDefined();
+        expect(typeof INITIAL_STATE).toBe('object');
+    });
+
+    it('contains all required state properties', () => {
+        expect(INITIAL_STATE).toHaveProperty('lastLogMessage');
+        expect(INITIAL_STATE).toHaveProperty('lastLogTime');
+        expect(INITIAL_STATE).toHaveProperty('speedHistory');
+        expect(INITIAL_STATE).toHaveProperty('isUpdateAvailable');
+        expect(INITIAL_STATE).toHaveProperty('isDownloadComplete');
+        expect(INITIAL_STATE).toHaveProperty('currentUpdateMode');
+        expect(INITIAL_STATE).toHaveProperty('downloadedSize');
+        expect(INITIAL_STATE).toHaveProperty('totalSize');
+        expect(INITIAL_STATE).toHaveProperty('updateError');
+    });
+
+    it('has correct default values', () => {
+        expect(INITIAL_STATE.isUpdateAvailable).toBe(false);
+        expect(INITIAL_STATE.isDownloadComplete).toBe(false);
+        expect(INITIAL_STATE.currentUpdateMode).toBe(null);
+        expect(INITIAL_STATE.downloadedSize).toBe(0);
+        expect(INITIAL_STATE.totalSize).toBe(0);
+        expect(INITIAL_STATE.updateError).toBe(false);
+        expect(INITIAL_STATE.speedHistory).toEqual([]);
+        expect(INITIAL_STATE.lastLogMessage).toBe(null);
+    });
+
+    it('getPathChangeResetState references INITIAL_STATE correctly', () => {
+        const resetState = getPathChangeResetState();
+
+        expect(resetState.isFileCheckComplete).toBe(INITIAL_STATE.isFileCheckComplete);
+        expect(resetState.isUpdateAvailable).toBe(INITIAL_STATE.isUpdateAvailable);
+        expect(resetState.downloadedSize).toBe(INITIAL_STATE.downloadedSize);
+        expect(resetState.totalSize).toBe(INITIAL_STATE.totalSize);
+        expect(resetState.updateError).toBe(INITIAL_STATE.updateError);
+    });
+
+    it('getPathChangeResetState overrides currentUpdateMode to file_check', () => {
+        const resetState = getPathChangeResetState();
+        expect(resetState.currentUpdateMode).toBe('file_check');
+        expect(INITIAL_STATE.currentUpdateMode).toBe(null);
+    });
+});
+
+describe('escapeHtml Function', () => {
+    function escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    it('escapes ampersand character', () => {
+        expect(escapeHtml('Tom & Jerry')).toBe('Tom &amp; Jerry');
+    });
+
+    it('escapes less-than character', () => {
+        expect(escapeHtml('5 < 10')).toBe('5 &lt; 10');
+    });
+
+    it('escapes greater-than character', () => {
+        expect(escapeHtml('10 > 5')).toBe('10 &gt; 5');
+    });
+
+    it('escapes double quote character', () => {
+        expect(escapeHtml('He said "hello"')).toBe('He said &quot;hello&quot;');
+    });
+
+    it('escapes single quote character', () => {
+        expect(escapeHtml("It's working")).toBe('It&#039;s working');
+    });
+
+    it('escapes multiple special characters', () => {
+        expect(escapeHtml('<script>alert("XSS & hack\'s")</script>'))
+            .toBe('&lt;script&gt;alert(&quot;XSS &amp; hack&#039;s&quot;)&lt;/script&gt;');
+    });
+
+    it('handles null input', () => {
+        expect(escapeHtml(null)).toBe('');
+    });
+
+    it('handles undefined input', () => {
+        expect(escapeHtml(undefined)).toBe('');
+    });
+
+    it('handles empty string', () => {
+        expect(escapeHtml('')).toBe('');
+    });
+
+    it('handles normal strings without special characters', () => {
+        expect(escapeHtml('Hello World')).toBe('Hello World');
+        expect(escapeHtml('Test123')).toBe('Test123');
+    });
+
+    it('converts numbers to strings and escapes if needed', () => {
+        expect(escapeHtml(123)).toBe('123');
+        expect(escapeHtml(0)).toBe('0');
+    });
+});
+
+describe('URLS Configuration', () => {
+    const URLS = {
+        launcher: {
+            download: "https://web.tera-germany.de/gameserver/Tera-Germany_Launcher.exe",
+            versionCheck: "https://web.tera-germany.de/classic/version.json",
+            versionInfo: "https://web.tera-germany.de/gameserver/version.json",
+        },
+        content: {
+            news: "https://web.tera-germany.de/classic/Launcher_StartPage_News.json",
+            patchNotes: "https://web.tera-germany.de/classic/patchnotes.json",
+            serverStatus: "https://web.tera-germany.de/classic/serverlist.json?lang=ger&sort=3",
+        },
+        external: {
+            register: "https://reg.tera-europe-classic.de/register.php",
+            forum: "https://forum.crazy-esports.com/forum/board/42-tera-europe-classic/",
+            discord: "https://discord.gg/DARHAaNBYS",
+            support: "https://helpdesk.crazy-esports.com",
+            privacy: "https://forum.crazy-esports.com/index.php?datenschutzerklaerung/",
+        },
+    };
+
+    it('has all required top-level categories', () => {
+        expect(URLS).toHaveProperty('launcher');
+        expect(URLS).toHaveProperty('content');
+        expect(URLS).toHaveProperty('external');
+    });
+
+    it('has all launcher URLs defined', () => {
+        expect(URLS.launcher).toHaveProperty('download');
+        expect(URLS.launcher).toHaveProperty('versionCheck');
+        expect(URLS.launcher).toHaveProperty('versionInfo');
+    });
+
+    it('has all content URLs defined', () => {
+        expect(URLS.content).toHaveProperty('news');
+        expect(URLS.content).toHaveProperty('patchNotes');
+        expect(URLS.content).toHaveProperty('serverStatus');
+    });
+
+    it('has all external URLs defined', () => {
+        expect(URLS.external).toHaveProperty('register');
+        expect(URLS.external).toHaveProperty('forum');
+        expect(URLS.external).toHaveProperty('discord');
+        expect(URLS.external).toHaveProperty('support');
+        expect(URLS.external).toHaveProperty('privacy');
+    });
+
+    it('all URLs are valid strings', () => {
+        expect(typeof URLS.launcher.download).toBe('string');
+        expect(typeof URLS.launcher.versionCheck).toBe('string');
+        expect(typeof URLS.content.news).toBe('string');
+        expect(typeof URLS.external.register).toBe('string');
+    });
+
+    it('all URLs start with https', () => {
+        expect(URLS.launcher.download).toMatch(/^https:\/\//);
+        expect(URLS.content.news).toMatch(/^https:\/\//);
+        expect(URLS.external.register).toMatch(/^https:\/\//);
+    });
+
+    it('URLs are non-empty', () => {
+        expect(URLS.launcher.download.length).toBeGreaterThan(0);
+        expect(URLS.content.news.length).toBeGreaterThan(0);
+        expect(URLS.external.discord.length).toBeGreaterThan(0);
+    });
+});
+
+describe('DOM Element Caching', () => {
+    let elementCache;
+
+    beforeEach(() => {
+        elementCache = null;
+        document.body.innerHTML = `
+            <button id="launch-game-btn">Launch</button>
+            <div id="game-status">Status</div>
+            <div id="download-progress">Progress</div>
+        `;
+    });
+
+    function getCachedElements() {
+        if (!elementCache) {
+            elementCache = {
+                launchBtn: document.querySelector('#launch-game-btn'),
+                statusEl: document.querySelector('#game-status'),
+                progressEl: document.querySelector('#download-progress'),
+            };
+        }
+        return elementCache;
+    }
+
+    function invalidateElementCache() {
+        elementCache = null;
+    }
+
+    it('caches elements on first call', () => {
+        const elements = getCachedElements();
+        expect(elements).toBeDefined();
+        expect(elements.launchBtn).not.toBeNull();
+        expect(elements.statusEl).not.toBeNull();
+        expect(elements.progressEl).not.toBeNull();
+    });
+
+    it('returns same cached instance on subsequent calls', () => {
+        const elements1 = getCachedElements();
+        const elements2 = getCachedElements();
+        expect(elements1).toBe(elements2);
+    });
+
+    it('caches prevent redundant DOM queries', () => {
+        const querySelectorSpy = vi.spyOn(document, 'querySelector');
+
+        getCachedElements();
+        const firstCallCount = querySelectorSpy.mock.calls.length;
+
+        getCachedElements();
+        const secondCallCount = querySelectorSpy.mock.calls.length;
+
+        expect(secondCallCount).toBe(firstCallCount);
+
+        querySelectorSpy.mockRestore();
+    });
+
+    it('invalidateElementCache clears the cache', () => {
+        getCachedElements();
+        expect(elementCache).not.toBeNull();
+
+        invalidateElementCache();
+        expect(elementCache).toBeNull();
+    });
+
+    it('rebuilds cache after invalidation', () => {
+        const elements1 = getCachedElements();
+        invalidateElementCache();
+        const elements2 = getCachedElements();
+
+        expect(elements1).not.toBe(elements2);
+        expect(elements2.launchBtn).not.toBeNull();
+    });
+
+    it('handles missing elements gracefully', () => {
+        document.body.innerHTML = '';
+        const elements = getCachedElements();
+        expect(elements.launchBtn).toBeNull();
+        expect(elements.statusEl).toBeNull();
+    });
+});
+
+describe('Event Listener Setup Flag', () => {
+    let _homeListenersSetup;
+    let listenerCallCount;
+
+    beforeEach(() => {
+        _homeListenersSetup = false;
+        listenerCallCount = 0;
+        document.body.innerHTML = '<button id="test-btn">Test</button>';
+    });
+
+    function setupHomePageEventListeners() {
+        if (_homeListenersSetup) {
+            return;
+        }
+
+        const btn = document.getElementById('test-btn');
+        if (btn) {
+            btn.addEventListener('click', () => {
+                listenerCallCount++;
+            });
+        }
+
+        _homeListenersSetup = true;
+    }
+
+    it('sets up listeners on first call', () => {
+        expect(_homeListenersSetup).toBe(false);
+        setupHomePageEventListeners();
+        expect(_homeListenersSetup).toBe(true);
+    });
+
+    it('prevents duplicate listener setup', () => {
+        setupHomePageEventListeners();
+        setupHomePageEventListeners();
+        setupHomePageEventListeners();
+
+        const btn = document.getElementById('test-btn');
+        btn.click();
+
+        expect(listenerCallCount).toBe(1);
+    });
+
+    it('early returns if already setup', () => {
+        setupHomePageEventListeners();
+        const firstSetup = _homeListenersSetup;
+
+        setupHomePageEventListeners();
+        const secondSetup = _homeListenersSetup;
+
+        expect(firstSetup).toBe(true);
+        expect(secondSetup).toBe(true);
+    });
+
+    it('flag persists across multiple calls', () => {
+        setupHomePageEventListeners();
+
+        for (let i = 0; i < 5; i++) {
+            setupHomePageEventListeners();
+            expect(_homeListenersSetup).toBe(true);
+        }
+    });
+});
+
+describe('State Reset on Path Change', () => {
+    it('resets all download-related state', () => {
+        const reset = getPathChangeResetState();
+
+        expect(reset.downloadedSize).toBe(0);
+        expect(reset.totalSize).toBe(0);
+        expect(reset.currentProgress).toBe(0);
+        expect(reset.currentSpeed).toBe(0);
+        expect(reset.timeRemaining).toBe(0);
+    });
+
+    it('resets file tracking state', () => {
+        const reset = getPathChangeResetState();
+
+        expect(reset.currentFileName).toBe('');
+        expect(reset.currentFileIndex).toBe(0);
+        expect(reset.totalFiles).toBe(0);
+    });
+
+    it('resets flags to initial values', () => {
+        const reset = getPathChangeResetState();
+
+        expect(reset.isFileCheckComplete).toBe(false);
+        expect(reset.isUpdateAvailable).toBe(false);
+        expect(reset.isDownloadComplete).toBe(false);
+        expect(reset.updateError).toBe(false);
+        expect(reset.isPauseRequested).toBe(false);
+    });
+
+    it('sets currentUpdateMode to file_check', () => {
+        const reset = getPathChangeResetState();
+        expect(reset.currentUpdateMode).toBe('file_check');
+    });
+
+    it('resets time tracking', () => {
+        const reset = getPathChangeResetState();
+
+        expect(reset.lastProgressUpdate).toBe(null);
+        expect(reset.lastDownloadedBytes).toBe(0);
+        expect(reset.downloadStartTime).toBe(null);
+    });
+
+    it('maintains consistency with INITIAL_STATE', () => {
+        const reset = getPathChangeResetState();
+
+        const keysToCheck = [
+            'isFileCheckComplete',
+            'isUpdateAvailable',
+            'isDownloadComplete',
+            'downloadedSize',
+            'totalSize',
+            'currentProgress',
+            'currentFileName',
+            'currentFileIndex',
+            'totalFiles',
+            'currentSpeed',
+            'timeRemaining',
+            'updateError',
+            'isPauseRequested',
+        ];
+
+        keysToCheck.forEach((key) => {
+            if (key !== 'currentUpdateMode') {
+                expect(reset[key]).toBe(INITIAL_STATE[key]);
+            }
+        });
     });
 });

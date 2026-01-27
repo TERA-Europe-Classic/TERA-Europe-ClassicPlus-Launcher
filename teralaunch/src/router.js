@@ -126,7 +126,7 @@ const createRouter = (App) => ({
     },
 
     async simulateLoadingDelay() {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // No artificial delay - immediate transitions feel more responsive
     },
 
     /**

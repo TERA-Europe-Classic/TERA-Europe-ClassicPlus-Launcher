@@ -13,14 +13,54 @@ const { listen } = window.__TAURI__.event;
 const { appWindow, WebviewWindow } = window.__TAURI__.window;
 const { message, ask } = window.__TAURI__.dialog;
 
+/**
+ * Application URL configuration.
+ * Centralized location for all external URLs used by the launcher.
+ */
+const URLS = {
+  // Launcher update endpoints
+  launcher: {
+    download: "https://web.tera-germany.de/gameserver/Tera-Germany_Launcher.exe",
+    versionCheck: "https://web.tera-germany.de/classic/version.json",
+    versionInfo: "https://web.tera-germany.de/gameserver/version.json",
+  },
+
+  // Game content endpoints
+  content: {
+    news: "https://web.tera-germany.de/classic/Launcher_StartPage_News.json",
+    patchNotes: "https://web.tera-germany.de/classic/patchnotes.json",
+    serverStatus: "https://web.tera-germany.de/classic/serverlist.json?lang=ger&sort=3",
+  },
+
+  // External links
+  external: {
+    register: "https://reg.tera-europe-classic.de/register.php",
+    forum: "https://forum.crazy-esports.com/forum/board/42-tera-europe-classic/",
+    discord: "https://discord.gg/DARHAaNBYS",
+    support: "https://helpdesk.crazy-esports.com",
+    privacy: "https://forum.crazy-esports.com/index.php?datenschutzerklaerung/",
+  },
+};
+
 const REQUIRED_PRIVILEGE_LEVEL = 3;
 const UPDATE_CHECK_ENABLED = true;
-const LAUNCHER_DOWNLOAD_URL =
-  "https://web.tera-germany.de/gameserver/Tera-Germany_Launcher.exe";
-// URL that provides metadata about the latest launcher release
-const VERSION_CHECK_URL = "https://web.tera-germany.de/classic/version.json";
 // Local launcher release date used for update comparisons
 const CURRENT_RELEASE_DATE = "2024-06-07";
+
+/**
+ * Escapes HTML special characters to prevent XSS attacks.
+ * @param {string} str - The string to escape
+ * @returns {string} The escaped string safe for innerHTML
+ */
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
 // Simple semantic version comparison
 function compareVersions(v1, v2) {
@@ -35,12 +75,6 @@ function compareVersions(v1, v2) {
   }
   return 0;
 }
-
-const NewsPageUpdaterJsonUrl =
-  "https://web.tera-germany.de/classic/Launcher_StartPage_News.json";
-const PatchNotesUrl = "https://web.tera-germany.de/classic/patchnotes.json";
-const ServerStatusUrl =
-  "https://web.tera-germany.de/classic/serverlist.json?lang=ger&sort=3";
 
 const App = {
   translations: {},
@@ -550,7 +584,7 @@ const App = {
 
   // Open the registration website in the user's default browser
   async openRegisterPopup() {
-    this.openExternal("https://reg.tera-europe-classic.de/register.php");
+    this.openExternal(URLS.external.register);
   },
 
   // Set up handlers for the header buttons and links
@@ -559,9 +593,7 @@ const App = {
     if (startBtn) {
       startBtn.addEventListener("click", (e) => {
         e.preventDefault();
-        this.openExternal(
-          "https://forum.crazy-esports.com/forum/board/42-tera-europe-classic/",
-        );
+        this.openExternal(URLS.external.forum);
       });
     }
 
@@ -609,12 +641,9 @@ const App = {
     }
 
     const links = [
-      { id: "discord-button", url: "https://discord.gg/DARHAaNBYS" },
-      { id: "support-button", url: "https://helpdesk.crazy-esports.com" },
-      {
-        id: "privacy-link",
-        url: "https://forum.crazy-esports.com/index.php?datenschutzerklaerung/",
-      },
+      { id: "discord-button", url: URLS.external.discord },
+      { id: "support-button", url: URLS.external.support },
+      { id: "privacy-link", url: URLS.external.privacy },
     ];
     links.forEach((link) => {
       const el = document.getElementById(link.id);
@@ -1854,7 +1883,7 @@ const App = {
 
   async loadServerStatus() {
     try {
-      const data = await fetchData(ServerStatusUrl);
+      const data = await fetchData(URLS.content.serverStatus);
       if (data && data.servers && data.servers.length > 0) {
         const statusEl = document.getElementById("game-status");
         statusEl.textContent =
@@ -1867,10 +1896,10 @@ const App = {
 
   async loadPatchNotes() {
     try {
-      const notes = await fetchData(PatchNotesUrl);
+      const notes = await fetchData(URLS.content.patchNotes);
       if (notes && notes.notes && Array.isArray(notes.notes)) {
         const container = document.getElementById("patch-notes");
-        container.innerHTML = notes.notes.map((n) => `<p>${n}</p>`).join("");
+        container.innerHTML = notes.notes.map((n) => `<p>${escapeHtml(n)}</p>`).join("");
       }
     } catch (e) {
       console.error("Failed to load patch notes", e);
@@ -1879,7 +1908,7 @@ const App = {
 
   async checkLauncherUpdate() {
     try {
-      const response = await fetch(VERSION_CHECK_URL);
+      const response = await fetch(URLS.launcher.versionCheck);
       if (!response.ok) {
         return; // Do nothing when the version URL is unreachable
       }
@@ -1912,7 +1941,7 @@ const App = {
           }
           if (userConfirm) {
             await invoke("update_launcher", {
-              downloadUrl: LAUNCHER_DOWNLOAD_URL,
+              downloadUrl: URLS.launcher.download,
             });
           }
         }
@@ -2727,14 +2756,14 @@ const App = {
     });
 
     if (versionInfo) {
-      fetch("https://web.tera-germany.de/gameserver/version.json")
+      fetch(URLS.launcher.versionInfo)
         .then((r) => r.json())
         .then((data) => {
           versionInfo.innerHTML = `
-                        <strong>${data.launcher_name}</strong><br>
-                        Version: ${data.version}<br>
-                        Release: ${data.release_date}<br>
-                        <a href="${data.website}" target="_blank">Website</a>
+                        <strong>${escapeHtml(data.launcher_name)}</strong><br>
+                        Version: ${escapeHtml(data.version)}<br>
+                        Release: ${escapeHtml(data.release_date)}<br>
+                        <a href="${escapeHtml(data.website)}" target="_blank">Website</a>
                     `;
         })
         .catch(() => {
@@ -3334,7 +3363,7 @@ const App = {
   },
 };
 function LoadStartPage() {
-  fetchData(NewsPageUpdaterJsonUrl).then((jsonNews) => {
+  fetchData(URLS.content.news).then((jsonNews) => {
     //MAINTENANCE INFO
     if (jsonNews.WARTUNG_enabled) {
       document.getElementById("NewsWartungImgId").style.display = "block";

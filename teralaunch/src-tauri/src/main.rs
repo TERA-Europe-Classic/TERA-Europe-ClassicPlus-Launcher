@@ -25,12 +25,10 @@ use rayon::iter::{
     IndexedParallelIterator, IntoParallelRefIterator, ParallelBridge, ParallelIterator,
 };
 use reqwest::header::{RANGE, USER_AGENT};
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use tauri::Manager;
-use tauri::WindowEvent;
 use teralib::config::get_config_value;
 use teralib::{get_game_status_receiver, reset_global_state, run_game};
 use tokio::io::AsyncReadExt;
@@ -40,6 +38,91 @@ use tokio::sync::{watch, Mutex, Semaphore};
 use tokio::task::JoinSet;
 use walkdir::WalkDir;
 
+// ============================================================================
+// Configuration Constants
+// ============================================================================
+
+/// Buffer size for file I/O operations (64 KB)
+const BUFFER_SIZE: usize = 65_536;
+
+/// HTTP request timeout for downloads (5 minutes)
+const DOWNLOAD_TIMEOUT_SECS: u64 = 300;
+
+/// HTTP connection timeout (30 seconds)
+const CONNECT_TIMEOUT_SECS: u64 = 30;
+
+/// Timeout before considering a download stalled (2 minutes)
+const STALL_TIMEOUT_SECS: u64 = 120;
+
+/// Progress update emission interval (500ms)
+const PROGRESS_UPDATE_MS: u64 = 500;
+
+/// Minimum chunk size for parallel downloads (16 MB)
+const CHUNK_MIN_SIZE: u64 = 16 * 1024 * 1024;
+
+/// Part size for chunked downloads (32 MB)
+const PART_SIZE: u64 = 32 * 1024 * 1024;
+
+/// Maximum number of parallel download parts
+const MAX_PARTS: usize = 32;
+
+/// Maximum concurrent file downloads
+const MAX_CONCURRENT_DOWNLOADS: usize = 16;
+
+/// BufWriter capacity for file downloads (1 MB)
+const BUFWRITER_CAPACITY: usize = 1024 * 1024;
+
+/// Part assembly buffer size (64 KB)
+const PART_ASSEMBLY_BUFFER_SIZE: usize = 64 * 1024;
+
+/// Maximum retry attempts for transient download errors
+const MAX_RETRIES: u8 = 2;
+
+/// Retry delay base multiplier (500ms per attempt)
+const RETRY_DELAY_BASE_MS: u64 = 500;
+
+/// HTTP client max idle connections per host
+const HTTP_POOL_MAX_IDLE_PER_HOST: usize = 10;
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/// Validates that a resolved path is safely within the base directory.
+/// Prevents path traversal attacks using ".." or absolute paths.
+fn validate_path_within_base(base: &Path, file_path: &Path) -> Result<PathBuf, String> {
+    // Canonicalize both paths to resolve symlinks and ".." components
+    let canonical_base = base.canonicalize()
+        .map_err(|e| format!("Failed to canonicalize base path: {}", e))?;
+
+    // For the file path, if it doesn't exist yet, canonicalize the parent
+    let canonical_path = if file_path.exists() {
+        file_path.canonicalize()
+            .map_err(|e| format!("Failed to canonicalize file path: {}", e))?
+    } else {
+        // For new files, ensure parent exists and check that
+        let parent = file_path.parent()
+            .ok_or_else(|| "File path has no parent".to_string())?;
+        if !parent.exists() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create parent directory: {}", e))?;
+        }
+        let canonical_parent = parent.canonicalize()
+            .map_err(|e| format!("Failed to canonicalize parent: {}", e))?;
+        canonical_parent.join(file_path.file_name().ok_or("No file name")?)
+    };
+
+    // Check that the canonical path starts with the canonical base
+    if !canonical_path.starts_with(&canonical_base) {
+        return Err(format!(
+            "Path traversal detected: {} is outside {}",
+            canonical_path.display(),
+            canonical_base.display()
+        ));
+    }
+
+    Ok(canonical_path)
+}
 
 // Struct definitions
 #[derive(Serialize, Deserialize)]
@@ -70,16 +153,6 @@ fn is_debug() -> bool {
     cfg!(debug_assertions)
 }
 
-#[derive(Serialize)]
-struct AuthInfo {
-    character_count: String,
-    permission: i32,
-    privilege: i32,
-    user_no: i32,
-    user_name: String,
-    auth_key: String,
-}
-
 struct GlobalAuthInfo {
     character_count: String,
     user_no: i32,
@@ -94,6 +167,12 @@ lazy_static! {
         user_name: String::new(),
         auth_key: String::new(),
     });
+    static ref HTTP_CLIENT: reqwest::Client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(DOWNLOAD_TIMEOUT_SECS))
+        .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
+        .pool_max_idle_per_host(HTTP_POOL_MAX_IDLE_PER_HOST)
+        .build()
+        .expect("Failed to create HTTP client");
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -183,8 +262,6 @@ struct GameState {
     is_launching: Arc<Mutex<bool>>,
 }
 
-//static INIT: Once = Once::new();
-
 lazy_static! {
     static ref HASH_CACHE: Mutex<HashMap<String, CachedFileInfo>> = Mutex::new(HashMap::new());
     static ref CANCEL_DOWNLOAD: AtomicBool = AtomicBool::new(false);
@@ -194,12 +271,13 @@ static GLOBAL_DOWNLOADED_BYTES: AtomicU64 = AtomicU64::new(0);
 static CURRENT_FILE_NAME: RwLock<String> = RwLock::new(String::new());
 
 fn is_ignored(path: &Path, game_path: &Path, ignored_paths: &HashSet<&str>) -> bool {
-    let relative_path = path
-        .strip_prefix(game_path)
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .replace("\\", "/");
+    let relative_path = match path.strip_prefix(game_path) {
+        Ok(p) => match p.to_str() {
+            Some(s) => s.replace("\\", "/"),
+            None => return false, // Non-UTF8 path, don't ignore
+        },
+        Err(_) => return false, // Path not under game_path, don't ignore
+    };
 
     // Ignore files at the root
     if relative_path.chars().filter(|&c| c == '/').count() == 0 {
@@ -217,7 +295,7 @@ fn is_ignored(path: &Path, game_path: &Path, ignored_paths: &HashSet<&str>) -> b
 }
 
 async fn get_server_hash_file() -> Result<serde_json::Value, String> {
-    let client = reqwest::Client::new();
+    let client = HTTP_CLIENT.clone();
     let res = client
         .get(get_config_value("HASH_FILE_URL"))
         .send()
@@ -229,9 +307,9 @@ async fn get_server_hash_file() -> Result<serde_json::Value, String> {
 
 fn calculate_file_hash<P: AsRef<Path>>(path: P) -> Result<String, String> {
     let file = File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
-    let mut reader = BufReader::with_capacity(65_536, file);
+    let mut reader = BufReader::with_capacity(BUFFER_SIZE, file);
     let mut hasher = Sha256::new();
-    let mut buffer = [0u8; 65_536];
+    let mut buffer = [0u8; BUFFER_SIZE];
 
     loop {
         let bytes_read = reader
@@ -254,21 +332,25 @@ fn get_cache_file_path() -> Result<PathBuf, String> {
     Ok(path)
 }
 
-fn save_cache_to_disk(cache: &HashMap<String, CachedFileInfo>) -> Result<(), String> {
+async fn save_cache_to_disk(cache: &HashMap<String, CachedFileInfo>) -> Result<(), String> {
     let cache_path = get_cache_file_path()?;
     let serialized = serde_json::to_string(cache).map_err(|e| e.to_string())?;
-    let mut file = File::create(cache_path).map_err(|e| e.to_string())?;
-    file.write_all(serialized.as_bytes())
-        .map_err(|e| e.to_string())?;
-    Ok(())
+    tokio::task::spawn_blocking(move || {
+        std::fs::write(&cache_path, serialized)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())
 }
 
-fn load_cache_from_disk() -> Result<HashMap<String, CachedFileInfo>, String> {
+async fn load_cache_from_disk() -> Result<HashMap<String, CachedFileInfo>, String> {
     let cache_path = get_cache_file_path()?;
-    let mut file = File::open(cache_path).map_err(|e| e.to_string())?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)
-        .map_err(|e| e.to_string())?;
+    let contents = tokio::task::spawn_blocking(move || {
+        std::fs::read_to_string(&cache_path)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
     let cache: HashMap<String, CachedFileInfo> =
         serde_json::from_str(&contents).map_err(|e| e.to_string())?;
     Ok(cache)
@@ -277,6 +359,11 @@ fn load_cache_from_disk() -> Result<HashMap<String, CachedFileInfo>, String> {
 //REPAIR CLIENT, DELETE CACHE AND RESTART HASH CHECK
 #[tauri::command]
 fn clear_cache() -> Result<(), String> {
+    // Clear the in-memory hash cache to prevent stale entries from old directory
+    if let Ok(mut cache) = HASH_CACHE.try_lock() {
+        cache.clear();
+    }
+    // Remove the disk cache file
     let cache_path = get_cache_file_path()?;
     if cache_path.exists() {
         remove_file(cache_path).map_err(|e| e.to_string())?;
@@ -305,10 +392,7 @@ async fn update_launcher(download_url: String) -> Result<(), String> {
     let exe_dir = current_exe.parent().ok_or("exe dir not found")?;
     let new_path = exe_dir.join("launcher_update.exe");
 
-    let client = reqwest::Client::builder()
-        .no_proxy()
-        .build()
-        .map_err(|e| e.to_string())?;
+    let client = HTTP_CLIENT.clone();
 
     let bytes = client
         .get(&download_url)
@@ -471,19 +555,30 @@ async fn generate_hash_file(window: tauri::Window) -> Result<String, String> {
             let entry = entry.map_err(|e| e.to_string())?;
             let path = entry.path();
             if path.is_file() && !is_ignored(path, &game_path, &ignored_paths) {
-                let relative_path = path
-                    .strip_prefix(&game_path)
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .replace("\\", "/");
+                let relative_path = match path.strip_prefix(&game_path) {
+                    Ok(p) => match p.to_str() {
+                        Some(s) => s.replace("\\", "/"),
+                        None => return Ok(()), // Non-UTF8 path, skip
+                    },
+                    Err(_) => return Ok(()), // Path not under game_path, skip
+                };
                 info!("Processing file: {}", relative_path);
 
-                let contents = std::fs::read(path).map_err(|e| e.to_string())?;
+                let file = File::open(path).map_err(|e| e.to_string())?;
+                let mut reader = BufReader::with_capacity(BUFFER_SIZE, file);
                 let mut hasher = Sha256::new();
-                hasher.update(&contents);
+                let mut buffer = [0u8; BUFFER_SIZE];
+                let mut size: u64 = 0;
+
+                loop {
+                    let bytes_read = reader.read(&mut buffer).map_err(|e| e.to_string())?;
+                    if bytes_read == 0 {
+                        break;
+                    }
+                    hasher.update(&buffer[..bytes_read]);
+                    size += bytes_read as u64;
+                }
                 let hash = format!("{:x}", hasher.finalize());
-                let size = contents.len() as u64;
                 let file_server_url = get_config_value("FILE_SERVER_URL");
                 let url = format!("{}/{}", file_server_url, relative_path);
 
@@ -569,6 +664,15 @@ async fn save_game_path_to_config(
     window: tauri::Window,
     _app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
+    // Validate that the path is a real directory
+    let path_buf = PathBuf::from(&path);
+    if !path_buf.exists() {
+        return Err("The specified path does not exist".to_string());
+    }
+    if !path_buf.is_dir() {
+        return Err("The specified path is not a directory".to_string());
+    }
+
     // Capture previous path before writing, so we can detect actual changes
     let prev_path_string = get_game_path()
         .ok()
@@ -589,6 +693,9 @@ async fn save_game_path_to_config(
     if should_refresh {
         // Interrupt any ongoing downloads
         CANCEL_DOWNLOAD.store(true, Ordering::SeqCst);
+        // Clear stale hash cache from old directory and reset download progress
+        clear_cache().ok();
+        GLOBAL_DOWNLOADED_BYTES.store(0, Ordering::SeqCst);
         let _ = window.emit("game_path_changed", &path);
     }
 
@@ -623,24 +730,23 @@ async fn check_update_required(window: tauri::Window) -> Result<bool, String> {
 #[tauri::command]
 async fn update_file(
     _app_handle: tauri::AppHandle,
-    window: tauri::Window,
+    _window: tauri::Window,
     file_info: FileInfo,
-    total_files: usize,
-    current_file_index: usize,
-    total_size: u64,
+    _total_files: usize,
+    _current_file_index: usize,
+    _total_size: u64,
 ) -> Result<u64, String> {
     // Update the current file name for global progress tracking
     {
-        let mut current_file = CURRENT_FILE_NAME.write().unwrap();
+        let mut current_file = CURRENT_FILE_NAME.write().unwrap_or_else(|e| e.into_inner());
         *current_file = file_info.path.clone();
     }
 
     let game_path = get_game_path()?;
     let file_path = game_path.join(&file_info.path);
 
-    //println!("Game Path: {}", game_path.display());
-    //println!("File Path: {}", file_path.display());
-    //println!("FileInfo: {}", file_info.url);
+    // Validate that the file path is within the game directory (prevent path traversal)
+    let file_path = validate_path_within_base(&game_path, &file_path)?;
 
     if let Some(parent) = file_path.parent() {
         tokio::fs::create_dir_all(parent)
@@ -648,15 +754,7 @@ async fn update_file(
             .map_err(|e| e.to_string())?;
     }
 
-    let client = reqwest::Client::builder()
-        .no_proxy()
-        .timeout(Duration::from_secs(300)) // 5 minute timeout
-        .connect_timeout(Duration::from_secs(30)) // 30 second connect timeout
-        .tcp_keepalive(Duration::from_secs(60)) // Keep connections alive
-        .pool_max_idle_per_host(20) // More connection pooling
-        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-        .build()
-        .map_err(|e| e.to_string())?;
+    let client = HTTP_CLIENT.clone();
 
     let mut corrected_url = file_info.url.clone();
     if let Some(pos) = corrected_url.find("/files/") {
@@ -688,17 +786,13 @@ async fn update_file(
             .await
             .map_err(|e| e.to_string())?
     };
-    let mut file = BufWriter::with_capacity(1024 * 1024, file_handle); // 1MB buffer
+    let mut file = BufWriter::with_capacity(BUFWRITER_CAPACITY, file_handle);
 
-    // Thresholds for chunked parallelism
-    const CHUNK_MIN_SIZE: u64 = 16 * 1024 * 1024; // 16 MB
-    const PART_SIZE: u64 = 32 * 1024 * 1024; // 32 MB
-    const MAX_PARTS: usize = 32;
-    let allow_parallel = false; // Keep downloads resumable with contiguous files.
+    // Keep downloads resumable with contiguous files.
+    let allow_parallel = false;
 
     info!("Downloading file: {} ({} bytes)", file_info.path, file_size);
-    let download_start = Instant::now();
-    let mut bytes_written: u64 = 0;
+    let bytes_written: u64;
 
     if resume_from > 0 {
         let range_probe = client
@@ -734,7 +828,7 @@ async fn update_file(
                 let file_handle = tokio::fs::File::create(&file_path)
                     .await
                     .map_err(|e| e.to_string())?;
-                file = BufWriter::with_capacity(1024 * 1024, file_handle);
+                file = BufWriter::with_capacity(BUFWRITER_CAPACITY, file_handle);
             } else {
                 let mut downloaded: u64 = 0;
                 let mut stream = res.bytes_stream();
@@ -755,7 +849,6 @@ async fn update_file(
         }
 
         GLOBAL_DOWNLOADED_BYTES.fetch_sub(resume_from, Ordering::SeqCst);
-        resume_from = 0;
         drop(file);
         tokio::fs::remove_file(&file_path).await.ok();
         let file_handle = tokio::fs::File::create(&file_path)
@@ -794,8 +887,6 @@ async fn update_file(
 
             let mut downloaded: u64 = 0;
             let mut stream = res.bytes_stream();
-            let start_time = Instant::now();
-            let mut last_update = Instant::now();
 
             while let Some(chunk_result) = stream.next().await {
                 if CANCEL_DOWNLOAD.load(Ordering::SeqCst) {
@@ -806,8 +897,6 @@ async fn update_file(
                 let len = chunk.len() as u64;
                 downloaded += len;
                 GLOBAL_DOWNLOADED_BYTES.fetch_add(len, Ordering::SeqCst);
-
-                let now = Instant::now();
             }
             bytes_written = downloaded;
         } else {
@@ -830,20 +919,10 @@ async fn update_file(
                 }
 
                 let part_url = corrected_url.clone();
-                let window_cl = window.clone();
                 let part_path = file_path.with_extension(format!("part{}", part_idx));
-                let file_name = file_info.path.clone();
 
                 join_set.spawn(async move {
-                let client = reqwest::Client::builder()
-                    .no_proxy()
-                    .timeout(Duration::from_secs(300))
-                    .connect_timeout(Duration::from_secs(30))
-                    .tcp_keepalive(Duration::from_secs(60))
-                    .pool_max_idle_per_host(20)
-                    .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-                    .build()
-                    .map_err(|e| e.to_string())?;
+                let client = HTTP_CLIENT.clone();
                 let range_header = format!("bytes={}-{}", start, end);
                 let res = client
                     .get(&part_url)
@@ -858,22 +937,15 @@ async fn update_file(
                     .map_err(|e| e.to_string())?;
 
                 let mut stream = res.bytes_stream();
-                let mut part_file = BufWriter::with_capacity(1024 * 1024,
+                let mut part_file = BufWriter::with_capacity(BUFWRITER_CAPACITY,
                     tokio::fs::File::create(&part_path).await.map_err(|e| e.to_string())?
                 );
-                let mut last_update = Instant::now();
-                let mut part_downloaded: u64 = 0;
-                let start_time = Instant::now();
-
                 while let Some(chunk_result) = stream.next().await {
                     if CANCEL_DOWNLOAD.load(Ordering::SeqCst) { return Err("cancelled".into()); }
                     let chunk = chunk_result.map_err(|e| e.to_string())?;
                     part_file.write_all(&chunk).await.map_err(|e| e.to_string())?;
                     let len = chunk.len() as u64;
-                    part_downloaded += len;
                     GLOBAL_DOWNLOADED_BYTES.fetch_add(len, Ordering::SeqCst);
-
-                    let now = Instant::now();
                 }
 
                 part_file.flush().await.map_err(|e| e.to_string())?;
@@ -895,7 +967,7 @@ async fn update_file(
                 let mut part_f = tokio::fs::File::open(&part_path)
                     .await
                     .map_err(|e| e.to_string())?;
-                let mut buf = vec![0u8; 64 * 1024];
+                let mut buf = vec![0u8; PART_ASSEMBLY_BUFFER_SIZE];
                 loop {
                     let n = part_f.read(&mut buf).await.map_err(|e| e.to_string())?;
                     if n == 0 {
@@ -919,8 +991,6 @@ async fn update_file(
 
         let mut downloaded: u64 = 0;
         let mut stream = res.bytes_stream();
-        let start_time = Instant::now();
-        let mut last_update = Instant::now();
 
         while let Some(chunk_result) = stream.next().await {
             if CANCEL_DOWNLOAD.load(Ordering::SeqCst) {
@@ -931,8 +1001,6 @@ async fn update_file(
             let len = chunk.len() as u64;
             downloaded += len;
             GLOBAL_DOWNLOADED_BYTES.fetch_add(len, Ordering::SeqCst);
-
-            let now = Instant::now();
         }
         bytes_written = downloaded;
     }
@@ -995,7 +1063,7 @@ fn is_transient_download_error(message: &str) -> bool {
 }
 
 fn retry_delay_ms(attempt: u8) -> u64 {
-    500u64.saturating_mul(attempt as u64)
+    RETRY_DELAY_BASE_MS.saturating_mul(attempt as u64)
 }
 
 #[tauri::command]
@@ -1022,10 +1090,8 @@ async fn download_all_files(
     GLOBAL_DOWNLOADED_BYTES.store(initial_downloaded, Ordering::SeqCst);
     CANCEL_DOWNLOAD.store(false, Ordering::SeqCst);
 
-    const MAX_CONCURRENT_DOWNLOADS: usize = 16;
     let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_DOWNLOADS));
     let global_start = Instant::now();
-    const STALL_TIMEOUT_SECS: u64 = 120;
 
     // Emit a smooth global progress tick to stabilize UI speed/ETA
     {
@@ -1033,7 +1099,7 @@ async fn download_all_files(
         let total_bytes_tick = total_size;
         let total_files_tick = total_files;
         tauri::async_runtime::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_millis(500));
+            let mut interval = tokio::time::interval(Duration::from_millis(PROGRESS_UPDATE_MS));
             let mut last_bytes = initial_downloaded;
             let mut last_change = Instant::now();
             loop {
@@ -1046,7 +1112,7 @@ async fn download_all_files(
                     0
                 };
                 let current_file_name = {
-                    let current_file = CURRENT_FILE_NAME.read().unwrap();
+                    let current_file = CURRENT_FILE_NAME.read().unwrap_or_else(|e| e.into_inner());
                     current_file.clone()
                 };
 
@@ -1110,7 +1176,6 @@ async fn download_all_files(
         let file_info_cl = file_info.clone();
         join_set.spawn(async move {
             let _permit = permit;
-            const MAX_RETRIES: u8 = 2;
             let mut attempt: u8 = 0;
             let res = loop {
                 let result = update_file(
@@ -1169,10 +1234,7 @@ async fn download_all_files(
 
     if !CANCEL_DOWNLOAD.load(Ordering::SeqCst) {
         // Post-download verification of files that completed
-        for (idx, maybe_size) in downloaded_sizes.iter().enumerate() {
-            let _ = maybe_size; // size not needed for verification
-        }
-        for (idx, maybe_file) in files_by_index.into_iter().enumerate() {
+        for (_idx, maybe_file) in files_by_index.into_iter().enumerate() {
             // Only verify files that finished successfully
             // (we used results before moving it; so check via downloaded_sizes length wouldn't align by idx)
             // Instead, recompute: if handler returned Some for this idx we already moved results, so we can't check here.
@@ -1180,10 +1242,10 @@ async fn download_all_files(
             if CANCEL_DOWNLOAD.load(Ordering::SeqCst) {
                 break;
             }
-            if maybe_file.is_none() {
-                continue;
-            }
-            let file_info = maybe_file.unwrap();
+            let file_info = match maybe_file {
+                Some(f) => f,
+                None => continue,
+            };
             let game_path = get_game_path()?;
             let file_path = game_path.join(&file_info.path);
             if !file_path.exists() {
@@ -1239,14 +1301,14 @@ async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, Str
     info!("Server hash file parsed, {} files found", files.len());
 
     info!("Starting file comparison");
-    let _cache = load_cache_from_disk().unwrap_or_else(|_| HashMap::new());
-    let cache = Arc::new(RwLock::new(_cache));
+    let loaded_cache = load_cache_from_disk().await.unwrap_or_else(|_| HashMap::new());
+    let cache = Arc::new(RwLock::new(loaded_cache));
 
     let progress_bar = ProgressBar::new(files.len() as u64);
     progress_bar.set_style(
         ProgressStyle::default_bar()
             .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} {msg}")
-            .unwrap()
+            .expect("Invalid progress bar template - this is a bug")
             .progress_chars("##-"),
     );
 
@@ -1264,6 +1326,15 @@ async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, Str
             let url = file_info["url"].as_str().unwrap_or("").to_string();
 
             let local_file_path = local_game_path.join(path);
+
+            // Validate path to prevent path traversal attacks
+            let local_file_path = match validate_path_within_base(&local_game_path, &local_file_path) {
+                Ok(p) => p,
+                Err(e) => {
+                    error!("Path validation failed for {}: {}", path, e);
+                    return None; // Skip this file
+                }
+            };
 
             let current_count = processed_count.fetch_add(1, Ordering::SeqCst) + 1;
             if current_count % 100 == 0 || current_count == files.len() {
@@ -1315,7 +1386,7 @@ async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, Str
 
             let last_modified = metadata.modified().ok();
 
-            let cache_read = cache.read().unwrap();
+            let cache_read = cache.read().unwrap_or_else(|e| e.into_inner());
             if let Some(cached_info) = cache_read.get(path) {
                 if let Some(lm) = last_modified {
                     if cached_info.last_modified == lm && cached_info.hash == server_hash {
@@ -1352,7 +1423,7 @@ async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, Str
                 }
             };
 
-            let mut cache_write = cache.write().unwrap();
+            let mut cache_write = cache.write().unwrap_or_else(|e| e.into_inner());
             cache_write.insert(
                 path.to_string(),
                 CachedFileInfo {
@@ -1398,8 +1469,8 @@ async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, Str
         });
 
     // Save the updated cache to disk
-    let final_cache = cache.read().unwrap();
-    if let Err(e) = save_cache_to_disk(&*final_cache) {
+    let final_cache = cache.read().unwrap_or_else(|e| e.into_inner()).clone();
+    if let Err(e) = save_cache_to_disk(&final_cache).await {
         error!("Failed to save cache to disk: {}", e);
     }
 
@@ -1450,7 +1521,7 @@ async fn handle_launch_game(
         return Err("Game is already running".to_string());
     }
 
-    let auth_info = GLOBAL_AUTH_INFO.read().unwrap();
+    let auth_info = GLOBAL_AUTH_INFO.read().unwrap_or_else(|e| e.into_inner());
     let account_name = auth_info.user_no.to_string();
     let characters_count = auth_info.character_count.clone();
     let ticket = auth_info.auth_key.clone();
@@ -1493,12 +1564,16 @@ async fn handle_launch_game(
         {
             Ok(exit_status) => {
                 let result = format!("Game exited with status: {:?}", exit_status);
-                app_handle_clone.emit_all("game_status", &result).unwrap();
+                if let Err(e) = app_handle_clone.emit_all("game_status", &result) {
+                    error!("Failed to emit game_status event: {:?}", e);
+                }
                 info!("{}", result);
             }
             Err(e) => {
                 let error = format!("Error launching game: {:?}", e);
-                app_handle_clone.emit_all("game_status", &error).unwrap();
+                if let Err(emit_err) = app_handle_clone.emit_all("game_status", &error) {
+                    error!("Failed to emit game_status event: {:?}", emit_err);
+                }
                 error!("{}", error);
             }
         }
@@ -1555,7 +1630,7 @@ async fn reset_launch_state(state: tauri::State<'_, GameState>) -> Result<(), St
 
 #[tauri::command]
 fn set_auth_info(auth_key: String, user_name: String, user_no: i32, character_count: String) {
-    let mut auth_info = GLOBAL_AUTH_INFO.write().unwrap();
+    let mut auth_info = GLOBAL_AUTH_INFO.write().unwrap_or_else(|e| e.into_inner());
     auth_info.auth_key = auth_key;
     auth_info.user_name = user_name;
     auth_info.user_no = user_no;
@@ -1579,6 +1654,9 @@ async fn login(username: String, password: String) -> Result<String, String> {
 
     let client = reqwest::Client::builder()
         .cookie_store(true)
+        .timeout(Duration::from_secs(DOWNLOAD_TIMEOUT_SECS))
+        .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
+        .pool_max_idle_per_host(HTTP_POOL_MAX_IDLE_PER_HOST)
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -1705,6 +1783,9 @@ async fn register_new_account(
 
     let client = reqwest::Client::builder()
         .cookie_store(true)
+        .timeout(Duration::from_secs(DOWNLOAD_TIMEOUT_SECS))
+        .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
+        .pool_max_idle_per_host(HTTP_POOL_MAX_IDLE_PER_HOST)
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -1741,7 +1822,7 @@ async fn handle_logout(state: tauri::State<'_, GameState>) -> Result<(), String>
     *is_launching = false;
 
     // Reset global authentication information
-    let mut auth_info = GLOBAL_AUTH_INFO.write().unwrap();
+    let mut auth_info = GLOBAL_AUTH_INFO.write().unwrap_or_else(|e| e.into_inner());
     auth_info.auth_key = String::new();
     auth_info.user_name = String::new();
     auth_info.user_no = 0;
@@ -1752,10 +1833,7 @@ async fn handle_logout(state: tauri::State<'_, GameState>) -> Result<(), String>
 
 #[tauri::command]
 async fn check_server_connection() -> Result<bool, String> {
-    let client = Client::builder()
-        .timeout(Duration::from_secs(10))
-        .build()
-        .map_err(|e| e.to_string())?;
+    let client = HTTP_CLIENT.clone();
 
     match client.get(get_config_value("FILE_SERVER_URL")).send().await {
         Ok(response) => Ok(response.status().is_success()),
@@ -1785,9 +1863,12 @@ fn main() {
                 let args_str = args.join(" ");
 
                 // Convert to CString for Windows API
-                let exe_path = CString::new(current_exe.to_string_lossy().as_ref()).unwrap();
-                let parameters = CString::new(args_str).unwrap();
-                let verb = CString::new("runas").unwrap();
+                let exe_path = CString::new(current_exe.to_string_lossy().as_ref())
+                    .expect("Executable path contains null bytes");
+                let parameters = CString::new(args_str)
+                    .expect("Arguments contain null bytes");
+                let verb = CString::new("runas")
+                    .expect("runas verb contains null bytes - this is a bug");
 
                 unsafe {
                     let result = ShellExecuteA(
@@ -1823,8 +1904,8 @@ fn main() {
     tauri::Builder::default()
         .manage(game_state)
         .setup(|app| {
-            let window = app.get_window("main").unwrap();
-            let app_handle = app.handle();
+            let window = app.get_window("main")
+                .expect("Main window not found - check tauri.conf.json");
             info!("Tauri setup started");
 
             // Ensure window stays hidden until updater check completes (if auto-install is enabled)
@@ -2015,5 +2096,457 @@ mod tests {
         std::env::set_var("TERA_LAUNCHER_AUTO_UPDATE", "true");
         assert!(should_auto_install_updater());
         std::env::remove_var("TERA_LAUNCHER_AUTO_UPDATE");
+    }
+
+    // ========================================================================
+    // Tests for is_zero
+    // ========================================================================
+
+    #[test]
+    fn is_zero_returns_true_for_zero() {
+        assert!(is_zero(&0));
+    }
+
+    #[test]
+    fn is_zero_returns_false_for_nonzero() {
+        assert!(!is_zero(&1));
+        assert!(!is_zero(&100));
+        assert!(!is_zero(&u64::MAX));
+    }
+
+    // ========================================================================
+    // Tests for format_bytes
+    // ========================================================================
+
+    #[test]
+    fn format_bytes_zero() {
+        assert_eq!(format_bytes(0), "0.00 B");
+    }
+
+    #[test]
+    fn format_bytes_bytes_range() {
+        assert_eq!(format_bytes(1), "1.00 B");
+        assert_eq!(format_bytes(512), "512.00 B");
+        assert_eq!(format_bytes(1023), "1023.00 B");
+    }
+
+    #[test]
+    fn format_bytes_kb_range() {
+        assert_eq!(format_bytes(1024), "1.00 KB");
+        assert_eq!(format_bytes(1536), "1.50 KB");
+        assert_eq!(format_bytes(1048575), "1024.00 KB");
+    }
+
+    #[test]
+    fn format_bytes_mb_range() {
+        assert_eq!(format_bytes(1048576), "1.00 MB");
+        assert_eq!(format_bytes(1572864), "1.50 MB");
+        assert_eq!(format_bytes(1073741823), "1024.00 MB");
+    }
+
+    #[test]
+    fn format_bytes_gb_range() {
+        assert_eq!(format_bytes(1073741824), "1.00 GB");
+        assert_eq!(format_bytes(1610612736), "1.50 GB");
+        // Very large value stays in GB
+        assert_eq!(format_bytes(10737418240), "10.00 GB");
+    }
+
+    #[test]
+    fn format_bytes_boundary_cases() {
+        // Exactly at KB boundary
+        assert_eq!(format_bytes(1024), "1.00 KB");
+        // Exactly at MB boundary
+        assert_eq!(format_bytes(1024 * 1024), "1.00 MB");
+        // Exactly at GB boundary
+        assert_eq!(format_bytes(1024 * 1024 * 1024), "1.00 GB");
+    }
+
+    // ========================================================================
+    // Tests for normalize_path_for_compare
+    // ========================================================================
+
+    #[test]
+    fn normalize_path_forward_slashes() {
+        assert_eq!(normalize_path_for_compare("c:/games/tera"), "c:/games/tera");
+    }
+
+    #[test]
+    fn normalize_path_back_slashes_to_forward() {
+        assert_eq!(normalize_path_for_compare("c:\\games\\tera"), "c:/games/tera");
+    }
+
+    #[test]
+    fn normalize_path_mixed_slashes() {
+        assert_eq!(normalize_path_for_compare("c:\\games/tera\\sub"), "c:/games/tera/sub");
+    }
+
+    #[test]
+    fn normalize_path_lowercase() {
+        assert_eq!(normalize_path_for_compare("C:/GAMES/TERA"), "c:/games/tera");
+        assert_eq!(normalize_path_for_compare("C:\\Games\\Tera"), "c:/games/tera");
+    }
+
+    #[test]
+    fn normalize_path_removes_trailing_slashes() {
+        assert_eq!(normalize_path_for_compare("c:/games/tera/"), "c:/games/tera");
+        assert_eq!(normalize_path_for_compare("c:/games/tera//"), "c:/games/tera");
+        assert_eq!(normalize_path_for_compare("c:\\games\\tera\\"), "c:/games/tera");
+    }
+
+    #[test]
+    fn normalize_path_empty_string() {
+        assert_eq!(normalize_path_for_compare(""), "");
+    }
+
+    #[test]
+    fn normalize_path_only_slashes() {
+        assert_eq!(normalize_path_for_compare("/"), "");
+        assert_eq!(normalize_path_for_compare("//"), "");
+        assert_eq!(normalize_path_for_compare("\\"), "");
+    }
+
+    // ========================================================================
+    // Tests for is_ignored
+    // ========================================================================
+
+    #[test]
+    fn is_ignored_root_files_ignored() {
+        let game_path = Path::new("/games/tera");
+        let ignored: HashSet<&str> = HashSet::new();
+
+        // File at root level (no subdirectory) should be ignored
+        let root_file = Path::new("/games/tera/somefile.txt");
+        assert!(is_ignored(root_file, game_path, &ignored));
+    }
+
+    #[test]
+    fn is_ignored_exact_match() {
+        let game_path = Path::new("/games/tera");
+        let mut ignored: HashSet<&str> = HashSet::new();
+        ignored.insert("$Patch");
+
+        let patch_dir = Path::new("/games/tera/$Patch/file.txt");
+        assert!(is_ignored(patch_dir, game_path, &ignored));
+    }
+
+    #[test]
+    fn is_ignored_prefix_match() {
+        let game_path = Path::new("/games/tera");
+        let mut ignored: HashSet<&str> = HashSet::new();
+        ignored.insert("S1Game/Logs");
+
+        let log_file = Path::new("/games/tera/S1Game/Logs/game.log");
+        assert!(is_ignored(log_file, game_path, &ignored));
+    }
+
+    #[test]
+    fn is_ignored_non_ignored_path() {
+        let game_path = Path::new("/games/tera");
+        let mut ignored: HashSet<&str> = HashSet::new();
+        ignored.insert("$Patch");
+        ignored.insert("S1Game/Logs");
+
+        // A legitimate game file should not be ignored
+        let game_file = Path::new("/games/tera/Binaries/TERA.exe");
+        assert!(!is_ignored(game_file, game_path, &ignored));
+    }
+
+    #[test]
+    fn is_ignored_path_outside_game_dir() {
+        let game_path = Path::new("/games/tera");
+        let ignored: HashSet<&str> = HashSet::new();
+
+        // Path not under game_path returns false
+        let outside_path = Path::new("/other/path/file.txt");
+        assert!(!is_ignored(outside_path, game_path, &ignored));
+    }
+
+    #[test]
+    fn is_ignored_handles_backslash_paths() {
+        let game_path = Path::new("/games/tera");
+        let mut ignored: HashSet<&str> = HashSet::new();
+        ignored.insert("S1Game/Config/S1Engine.ini");
+
+        // The function normalizes backslashes to forward slashes
+        let config_file = Path::new("/games/tera/S1Game/Config/S1Engine.ini");
+        assert!(is_ignored(config_file, game_path, &ignored));
+    }
+
+    // ========================================================================
+    // Tests for validate_path_within_base (requires temp directory)
+    // ========================================================================
+
+    #[test]
+    fn validate_path_within_base_valid_path() {
+        let temp_dir = std::env::temp_dir().join("test_validate_path");
+        let _ = std::fs::create_dir_all(&temp_dir);
+
+        let file_path = temp_dir.join("subdir").join("file.txt");
+        let result = validate_path_within_base(&temp_dir, &file_path);
+
+        assert!(result.is_ok());
+        let validated = result.unwrap();
+        assert!(validated.starts_with(temp_dir.canonicalize().unwrap()));
+
+        // Cleanup
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn validate_path_within_base_traversal_attempt() {
+        let temp_dir = std::env::temp_dir().join("test_validate_traversal");
+        let _ = std::fs::create_dir_all(&temp_dir);
+
+        // Attempt path traversal with ..
+        let malicious_path = temp_dir.join("..").join("..").join("etc").join("passwd");
+        let result = validate_path_within_base(&temp_dir, &malicious_path);
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("Path traversal detected") || err.contains("outside"));
+
+        // Cleanup
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn validate_path_within_base_absolute_outside_path() {
+        let temp_dir = std::env::temp_dir().join("test_validate_outside");
+        let _ = std::fs::create_dir_all(&temp_dir);
+
+        // Try to validate a path completely outside the base
+        let outside_path = std::env::temp_dir().join("completely_different_dir").join("file.txt");
+        let _ = std::fs::create_dir_all(outside_path.parent().unwrap());
+
+        let result = validate_path_within_base(&temp_dir, &outside_path);
+
+        assert!(result.is_err());
+
+        // Cleanup
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        let _ = std::fs::remove_dir_all(outside_path.parent().unwrap());
+    }
+
+    #[test]
+    fn validate_path_within_base_nonexistent_base() {
+        let nonexistent_base = Path::new("/nonexistent/base/path/that/does/not/exist");
+        let file_path = nonexistent_base.join("file.txt");
+
+        let result = validate_path_within_base(nonexistent_base, &file_path);
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Failed to canonicalize base path"));
+    }
+
+    #[test]
+    fn validate_path_within_base_creates_parent_dirs() {
+        let temp_dir = std::env::temp_dir().join("test_validate_create_parent");
+        let _ = std::fs::create_dir_all(&temp_dir);
+
+        // Nested path that doesn't exist yet
+        let nested_path = temp_dir.join("new").join("nested").join("dir").join("file.txt");
+        let result = validate_path_within_base(&temp_dir, &nested_path);
+
+        assert!(result.is_ok());
+        // Parent directories should have been created
+        assert!(nested_path.parent().unwrap().exists());
+
+        // Cleanup
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn validate_path_within_base_existing_file() {
+        let temp_dir = std::env::temp_dir().join("test_validate_existing");
+        let _ = std::fs::create_dir_all(&temp_dir);
+
+        // Create an actual file
+        let file_path = temp_dir.join("existing_file.txt");
+        let _ = std::fs::write(&file_path, "test content");
+
+        let result = validate_path_within_base(&temp_dir, &file_path);
+
+        assert!(result.is_ok());
+
+        // Cleanup
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    // ========================================================================
+    // Additional tests for compute_initial_downloaded
+    // ========================================================================
+
+    #[test]
+    fn compute_initial_downloaded_empty_files_array() {
+        let files: Vec<FileInfo> = vec![];
+        assert_eq!(compute_initial_downloaded(&files, None), 0);
+        // With empty files, total_size=0, so override is returned unclamped
+        assert_eq!(compute_initial_downloaded(&files, Some(100)), 100);
+    }
+
+    #[test]
+    fn compute_initial_downloaded_none_resume_override() {
+        let files = vec![
+            FileInfo {
+                path: "a".to_string(),
+                hash: "h".to_string(),
+                size: 100,
+                url: "u".to_string(),
+                existing_size: 50,
+            },
+            FileInfo {
+                path: "b".to_string(),
+                hash: "h".to_string(),
+                size: 200,
+                url: "u".to_string(),
+                existing_size: 100,
+            },
+        ];
+        // Sum of resume_offsets: 50 + 100 = 150
+        assert_eq!(compute_initial_downloaded(&files, None), 150);
+    }
+
+    #[test]
+    fn compute_initial_downloaded_override_less_than_existing() {
+        let files = vec![FileInfo {
+            path: "a".to_string(),
+            hash: "h".to_string(),
+            size: 100,
+            url: "u".to_string(),
+            existing_size: 80,
+        }];
+        // Existing is 80, override is 50, so we use existing (80)
+        assert_eq!(compute_initial_downloaded(&files, Some(50)), 80);
+    }
+
+    #[test]
+    fn compute_initial_downloaded_files_with_zero_size() {
+        let files = vec![FileInfo {
+            path: "a".to_string(),
+            hash: "h".to_string(),
+            size: 0,
+            url: "u".to_string(),
+            existing_size: 0,
+        }];
+        assert_eq!(compute_initial_downloaded(&files, None), 0);
+        // With total_size=0, the clamping condition (total_size > 0) is false,
+        // so the override value is returned as-is
+        assert_eq!(compute_initial_downloaded(&files, Some(100)), 100);
+    }
+
+    #[test]
+    fn compute_initial_downloaded_clamping_with_positive_size() {
+        let files = vec![FileInfo {
+            path: "a".to_string(),
+            hash: "h".to_string(),
+            size: 50,
+            url: "u".to_string(),
+            existing_size: 0,
+        }];
+        // Override 100 exceeds total_size 50, should be clamped
+        assert_eq!(compute_initial_downloaded(&files, Some(100)), 50);
+    }
+
+    // ========================================================================
+    // Additional tests for stall_exceeded
+    // ========================================================================
+
+    #[test]
+    fn stall_exceeded_exactly_at_threshold() {
+        // idle_secs == threshold_secs should return true
+        assert!(stall_exceeded(100, 100, 60, 60));
+    }
+
+    #[test]
+    fn stall_exceeded_just_below_threshold() {
+        assert!(!stall_exceeded(100, 100, 59, 60));
+    }
+
+    #[test]
+    fn stall_exceeded_zero_threshold() {
+        // With threshold of 0, any idle time >= 0 triggers stall
+        assert!(stall_exceeded(100, 100, 0, 0));
+    }
+
+    #[test]
+    fn stall_exceeded_progress_made_resets() {
+        // Even with high idle time, if progress was made, no stall
+        assert!(!stall_exceeded(100, 101, 1000, 60));
+    }
+
+    // ========================================================================
+    // Additional tests for is_transient_download_error
+    // ========================================================================
+
+    #[test]
+    fn is_transient_all_patterns() {
+        // Test all transient patterns
+        assert!(is_transient_download_error("request TIMED OUT"));
+        assert!(is_transient_download_error("Connection Timeout occurred"));
+        assert!(is_transient_download_error("connection reset by peer"));
+        assert!(is_transient_download_error("connection closed unexpectedly"));
+        assert!(is_transient_download_error("broken pipe error"));
+        assert!(is_transient_download_error("service temporarily unavailable"));
+        assert!(is_transient_download_error("network error"));
+        assert!(is_transient_download_error("DNS resolution failed"));
+        assert!(is_transient_download_error("HTTP error 503"));
+        assert!(is_transient_download_error("error 502 bad gateway"));
+        assert!(is_transient_download_error("gateway timeout 504"));
+    }
+
+    #[test]
+    fn is_transient_non_transient_errors() {
+        assert!(!is_transient_download_error("file not found"));
+        assert!(!is_transient_download_error("permission denied"));
+        assert!(!is_transient_download_error("hash mismatch"));
+        assert!(!is_transient_download_error("invalid response format"));
+        assert!(!is_transient_download_error("HTTP 404 not found"));
+        assert!(!is_transient_download_error("HTTP 401 unauthorized"));
+        assert!(!is_transient_download_error("HTTP 500 internal server error"));
+    }
+
+    #[test]
+    fn is_transient_case_insensitive() {
+        assert!(is_transient_download_error("TIMED OUT"));
+        assert!(is_transient_download_error("Timed Out"));
+        assert!(is_transient_download_error("CONNECTION RESET"));
+        assert!(is_transient_download_error("NETWORK ERROR"));
+    }
+
+    #[test]
+    fn is_transient_empty_string() {
+        assert!(!is_transient_download_error(""));
+    }
+
+    // ========================================================================
+    // Additional tests for game_path_changed
+    // ========================================================================
+
+    #[test]
+    fn game_path_changed_same_path_different_case() {
+        assert!(!game_path_changed(Some("C:/Games/TERA"), "c:/games/tera"));
+    }
+
+    #[test]
+    fn game_path_changed_same_with_trailing_slash() {
+        assert!(!game_path_changed(Some("C:/Games/TERA"), "C:/Games/TERA/"));
+        assert!(!game_path_changed(Some("C:/Games/TERA/"), "C:/Games/TERA"));
+    }
+
+    #[test]
+    fn game_path_changed_none_previous() {
+        assert!(game_path_changed(None, "C:/Games/TERA"));
+    }
+
+    // ========================================================================
+    // Additional tests for retry_delay_ms
+    // ========================================================================
+
+    #[test]
+    fn retry_delay_high_attempts() {
+        // Test that it doesn't overflow
+        assert_eq!(retry_delay_ms(10), 5000);
+        assert_eq!(retry_delay_ms(255), 127500);
     }
 }

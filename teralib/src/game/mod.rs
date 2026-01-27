@@ -1050,3 +1050,176 @@ fn ipv4_to_u32(ip: &str) -> u32 {
         .map(|addr| u32::from_be_bytes(addr.octets()))
         .unwrap_or(0)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_to_wstring_empty() {
+        let result = to_wstring("");
+        assert_eq!(result, vec![0u16], "Empty string should produce only null terminator");
+    }
+
+    #[test]
+    fn test_to_wstring_ascii() {
+        let result = to_wstring("Hello");
+        let expected: Vec<u16> = vec![
+            'H' as u16,
+            'e' as u16,
+            'l' as u16,
+            'l' as u16,
+            'o' as u16,
+            0u16, // null terminator
+        ];
+        assert_eq!(result, expected, "ASCII string should be correctly converted to wide string");
+    }
+
+    #[test]
+    fn test_to_wstring_unicode() {
+        let result = to_wstring("Hello世界");
+        // '世' = U+4E16 and '界' = U+754C
+        let expected: Vec<u16> = vec![
+            'H' as u16,
+            'e' as u16,
+            'l' as u16,
+            'l' as u16,
+            'o' as u16,
+            0x4E16, // 世
+            0x754C, // 界
+            0u16,   // null terminator
+        ];
+        assert_eq!(result, expected, "Unicode string should be correctly converted to wide string");
+    }
+
+    #[test]
+    fn test_to_wstring_special_chars() {
+        let result = to_wstring("Test\n\t\r");
+        let expected: Vec<u16> = vec![
+            'T' as u16,
+            'e' as u16,
+            's' as u16,
+            't' as u16,
+            '\n' as u16,
+            '\t' as u16,
+            '\r' as u16,
+            0u16, // null terminator
+        ];
+        assert_eq!(result, expected, "Special characters should be correctly converted");
+    }
+
+    #[test]
+    fn test_utf16_to_bytes_empty() {
+        let result = utf16_to_bytes("");
+        assert!(result.is_empty(), "Empty string should produce empty byte vector");
+    }
+
+    #[test]
+    fn test_utf16_to_bytes_ascii() {
+        let result = utf16_to_bytes("Hi");
+        // 'H' = 0x0048, 'i' = 0x0069 in little-endian
+        let expected: Vec<u8> = vec![0x48, 0x00, 0x69, 0x00];
+        assert_eq!(result, expected, "ASCII string should be correctly converted to UTF-16 LE bytes");
+    }
+
+    #[test]
+    fn test_utf16_to_bytes_unicode() {
+        let result = utf16_to_bytes("世界");
+        // '世' = U+4E16, '界' = U+754C in little-endian
+        let expected: Vec<u8> = vec![0x16, 0x4E, 0x4C, 0x75];
+        assert_eq!(result, expected, "Unicode string should be correctly converted to UTF-16 LE bytes");
+    }
+
+    #[test]
+    fn test_utf16_to_bytes_mixed() {
+        let result = utf16_to_bytes("A世");
+        // 'A' = 0x0041, '世' = U+4E16 in little-endian
+        let expected: Vec<u8> = vec![0x41, 0x00, 0x16, 0x4E];
+        assert_eq!(result, expected, "Mixed ASCII and Unicode should be correctly converted");
+    }
+
+    #[test]
+    fn test_ipv4_to_u32_valid() {
+        // 192.168.1.1 = 0xC0A80101 in network byte order
+        let result = ipv4_to_u32("192.168.1.1");
+        assert_eq!(result, 0xC0A80101, "Valid IP should be correctly converted");
+    }
+
+    #[test]
+    fn test_ipv4_to_u32_localhost() {
+        // 127.0.0.1 = 0x7F000001 in network byte order
+        let result = ipv4_to_u32("127.0.0.1");
+        assert_eq!(result, 0x7F000001, "Localhost IP should be correctly converted");
+    }
+
+    #[test]
+    fn test_ipv4_to_u32_zero() {
+        // 0.0.0.0 = 0x00000000 in network byte order
+        let result = ipv4_to_u32("0.0.0.0");
+        assert_eq!(result, 0x00000000, "Zero IP should be correctly converted");
+    }
+
+    #[test]
+    fn test_ipv4_to_u32_max() {
+        // 255.255.255.255 = 0xFFFFFFFF in network byte order
+        let result = ipv4_to_u32("255.255.255.255");
+        assert_eq!(result, 0xFFFFFFFF, "Max IP should be correctly converted");
+    }
+
+    #[test]
+    fn test_ipv4_to_u32_invalid_format() {
+        let result = ipv4_to_u32("not.an.ip.address");
+        assert_eq!(result, 0, "Invalid IP format should return 0");
+    }
+
+    #[test]
+    fn test_ipv4_to_u32_invalid_octets() {
+        let result = ipv4_to_u32("256.256.256.256");
+        assert_eq!(result, 0, "Invalid octets should return 0");
+    }
+
+    #[test]
+    fn test_ipv4_to_u32_incomplete() {
+        let result = ipv4_to_u32("192.168.1");
+        assert_eq!(result, 0, "Incomplete IP address should return 0");
+    }
+
+    #[test]
+    fn test_ipv4_to_u32_extra_octets() {
+        let result = ipv4_to_u32("192.168.1.1.1");
+        assert_eq!(result, 0, "IP with extra octets should return 0");
+    }
+
+    #[test]
+    fn test_ipv4_to_u32_negative() {
+        let result = ipv4_to_u32("-1.0.0.1");
+        assert_eq!(result, 0, "IP with negative octets should return 0");
+    }
+
+    #[test]
+    fn test_ipv4_to_u32_empty() {
+        let result = ipv4_to_u32("");
+        assert_eq!(result, 0, "Empty string should return 0");
+    }
+
+    #[test]
+    fn test_ipv4_to_u32_whitespace() {
+        let result = ipv4_to_u32("192.168.1.1 ");
+        assert_eq!(result, 0, "IP with trailing whitespace should return 0");
+    }
+
+    #[test]
+    fn test_ipv4_to_u32_various_valid() {
+        let test_cases = vec![
+            ("10.0.0.1", 0x0A000001),
+            ("172.16.0.1", 0xAC100001),
+            ("8.8.8.8", 0x08080808),
+            ("1.2.3.4", 0x01020304),
+        ];
+
+        for (ip, expected) in test_cases {
+            let result = ipv4_to_u32(ip);
+            assert_eq!(result, expected, "IP {} should convert to 0x{:08X}", ip, expected);
+        }
+    }
+}
