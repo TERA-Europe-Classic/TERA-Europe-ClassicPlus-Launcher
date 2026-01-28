@@ -67,10 +67,9 @@ fn main() {
                 // Convert to CString for Windows API
                 let exe_path = CString::new(current_exe.to_string_lossy().as_ref())
                     .expect("Executable path contains null bytes");
-                let parameters =
-                    CString::new(args_str).expect("Arguments contain null bytes");
-                let verb = CString::new("runas")
-                    .expect("runas verb contains null bytes - this is a bug");
+                let parameters = CString::new(args_str).expect("Arguments contain null bytes");
+                let verb =
+                    CString::new("runas").expect("runas verb contains null bytes - this is a bug");
 
                 unsafe {
                     let result = ShellExecuteA(

@@ -194,6 +194,7 @@ const App = {
       this.setupModalButtonEventHandlers();
       await this.updateLanguageSelector();
       this.setupHeaderLinks();
+      this.displayLauncherVersion();
       this.Router.setupEventListeners();
       await this.Router.navigate();
       // Determine debug mode from backend (for logging/flags)
@@ -205,9 +206,7 @@ const App = {
       }
       this.sendStoredAuthInfoToBackend();
       this.setupMutationObserver();
-
-      await this.checkAppUpdate(false);
-
+      // Tauri's built-in updater (dialog: true) handles update checks automatically at startup
       this.checkAuthentication();
       document.addEventListener("DOMContentLoaded", () => {
         this.resetState();
@@ -444,62 +443,6 @@ const App = {
     });
   },
 
-  // Minimal Tauri App self-updater (separate from game patcher)
-  // Uses Tauri v1 global API available on window.__TAURI__
-  async checkAppUpdate(silent = false, auto = false) {
-    try {
-      const updater = window.__TAURI__?.updater;
-      const process = window.__TAURI__?.process;
-      if (!updater || !process) {
-        console.warn("Tauri updater API not available");
-        return;
-      }
-      const { shouldUpdate, manifest } = await updater.checkUpdate();
-      if (shouldUpdate) {
-        if (auto) {
-          await this.installAppUpdate();
-        } else {
-          const notes =
-            manifest?.notes ||
-            manifest?.body ||
-            manifest?.releaseNotes ||
-            "";
-          const suffix = notes ? `\n\n${notes}` : "";
-          const next = await ask(
-            `Update ${manifest?.version || ""} available. Install now?${suffix}`,
-            { title: "Launcher Update", type: "info" },
-          );
-          if (next) {
-            await this.installAppUpdate();
-          }
-        }
-      } else {
-        if (!silent)
-          this.showCustomNotification(
-            "You are on the latest launcher.",
-            "success",
-          );
-      }
-    } catch (e) {
-      console.error("checkAppUpdate failed", e);
-      if (!silent) this.showCustomNotification("Update check failed.", "error");
-    }
-  },
-
-  async installAppUpdate() {
-    try {
-      const updater = window.__TAURI__?.updater;
-      const process = window.__TAURI__?.process;
-      if (!updater || !process) return;
-      await updater.installUpdate();
-      await process.relaunch();
-    } catch (e) {
-      console.error("installAppUpdate failed", e);
-      this.showCustomNotification("Update installation failed.", "error");
-    }
-  },
-
-
   async handleFirstLaunch() {
     this.showFirstLaunchModal();
   },
@@ -662,8 +605,39 @@ const App = {
     if (checkLauncherUpdate) {
       checkLauncherUpdate.addEventListener("click", async (e) => {
         e.preventDefault();
-        await this.checkAppUpdate(false);
+        try {
+          const updater = window.__TAURI__?.updater;
+          if (!updater) {
+            this.showCustomNotification("Update check not available.", "error");
+            return;
+          }
+          // Tauri's built-in dialog (dialog: true) shows automatically if update available
+          const { shouldUpdate } = await updater.checkUpdate();
+          if (!shouldUpdate) {
+            const version = await window.__TAURI__?.app?.getVersion?.() || "unknown";
+            this.showCustomNotification(
+              `You are on the latest launcher (v${version}).`,
+              "success",
+            );
+          }
+        } catch (err) {
+          console.error("Update check failed:", err);
+          this.showCustomNotification("Update check failed.", "error");
+        }
       });
+    }
+  },
+
+  // Display launcher version in the header
+  async displayLauncherVersion() {
+    try {
+      const version = await window.__TAURI__?.app?.getVersion?.();
+      const versionEl = document.getElementById("launcher-version");
+      if (versionEl && version) {
+        versionEl.textContent = `v${version}`;
+      }
+    } catch (e) {
+      console.warn("Failed to get launcher version:", e);
     }
   },
 

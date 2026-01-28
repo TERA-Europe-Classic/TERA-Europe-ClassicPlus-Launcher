@@ -5417,7 +5417,7 @@ dependencies = [
 
 [[package]]
 name = "tera-europe-launcher"
-version = "1.8.1"
+version = "1.7.0"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",

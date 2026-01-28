@@ -182,6 +182,11 @@ table {
     min-width: 100px;
     min-height: 30px;
     margin-right: 8px;
+    text-transform: uppercase;
+    font-family: "Inter", sans-serif;
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.5px;
 }
 
 .settings-container {
@@ -216,6 +221,16 @@ table {
 
 .privacy-link:hover {
     text-decoration: underline;
+}
+
+.launcher-version {
+    position: fixed;
+    bottom: 8px;
+    right: 12px;
+    color: #6c7389;
+    font-size: 10px;
+    font-family: "Inter", sans-serif;
+    z-index: 100;
 }
 
 .top-button:hover {
@@ -1636,12 +1651,12 @@ input[type="text"]::placeholder {
 }
 
 .custom-notification.success {
-    background-color: rgba(0, 255, 0, 0.2);
+    background-color: #1a472a;
     color: #7af77a;
 }
 
 .custom-notification.error {
-    background-color: rgba(255, 30, 0, 0.2);
+    background-color: #4a1a1a;
     color: #f77e7a;
 }
 
