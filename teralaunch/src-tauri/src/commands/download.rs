@@ -254,11 +254,21 @@ pub async fn download_all_files(
                 continue;
             }
             let expected_hash = file_info.hash.clone();
+            let file_path_for_size = file_path.clone();
             let calc = tokio::task::spawn_blocking(move || calculate_file_hash(&file_path))
                 .await
                 .map_err(|e| e.to_string())??;
             if calc != expected_hash {
-                let message = format!("Hash mismatch after download for file: {}", file_info.path);
+                // Get file size for debugging
+                let actual_size = tokio::fs::metadata(&file_path_for_size)
+                    .await
+                    .map(|m| m.len())
+                    .unwrap_or(0);
+                let message = format!(
+                    "Hash mismatch for {}: expected {} but got {} (size: {} bytes, expected: {} bytes)",
+                    file_info.path, expected_hash, calc, actual_size, file_info.size
+                );
+                error!("{}", message);
                 let _ = window.emit(
                     "download_error",
                     json!({
@@ -317,9 +327,11 @@ pub async fn update_file(
             .map_err(|e| e.to_string())?;
     }
 
+    // Don't set total timeout - it aborts large file downloads on slow connections
+    // Only use connect_timeout for initial connection and read_timeout for stalled reads
     let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(DOWNLOAD_TIMEOUT_SECS))
         .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
+        .read_timeout(Duration::from_secs(STALL_TIMEOUT_SECS))
         .pool_max_idle_per_host(HTTP_POOL_MAX_IDLE_PER_HOST)
         .build()
         .map_err(|e| e.to_string())?;
@@ -330,49 +342,49 @@ pub async fn update_file(
     }
 
     let file_size = file_info.size;
-    let mut resume_from = resume_offset(file_info.existing_size, file_size);
 
-    if resume_from > 0 && !file_path.exists() {
-        sub_downloaded_bytes(resume_from);
-        resume_from = 0;
-    }
-
-    if resume_from == 0 && file_path.exists() {
-        tokio::fs::remove_file(&file_path)
-            .await
-            .map_err(|e| e.to_string())?;
-    }
-
-    let file_handle = if resume_from > 0 {
-        tokio::fs::OpenOptions::new()
-            .append(true)
-            .open(&file_path)
-            .await
-            .map_err(|e| e.to_string())?
-    } else {
-        tokio::fs::File::create(&file_path)
-            .await
-            .map_err(|e| e.to_string())?
-    };
+    // Create file (automatically truncates/overwrites if exists)
+    let file_handle = tokio::fs::File::create(&file_path)
+        .await
+        .map_err(|e| e.to_string())?;
     let mut file = BufWriter::with_capacity(BUFWRITER_CAPACITY, file_handle);
 
-    // Keep downloads resumable with contiguous files.
+    // Server doesn't support Range requests (returns 416), so always download fresh
+    let resume_from: u64 = 0;
     let allow_parallel = false;
 
     info!("Downloading file: {} ({} bytes)", file_info.path, file_size);
     let bytes_written: u64;
 
+    // resume_from is always 0 since server doesn't support ranges, but keep structure for future
     if resume_from > 0 {
+        info!("Attempting resume download from byte {}", resume_from);
+        #[allow(unused_assignments)]
+        let mut resume_from = resume_from; // Make mutable for the code below
         let range_probe = client
             .get(&corrected_url)
             .header(RANGE, "bytes=0-0")
             .send()
             .await
             .map_err(|e| e.to_string())?;
-        let supports_range = range_probe.status() == reqwest::StatusCode::PARTIAL_CONTENT
-            || range_probe.headers().get("content-range").is_some();
+        // Only consider range supported if we get 206 Partial Content
+        // A 416 with content-range header (bytes */0) means NOT supported
+        let supports_range = range_probe.status() == reqwest::StatusCode::PARTIAL_CONTENT;
 
-        if supports_range {
+        if !supports_range {
+            // Server doesn't support range requests - must start fresh
+            info!("Range not supported (status {}), resetting for fresh download", range_probe.status());
+            sub_downloaded_bytes(resume_from);
+            resume_from = 0;
+            drop(file);
+            if let Err(e) = tokio::fs::remove_file(&file_path).await {
+                error!("Failed to remove file for fresh download: {}", e);
+            }
+            let file_handle = tokio::fs::File::create(&file_path)
+                .await
+                .map_err(|e| e.to_string())?;
+            file = BufWriter::with_capacity(BUFWRITER_CAPACITY, file_handle);
+        } else if supports_range {
             let range_header = format!("bytes={}-", resume_from);
             let res = client
                 .get(&corrected_url)
@@ -433,8 +445,9 @@ pub async fn update_file(
             .send()
             .await
             .map_err(|e| e.to_string())?;
-        let supports_range = range_probe.status() == reqwest::StatusCode::PARTIAL_CONTENT
-            || range_probe.headers().get("content-range").is_some();
+        // Only consider range supported if we get 206 Partial Content
+        // A 416 with content-range header (bytes */0) means NOT supported
+        let supports_range = range_probe.status() == reqwest::StatusCode::PARTIAL_CONTENT;
 
         if !supports_range {
             info!(
@@ -562,8 +575,8 @@ pub async fn update_file(
         }
     } else {
         // Single-stream download
-        let req = client.get(&corrected_url);
-        let res = req
+        let res = client
+            .get(&corrected_url)
             .send()
             .await
             .map_err(|e| e.to_string())?
@@ -586,7 +599,22 @@ pub async fn update_file(
         bytes_written = downloaded;
     }
 
+    // Ensure all data is written to disk
     file.flush().await.map_err(|e| e.to_string())?;
+    let inner_file = file.into_inner();
+    inner_file.sync_all().await.map_err(|e| e.to_string())?;
+
+    // Validate downloaded size matches expected
+    if bytes_written != file_size {
+        error!(
+            "Download size mismatch for {}: expected {} bytes but got {} bytes",
+            file_info.path, file_size, bytes_written
+        );
+        return Err(format!(
+            "Download incomplete for {}: got {} of {} bytes",
+            file_info.path, bytes_written, file_size
+        ));
+    }
 
     info!("File download completed: {}", file_info.path);
 
