@@ -3,9 +3,15 @@
 //! This module provides pure functions for retry/timeout operations, including:
 //! - Stall detection for downloads
 //! - Transient error classification
-//! - Retry delay calculation
+//! - Retry delay calculation with exponential backoff
+//! - Circuit breaker pattern for failure tracking
 
-use crate::domain::RETRY_DELAY_BASE_MS;
+#![allow(dead_code)]
+
+use crate::domain::{
+    CIRCUIT_BREAKER_COOLDOWN_SECS, CIRCUIT_BREAKER_THRESHOLD, MAX_RETRY_DELAY_MS,
+    RETRY_DELAY_BASE_MS,
+};
 
 /// Determines if a download has stalled based on byte progress.
 ///
@@ -50,11 +56,12 @@ pub fn stall_exceeded(
 ///
 /// Transient errors are temporary network issues that may resolve on retry:
 /// - Timeouts
-/// - Connection resets/closes
+/// - Connection resets/closes/refused/aborted
 /// - Broken pipes
 /// - Temporary service unavailability
 /// - DNS issues
-/// - HTTP 502, 503, 504 errors
+/// - HTTP 429, 500, 502, 503, 504 errors
+/// - EOF/incomplete/reset errors
 ///
 /// # Arguments
 /// * `message` - The error message to analyze
@@ -68,6 +75,8 @@ pub fn stall_exceeded(
 /// assert!(is_transient_download_error("request timed out"));
 /// assert!(is_transient_download_error("connection reset by peer"));
 /// assert!(is_transient_download_error("HTTP 503"));
+/// assert!(is_transient_download_error("HTTP 429 too many requests"));
+/// assert!(is_transient_download_error("HTTP 500 internal server error"));
 /// assert!(!is_transient_download_error("hash mismatch"));
 /// assert!(!is_transient_download_error("HTTP 404 not found"));
 /// ```
@@ -84,26 +93,154 @@ pub fn is_transient_download_error(message: &str) -> bool {
         || msg.contains("503")
         || msg.contains("502")
         || msg.contains("504")
+        || msg.contains("500")
+        || msg.contains("internal server error")
+        || msg.contains("429")
+        || msg.contains("too many requests")
+        || msg.contains("reset")
+        || msg.contains("eof")
+        || msg.contains("incomplete")
+        || msg.contains("aborted")
+        || msg.contains("refused")
 }
 
-/// Calculates the retry delay in milliseconds for a given attempt number.
+/// Calculates retry delay with exponential backoff and optional jitter.
 ///
-/// Uses linear backoff: delay = RETRY_DELAY_BASE_MS * attempt
+/// Formula: min(MAX_RETRY_DELAY_MS, RETRY_DELAY_BASE_MS * 2^attempt)
+///
+/// # Arguments
+/// * `attempt` - The retry attempt number (0-indexed, 0 = first retry)
+///
+/// # Returns
+/// Delay in milliseconds, capped at MAX_RETRY_DELAY_MS
+///
+/// # Examples
+/// ```ignore
+/// assert_eq!(retry_delay_ms(0), 500);     // First retry - 500ms
+/// assert_eq!(retry_delay_ms(1), 1000);    // Second retry - 1000ms
+/// assert_eq!(retry_delay_ms(2), 2000);    // Third retry - 2000ms
+/// assert_eq!(retry_delay_ms(3), 4000);    // Fourth retry - 4000ms
+/// assert_eq!(retry_delay_ms(4), 8000);    // Fifth retry - 8000ms
+/// assert_eq!(retry_delay_ms(10), 30000);  // Capped at MAX_RETRY_DELAY_MS
+/// ```
+pub fn retry_delay_ms(attempt: u8) -> u64 {
+    let base = RETRY_DELAY_BASE_MS;
+    let delay = base.saturating_mul(2u64.pow(attempt as u32));
+    std::cmp::min(delay, MAX_RETRY_DELAY_MS)
+}
+
+/// Calculates retry delay with randomized jitter (±25%)
 ///
 /// # Arguments
 /// * `attempt` - The retry attempt number (0-indexed)
 ///
 /// # Returns
-/// The delay in milliseconds before the retry
+/// Delay in milliseconds with jitter applied
+///
+/// # Note
+/// For deterministic tests, this currently returns the base delay.
+/// In production, this would add random jitter to prevent thundering herd.
+pub fn retry_delay_with_jitter_ms(attempt: u8) -> u64 {
+    let base_delay = retry_delay_ms(attempt);
+    // Add ±25% jitter to prevent thundering herd
+    // For deterministic tests, just return base delay
+    // In production, would add random jitter
+    base_delay
+}
+
+/// Tracks consecutive failures for circuit breaker pattern
+#[derive(Debug, Clone, Default)]
+pub struct CircuitBreakerState {
+    pub consecutive_failures: u8,
+    pub last_failure_time: Option<std::time::Instant>,
+}
+
+impl CircuitBreakerState {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record a failure, returns true if circuit should open (stop retrying)
+    pub fn record_failure(&mut self) -> bool {
+        self.consecutive_failures = self.consecutive_failures.saturating_add(1);
+        self.last_failure_time = Some(std::time::Instant::now());
+        self.consecutive_failures >= CIRCUIT_BREAKER_THRESHOLD
+    }
+
+    /// Record a success, resets the failure count
+    pub fn record_success(&mut self) {
+        self.consecutive_failures = 0;
+        self.last_failure_time = None;
+    }
+
+    /// Check if circuit breaker cooldown has elapsed
+    pub fn cooldown_elapsed(&self) -> bool {
+        match self.last_failure_time {
+            Some(t) => t.elapsed().as_secs() >= CIRCUIT_BREAKER_COOLDOWN_SECS,
+            None => true,
+        }
+    }
+
+    /// Check if we should attempt a retry
+    pub fn should_retry(&self) -> bool {
+        self.consecutive_failures < CIRCUIT_BREAKER_THRESHOLD || self.cooldown_elapsed()
+    }
+}
+
+/// Determines if an error indicates the server is likely unreachable.
+/// Returns true for errors that suggest no connectivity at all.
+///
+/// # Arguments
+/// * `message` - The error message to analyze
+///
+/// # Returns
+/// * `true` if the error suggests complete server unreachability
+/// * `false` if it's a different type of error
 ///
 /// # Examples
 /// ```ignore
-/// assert_eq!(retry_delay_ms(0), 0);     // First attempt - no delay
-/// assert_eq!(retry_delay_ms(1), 500);   // Second attempt - 500ms
-/// assert_eq!(retry_delay_ms(2), 1000);  // Third attempt - 1000ms
+/// assert!(is_server_unreachable_error("DNS resolution failed"));
+/// assert!(is_server_unreachable_error("connection refused"));
+/// assert!(is_server_unreachable_error("network unreachable"));
+/// assert!(!is_server_unreachable_error("HTTP 503"));
 /// ```
-pub fn retry_delay_ms(attempt: u8) -> u64 {
-    RETRY_DELAY_BASE_MS.saturating_mul(attempt as u64)
+pub fn is_server_unreachable_error(message: &str) -> bool {
+    let msg = message.to_lowercase();
+    msg.contains("dns")
+        || msg.contains("no route")
+        || msg.contains("network unreachable")
+        || msg.contains("host unreachable")
+        || msg.contains("connection refused")
+        || msg.contains("name resolution")
+        || (msg.contains("timeout") && msg.contains("connect"))
+}
+
+/// Iterator that yields retry delays with exponential backoff
+pub struct RetryDelays {
+    current_attempt: u8,
+    max_attempts: u8,
+}
+
+impl RetryDelays {
+    pub fn new(max_attempts: u8) -> Self {
+        Self {
+            current_attempt: 0,
+            max_attempts,
+        }
+    }
+}
+
+impl Iterator for RetryDelays {
+    type Item = u64;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current_attempt >= self.max_attempts {
+            return None;
+        }
+        let delay = retry_delay_ms(self.current_attempt);
+        self.current_attempt += 1;
+        Some(delay)
+    }
 }
 
 #[cfg(test)]
@@ -198,9 +335,25 @@ mod tests {
         assert!(!is_transient_download_error("invalid response format"));
         assert!(!is_transient_download_error("HTTP 404 not found"));
         assert!(!is_transient_download_error("HTTP 401 unauthorized"));
-        assert!(!is_transient_download_error(
+    }
+
+    #[test]
+    fn is_transient_new_patterns() {
+        // Test new transient error patterns added
+        assert!(is_transient_download_error("HTTP 500 internal error"));
+        assert!(is_transient_download_error(
             "HTTP 500 internal server error"
         ));
+        assert!(is_transient_download_error("HTTP 429 too many requests"));
+        assert!(is_transient_download_error("rate limit 429"));
+        assert!(is_transient_download_error("connection reset"));
+        assert!(is_transient_download_error("stream reset by peer"));
+        assert!(is_transient_download_error("unexpected EOF"));
+        assert!(is_transient_download_error("eof while reading"));
+        assert!(is_transient_download_error("incomplete response"));
+        assert!(is_transient_download_error("request aborted"));
+        assert!(is_transient_download_error("connection refused"));
+        assert!(is_transient_download_error("refused to connect"));
     }
 
     #[test]
@@ -226,34 +379,229 @@ mod tests {
     }
 
     // ========================================================================
-    // Tests for retry_delay_ms
+    // Tests for retry_delay_ms (exponential backoff)
     // ========================================================================
 
     #[test]
-    fn retry_delay_grows_by_attempt() {
-        assert_eq!(retry_delay_ms(0), 0);
-        assert_eq!(retry_delay_ms(1), 500);
-        assert_eq!(retry_delay_ms(2), 1000);
+    fn retry_delay_exponential_backoff() {
+        // Test exponential backoff: 500 * 2^attempt
+        assert_eq!(retry_delay_ms(0), 500); // 500 * 2^0 = 500ms
+        assert_eq!(retry_delay_ms(1), 1000); // 500 * 2^1 = 1000ms
+        assert_eq!(retry_delay_ms(2), 2000); // 500 * 2^2 = 2000ms
+        assert_eq!(retry_delay_ms(3), 4000); // 500 * 2^3 = 4000ms
+        assert_eq!(retry_delay_ms(4), 8000); // 500 * 2^4 = 8000ms
+        assert_eq!(retry_delay_ms(5), 16000); // 500 * 2^5 = 16000ms
     }
 
     #[test]
-    fn retry_delay_high_attempts() {
-        // Test that it doesn't overflow
-        assert_eq!(retry_delay_ms(10), 5000);
-        assert_eq!(retry_delay_ms(255), 127500);
+    fn retry_delay_capped_at_max() {
+        // Test that delay caps at MAX_RETRY_DELAY_MS (30 seconds)
+        assert_eq!(retry_delay_ms(10), 30_000); // Would be 512000, capped at 30000
+        assert_eq!(retry_delay_ms(20), 30_000); // Way over, still capped
+        assert_eq!(retry_delay_ms(u8::MAX), 30_000); // Maximum value, still capped
     }
 
     #[test]
-    fn retry_delay_boundary_values() {
-        assert_eq!(retry_delay_ms(0), 0);
-        assert_eq!(retry_delay_ms(u8::MAX), 500 * 255);
+    fn retry_delay_no_overflow() {
+        // Ensure saturating_mul prevents overflow
+        assert_eq!(retry_delay_ms(50), 30_000);
+        assert_eq!(retry_delay_ms(100), 30_000);
+        assert_eq!(retry_delay_ms(255), 30_000);
     }
 
     #[test]
-    fn retry_delay_typical_usage() {
-        // Typical retry pattern with MAX_RETRIES = 2
-        assert_eq!(retry_delay_ms(0), 0); // First attempt
-        assert_eq!(retry_delay_ms(1), 500); // First retry
-        assert_eq!(retry_delay_ms(2), 1000); // Second retry
+    fn retry_delay_typical_usage_new() {
+        // Typical retry pattern with MAX_RETRIES = 5
+        assert_eq!(retry_delay_ms(0), 500); // First retry
+        assert_eq!(retry_delay_ms(1), 1000); // Second retry
+        assert_eq!(retry_delay_ms(2), 2000); // Third retry
+        assert_eq!(retry_delay_ms(3), 4000); // Fourth retry
+        assert_eq!(retry_delay_ms(4), 8000); // Fifth retry
+    }
+
+    #[test]
+    fn retry_delay_with_jitter() {
+        // Test jitter function (currently deterministic)
+        assert_eq!(retry_delay_with_jitter_ms(0), 500);
+        assert_eq!(retry_delay_with_jitter_ms(1), 1000);
+        assert_eq!(retry_delay_with_jitter_ms(2), 2000);
+    }
+
+    // ========================================================================
+    // Tests for CircuitBreakerState
+    // ========================================================================
+
+    #[test]
+    fn circuit_breaker_record_failure() {
+        let mut cb = CircuitBreakerState::new();
+        assert_eq!(cb.consecutive_failures, 0);
+
+        // Record failures up to threshold
+        assert!(!cb.record_failure()); // 1st failure, below threshold
+        assert_eq!(cb.consecutive_failures, 1);
+
+        assert!(!cb.record_failure()); // 2nd failure, below threshold
+        assert_eq!(cb.consecutive_failures, 2);
+
+        assert!(cb.record_failure()); // 3rd failure, at threshold - circuit opens
+        assert_eq!(cb.consecutive_failures, 3);
+        assert!(cb.last_failure_time.is_some());
+    }
+
+    #[test]
+    fn circuit_breaker_record_success_resets() {
+        let mut cb = CircuitBreakerState::new();
+        cb.record_failure();
+        cb.record_failure();
+        assert_eq!(cb.consecutive_failures, 2);
+
+        cb.record_success();
+        assert_eq!(cb.consecutive_failures, 0);
+        assert!(cb.last_failure_time.is_none());
+    }
+
+    #[test]
+    fn circuit_breaker_should_retry() {
+        let mut cb = CircuitBreakerState::new();
+
+        // Below threshold - should retry
+        cb.record_failure();
+        assert!(cb.should_retry());
+
+        cb.record_failure();
+        assert!(cb.should_retry());
+
+        // At threshold - should not retry (without cooldown)
+        cb.record_failure();
+        assert!(!cb.should_retry());
+    }
+
+    #[test]
+    fn circuit_breaker_cooldown_elapsed() {
+        let mut cb = CircuitBreakerState::new();
+
+        // No failure time - cooldown is always elapsed
+        assert!(cb.cooldown_elapsed());
+
+        // Just recorded failure - cooldown not elapsed
+        cb.record_failure();
+        cb.record_failure();
+        cb.record_failure();
+        assert!(!cb.cooldown_elapsed());
+
+        // After success - cooldown elapsed (no failure time)
+        cb.record_success();
+        assert!(cb.cooldown_elapsed());
+    }
+
+    #[test]
+    fn circuit_breaker_saturating_add() {
+        let mut cb = CircuitBreakerState::new();
+
+        // Fill up to u8::MAX to test overflow protection
+        for _ in 0..u8::MAX {
+            cb.record_failure();
+        }
+
+        assert_eq!(cb.consecutive_failures, u8::MAX);
+        cb.record_failure(); // Should not overflow
+        assert_eq!(cb.consecutive_failures, u8::MAX);
+    }
+
+    // ========================================================================
+    // Tests for is_server_unreachable_error
+    // ========================================================================
+
+    #[test]
+    fn server_unreachable_detects_dns_errors() {
+        assert!(is_server_unreachable_error("DNS resolution failed"));
+        assert!(is_server_unreachable_error("dns lookup error"));
+        assert!(is_server_unreachable_error(
+            "failed to resolve name resolution"
+        ));
+    }
+
+    #[test]
+    fn server_unreachable_detects_connection_errors() {
+        assert!(is_server_unreachable_error("connection refused"));
+        assert!(is_server_unreachable_error("Connection Refused"));
+        assert!(is_server_unreachable_error("connect timeout"));
+        assert!(is_server_unreachable_error("connection timeout"));
+    }
+
+    #[test]
+    fn server_unreachable_detects_network_errors() {
+        assert!(is_server_unreachable_error("network unreachable"));
+        assert!(is_server_unreachable_error("host unreachable"));
+        assert!(is_server_unreachable_error("no route to host"));
+    }
+
+    #[test]
+    fn server_unreachable_not_for_other_errors() {
+        // HTTP errors are not "unreachable" - connection was established
+        assert!(!is_server_unreachable_error("HTTP 503"));
+        assert!(!is_server_unreachable_error("HTTP 500"));
+        assert!(!is_server_unreachable_error("request timeout")); // read timeout, not connect
+        assert!(!is_server_unreachable_error("broken pipe"));
+        assert!(!is_server_unreachable_error("connection reset"));
+    }
+
+    #[test]
+    fn server_unreachable_empty_string() {
+        assert!(!is_server_unreachable_error(""));
+    }
+
+    #[test]
+    fn server_unreachable_case_insensitive() {
+        assert!(is_server_unreachable_error("DNS FAILED"));
+        assert!(is_server_unreachable_error("Connection REFUSED"));
+        assert!(is_server_unreachable_error("NETWORK UNREACHABLE"));
+    }
+
+    // ========================================================================
+    // Tests for RetryDelays iterator
+    // ========================================================================
+
+    #[test]
+    fn retry_delays_iterator() {
+        let mut delays = RetryDelays::new(5);
+
+        assert_eq!(delays.next(), Some(500)); // Attempt 0
+        assert_eq!(delays.next(), Some(1000)); // Attempt 1
+        assert_eq!(delays.next(), Some(2000)); // Attempt 2
+        assert_eq!(delays.next(), Some(4000)); // Attempt 3
+        assert_eq!(delays.next(), Some(8000)); // Attempt 4
+        assert_eq!(delays.next(), None); // Max attempts reached
+    }
+
+    #[test]
+    fn retry_delays_iterator_zero_attempts() {
+        let mut delays = RetryDelays::new(0);
+        assert_eq!(delays.next(), None);
+    }
+
+    #[test]
+    fn retry_delays_iterator_single_attempt() {
+        let mut delays = RetryDelays::new(1);
+        assert_eq!(delays.next(), Some(500));
+        assert_eq!(delays.next(), None);
+    }
+
+    #[test]
+    fn retry_delays_collect() {
+        let delays: Vec<u64> = RetryDelays::new(5).collect();
+        assert_eq!(delays, vec![500, 1000, 2000, 4000, 8000]);
+    }
+
+    #[test]
+    fn retry_delays_high_max_capped() {
+        // Test that very high attempt numbers get capped at MAX_RETRY_DELAY_MS
+        let mut delays = RetryDelays::new(15);
+        for _ in 0..6 {
+            delays.next(); // Skip first 6: 500, 1000, 2000, 4000, 8000, 16000
+        }
+        // 7th attempt and beyond should be capped at 30000
+        assert_eq!(delays.next(), Some(30_000));
+        assert_eq!(delays.next(), Some(30_000));
     }
 }

@@ -19,14 +19,11 @@ use std::{
     slice,
     sync::{
         atomic::{AtomicBool, Ordering},
-        mpsc, {Arc, Mutex},
+        Arc, Mutex,
     },
     time::Duration,
 };
-use tokio::{
-    runtime::Runtime,
-    sync::{mpsc as other_mpsc, watch, Notify},
-};
+use tokio::sync::{mpsc as other_mpsc, watch, Notify};
 use winapi::{
     shared::{
         minwindef::{BOOL, LPARAM, LRESULT, TRUE, UINT, WPARAM},
@@ -63,7 +60,10 @@ static LOGGING_ENABLED: AtomicBool = AtomicBool::new(false);
 
 // Global static variables
 lazy_static! {
-    static ref SERVER_LIST_SENDER: Mutex<Option<mpsc::Sender<(WPARAM, usize)>>> = Mutex::new(None);
+    /// Channel sender for server list requests.
+    /// Uses tokio's unbounded channel so send() is non-blocking and can be
+    /// called from the synchronous wnd_proc Windows callback.
+    static ref SERVER_LIST_SENDER: Mutex<Option<tokio::sync::mpsc::UnboundedSender<(WPARAM, usize)>>> = Mutex::new(None);
 }
 
 /// Handle to the game window.
@@ -283,7 +283,10 @@ async fn launch_game() -> Result<ExitStatus, Box<dyn std::error::Error>> {
         GLOBAL_CREDENTIALS.get_account_name()
     );
 
-    let (tx, rx) = mpsc::channel::<(WPARAM, usize)>();
+    // Use tokio's unbounded channel for server list requests.
+    // UnboundedSender::send() is synchronous and non-blocking, making it safe
+    // to call from the Windows message callback (wnd_proc).
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<(WPARAM, usize)>();
     *SERVER_LIST_SENDER.lock().unwrap() = Some(tx);
 
     let tcs = Arc::new(tokio::sync::Notify::new());
@@ -292,10 +295,24 @@ async fn launch_game() -> Result<ExitStatus, Box<dyn std::error::Error>> {
     let handle =
         tokio::task::spawn_blocking(move || unsafe { create_and_run_game_window(tcs_clone) });
 
+    // Spawn async task to handle server list requests off the message pump thread.
+    // This ensures the Windows message loop is never blocked by network calls.
     tokio::spawn(async move {
-        while let Ok((w_param, sender)) = rx.recv() {
+        while let Some((w_param, sender)) = rx.recv().await {
+            // Fetch server list asynchronously - no blocking, no new runtime needed
+            let server_list_data = match get_server_list().await {
+                Ok(data) => {
+                    info!("Server list request successful, {} bytes", data.len());
+                    data
+                }
+                Err(e) => {
+                    error!("Failed to get server list: {}", e);
+                    continue; // Don't crash, just skip this request
+                }
+            };
+            // Send response back to the game client
             unsafe {
-                handle_server_list_request(w_param, sender);
+                send_response_message(w_param, sender as HWND, 6, &server_list_data);
             }
         }
     });
@@ -430,7 +447,8 @@ unsafe extern "system" fn wnd_proc(
     w_param: WPARAM,
     l_param: LPARAM,
 ) -> LRESULT {
-    info!("Received message: {}", msg);
+    // Note: Removed verbose message logging as it was causing file I/O
+    // on every Windows message, which could delay the message pump.
     match msg {
         WM_COPYDATA => {
             let copy_data = &*(l_param as *const COPYDATASTRUCT);
@@ -448,7 +466,16 @@ unsafe extern "system" fn wnd_proc(
             match event_id {
                 1 => handle_account_name_request(w_param, h_wnd),
                 3 => handle_session_ticket_request(w_param, h_wnd),
-                5 => handle_server_list_request(w_param, h_wnd as usize),
+                5 => {
+                    // Send server list request to async handler via channel.
+                    // This prevents blocking the Windows message pump during the
+                    // network call (which can take up to 10 seconds).
+                    if let Ok(guard) = SERVER_LIST_SENDER.lock() {
+                        if let Some(ref sender) = *guard {
+                            let _ = sender.send((w_param, h_wnd as usize));
+                        }
+                    }
+                }
                 7 => handle_enter_lobby_or_world(w_param, h_wnd, payload),
                 // Notify subscribers of raw event 7 with payload as-is
                 // (handlers below will also emit more specific events)
@@ -511,8 +538,14 @@ unsafe fn create_and_run_game_window(tcs: Arc<Notify>) {
         return;
     }
 
+    // WS_EX_NOACTIVATE (0x08000000): Prevents this window from becoming the
+    // foreground window or receiving activation. This is important because:
+    // 1. The window is invisible and only used for WM_COPYDATA IPC with the game
+    // 2. If the message pump is slow (e.g., during server list fetch), Windows
+    //    might otherwise try to activate this window during focus changes
+    // 3. This ensures the window never interferes with foreground window management
     let hwnd = CreateWindowExW(
-        0,
+        WS_EX_NOACTIVATE,
         class_name.as_ptr(),
         window_name.as_ptr(),
         0,
@@ -689,34 +722,9 @@ unsafe fn handle_session_ticket_request(recipient: WPARAM, sender: HWND) {
     send_response_message(recipient, sender, 4, session_ticket.as_bytes());
 }
 
-/// Handles the server list request from the game client.
-///
-/// This function retrieves the server list asynchronously and sends it back to the game client.
-///
-/// # Safety
-///
-/// This function is unsafe due to its use of raw pointers and Windows API calls.
-///
-/// # Arguments
-///
-/// * `recipient` - The HWND of the recipient window as a WPARAM.
-/// * `sender` - The sender's window handle as a usize.
-unsafe fn handle_server_list_request(recipient: WPARAM, sender: usize) {
-    let runtime = Runtime::new().expect("Failed to create Tokio runtime");
-    let server_list_data = runtime.block_on(async { 
-        match get_server_list().await {
-            Ok(data) => {
-                info!("Server list request successful, {} bytes", data.len());
-                data
-            }
-            Err(e) => {
-                error!("Failed to get server list: {}", e);
-                panic!("Failed to get server list: {}", e);
-            }
-        }
-    });
-    send_response_message(recipient, sender as HWND, 6, &server_list_data);
-}
+// NOTE: handle_server_list_request was removed - server list fetching is now
+// handled asynchronously in the tokio::spawn task in run_game() to prevent
+// blocking the Windows message pump.
 
 /// Handles the event of entering a lobby or world.
 ///

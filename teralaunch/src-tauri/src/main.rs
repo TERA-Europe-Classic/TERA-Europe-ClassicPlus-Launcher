@@ -48,7 +48,7 @@ fn main() {
 
     // Windows: relaunch elevated via UAC using ShellExecute with "runas" verb.
     // This shows proper UAC dialog and admin shield icon without command prompt flash.
-    #[cfg(target_os = "windows")]
+    #[cfg(all(target_os = "windows", not(debug_assertions)))]
     {
         use std::ffi::CString;
         use std::ptr;

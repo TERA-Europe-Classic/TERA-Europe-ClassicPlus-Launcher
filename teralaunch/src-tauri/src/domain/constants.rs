@@ -2,6 +2,8 @@
 // Configuration Constants
 // ============================================================================
 
+#![allow(dead_code)]
+
 /// Buffer size for file I/O operations (64 KB)
 pub const BUFFER_SIZE: usize = 65_536;
 
@@ -35,11 +37,20 @@ pub const BUFWRITER_CAPACITY: usize = 1024 * 1024;
 /// Part assembly buffer size (64 KB)
 pub const PART_ASSEMBLY_BUFFER_SIZE: usize = 64 * 1024;
 
-/// Maximum retry attempts for transient download errors
-pub const MAX_RETRIES: u8 = 2;
+/// Maximum retry attempts for transient download errors (increased for resilience)
+pub const MAX_RETRIES: u8 = 5;
 
 /// Retry delay base multiplier (500ms per attempt)
 pub const RETRY_DELAY_BASE_MS: u64 = 500;
+
+/// Maximum retry delay cap in milliseconds (30 seconds)
+pub const MAX_RETRY_DELAY_MS: u64 = 30_000;
+
+/// Circuit breaker threshold - consecutive failures before backing off
+pub const CIRCUIT_BREAKER_THRESHOLD: u8 = 3;
+
+/// Circuit breaker cooldown period in seconds
+pub const CIRCUIT_BREAKER_COOLDOWN_SECS: u64 = 60;
 
 /// HTTP client max idle connections per host
 pub const HTTP_POOL_MAX_IDLE_PER_HOST: usize = 10;

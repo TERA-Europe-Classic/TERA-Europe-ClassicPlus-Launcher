@@ -19,6 +19,9 @@ lazy_static! {
 
     /// Flag to signal download cancellation.
     static ref CANCEL_DOWNLOAD: AtomicBool = AtomicBool::new(false);
+
+    /// Flag to signal download is complete (success or error).
+    static ref DOWNLOAD_COMPLETE: AtomicBool = AtomicBool::new(false);
 }
 
 /// Global counter for total bytes downloaded across all files.
@@ -127,6 +130,20 @@ pub fn clear_download_cancelled() {
 }
 
 // ============================================================================
+// Download Completion Functions
+// ============================================================================
+
+/// Checks if download has completed (success or error).
+pub fn is_download_complete() -> bool {
+    DOWNLOAD_COMPLETE.load(Ordering::SeqCst)
+}
+
+/// Sets the download completion flag.
+pub fn set_download_complete(value: bool) {
+    DOWNLOAD_COMPLETE.store(value, Ordering::SeqCst);
+}
+
+// ============================================================================
 // Current File Name Functions
 // ============================================================================
 
@@ -158,11 +175,13 @@ pub fn clear_current_file_name() {
 /// Resets all download state for a fresh download session.
 /// - Clears downloaded bytes counter
 /// - Clears cancellation flag
+/// - Clears download complete flag
 /// - Clears current file name
 #[allow(dead_code)]
 pub fn reset_download_state() {
     GLOBAL_DOWNLOADED_BYTES.store(0, Ordering::SeqCst);
     CANCEL_DOWNLOAD.store(false, Ordering::SeqCst);
+    DOWNLOAD_COMPLETE.store(false, Ordering::SeqCst);
     let mut guard = CURRENT_FILE_NAME.write().unwrap_or_else(|e| e.into_inner());
     guard.clear();
 }
@@ -212,6 +231,19 @@ mod tests {
     }
 
     #[test]
+    fn test_download_completion() {
+        // Reset to known state
+        set_download_complete(false);
+        assert!(!is_download_complete());
+
+        set_download_complete(true);
+        assert!(is_download_complete());
+
+        set_download_complete(false);
+        assert!(!is_download_complete());
+    }
+
+    #[test]
     fn test_current_file_name() {
         clear_current_file_name();
         assert_eq!(get_current_file_name(), "");
@@ -231,6 +263,7 @@ mod tests {
         // Set up some state
         set_downloaded_bytes(5000);
         set_download_cancelled(true);
+        set_download_complete(true);
         set_current_file_name("some_file.txt".to_string());
 
         // Reset all
@@ -238,6 +271,7 @@ mod tests {
 
         assert_eq!(get_downloaded_bytes(), 0);
         assert!(!is_download_cancelled());
+        assert!(!is_download_complete());
         assert_eq!(get_current_file_name(), "");
     }
 

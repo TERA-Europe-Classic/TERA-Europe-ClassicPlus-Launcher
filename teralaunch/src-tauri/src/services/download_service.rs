@@ -7,7 +7,7 @@
 
 #![allow(dead_code)]
 
-use crate::domain::FileInfo;
+use crate::domain::{FileInfo, MAX_RETRIES, MAX_RETRY_DELAY_MS};
 use crate::utils::resume_offset;
 
 /// Calculates the initial downloaded byte count for resuming downloads.
@@ -318,6 +318,280 @@ pub fn calculate_chunk_ranges(file_size: u64, part_size: u64, max_parts: usize) 
     }
 
     ranges
+}
+
+/// Configuration for download retry behavior.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RetryPolicy {
+    /// Maximum number of retry attempts
+    pub max_retries: u8,
+    /// Base delay in milliseconds for exponential backoff
+    pub base_delay_ms: u64,
+    /// Maximum delay cap in milliseconds
+    pub max_delay_ms: u64,
+    /// Whether to retry on stream interruptions
+    pub retry_stream_errors: bool,
+}
+
+impl Default for RetryPolicy {
+    fn default() -> Self {
+        Self {
+            max_retries: MAX_RETRIES,
+            base_delay_ms: 500,
+            max_delay_ms: MAX_RETRY_DELAY_MS,
+            retry_stream_errors: true,
+        }
+    }
+}
+
+impl RetryPolicy {
+    /// Create a policy for aggressive retrying (more attempts, shorter delays)
+    pub fn aggressive() -> Self {
+        Self {
+            max_retries: 8,
+            base_delay_ms: 250,
+            max_delay_ms: 15_000,
+            retry_stream_errors: true,
+        }
+    }
+
+    /// Create a conservative policy (fewer attempts, longer delays)
+    pub fn conservative() -> Self {
+        Self {
+            max_retries: 3,
+            base_delay_ms: 1000,
+            max_delay_ms: 60_000,
+            retry_stream_errors: true,
+        }
+    }
+
+    /// Calculate delay for a given attempt using this policy
+    pub fn delay_for_attempt(&self, attempt: u8) -> u64 {
+        let delay = self.base_delay_ms.saturating_mul(2u64.pow(attempt as u32));
+        std::cmp::min(delay, self.max_delay_ms)
+    }
+
+    /// Check if we should retry given the attempt count
+    pub fn should_retry(&self, attempt: u8) -> bool {
+        attempt < self.max_retries
+    }
+}
+
+/// Result of classifying a download error for retry decisions.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ErrorClassification {
+    /// Transient error that should be retried (network glitch, server overload)
+    Transient,
+    /// Permanent error that should not be retried (404, hash mismatch)
+    Permanent,
+    /// Server appears unreachable (DNS failure, connection refused)
+    ServerUnreachable,
+    /// User cancelled the operation
+    Cancelled,
+}
+
+/// Classifies an error message for retry decision making.
+///
+/// # Arguments
+/// * `error_msg` - The error message to classify
+///
+/// # Returns
+/// Classification indicating whether to retry
+pub fn classify_error(error_msg: &str) -> ErrorClassification {
+    let msg = error_msg.to_lowercase();
+
+    // Check for cancellation first
+    if msg == "cancelled" || msg.contains("cancelled by user") {
+        return ErrorClassification::Cancelled;
+    }
+
+    // Check for server unreachable patterns
+    if msg.contains("dns")
+        || msg.contains("no route")
+        || msg.contains("network unreachable")
+        || msg.contains("host unreachable")
+        || msg.contains("name resolution")
+        || (msg.contains("connection refused") && !msg.contains("temporarily"))
+    {
+        return ErrorClassification::ServerUnreachable;
+    }
+
+    // Check for permanent errors (4xx except 429)
+    // NOTE: Hash mismatch is NOT permanent - it means corruption during download,
+    // so we should delete the file and retry the download from scratch
+    if msg.contains("404")
+        || msg.contains("not found")
+        || msg.contains("401")
+        || msg.contains("unauthorized")
+        || msg.contains("403")
+        || msg.contains("forbidden")
+        || msg.contains("invalid")
+    {
+        return ErrorClassification::Permanent;
+    }
+
+    // Hash mismatch = corruption during download, should retry (delete + redownload)
+    if msg.contains("hash mismatch") || msg.contains("checksum") {
+        return ErrorClassification::Transient;
+    }
+
+    // Check for transient errors
+    if msg.contains("timeout")
+        || msg.contains("timed out")
+        || msg.contains("connection reset")
+        || msg.contains("connection closed")
+        || msg.contains("broken pipe")
+        || msg.contains("temporarily")
+        || msg.contains("network")
+        || msg.contains("500")
+        || msg.contains("502")
+        || msg.contains("503")
+        || msg.contains("504")
+        || msg.contains("429")
+        || msg.contains("too many")
+        || msg.contains("eof")
+        || msg.contains("incomplete")
+        || msg.contains("aborted")
+        || msg.contains("reset")
+        || msg.contains("interrupted")
+    {
+        return ErrorClassification::Transient;
+    }
+
+    // Default to transient (optimistic - retry unknown errors)
+    ErrorClassification::Transient
+}
+
+/// Determines if a download should be retried based on error and attempt count.
+///
+/// # Arguments
+/// * `error_msg` - The error message
+/// * `attempt` - Current attempt number (0-indexed)
+/// * `policy` - Retry policy to use
+///
+/// # Returns
+/// `true` if the download should be retried
+pub fn should_retry_download(error_msg: &str, attempt: u8, policy: &RetryPolicy) -> bool {
+    if attempt >= policy.max_retries {
+        return false;
+    }
+
+    match classify_error(error_msg) {
+        ErrorClassification::Transient => true,
+        ErrorClassification::ServerUnreachable => attempt < 2, // Only retry unreachable twice
+        ErrorClassification::Permanent | ErrorClassification::Cancelled => false,
+    }
+}
+
+/// Calculates an adaptive read timeout based on file size and estimated speed.
+///
+/// For large files on slow connections, the default timeout may not be enough.
+/// This calculates a reasonable timeout that accounts for transfer time.
+///
+/// # Arguments
+/// * `file_size` - Size of the file in bytes
+/// * `estimated_speed_bps` - Estimated download speed in bytes per second
+/// * `min_timeout_secs` - Minimum timeout to return
+///
+/// # Returns
+/// Recommended timeout in seconds
+pub fn calculate_adaptive_timeout(
+    file_size: u64,
+    estimated_speed_bps: u64,
+    min_timeout_secs: u64,
+) -> u64 {
+    if estimated_speed_bps == 0 {
+        return min_timeout_secs;
+    }
+
+    // Calculate time needed to download file at estimated speed
+    let transfer_time_secs = file_size / estimated_speed_bps;
+
+    // Add 50% buffer for variability, minimum of min_timeout
+    let timeout = transfer_time_secs + (transfer_time_secs / 2);
+    std::cmp::max(timeout, min_timeout_secs)
+}
+
+/// Estimates download speed from historical data.
+///
+/// # Arguments
+/// * `bytes_downloaded` - Total bytes downloaded in session
+/// * `elapsed_secs` - Seconds elapsed
+/// * `default_speed` - Default speed if no data available
+///
+/// # Returns
+/// Estimated speed in bytes per second
+pub fn estimate_speed(bytes_downloaded: u64, elapsed_secs: f64, default_speed: u64) -> u64 {
+    if elapsed_secs < 1.0 || bytes_downloaded == 0 {
+        return default_speed;
+    }
+    (bytes_downloaded as f64 / elapsed_secs) as u64
+}
+
+/// Tracks the health of an ongoing download for adaptive behavior.
+#[derive(Debug, Clone)]
+pub struct DownloadHealth {
+    /// Number of successful chunks received
+    pub successful_chunks: u64,
+    /// Number of retried chunks
+    pub retried_chunks: u64,
+    /// Current streak of successful chunks
+    pub success_streak: u64,
+    /// Highest error count before recovery
+    pub max_consecutive_errors: u8,
+    /// Current consecutive error count
+    pub consecutive_errors: u8,
+}
+
+impl Default for DownloadHealth {
+    fn default() -> Self {
+        Self {
+            successful_chunks: 0,
+            retried_chunks: 0,
+            success_streak: 0,
+            max_consecutive_errors: 0,
+            consecutive_errors: 0,
+        }
+    }
+}
+
+impl DownloadHealth {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record a successful chunk download
+    pub fn record_success(&mut self) {
+        self.successful_chunks += 1;
+        self.success_streak += 1;
+        self.consecutive_errors = 0;
+    }
+
+    /// Record a retried chunk (error followed by success)
+    pub fn record_retry(&mut self) {
+        self.retried_chunks += 1;
+        self.consecutive_errors = self.consecutive_errors.saturating_add(1);
+        self.max_consecutive_errors = std::cmp::max(
+            self.max_consecutive_errors,
+            self.consecutive_errors,
+        );
+        self.success_streak = 0;
+    }
+
+    /// Calculate health score (0.0 = poor, 1.0 = excellent)
+    pub fn health_score(&self) -> f64 {
+        let total = self.successful_chunks + self.retried_chunks;
+        if total == 0 {
+            return 1.0;
+        }
+        self.successful_chunks as f64 / total as f64
+    }
+
+    /// Determine if download is healthy enough to continue
+    pub fn is_healthy(&self) -> bool {
+        // Consider unhealthy if more than 50% retries or 5+ consecutive errors
+        self.health_score() > 0.5 && self.consecutive_errors < 5
+    }
 }
 
 #[cfg(test)]
@@ -696,5 +970,518 @@ mod tests {
             assert_eq!(*start, (i as u64) * 25);
             assert_eq!(*end, (i as u64) * 25 + 24);
         }
+    }
+
+    // ========================================================================
+    // Tests for RetryPolicy
+    // ========================================================================
+
+    #[test]
+    fn retry_policy_default_values() {
+        let policy = RetryPolicy::default();
+        assert_eq!(policy.max_retries, MAX_RETRIES);
+        assert_eq!(policy.base_delay_ms, 500);
+        assert_eq!(policy.max_delay_ms, MAX_RETRY_DELAY_MS);
+        assert!(policy.retry_stream_errors);
+    }
+
+    #[test]
+    fn retry_policy_aggressive() {
+        let policy = RetryPolicy::aggressive();
+        assert_eq!(policy.max_retries, 8);
+        assert_eq!(policy.base_delay_ms, 250);
+        assert_eq!(policy.max_delay_ms, 15_000);
+        assert!(policy.retry_stream_errors);
+    }
+
+    #[test]
+    fn retry_policy_conservative() {
+        let policy = RetryPolicy::conservative();
+        assert_eq!(policy.max_retries, 3);
+        assert_eq!(policy.base_delay_ms, 1000);
+        assert_eq!(policy.max_delay_ms, 60_000);
+        assert!(policy.retry_stream_errors);
+    }
+
+    #[test]
+    fn retry_policy_delay_exponential_growth() {
+        let policy = RetryPolicy::default();
+        // Base delay is 500ms, should double each attempt
+        assert_eq!(policy.delay_for_attempt(0), 500);
+        assert_eq!(policy.delay_for_attempt(1), 1000);
+        assert_eq!(policy.delay_for_attempt(2), 2000);
+        assert_eq!(policy.delay_for_attempt(3), 4000);
+    }
+
+    #[test]
+    fn retry_policy_delay_caps_at_max() {
+        let policy = RetryPolicy {
+            max_retries: 10,
+            base_delay_ms: 1000,
+            max_delay_ms: 5000,
+            retry_stream_errors: true,
+        };
+        // Should cap at max_delay_ms
+        assert_eq!(policy.delay_for_attempt(10), 5000);
+        assert_eq!(policy.delay_for_attempt(20), 5000);
+    }
+
+    #[test]
+    fn retry_policy_should_retry_boundaries() {
+        let policy = RetryPolicy {
+            max_retries: 3,
+            base_delay_ms: 500,
+            max_delay_ms: 10_000,
+            retry_stream_errors: true,
+        };
+        assert!(policy.should_retry(0));
+        assert!(policy.should_retry(1));
+        assert!(policy.should_retry(2));
+        assert!(!policy.should_retry(3));
+        assert!(!policy.should_retry(4));
+    }
+
+    // ========================================================================
+    // Tests for classify_error
+    // ========================================================================
+
+    #[test]
+    fn classify_error_cancelled() {
+        assert_eq!(classify_error("cancelled"), ErrorClassification::Cancelled);
+        assert_eq!(
+            classify_error("Cancelled by user"),
+            ErrorClassification::Cancelled
+        );
+    }
+
+    #[test]
+    fn classify_error_server_unreachable() {
+        assert_eq!(
+            classify_error("DNS lookup failed"),
+            ErrorClassification::ServerUnreachable
+        );
+        assert_eq!(
+            classify_error("no route to host"),
+            ErrorClassification::ServerUnreachable
+        );
+        assert_eq!(
+            classify_error("Network unreachable"),
+            ErrorClassification::ServerUnreachable
+        );
+        assert_eq!(
+            classify_error("host unreachable"),
+            ErrorClassification::ServerUnreachable
+        );
+        assert_eq!(
+            classify_error("name resolution failed"),
+            ErrorClassification::ServerUnreachable
+        );
+        assert_eq!(
+            classify_error("connection refused"),
+            ErrorClassification::ServerUnreachable
+        );
+    }
+
+    #[test]
+    fn classify_error_permanent() {
+        assert_eq!(
+            classify_error("404 not found"),
+            ErrorClassification::Permanent
+        );
+        assert_eq!(
+            classify_error("File not found"),
+            ErrorClassification::Permanent
+        );
+        assert_eq!(classify_error("401"), ErrorClassification::Permanent);
+        assert_eq!(
+            classify_error("Unauthorized"),
+            ErrorClassification::Permanent
+        );
+        assert_eq!(
+            classify_error("403 Forbidden"),
+            ErrorClassification::Permanent
+        );
+        // Hash mismatch = corruption, should be transient (delete + retry)
+        assert_eq!(
+            classify_error("Hash mismatch detected"),
+            ErrorClassification::Transient
+        );
+        assert_eq!(
+            classify_error("Invalid signature"),
+            ErrorClassification::Permanent
+        );
+    }
+
+    #[test]
+    fn classify_error_transient() {
+        // Timeouts
+        assert_eq!(
+            classify_error("connection timeout"),
+            ErrorClassification::Transient
+        );
+        assert_eq!(
+            classify_error("Request timed out"),
+            ErrorClassification::Transient
+        );
+
+        // Connection issues
+        assert_eq!(
+            classify_error("connection reset by peer"),
+            ErrorClassification::Transient
+        );
+        assert_eq!(
+            classify_error("connection closed"),
+            ErrorClassification::Transient
+        );
+        assert_eq!(
+            classify_error("broken pipe"),
+            ErrorClassification::Transient
+        );
+
+        // Server errors
+        assert_eq!(
+            classify_error("500 internal server error"),
+            ErrorClassification::Transient
+        );
+        assert_eq!(
+            classify_error("502 bad gateway"),
+            ErrorClassification::Transient
+        );
+        assert_eq!(
+            classify_error("503 service unavailable"),
+            ErrorClassification::Transient
+        );
+        assert_eq!(
+            classify_error("504 gateway timeout"),
+            ErrorClassification::Transient
+        );
+
+        // Rate limiting
+        assert_eq!(
+            classify_error("429 too many requests"),
+            ErrorClassification::Transient
+        );
+
+        // Stream errors
+        assert_eq!(
+            classify_error("unexpected EOF"),
+            ErrorClassification::Transient
+        );
+        assert_eq!(
+            classify_error("incomplete read"),
+            ErrorClassification::Transient
+        );
+        assert_eq!(
+            classify_error("transfer aborted"),
+            ErrorClassification::Transient
+        );
+        assert_eq!(
+            classify_error("stream interrupted"),
+            ErrorClassification::Transient
+        );
+
+        // Generic network
+        assert_eq!(
+            classify_error("network error"),
+            ErrorClassification::Transient
+        );
+        assert_eq!(
+            classify_error("temporarily unavailable"),
+            ErrorClassification::Transient
+        );
+    }
+
+    #[test]
+    fn classify_error_unknown_defaults_transient() {
+        // Unknown errors should default to transient (optimistic retry)
+        assert_eq!(
+            classify_error("some weird error"),
+            ErrorClassification::Transient
+        );
+    }
+
+    #[test]
+    fn classify_error_case_insensitive() {
+        assert_eq!(
+            classify_error("TIMEOUT"),
+            ErrorClassification::Transient
+        );
+        assert_eq!(
+            classify_error("TimeOut"),
+            ErrorClassification::Transient
+        );
+        assert_eq!(
+            classify_error("CANCELLED"),
+            ErrorClassification::Cancelled
+        );
+    }
+
+    // ========================================================================
+    // Tests for should_retry_download
+    // ========================================================================
+
+    #[test]
+    fn should_retry_download_transient_errors() {
+        let policy = RetryPolicy::default();
+        assert!(should_retry_download("timeout", 0, &policy));
+        assert!(should_retry_download("timeout", 1, &policy));
+        assert!(should_retry_download("500 error", 2, &policy));
+    }
+
+    #[test]
+    fn should_retry_download_permanent_errors() {
+        let policy = RetryPolicy::default();
+        assert!(!should_retry_download("404 not found", 0, &policy));
+        assert!(!should_retry_download("401 unauthorized", 1, &policy));
+    }
+
+    #[test]
+    fn should_retry_download_hash_mismatch() {
+        // Hash mismatch = corruption during download, should retry (delete + redownload)
+        let policy = RetryPolicy::default();
+        assert!(should_retry_download("hash mismatch", 0, &policy));
+        assert!(should_retry_download("checksum failed", 0, &policy));
+    }
+
+    #[test]
+    fn should_retry_download_cancelled_errors() {
+        let policy = RetryPolicy::default();
+        assert!(!should_retry_download("cancelled", 0, &policy));
+        assert!(!should_retry_download("cancelled by user", 1, &policy));
+    }
+
+    #[test]
+    fn should_retry_download_unreachable_limited() {
+        let policy = RetryPolicy::default();
+        // Unreachable errors retry max twice (attempts 0 and 1)
+        assert!(should_retry_download("DNS failure", 0, &policy));
+        assert!(should_retry_download("DNS failure", 1, &policy));
+        assert!(!should_retry_download("DNS failure", 2, &policy));
+    }
+
+    #[test]
+    fn should_retry_download_respects_max_retries() {
+        let policy = RetryPolicy {
+            max_retries: 2,
+            base_delay_ms: 500,
+            max_delay_ms: 10_000,
+            retry_stream_errors: true,
+        };
+        assert!(should_retry_download("timeout", 0, &policy));
+        assert!(should_retry_download("timeout", 1, &policy));
+        assert!(!should_retry_download("timeout", 2, &policy));
+        assert!(!should_retry_download("timeout", 3, &policy));
+    }
+
+    // ========================================================================
+    // Tests for calculate_adaptive_timeout
+    // ========================================================================
+
+    #[test]
+    fn calculate_adaptive_timeout_basic() {
+        // File: 1000 bytes, Speed: 100 bps, Min: 5s
+        // Transfer time: 1000/100 = 10s
+        // With 50% buffer: 10 + 5 = 15s
+        let timeout = calculate_adaptive_timeout(1000, 100, 5);
+        assert_eq!(timeout, 15);
+    }
+
+    #[test]
+    fn calculate_adaptive_timeout_respects_minimum() {
+        // File: 100 bytes, Speed: 100 bps, Min: 10s
+        // Transfer time: 100/100 = 1s
+        // With 50% buffer: 1 + 0.5 = 1.5s
+        // Should return min of 10s
+        let timeout = calculate_adaptive_timeout(100, 100, 10);
+        assert_eq!(timeout, 10);
+    }
+
+    #[test]
+    fn calculate_adaptive_timeout_zero_speed() {
+        // Zero speed should return minimum timeout
+        let timeout = calculate_adaptive_timeout(1000, 0, 30);
+        assert_eq!(timeout, 30);
+    }
+
+    #[test]
+    fn calculate_adaptive_timeout_large_file() {
+        // 10 MB file at 1 MB/s
+        let mb = 1024 * 1024;
+        let file_size = 10 * mb;
+        let speed = mb; // 1 MB/s
+        let timeout = calculate_adaptive_timeout(file_size, speed, 5);
+        // Transfer time: 10s, with 50% buffer: 15s
+        assert_eq!(timeout, 15);
+    }
+
+    // ========================================================================
+    // Tests for estimate_speed
+    // ========================================================================
+
+    #[test]
+    fn estimate_speed_basic() {
+        let speed = estimate_speed(1000, 10.0, 500);
+        assert_eq!(speed, 100); // 1000 bytes / 10 seconds
+    }
+
+    #[test]
+    fn estimate_speed_insufficient_time() {
+        // Less than 1 second should return default
+        let speed = estimate_speed(100, 0.5, 500);
+        assert_eq!(speed, 500);
+    }
+
+    #[test]
+    fn estimate_speed_zero_bytes() {
+        let speed = estimate_speed(0, 10.0, 500);
+        assert_eq!(speed, 500);
+    }
+
+    #[test]
+    fn estimate_speed_zero_time() {
+        let speed = estimate_speed(1000, 0.0, 500);
+        assert_eq!(speed, 500);
+    }
+
+    #[test]
+    fn estimate_speed_large_values() {
+        let gb = 1024u64 * 1024 * 1024;
+        let speed = estimate_speed(gb, 100.0, 1000);
+        assert_eq!(speed, gb / 100);
+    }
+
+    // ========================================================================
+    // Tests for DownloadHealth
+    // ========================================================================
+
+    #[test]
+    fn download_health_default() {
+        let health = DownloadHealth::default();
+        assert_eq!(health.successful_chunks, 0);
+        assert_eq!(health.retried_chunks, 0);
+        assert_eq!(health.success_streak, 0);
+        assert_eq!(health.max_consecutive_errors, 0);
+        assert_eq!(health.consecutive_errors, 0);
+    }
+
+    #[test]
+    fn download_health_new() {
+        let health = DownloadHealth::new();
+        assert_eq!(health.successful_chunks, 0);
+    }
+
+    #[test]
+    fn download_health_record_success() {
+        let mut health = DownloadHealth::new();
+        health.record_success();
+        assert_eq!(health.successful_chunks, 1);
+        assert_eq!(health.success_streak, 1);
+        assert_eq!(health.consecutive_errors, 0);
+
+        health.record_success();
+        assert_eq!(health.successful_chunks, 2);
+        assert_eq!(health.success_streak, 2);
+    }
+
+    #[test]
+    fn download_health_record_retry() {
+        let mut health = DownloadHealth::new();
+        health.record_retry();
+        assert_eq!(health.retried_chunks, 1);
+        assert_eq!(health.consecutive_errors, 1);
+        assert_eq!(health.max_consecutive_errors, 1);
+        assert_eq!(health.success_streak, 0);
+    }
+
+    #[test]
+    fn download_health_consecutive_errors_tracking() {
+        let mut health = DownloadHealth::new();
+        health.record_retry();
+        health.record_retry();
+        health.record_retry();
+        assert_eq!(health.consecutive_errors, 3);
+        assert_eq!(health.max_consecutive_errors, 3);
+
+        // Success resets consecutive count
+        health.record_success();
+        assert_eq!(health.consecutive_errors, 0);
+        assert_eq!(health.max_consecutive_errors, 3); // Max persists
+    }
+
+    #[test]
+    fn download_health_score_perfect() {
+        let mut health = DownloadHealth::new();
+        health.successful_chunks = 100;
+        health.retried_chunks = 0;
+        assert_eq!(health.health_score(), 1.0);
+    }
+
+    #[test]
+    fn download_health_score_half() {
+        let mut health = DownloadHealth::new();
+        health.successful_chunks = 50;
+        health.retried_chunks = 50;
+        assert_eq!(health.health_score(), 0.5);
+    }
+
+    #[test]
+    fn download_health_score_poor() {
+        let mut health = DownloadHealth::new();
+        health.successful_chunks = 25;
+        health.retried_chunks = 75;
+        assert_eq!(health.health_score(), 0.25);
+    }
+
+    #[test]
+    fn download_health_score_no_data() {
+        let health = DownloadHealth::new();
+        // With no data, assume perfect health
+        assert_eq!(health.health_score(), 1.0);
+    }
+
+    #[test]
+    fn download_health_is_healthy_good() {
+        let mut health = DownloadHealth::new();
+        health.successful_chunks = 80;
+        health.retried_chunks = 20;
+        health.consecutive_errors = 2;
+        assert!(health.is_healthy());
+    }
+
+    #[test]
+    fn download_health_is_healthy_too_many_retries() {
+        let mut health = DownloadHealth::new();
+        health.successful_chunks = 40;
+        health.retried_chunks = 60; // 40% success rate
+        health.consecutive_errors = 2;
+        assert!(!health.is_healthy()); // Below 50% threshold
+    }
+
+    #[test]
+    fn download_health_is_healthy_too_many_consecutive_errors() {
+        let mut health = DownloadHealth::new();
+        health.successful_chunks = 90;
+        health.retried_chunks = 10;
+        health.consecutive_errors = 5; // Hit threshold
+        assert!(!health.is_healthy());
+    }
+
+    #[test]
+    fn download_health_is_healthy_boundary_50_percent() {
+        let mut health = DownloadHealth::new();
+        health.successful_chunks = 50;
+        health.retried_chunks = 50;
+        health.consecutive_errors = 0;
+        // Exactly 50% - is_healthy requires > 0.5
+        assert!(!health.is_healthy());
+    }
+
+    #[test]
+    fn download_health_is_healthy_boundary_errors() {
+        let mut health = DownloadHealth::new();
+        health.successful_chunks = 90;
+        health.retried_chunks = 10;
+        health.consecutive_errors = 4;
+        assert!(health.is_healthy()); // 4 errors is under threshold of 5
     }
 }
