@@ -29,16 +29,10 @@ pub enum DownloadError {
     Cancelled,
 
     /// Server is unreachable after all retry attempts
-    ServerUnreachable {
-        attempts: u8,
-        last_error: String
-    },
+    ServerUnreachable { attempts: u8, last_error: String },
 
     /// Stream was interrupted mid-download
-    StreamInterrupted {
-        bytes_received: u64,
-        error: String
-    },
+    StreamInterrupted { bytes_received: u64, error: String },
 }
 
 impl fmt::Display for DownloadError {
@@ -57,14 +51,20 @@ impl fmt::Display for DownloadError {
                 )
             }
             DownloadError::Cancelled => write!(f, "Download cancelled by user"),
-            DownloadError::ServerUnreachable { attempts, last_error } => {
+            DownloadError::ServerUnreachable {
+                attempts,
+                last_error,
+            } => {
                 write!(
                     f,
                     "Server unreachable after {} attempts: {}",
                     attempts, last_error
                 )
             }
-            DownloadError::StreamInterrupted { bytes_received, error } => {
+            DownloadError::StreamInterrupted {
+                bytes_received,
+                error,
+            } => {
                 write!(
                     f,
                     "Stream interrupted after {} bytes: {}",
@@ -102,7 +102,8 @@ impl From<&str> for DownloadError {
             || lower.contains("network")
             || lower.contains("timed out")
             || lower.contains("connection refused")
-            || lower.contains("connection reset") {
+            || lower.contains("connection reset")
+        {
             return DownloadError::Network(s.to_string());
         }
 
@@ -156,10 +157,26 @@ impl DownloadError {
     pub fn is_transient(&self) -> bool {
         match self {
             DownloadError::Network(_) => true,
-            DownloadError::Http { status, .. } => *status >= 500 && *status < 600,
+            DownloadError::Http { status, .. } => {
+                // 5xx are server errors (transient)
+                // 408 is Request Timeout (transient)
+                // 416 is Range Not Satisfiable (transient - retry fresh)
+                // 429 is Too Many Requests (transient)
+                *status >= 500 || *status == 408 || *status == 416 || *status == 429
+            }
             DownloadError::StreamInterrupted { .. } => true,
             // Hash mismatch = corruption, should delete file and retry download
             DownloadError::HashMismatch { .. } => true,
+            // Some filesystem errors are transient and should be retried
+            DownloadError::FileSystem(msg) => {
+                let m = msg.to_lowercase();
+                m.contains("temporarily")
+                    || m.contains("locked")
+                    || m.contains("in use")
+                    || m.contains("eagain")
+                    || m.contains("would block")
+                    || m.contains("resource busy")
+            }
             _ => false,
         }
     }
@@ -175,12 +192,29 @@ impl DownloadError {
     /// Returns true if this is a permanent error that should not be retried
     pub fn is_permanent(&self) -> bool {
         match self {
-            DownloadError::Http { status, .. } => *status >= 400 && *status < 500,
+            DownloadError::Http { status, .. } => {
+                // 4xx except 408, 416, 429 are permanent
+                *status >= 400
+                    && *status < 500
+                    && *status != 408
+                    && *status != 416
+                    && *status != 429
+            }
             // Hash mismatch is NOT permanent - it means corruption during download
             // The file should be deleted and re-downloaded
             DownloadError::HashMismatch { .. } => false,
             DownloadError::Cancelled => true,
-            DownloadError::FileSystem(_) => true,
+            // Some filesystem errors are transient (locked, busy, etc.)
+            DownloadError::FileSystem(msg) => {
+                let m = msg.to_lowercase();
+                // These filesystem errors are transient and should be retried
+                !(m.contains("temporarily")
+                    || m.contains("locked")
+                    || m.contains("in use")
+                    || m.contains("eagain")
+                    || m.contains("would block")
+                    || m.contains("resource busy"))
+            }
             _ => false,
         }
     }
@@ -471,5 +505,61 @@ mod tests {
     fn test_error_trait() {
         let err: Box<dyn std::error::Error> = Box::new(DownloadError::Cancelled);
         assert_eq!(err.to_string(), "Download cancelled by user");
+    }
+
+    #[test]
+    fn test_filesystem_error_transient_locked() {
+        let err = DownloadError::FileSystem("file is locked by another process".to_string());
+        assert!(err.is_transient());
+        assert!(!err.is_permanent());
+    }
+
+    #[test]
+    fn test_filesystem_error_transient_in_use() {
+        let err = DownloadError::FileSystem("resource is in use".to_string());
+        assert!(err.is_transient());
+        assert!(!err.is_permanent());
+    }
+
+    #[test]
+    fn test_filesystem_error_transient_temporarily() {
+        let err = DownloadError::FileSystem("temporarily unavailable".to_string());
+        assert!(err.is_transient());
+        assert!(!err.is_permanent());
+    }
+
+    #[test]
+    fn test_filesystem_error_transient_eagain() {
+        let err = DownloadError::FileSystem("EAGAIN error occurred".to_string());
+        assert!(err.is_transient());
+        assert!(!err.is_permanent());
+    }
+
+    #[test]
+    fn test_filesystem_error_transient_would_block() {
+        let err = DownloadError::FileSystem("operation would block".to_string());
+        assert!(err.is_transient());
+        assert!(!err.is_permanent());
+    }
+
+    #[test]
+    fn test_filesystem_error_transient_resource_busy() {
+        let err = DownloadError::FileSystem("resource busy".to_string());
+        assert!(err.is_transient());
+        assert!(!err.is_permanent());
+    }
+
+    #[test]
+    fn test_filesystem_error_permanent_disk_full() {
+        let err = DownloadError::FileSystem("disk full".to_string());
+        assert!(!err.is_transient());
+        assert!(err.is_permanent());
+    }
+
+    #[test]
+    fn test_filesystem_error_permanent_permission_denied() {
+        let err = DownloadError::FileSystem("permission denied".to_string());
+        assert!(!err.is_transient());
+        assert!(err.is_permanent());
     }
 }

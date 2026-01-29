@@ -231,7 +231,7 @@ pub fn set_auth_info(auth_key: String, user_name: String, user_no: i32, characte
     info!("User Name: {}", user_name);
     info!("User No: {}", user_no);
     info!("Character Count: {}", character_count);
-    info!("Auth Key: {}", auth_key);
+    info!("Auth Key: [REDACTED]");
 }
 
 /// Logs out the current user.

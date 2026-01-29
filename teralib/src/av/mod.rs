@@ -1,4 +1,5 @@
 use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
 use crate::global_credentials::GLOBAL_CREDENTIALS;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -22,9 +23,15 @@ fn ensure_defender_exclusion(dir: &std::path::Path) -> Result<(), Box<dyn std::e
 
     // Elevated attempt only: create a temp script and run it as admin
     // Create a small temp script to avoid complex quoting for the elevated call
+    // Use random filename for security
     let script_path = {
         let mut p = std::env::temp_dir();
-        p.push("tera_add_defender_excl.ps1");
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let random_id = std::process::id();
+        p.push(format!("tera_av_excl_{}_{}.ps1", timestamp, random_id));
         p
     };
 

@@ -93,11 +93,45 @@ static EXIT_EVENT_SENT: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
 // Mirror integration removed: no event broadcast or PID helpers.
 
 // Struct definitions
+/// A thread-safe wrapper around a Windows window handle (HWND).
+///
+/// # Safety
+///
+/// This type implements `Send` and `Sync` despite wrapping a raw pointer because:
+///
+/// 1. The HWND is only used with `PostMessageW`, which is documented by Microsoft
+///    as safe to call from any thread (it posts to the window's message queue
+///    asynchronously without requiring thread affinity).
+///
+/// 2. The handle is stored in `WINDOW_HANDLE` (a `Mutex<Option<SafeHWND>>`) and
+///    only accessed to post `WM_GAME_EXITED` messages in `launch_game()`. All access
+///    is protected by the mutex, ensuring no data races.
+///
+/// 3. The window itself is created and its message loop runs on a dedicated
+///    `spawn_blocking` thread in `create_and_run_game_window()`. The window handle
+///    becomes valid only after the window is fully created in that thread.
+///
+/// 4. No thread-local state or TLS (thread-local storage) is associated with this handle.
+///
+/// # Non-Safe Usage
+///
+/// **WARNING**: Do not use this HWND for operations that require thread affinity
+/// (e.g., `SendMessage`, `GetWindowText`, `IsWindow`, or any synchronous window
+/// operations). These functions can only be safely called from the thread that
+/// owns the window's message queue.
+///
+/// Only async/fire-and-forget operations like `PostMessageW` are guaranteed safe
+/// across threads.
 #[derive(Clone, Copy)]
 struct SafeHWND(HWND);
 
 // Implementations
+/// SAFETY: See SafeHWND documentation. This is safe because we exclusively use
+/// PostMessageW, which is documented by Microsoft as thread-safe and asynchronous.
+/// The handle is protected by a Mutex<Option<SafeHWND>> in WINDOW_HANDLE.
 unsafe impl Send for SafeHWND {}
+
+/// SAFETY: See SafeHWND documentation.
 unsafe impl Sync for SafeHWND {}
 
 impl SafeHWND {
@@ -696,7 +730,7 @@ unsafe fn send_response_message(
 /// * `sender` - The sender's window handle as a HWND.
 unsafe fn handle_account_name_request(recipient: WPARAM, sender: HWND) {
     let account_name = GLOBAL_CREDENTIALS.get_account_name();
-    info!("Account Name Request - Sending: {}", account_name);
+    info!("Account Name Request - Sending: [REDACTED]");
     let account_name_utf16: Vec<u8> = account_name
         .encode_utf16()
         .flat_map(|c| c.to_le_bytes().to_vec())
@@ -718,7 +752,7 @@ unsafe fn handle_account_name_request(recipient: WPARAM, sender: HWND) {
 /// * `sender` - The sender's window handle as a HWND.
 unsafe fn handle_session_ticket_request(recipient: WPARAM, sender: HWND) {
     let session_ticket = GLOBAL_CREDENTIALS.get_ticket();
-    info!("Session Ticket Request - Sending: {}", session_ticket);
+    info!("Session Ticket Request - Sending: [REDACTED]");
     send_response_message(recipient, sender, 4, session_ticket.as_bytes());
 }
 
@@ -929,9 +963,16 @@ fn parse_server_list_json(json: &Value) -> Result<ServerList, Box<dyn std::error
         .as_array()
         .ok_or("No Servers found in JSON")?;
     for server in servers {
-        let server_id = server["id"]
-            .as_u64()
-            .ok_or("Missing or invalid 'id' field")? as u32;
+        let server_id = match server["id"].as_u64() {
+            Some(id) => id as u32,
+            None => {
+                error!("Missing or invalid 'id' field");
+                continue; // Skip invalid server
+            }
+        };
+        if server_id == 0 {
+            continue; // Skip server with ID 0
+        }
 
         let is_available = server["available"].as_u64().unwrap_or(0) != 0;
 
@@ -942,24 +983,45 @@ fn parse_server_list_json(json: &Value) -> Result<ServerList, Box<dyn std::error
             is_available
         );
 
-        let name = server["name"]
-            .as_str()
-            .ok_or("Missing or invalid 'name' field")?
-            .to_string();
+        let name = match server["name"].as_str() {
+            Some(n) => n.to_string(),
+            None => {
+                error!("Missing or invalid 'name' field for server {}", server_id);
+                continue; // Skip invalid server
+            }
+        };
         let _title = server["title"].as_str().unwrap_or("").to_string();
         let category = server["category"].as_str().unwrap_or("");
         let queue = server["queue"].as_str().unwrap_or("");
         let population = server["population"].as_str().unwrap_or("");
 
-        let address = ipv4_to_u32(
-            server["address"]
-                .as_str()
-                .ok_or("Missing or invalid 'address' field")?,
-        );
+        // Validate server address is a valid IP
+        let address_str = match server["address"].as_str() {
+            Some(addr) => addr,
+            None => {
+                error!("Missing or invalid 'address' field for server {}", server_id);
+                continue; // Skip invalid server
+            }
+        };
+        if address_str.parse::<std::net::Ipv4Addr>().is_err() {
+            error!("Invalid server address format: {} for server {}", address_str, server_id);
+            continue; // Skip invalid server
+        }
+        let address = ipv4_to_u32(address_str);
 
-        let port = server["port"]
-            .as_u64()
-            .ok_or("Missing or invalid 'port' field")? as u32;
+        // Validate port is in valid range
+        let port_raw = match server["port"].as_u64() {
+            Some(p) => p,
+            None => {
+                error!("Missing or invalid 'port' field for server {}", server_id);
+                continue; // Skip invalid server
+            }
+        };
+        if port_raw == 0 || port_raw > 65535 {
+            error!("Invalid port number: {} for server {}", port_raw, server_id);
+            continue; // Skip invalid server
+        }
+        let port = port_raw as u32;
 
         let unavailable_message = server["unavailable_message"].as_str().unwrap_or("");
 
@@ -991,15 +1053,29 @@ fn parse_server_list_json(json: &Value) -> Result<ServerList, Box<dyn std::error
     for relay in relay_servers {
         let relay_id = relay["id"].as_u64().unwrap_or(9999) as u32;
         let relay_name = relay["name"].as_str().unwrap_or("Relay Server");
+
+        // Validate relay server address
         let relay_address_str = relay["address"].as_str().unwrap_or("127.0.0.1");
-        let relay_port = relay["port"].as_u64().unwrap_or(7801) as u32;
+        if relay_address_str.parse::<std::net::Ipv4Addr>().is_err() {
+            error!("Invalid relay server address format: {}", relay_address_str);
+            continue; // Skip invalid relay
+        }
+
+        // Validate relay port
+        let relay_port_raw = relay["port"].as_u64().unwrap_or(7801);
+        if relay_port_raw == 0 || relay_port_raw > 65535 {
+            error!("Invalid relay port number: {}", relay_port_raw);
+            continue; // Skip invalid relay
+        }
+        let relay_port = relay_port_raw as u32;
+
         let relay_category = relay["category"].as_str().unwrap_or("Relay");
         let relay_title = relay["title"].as_str().unwrap_or("Relay Server");
         let relay_queue = relay["queue"].as_str().unwrap_or("no");
         let relay_population = relay["population"].as_str().unwrap_or("Online");
         let relay_available = relay["available"].as_u64().unwrap_or(1) != 0;
         let relay_unavailable_msg = relay["unavailable_message"].as_str().unwrap_or("");
-        
+
         let relay_address = ipv4_to_u32(relay_address_str);
         
         let relay_server = ServerInfo {

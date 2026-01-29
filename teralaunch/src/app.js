@@ -133,7 +133,17 @@ const App = {
     processedFiles: 0,
     isPauseRequested: false,
     updateError: false,
+    isTogglingPauseResume: false,
+    isDownloading: false,
   },
+
+  // Store unlisteners for cleanup
+  updateListeners: [],
+  gameStatusListeners: [],
+  errorListener: null,
+
+  // Track pending download timeout so it can be cancelled
+  pendingDownloadTimeout: null,
 
   /**
    * Updates the global application state.
@@ -208,10 +218,8 @@ const App = {
       this.setupMutationObserver();
       // Tauri's built-in updater (dialog: true) handles update checks automatically at startup
       this.checkAuthentication();
-      document.addEventListener("DOMContentLoaded", () => {
-        this.resetState();
-        this.updateUI();
-      });
+      this.resetState();
+      this.updateUI();
 
       if (this.state.isAuthenticated && this.Router.currentRoute === "home") {
         LoadStartPage();
@@ -295,11 +303,6 @@ const App = {
    * Sets up event listeners to handle page loading, hash changes, game status events, update events, and errors.
    */
   setupEventListeners() {
-    window.addEventListener("DOMContentLoaded", () => {
-      this.handleRouteChange();
-      this.setupCustomAnimations();
-    });
-
     window.addEventListener("hashchange", () => this.handleRouteChange());
 
     this.setupGameStatusListeners();
@@ -320,20 +323,26 @@ const App = {
    *
    * When any of these events are received, the UI is updated to reflect the new game status.
    */
-  setupGameStatusListeners() {
-    listen("game_status", async (event) => {
+  async setupGameStatusListeners() {
+    // Clean up any existing listeners first
+    this.cleanupGameStatusListeners();
+
+    const gameStatusListener = await listen("game_status", async (event) => {
       const isRunning = event.payload === "GAME_STATUS_RUNNING";
       this.updateUIForGameStatus(isRunning);
     });
+    this.gameStatusListeners.push(gameStatusListener);
 
-    listen("game_status_changed", (event) => {
+    const gameStatusChangedListener = await listen("game_status_changed", (event) => {
       const isRunning = event.payload;
       this.updateUIForGameStatus(isRunning);
     });
+    this.gameStatusListeners.push(gameStatusChangedListener);
 
-    listen("game_ended", async () => {
+    const gameEndedListener = await listen("game_ended", async () => {
       this.updateUIForGameStatus(false);
     });
+    this.gameStatusListeners.push(gameEndedListener);
   },
 
   /**
@@ -352,10 +361,15 @@ const App = {
    *
    * When any of these events are received, the UI is updated to reflect the new download status.
    */
-  setupUpdateListeners() {
-    listen("download_progress", this.handleDownloadProgress.bind(this));
+  async setupUpdateListeners() {
+    // Clear any existing listeners first
+    this.cleanupUpdateListeners();
+
+    const progressListener = await listen("download_progress", this.handleDownloadProgress.bind(this));
+    this.updateListeners.push(progressListener);
+
     // Stabilized global progress for speed/ETA and total bar
-    listen("global_download_progress", (event) => {
+    const globalProgressListener = await listen("global_download_progress", (event) => {
       const p = event?.payload;
       if (!p) return;
       const now = Date.now();
@@ -388,13 +402,21 @@ const App = {
         lastProgressUpdate: now,
       });
     });
-    listen("file_check_progress", this.handleFileCheckProgress.bind(this));
-    listen("file_check_completed", this.handleFileCheckCompleted.bind(this));
-    listen("download_complete", () => {
+    this.updateListeners.push(globalProgressListener);
+
+    const fileCheckProgressListener = await listen("file_check_progress", this.handleFileCheckProgress.bind(this));
+    this.updateListeners.push(fileCheckProgressListener);
+
+    const fileCheckCompletedListener = await listen("file_check_completed", this.handleFileCheckCompleted.bind(this));
+    this.updateListeners.push(fileCheckCompletedListener);
+
+    const downloadCompleteListener = await listen("download_complete", () => {
       // Finalize via unified completion path
       this.handleCompletion();
     });
-    listen("download_error", (event) => {
+    this.updateListeners.push(downloadCompleteListener);
+
+    const downloadErrorListener = await listen("download_error", (event) => {
       const message =
         event?.payload?.message || this.t("UPDATE_ERROR_MESSAGE");
       this.setState({
@@ -408,7 +430,9 @@ const App = {
       this.updateLaunchGameButton(true);
       this.toggleLanguageSelector(true);
     });
-    listen("download_cancelled", () => {
+    this.updateListeners.push(downloadErrorListener);
+
+    const downloadCancelledListener = await listen("download_cancelled", () => {
       (async () => {
         let downloadedSnapshot = this.state.downloadedSize;
         try {
@@ -426,6 +450,47 @@ const App = {
         this.updateLaunchGameButton(true);
       })();
     });
+    this.updateListeners.push(downloadCancelledListener);
+  },
+
+  /**
+   * Cleans up update event listeners to prevent memory leaks.
+   *
+   * This method should be called before setting up new listeners or when
+   * the component is being destroyed (e.g., on logout or route change).
+   */
+  cleanupUpdateListeners() {
+    if (this.updateListeners && this.updateListeners.length > 0) {
+      this.updateListeners.forEach(unlisten => {
+        if (typeof unlisten === 'function') {
+          try {
+            unlisten();
+          } catch (e) {
+            console.warn("Failed to unlisten:", e);
+          }
+        }
+      });
+      this.updateListeners = [];
+    }
+  },
+
+  /**
+   * Cleans up game status event listeners to prevent memory leaks.
+   *
+   * This method should be called before setting up new listeners or when
+   * the component is being destroyed (e.g., on logout or route change).
+   */
+  cleanupGameStatusListeners() {
+    for (const unlisten of this.gameStatusListeners) {
+      if (typeof unlisten === 'function') {
+        try {
+          unlisten();
+        } catch (e) {
+          console.warn("Failed to unlisten game status listener:", e);
+        }
+      }
+    }
+    this.gameStatusListeners = [];
   },
 
   /**
@@ -437,10 +502,27 @@ const App = {
    *
    * When any of these events are received, the UI is updated to reflect the new error state.
    */
-  setupErrorListener() {
-    listen("error", (event) => {
+  async setupErrorListener() {
+    if (this.errorListener) {
+      this.errorListener();
+    }
+    this.errorListener = await listen("error", (event) => {
       this.showErrorMessage(event.payload);
     });
+  },
+
+  /**
+   * Cleans up error event listener to prevent memory leaks.
+   */
+  cleanupErrorListener() {
+    if (this.errorListener) {
+      try {
+        this.errorListener();
+      } catch (e) {
+        console.warn("Failed to unlisten error listener:", e);
+      }
+      this.errorListener = null;
+    }
   },
 
   async handleFirstLaunch() {
@@ -1121,6 +1203,11 @@ const App = {
    * It resets all the state fields to their default values, effectively resetting the state of the download.
    */
   resetState() {
+    // Cancel any pending download timeout
+    if (this.pendingDownloadTimeout) {
+      clearTimeout(this.pendingDownloadTimeout);
+      this.pendingDownloadTimeout = null;
+    }
     this.setState({
       isFileCheckComplete: false,
       isUpdateAvailable: false,
@@ -1148,7 +1235,10 @@ const App = {
       processedFiles: 0,
       isPauseRequested: false,
       updateError: false,
+      isTogglingPauseResume: false,
+      isDownloading: false,
     });
+    this._activeFileWindow = [];
   },
 
   toggleTheme() {
@@ -1169,23 +1259,42 @@ const App = {
    * Also re-enables the game launch button and language selector.
    */
   handleCompletion() {
+    // First, ensure progress bar shows 100% before hiding
+    // Set downloadedSize equal to totalSize to show 100% progress
     this.setState({
-      isDownloadComplete: true,
+      downloadedSize: this.state.totalSize,
       currentProgress: 100,
-      currentUpdateMode: "complete",
-      isUpdateAvailable: false,
-      isFileCheckComplete: true,
-      updateError: false,
     });
-    // Re-enable controls immediately, then transition to ready after delay
-    this.updateLaunchGameButton(false);
-    this.toggleLanguageSelector(true);
+
+    // Force update the progress bar to 100% visually
+    const progressPercentageDiv = document.getElementById("progress-percentage-div");
+    if (progressPercentageDiv) {
+      progressPercentageDiv.style.width = "100%";
+    }
+    const progressPercentage = document.getElementById("progress-percentage");
+    if (progressPercentage) {
+      progressPercentage.textContent = "(100%)";
+    }
+
+    // Brief delay to show 100% progress before transitioning
     setTimeout(() => {
       this.setState({
-        isUpdateComplete: true,
-        currentUpdateMode: "ready",
+        isDownloadComplete: true,
+        currentUpdateMode: "complete",
+        isUpdateAvailable: false,
+        isFileCheckComplete: true,
+        updateError: false,
       });
-    }, 2000);
+      // Re-enable controls immediately, then transition to ready after delay
+      this.updateLaunchGameButton(false);
+      this.toggleLanguageSelector(true);
+      setTimeout(() => {
+        this.setState({
+          isUpdateComplete: true,
+          currentUpdateMode: "ready",
+        });
+      }, 1500);
+    }, 500);
   },
 
   /**
@@ -1228,7 +1337,12 @@ const App = {
       }
     } catch (error) {
       console.error("Error during initialization and update check:", error);
-      // Handle the error (e.g., display a message to the user)
+      this.showErrorMessage(this.t("UPDATE_CHECK_FAILED") || "Failed to check for updates. Please try again.");
+      this.setState({
+        currentUpdateMode: "error",
+        updateError: true,
+        isCheckingForUpdates: false
+      });
     }
   },
 
@@ -1288,7 +1402,17 @@ const App = {
             0,
           ),
         });
-        setTimeout(async () => {
+        // Clear any existing pending download timeout
+        if (this.pendingDownloadTimeout) {
+          clearTimeout(this.pendingDownloadTimeout);
+        }
+        this.pendingDownloadTimeout = setTimeout(async () => {
+          this.pendingDownloadTimeout = null;
+          // Safety check: only proceed if we're still in "complete" mode (not paused, cancelled, etc.)
+          if (this.state.currentUpdateMode !== "complete") {
+            console.log("Download aborted: mode changed to", this.state.currentUpdateMode);
+            return;
+          }
           this.setState({ currentUpdateMode: "download" });
           await this.runPatchSystem(filesToUpdate);
         }, 2000);
@@ -1319,6 +1443,14 @@ const App = {
    */
   async runPatchSystem(filesToUpdate) {
     if (!UPDATE_CHECK_ENABLED) return;
+
+    // Prevent concurrent download attempts
+    if (this.state.isDownloading) {
+      console.log("Download already in progress, skipping duplicate call");
+      return;
+    }
+    this.setState({ isDownloading: true });
+
     let pausedDuringDownload = false;
     try {
       this.updateLaunchGameButton(true);
@@ -1383,6 +1515,24 @@ const App = {
       }
     } catch (error) {
       console.error("Error during update:", error);
+
+      // Handle "Download already in progress" error by resetting state and retrying
+      const errorStr = String(error);
+      if (errorStr.includes("Download already in progress")) {
+        console.log("Download state conflict detected, resetting and retrying...");
+        try {
+          await invoke("reset_download_state");
+          // Reset frontend state and retry
+          this.setState({ isDownloading: false });
+          // Small delay to ensure state is fully reset
+          await new Promise(resolve => setTimeout(resolve, 100));
+          // Retry the download
+          return this.runPatchSystem(filesToUpdate);
+        } catch (resetError) {
+          console.error("Failed to reset download state:", resetError);
+        }
+      }
+
       const message = getUpdateErrorMessage(
         error,
         this.t("UPDATE_ERROR_MESSAGE"),
@@ -1395,6 +1545,9 @@ const App = {
         isFileCheckComplete: true,
       });
     } finally {
+      // Always reset isDownloading flag
+      this.setState({ isDownloading: false });
+
       // Re-enable controls only if not paused
       if (!pausedDuringDownload && this.state.currentUpdateMode !== "paused") {
         this.updateLaunchGameButton(false);
@@ -1450,7 +1603,11 @@ const App = {
           Permission: Number(jsonResponse.Return.Permission),
           Privilege: 0,
         };
-        this.storeAuthInfo(jsonResponseFormatted);
+        await this.storeAuthInfo(jsonResponseFormatted);
+
+        // Store credentials for automatic re-login (base64 encoded for basic obfuscation)
+        // Uses localStorage so credentials persist across launcher restarts
+        localStorage.setItem('_cred', btoa(JSON.stringify({u: username, p: password})));
 
         if (!UPDATE_CHECK_ENABLED) {
           this.setState({
@@ -1511,7 +1668,7 @@ const App = {
    * @param {number} jsonResponse.Permission - The permission level
    * @param {number} jsonResponse.Privilege - The privilege level
    */
-  storeAuthInfo(jsonResponse) {
+  async storeAuthInfo(jsonResponse) {
     localStorage.setItem("authKey", jsonResponse.AuthKey);
     localStorage.setItem("userName", jsonResponse.UserName);
     localStorage.setItem("userNo", jsonResponse.UserNo.toString());
@@ -1522,12 +1679,17 @@ const App = {
     localStorage.setItem("permission", jsonResponse.Permission.toString());
     localStorage.setItem("privilege", jsonResponse.Privilege.toString());
 
-    invoke("set_auth_info", {
-      authKey: jsonResponse.AuthKey,
-      userName: jsonResponse.UserName,
-      userNo: jsonResponse.UserNo,
-      characterCount: jsonResponse.CharacterCount,
-    });
+    try {
+      await invoke("set_auth_info", {
+        authKey: jsonResponse.AuthKey,
+        userName: jsonResponse.UserName,
+        userNo: jsonResponse.UserNo,
+        characterCount: jsonResponse.CharacterCount,
+      });
+    } catch (error) {
+      console.error("Failed to set auth info in backend:", error);
+      // Continue anyway - localStorage has the data as backup
+    }
 
     this.checkAuthentication();
   },
@@ -1545,13 +1707,18 @@ const App = {
 
   /**
    * Waits until the home page is loaded and resolves the promise
+   * @param {number} maxWaitMs - Maximum time to wait in milliseconds (default: 10000)
    * @returns {Promise<void>}
    */
-  waitForHomePage() {
+  waitForHomePage(maxWaitMs = 10000) {
     return new Promise((resolve) => {
+      const startTime = Date.now();
       const checkDom = () => {
         if (document.getElementById("home-page")) {
           resolve();
+        } else if (Date.now() - startTime > maxWaitMs) {
+          console.warn("Timeout waiting for home page element");
+          resolve(); // Resolve anyway to not block the app
         } else {
           setTimeout(checkDom, 100);
         }
@@ -1583,6 +1750,15 @@ const App = {
       localStorage.removeItem("characterCount");
       localStorage.removeItem("permission");
       localStorage.removeItem("privilege");
+
+      // Clear stored credentials for auto re-login
+      localStorage.removeItem("_cred");
+
+      // Clean up event listeners to prevent memory leaks
+      this.cleanupUpdateListeners();
+      this.cleanupGameStatusListeners();
+      this.cleanupErrorListener();
+      this.cleanupMutationObserver();
 
       this.setState({
         updateCheckPerformed: false,
@@ -1688,6 +1864,36 @@ const App = {
    *
    * @returns {void}
    */
+  /**
+   * Silently refreshes authentication using stored credentials.
+   * Does not update UI or navigate - just refreshes the backend auth state.
+   *
+   * @param {string} username - The username
+   * @param {string} password - The password
+   * @returns {Promise<boolean>} True if refresh succeeded, false otherwise
+   */
+  async silentAuthRefresh(username, password) {
+    try {
+      const response = await invoke("login", { username, password });
+      const jsonResponse = JSON.parse(response);
+
+      if (jsonResponse && jsonResponse.Return && jsonResponse.Msg === "success") {
+        // Store auth info in backend (no UI updates)
+        await invoke("set_auth_info", {
+          authKey: jsonResponse.Return.AuthKey,
+          userName: username,
+          userNo: Number(jsonResponse.Return.UserNo),
+          characterCount: jsonResponse.Return.CharacterCount,
+        });
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Silent auth refresh failed:", error);
+      return false;
+    }
+  },
+
   async handleLaunchGame() {
     if (UPDATE_CHECK_ENABLED && this.state.isUpdateAvailable) return;
     if (this.state.isGameLaunching) return;
@@ -1698,9 +1904,37 @@ const App = {
       this.updateUIForGameStatus(true);
       if (this.statusEl) this.statusEl.textContent = this.t("LAUNCHING_GAME");
 
+      // Silently refresh auth before launching to ensure valid session
+      const storedCred = localStorage.getItem('_cred');
+      if (storedCred) {
+        const cred = JSON.parse(atob(storedCred));
+        console.log("Refreshing auth before game launch...");
+        const refreshed = await this.silentAuthRefresh(cred.u, cred.p);
+        if (!refreshed) {
+          console.error("Auth refresh failed");
+          await message(this.t("SESSION_EXPIRED_MESSAGE"), {
+            title: this.t("ERROR"),
+            type: "error",
+          });
+          await this.logout();
+          return;
+        }
+        console.log("Auth refreshed, launching game...");
+      } else {
+        // No stored credentials - user needs to login
+        console.log("No stored credentials, redirecting to login...");
+        await message(this.t("SESSION_EXPIRED_MESSAGE"), {
+          title: this.t("ERROR"),
+          type: "error",
+        });
+        await this.logout();
+        return;
+      }
+
       await invoke("handle_launch_game");
     } catch (error) {
       console.error("Error initiating game launch:", error);
+
       const game_launch_error = this.t("GAME_LAUNCH_ERROR") + error.toString();
 
       await message(game_launch_error, {
@@ -3026,6 +3260,9 @@ const App = {
    * information is correct.
    */
   setupMutationObserver() {
+    // Cleanup existing observer first
+    this.cleanupMutationObserver();
+
     const targetNode = document.getElementById("dl-status-string");
     if (targetNode) {
       const config = { childList: true, subtree: true };
@@ -3036,6 +3273,16 @@ const App = {
       };
       this.observer = new MutationObserver(callback);
       this.observer.observe(targetNode, config);
+    }
+  },
+
+  /**
+   * Disconnects the MutationObserver to prevent memory leaks.
+   */
+  cleanupMutationObserver() {
+    if (this.observer) {
+      this.observer.disconnect();
+      this.observer = null;
     }
   },
 
@@ -3204,61 +3451,84 @@ const App = {
   },
 
   async togglePauseResume() {
-    if (this.state.currentUpdateMode === "download") {
-      try {
-        this.setState({ isPauseRequested: true });
-        await invoke("cancel_downloads");
-      } catch (e) {
-        console.error("pause failed", e);
-        this.setState({ isPauseRequested: false });
-      }
+    // Prevent double execution
+    if (this.state.isTogglingPauseResume) {
       return;
     }
-    if (this.state.currentUpdateMode === "paused") {
-      if (this.state.updateError) {
-        this.showErrorMessage(this.t("UPDATE_ERROR_MESSAGE"));
+
+    try {
+      this.setState({ isTogglingPauseResume: true });
+
+      // Cancel any pending download timeout when pausing
+      if (this.pendingDownloadTimeout) {
+        clearTimeout(this.pendingDownloadTimeout);
+        this.pendingDownloadTimeout = null;
+      }
+
+      if (this.state.currentUpdateMode === "download" || this.state.currentUpdateMode === "complete") {
+        try {
+          this.setState({ isPauseRequested: true, currentUpdateMode: "paused" });
+          await invoke("cancel_downloads");
+        } catch (e) {
+          console.error("pause failed", e);
+          this.setState({ isPauseRequested: false });
+        }
         return;
       }
-      try {
-        const previousTotal = this.state.totalSize || 0;
-        const previousDownloaded = this.state.downloadedSize || 0;
-        this.setState({
-          currentUpdateMode: "file_check",
-          isCheckingForUpdates: true,
-        });
-        const filesToUpdate = await invoke("get_files_to_update");
-        this.setState({ isCheckingForUpdates: false });
-
-        if (filesToUpdate && filesToUpdate.length > 0) {
-          const { newTotalSize, clampedDownloaded } = calculateResumeSnapshot(
-            previousTotal,
-            previousDownloaded,
-            filesToUpdate,
-          );
-
-          this.setState({
-            currentUpdateMode: "download",
-            isUpdateAvailable: true,
-            isFileCheckComplete: true,
-            downloadStartTime: Date.now(),
-            lastProgressUpdate: null,
-            speedHistory: [],
-            totalFiles: filesToUpdate.length,
-            totalSize: newTotalSize,
-            downloadedBytesOffset: clampedDownloaded,
-            downloadedSize: clampedDownloaded,
-            isPauseRequested: false,
-          });
-          await this.runPatchSystem(filesToUpdate);
-        } else {
-          this.handleCompletion();
+      if (this.state.currentUpdateMode === "paused") {
+        if (this.state.updateError) {
+          this.showErrorMessage(this.t("UPDATE_ERROR_MESSAGE"));
+          return;
         }
-      } catch (e) {
-        console.error("resume failed", e);
-        this.setState({
-          currentUpdateMode: "paused",
-          isCheckingForUpdates: false,
-        });
+        try {
+          const previousTotal = this.state.totalSize || 0;
+          const previousDownloaded = this.state.downloadedSize || 0;
+          this.setState({
+            currentUpdateMode: "file_check",
+            isCheckingForUpdates: true,
+          });
+          const filesToUpdate = await invoke("get_files_to_update");
+          this.setState({ isCheckingForUpdates: false });
+
+          if (filesToUpdate && filesToUpdate.length > 0) {
+            const { newTotalSize, clampedDownloaded } = calculateResumeSnapshot(
+              previousTotal,
+              previousDownloaded,
+              filesToUpdate,
+            );
+
+            this.setState({
+              currentUpdateMode: "download",
+              isUpdateAvailable: true,
+              isFileCheckComplete: true,
+              downloadStartTime: Date.now(),
+              lastProgressUpdate: null,
+              speedHistory: [],
+              totalFiles: filesToUpdate.length,
+              totalSize: newTotalSize,
+              downloadedBytesOffset: clampedDownloaded,
+              downloadedSize: clampedDownloaded,
+              isPauseRequested: false,
+            });
+            // Reset toggle guard BEFORE starting the long-running download
+            // so user can pause again during download
+            this.setState({ isTogglingPauseResume: false });
+            await this.runPatchSystem(filesToUpdate);
+          } else {
+            this.handleCompletion();
+          }
+        } catch (e) {
+          console.error("resume failed", e);
+          this.setState({
+            currentUpdateMode: "paused",
+            isCheckingForUpdates: false,
+          });
+        }
+      }
+    } finally {
+      // Ensure toggle guard is always reset (handles early returns and errors)
+      if (this.state.isTogglingPauseResume) {
+        this.setState({ isTogglingPauseResume: false });
       }
     }
   },
@@ -3338,6 +3608,10 @@ const App = {
 };
 function LoadStartPage() {
   fetchData(URLS.content.news).then((jsonNews) => {
+    if (!jsonNews) {
+      console.warn("Failed to load news data");
+      return;
+    }
     //MAINTENANCE INFO
     if (jsonNews.WARTUNG_enabled) {
       document.getElementById("NewsWartungImgId").style.display = "block";
@@ -3410,6 +3684,8 @@ function LoadStartPage() {
       document.getElementById("AdImgId3Href").href =
         jsonNews.Advertisement_right_img_link_url;
     }
+  }).catch((error) => {
+    console.error("Error loading start page:", error);
   });
 }
 

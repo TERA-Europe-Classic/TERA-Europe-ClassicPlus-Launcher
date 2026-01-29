@@ -382,7 +382,7 @@ impl RetryPolicy {
 pub enum ErrorClassification {
     /// Transient error that should be retried (network glitch, server overload)
     Transient,
-    /// Permanent error that should not be retried (404, hash mismatch)
+    /// Permanent error that should not be retried (404, 401, 403)
     Permanent,
     /// Server appears unreachable (DNS failure, connection refused)
     ServerUnreachable,
@@ -406,26 +406,42 @@ pub fn classify_error(error_msg: &str) -> ErrorClassification {
     }
 
     // Check for server unreachable patterns
+    // Network-level "not found" errors are connectivity issues, not permanent
     if msg.contains("dns")
         || msg.contains("no route")
         || msg.contains("network unreachable")
         || msg.contains("host unreachable")
         || msg.contains("name resolution")
+        || msg.contains("host not found")
+        || msg.contains("route not found")
+        || msg.contains("interface not found")
+        || msg.contains("address not found")
         || (msg.contains("connection refused") && !msg.contains("temporarily"))
     {
         return ErrorClassification::ServerUnreachable;
     }
 
-    // Check for permanent errors (4xx except 429)
+    // Check for specific transient HTTP status codes
+    if msg.contains("408") || msg.contains("request timeout") {
+        return ErrorClassification::Transient;
+    }
+    if msg.contains("416") || msg.contains("range not satisfiable") {
+        return ErrorClassification::Transient;
+    }
+
+    // Check for permanent errors (4xx except 408, 416, 429)
     // NOTE: Hash mismatch is NOT permanent - it means corruption during download,
     // so we should delete the file and retry the download from scratch
+    // HTTP 404 is permanent, but only if it looks like an HTTP error
     if msg.contains("404")
-        || msg.contains("not found")
+        || (msg.contains("not found") && !msg.contains("host") && !msg.contains("route"))
         || msg.contains("401")
         || msg.contains("unauthorized")
         || msg.contains("403")
         || msg.contains("forbidden")
-        || msg.contains("invalid")
+        || msg.contains("invalid url")
+        || msg.contains("invalid request")
+        || msg.contains("invalid path")
     {
         return ErrorClassification::Permanent;
     }
@@ -571,10 +587,8 @@ impl DownloadHealth {
     pub fn record_retry(&mut self) {
         self.retried_chunks += 1;
         self.consecutive_errors = self.consecutive_errors.saturating_add(1);
-        self.max_consecutive_errors = std::cmp::max(
-            self.max_consecutive_errors,
-            self.consecutive_errors,
-        );
+        self.max_consecutive_errors =
+            std::cmp::max(self.max_consecutive_errors, self.consecutive_errors);
         self.success_streak = 0;
     }
 
@@ -1202,18 +1216,9 @@ mod tests {
 
     #[test]
     fn classify_error_case_insensitive() {
-        assert_eq!(
-            classify_error("TIMEOUT"),
-            ErrorClassification::Transient
-        );
-        assert_eq!(
-            classify_error("TimeOut"),
-            ErrorClassification::Transient
-        );
-        assert_eq!(
-            classify_error("CANCELLED"),
-            ErrorClassification::Cancelled
-        );
+        assert_eq!(classify_error("TIMEOUT"), ErrorClassification::Transient);
+        assert_eq!(classify_error("TimeOut"), ErrorClassification::Transient);
+        assert_eq!(classify_error("CANCELLED"), ErrorClassification::Cancelled);
     }
 
     // ========================================================================

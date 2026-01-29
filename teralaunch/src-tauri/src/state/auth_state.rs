@@ -47,6 +47,13 @@ pub fn read_auth_info() -> impl std::ops::Deref<Target = GlobalAuthInfo> + 'stat
     GLOBAL_AUTH_INFO.read().unwrap_or_else(|e| e.into_inner())
 }
 
+/// Returns a write guard to the global authentication info.
+/// Recovers from poisoned lock by using `into_inner`.
+#[cfg(test)]
+pub fn write_auth_info() -> impl std::ops::DerefMut<Target = GlobalAuthInfo> + 'static {
+    GLOBAL_AUTH_INFO.write().unwrap_or_else(|e| e.into_inner())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

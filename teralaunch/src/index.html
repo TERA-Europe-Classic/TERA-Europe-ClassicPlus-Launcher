@@ -200,6 +200,7 @@
                 return await response.json();
             } catch (error) {
                 console.error('There was a problem with the News fetch operation:', error);
+                return null;
             }
         }
     </script>

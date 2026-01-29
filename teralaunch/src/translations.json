@@ -1,6 +1,7 @@
 {
     "FRA": {
         "RECHECK_GAME_FILES": null,
+        "UPDATE_CHECK_FAILED": "Échec de la vérification des mises à jour. Veuillez réessayer.",
         "LOGIN_TITLE": "Connexion",
         "REGISTER_TITLE": "Inscription",
         "USERNAME_PLACEHOLDER": "Nom d'utilisateur",
@@ -75,6 +76,7 @@
         "FOLDER_FOUND_SUCCESS": "Dossier trouvé avec succès !",
         "FOLDER_NOT_FOUND": "Dossier introuvable.",
         "GAME_LAUNCH_ERROR": "Erreur lors du lancement du jeu: ",
+        "SESSION_EXPIRED_MESSAGE": "Votre session a expiré. Veuillez vous reconnecter pour jouer.",
         "SETTINGS_GAME_FOLDER": "Dossier du jeu",
         "SETTINGS_VERSION_INFO": "Informations sur la version",
         "CHECK_REPAIR_FILES": "Vérifier et réparer les fichiers",
@@ -83,6 +85,7 @@
         "CHECK_LAUNCHER_UPDATE": "Vérifier la mise à jour du lanceur"
     },
     "EUR": {
+        "UPDATE_CHECK_FAILED": "Failed to check for updates. Please try again.",
         "LOGIN_TITLE": "Login",
         "REGISTER_TITLE": "Register",
         "USERNAME_PLACEHOLDER": "Username",
@@ -157,6 +160,7 @@
         "FOLDER_FOUND_SUCCESS": "Folder found successfully!",
         "FOLDER_NOT_FOUND": "Folder not found.",
         "GAME_LAUNCH_ERROR": "Error launching game: ",
+        "SESSION_EXPIRED_MESSAGE": "Your session has expired. Please log in again to play.",
         "SETTINGS_GAME_FOLDER": "Game Folder",
         "SETTINGS_VERSION_INFO": "Version Info",
         "CHECK_REPAIR_FILES": "Check & Repair Files",
@@ -165,6 +169,7 @@
         "CHECK_LAUNCHER_UPDATE": "Check Launcher Update"
     },
     "RUS": {
+        "UPDATE_CHECK_FAILED": "Не удалось проверить обновления. Пожалуйста, попробуйте снова.",
         "LOGIN_TITLE": "Вход",
         "REGISTER_TITLE": "Регистрация",
         "USERNAME_PLACEHOLDER": "Имя пользователя",
@@ -239,6 +244,7 @@
         "FOLDER_FOUND_SUCCESS": "Папка успешно найдена!",
         "FOLDER_NOT_FOUND": "Папка не найдена.",
         "GAME_LAUNCH_ERROR": "Ошибка при запуске игры: ",
+        "SESSION_EXPIRED_MESSAGE": "Ваша сессия истекла. Пожалуйста, войдите снова, чтобы играть.",
         "SETTINGS_GAME_FOLDER": "Папка игры",
         "SETTINGS_VERSION_INFO": "Информация о версии",
         "CHECK_REPAIR_FILES": "Проверить и восстановить файлы",
@@ -247,6 +253,7 @@
         "CHECK_LAUNCHER_UPDATE": "Проверить обновление лаунчера"
     },
     "GER": {
+        "UPDATE_CHECK_FAILED": "Updateprüfung fehlgeschlagen. Bitte erneut versuchen.",
         "LOGIN_TITLE": "Anmelden",
         "REGISTER_TITLE": "Registrieren",
         "USERNAME_PLACEHOLDER": "Benutzername",
@@ -321,6 +328,7 @@
         "FOLDER_FOUND_SUCCESS": "Ordner erfolgreich gefunden!",
         "FOLDER_NOT_FOUND": "Ordner nicht gefunden.",
         "GAME_LAUNCH_ERROR": "Fehler beim Starten des Spiels: ",
+        "SESSION_EXPIRED_MESSAGE": "Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an, um zu spielen.",
         "SETTINGS_GAME_FOLDER": "Spieleordner",
         "SETTINGS_VERSION_INFO": "Versionsinfo",
         "CHECK_REPAIR_FILES": "Dateien prüfen und reparieren",

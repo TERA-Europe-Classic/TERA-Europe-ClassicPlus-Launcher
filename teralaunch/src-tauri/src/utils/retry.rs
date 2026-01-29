@@ -12,6 +12,7 @@ use crate::domain::{
     CIRCUIT_BREAKER_COOLDOWN_SECS, CIRCUIT_BREAKER_THRESHOLD, MAX_RETRY_DELAY_MS,
     RETRY_DELAY_BASE_MS,
 };
+use crate::services::download_service::{classify_error, ErrorClassification};
 
 /// Determines if a download has stalled based on byte progress.
 ///
@@ -54,21 +55,22 @@ pub fn stall_exceeded(
 
 /// Checks if an error message indicates a transient (retriable) download error.
 ///
+/// This function delegates to download_service::classify_error() for consistency.
 /// Transient errors are temporary network issues that may resolve on retry:
 /// - Timeouts
-/// - Connection resets/closes/refused/aborted
+/// - Connection resets/closes/aborted
 /// - Broken pipes
 /// - Temporary service unavailability
-/// - DNS issues
 /// - HTTP 429, 500, 502, 503, 504 errors
 /// - EOF/incomplete/reset errors
+/// - Hash mismatches (corruption during download - delete and retry)
 ///
 /// # Arguments
 /// * `message` - The error message to analyze
 ///
 /// # Returns
 /// * `true` if the error is likely transient and worth retrying
-/// * `false` if the error is permanent (e.g., 404, permission denied)
+/// * `false` if the error is permanent (e.g., 404, cancelled) or unreachable
 ///
 /// # Examples
 /// ```ignore
@@ -77,31 +79,11 @@ pub fn stall_exceeded(
 /// assert!(is_transient_download_error("HTTP 503"));
 /// assert!(is_transient_download_error("HTTP 429 too many requests"));
 /// assert!(is_transient_download_error("HTTP 500 internal server error"));
-/// assert!(!is_transient_download_error("hash mismatch"));
+/// assert!(is_transient_download_error("hash mismatch")); // corruption, retry
 /// assert!(!is_transient_download_error("HTTP 404 not found"));
 /// ```
 pub fn is_transient_download_error(message: &str) -> bool {
-    let msg = message.to_lowercase();
-    msg.contains("timed out")
-        || msg.contains("timeout")
-        || msg.contains("connection reset")
-        || msg.contains("connection closed")
-        || msg.contains("broken pipe")
-        || msg.contains("temporarily")
-        || msg.contains("network")
-        || msg.contains("dns")
-        || msg.contains("503")
-        || msg.contains("502")
-        || msg.contains("504")
-        || msg.contains("500")
-        || msg.contains("internal server error")
-        || msg.contains("429")
-        || msg.contains("too many requests")
-        || msg.contains("reset")
-        || msg.contains("eof")
-        || msg.contains("incomplete")
-        || msg.contains("aborted")
-        || msg.contains("refused")
+    matches!(classify_error(message), ErrorClassification::Transient)
 }
 
 /// Calculates retry delay with exponential backoff and optional jitter.
@@ -160,10 +142,14 @@ impl CircuitBreakerState {
         Self::default()
     }
 
-    /// Record a failure, returns true if circuit should open (stop retrying)
-    pub fn record_failure(&mut self) -> bool {
-        self.consecutive_failures = self.consecutive_failures.saturating_add(1);
-        self.last_failure_time = Some(std::time::Instant::now());
+    /// Records a failure attempt.
+    /// Only connectivity errors (DNS, network unreachable, etc.) should count toward circuit breaking.
+    /// Returns `true` if circuit should open (threshold reached for connectivity errors).
+    pub fn record_failure(&mut self, is_connectivity_error: bool) -> bool {
+        if is_connectivity_error {
+            self.consecutive_failures = self.consecutive_failures.saturating_add(1);
+            self.last_failure_time = Some(std::time::Instant::now());
+        }
         self.consecutive_failures >= CIRCUIT_BREAKER_THRESHOLD
     }
 
@@ -190,6 +176,8 @@ impl CircuitBreakerState {
 /// Determines if an error indicates the server is likely unreachable.
 /// Returns true for errors that suggest no connectivity at all.
 ///
+/// This function delegates to download_service::classify_error() for consistency.
+///
 /// # Arguments
 /// * `message` - The error message to analyze
 ///
@@ -205,14 +193,10 @@ impl CircuitBreakerState {
 /// assert!(!is_server_unreachable_error("HTTP 503"));
 /// ```
 pub fn is_server_unreachable_error(message: &str) -> bool {
-    let msg = message.to_lowercase();
-    msg.contains("dns")
-        || msg.contains("no route")
-        || msg.contains("network unreachable")
-        || msg.contains("host unreachable")
-        || msg.contains("connection refused")
-        || msg.contains("name resolution")
-        || (msg.contains("timeout") && msg.contains("connect"))
+    matches!(
+        classify_error(message),
+        ErrorClassification::ServerUnreachable
+    )
 }
 
 /// Iterator that yields retry delays with exponential backoff
@@ -304,7 +288,8 @@ mod tests {
         assert!(is_transient_download_error("request timed out"));
         assert!(is_transient_download_error("connection reset by peer"));
         assert!(is_transient_download_error("HTTP 503"));
-        assert!(!is_transient_download_error("hash mismatch"));
+        // Hash mismatch = corruption during download, should retry (delete + redownload)
+        assert!(is_transient_download_error("hash mismatch"));
     }
 
     #[test]
@@ -331,7 +316,8 @@ mod tests {
     fn is_transient_non_transient_errors() {
         assert!(!is_transient_download_error("file not found"));
         assert!(!is_transient_download_error("permission denied"));
-        assert!(!is_transient_download_error("hash mismatch"));
+        // Hash mismatch IS transient (corruption, delete + retry)
+        assert!(is_transient_download_error("hash mismatch"));
         assert!(!is_transient_download_error("invalid response format"));
         assert!(!is_transient_download_error("HTTP 404 not found"));
         assert!(!is_transient_download_error("HTTP 401 unauthorized"));
@@ -437,13 +423,13 @@ mod tests {
         assert_eq!(cb.consecutive_failures, 0);
 
         // Record failures up to threshold
-        assert!(!cb.record_failure()); // 1st failure, below threshold
+        assert!(!cb.record_failure(true)); // 1st failure, below threshold
         assert_eq!(cb.consecutive_failures, 1);
 
-        assert!(!cb.record_failure()); // 2nd failure, below threshold
+        assert!(!cb.record_failure(true)); // 2nd failure, below threshold
         assert_eq!(cb.consecutive_failures, 2);
 
-        assert!(cb.record_failure()); // 3rd failure, at threshold - circuit opens
+        assert!(cb.record_failure(true)); // 3rd failure, at threshold - circuit opens
         assert_eq!(cb.consecutive_failures, 3);
         assert!(cb.last_failure_time.is_some());
     }
@@ -451,8 +437,8 @@ mod tests {
     #[test]
     fn circuit_breaker_record_success_resets() {
         let mut cb = CircuitBreakerState::new();
-        cb.record_failure();
-        cb.record_failure();
+        cb.record_failure(true);
+        cb.record_failure(true);
         assert_eq!(cb.consecutive_failures, 2);
 
         cb.record_success();
@@ -465,14 +451,14 @@ mod tests {
         let mut cb = CircuitBreakerState::new();
 
         // Below threshold - should retry
-        cb.record_failure();
+        cb.record_failure(true);
         assert!(cb.should_retry());
 
-        cb.record_failure();
+        cb.record_failure(true);
         assert!(cb.should_retry());
 
         // At threshold - should not retry (without cooldown)
-        cb.record_failure();
+        cb.record_failure(true);
         assert!(!cb.should_retry());
     }
 
@@ -484,9 +470,9 @@ mod tests {
         assert!(cb.cooldown_elapsed());
 
         // Just recorded failure - cooldown not elapsed
-        cb.record_failure();
-        cb.record_failure();
-        cb.record_failure();
+        cb.record_failure(true);
+        cb.record_failure(true);
+        cb.record_failure(true);
         assert!(!cb.cooldown_elapsed());
 
         // After success - cooldown elapsed (no failure time)
@@ -500,11 +486,11 @@ mod tests {
 
         // Fill up to u8::MAX to test overflow protection
         for _ in 0..u8::MAX {
-            cb.record_failure();
+            cb.record_failure(true);
         }
 
         assert_eq!(cb.consecutive_failures, u8::MAX);
-        cb.record_failure(); // Should not overflow
+        cb.record_failure(true); // Should not overflow
         assert_eq!(cb.consecutive_failures, u8::MAX);
     }
 

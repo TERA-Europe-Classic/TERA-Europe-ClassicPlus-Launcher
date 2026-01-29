@@ -31,32 +31,48 @@ use std::path::{Path, PathBuf};
 /// assert!(validate_path_within_base(base, malicious).is_err());
 /// ```
 pub fn validate_path_within_base(base: &Path, file_path: &Path) -> Result<PathBuf, String> {
-    // Canonicalize both paths to resolve symlinks and ".." components
+    // Step 1: Canonicalize base path first
     let canonical_base = base
         .canonicalize()
         .map_err(|e| format!("Failed to canonicalize base path: {}", e))?;
 
-    // For the file path, if it doesn't exist yet, canonicalize the parent
+    // Step 2: Build the expected path and check for path traversal in components
+    // This validation happens BEFORE creating any directories
+    let relative = file_path.strip_prefix(base).unwrap_or(file_path);
+
+    // Check for path traversal attempts in the components
+    for component in relative.components() {
+        if let std::path::Component::ParentDir = component {
+            return Err("Path traversal detected: '..' not allowed".to_string());
+        }
+    }
+
+    // Step 3: Now safe to create parent directories (validation passed)
+    if !file_path.exists() {
+        if let Some(parent) = file_path.parent() {
+            if !parent.exists() {
+                std::fs::create_dir_all(parent)
+                    .map_err(|e| format!("Failed to create parent directory: {}", e))?;
+            }
+        }
+    }
+
+    // Step 4: Final canonicalization and containment check
     let canonical_path = if file_path.exists() {
         file_path
             .canonicalize()
             .map_err(|e| format!("Failed to canonicalize file path: {}", e))?
     } else {
-        // For new files, ensure parent exists and check that
         let parent = file_path
             .parent()
             .ok_or_else(|| "File path has no parent".to_string())?;
-        if !parent.exists() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| format!("Failed to create parent directory: {}", e))?;
-        }
         let canonical_parent = parent
             .canonicalize()
             .map_err(|e| format!("Failed to canonicalize parent: {}", e))?;
         canonical_parent.join(file_path.file_name().ok_or("No file name")?)
     };
 
-    // Check that the canonical path starts with the canonical base
+    // Step 5: Verify the canonical path is within the canonical base
     if !canonical_path.starts_with(&canonical_base) {
         return Err(format!(
             "Path traversal detected: {} is outside {}",
@@ -151,9 +167,125 @@ pub fn normalize_path_for_compare(value: &str) -> String {
     path.to_lowercase()
 }
 
+/// Allowed domains for download URLs.
+/// Only URLs from these domains are permitted for file downloads.
+const ALLOWED_DOWNLOAD_DOMAINS: &[&str] = &[
+    "dl.tera-europe.net",
+    "web.tera-germany.de",
+    "tera-europe.net",
+    "tera-germany.de",
+];
+
+/// Validates that a download URL belongs to an allowed domain.
+///
+/// This prevents malicious hash files from directing downloads to arbitrary servers.
+///
+/// # Arguments
+/// * `url` - The URL to validate
+///
+/// # Returns
+/// * `Ok(())` if the URL is from an allowed domain
+/// * `Err(String)` if the URL is invalid or from an untrusted domain
+///
+/// # Examples
+/// ```ignore
+/// assert!(validate_download_url("https://dl.tera-europe.net/file.pak").is_ok());
+/// assert!(validate_download_url("https://evil.com/malware.exe").is_err());
+/// ```
+pub fn validate_download_url(url: &str) -> Result<(), String> {
+    // Parse the URL to extract the host
+    let url_parsed = url::Url::parse(url).map_err(|e| format!("Invalid URL '{}': {}", url, e))?;
+
+    // Require HTTPS for security
+    if url_parsed.scheme() != "https" {
+        return Err(format!(
+            "URL must use HTTPS, got: {}://",
+            url_parsed.scheme()
+        ));
+    }
+
+    let host = url_parsed
+        .host_str()
+        .ok_or_else(|| format!("URL has no host: {}", url))?;
+
+    // Check if the host matches any allowed domain (including subdomains)
+    let host_lower = host.to_lowercase();
+    for allowed_domain in ALLOWED_DOWNLOAD_DOMAINS {
+        if host_lower == *allowed_domain || host_lower.ends_with(&format!(".{}", allowed_domain)) {
+            return Ok(());
+        }
+    }
+
+    Err(format!(
+        "URL '{}' is from untrusted domain '{}'. Allowed domains: {:?}",
+        url, host, ALLOWED_DOWNLOAD_DOMAINS
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ========================================================================
+    // Tests for validate_download_url
+    // ========================================================================
+
+    #[test]
+    fn validate_download_url_allowed_domains() {
+        assert!(validate_download_url("https://dl.tera-europe.net/TERAClassic/file.pak").is_ok());
+        assert!(validate_download_url("https://web.tera-germany.de/classic/hash.json").is_ok());
+        assert!(validate_download_url("https://tera-europe.net/files/patch.pak").is_ok());
+        assert!(validate_download_url("https://tera-germany.de/data/file.pak").is_ok());
+    }
+
+    #[test]
+    fn validate_download_url_subdomains_allowed() {
+        assert!(validate_download_url("https://cdn.dl.tera-europe.net/file.pak").is_ok());
+        assert!(validate_download_url("https://files.web.tera-germany.de/file.pak").is_ok());
+    }
+
+    #[test]
+    fn validate_download_url_rejects_untrusted_domains() {
+        let result = validate_download_url("https://evil.com/malware.exe");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("untrusted domain"));
+    }
+
+    #[test]
+    fn validate_download_url_rejects_http() {
+        let result = validate_download_url("http://dl.tera-europe.net/file.pak");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("HTTPS"));
+    }
+
+    #[test]
+    fn validate_download_url_rejects_invalid_url() {
+        let result = validate_download_url("not-a-valid-url");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid URL"));
+    }
+
+    #[test]
+    fn validate_download_url_rejects_empty_url() {
+        let result = validate_download_url("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn validate_download_url_case_insensitive() {
+        assert!(validate_download_url("https://DL.TERA-EUROPE.NET/file.pak").is_ok());
+        assert!(validate_download_url("https://Web.Tera-Germany.De/file.pak").is_ok());
+    }
+
+    #[test]
+    fn validate_download_url_rejects_similar_domain_names() {
+        // These look similar but should be rejected
+        let result = validate_download_url("https://dl.tera-europe.net.evil.com/file.pak");
+        assert!(result.is_err());
+
+        let result2 = validate_download_url("https://fake-tera-europe.net/file.pak");
+        assert!(result2.is_err());
+    }
 
     // ========================================================================
     // Tests for is_ignored

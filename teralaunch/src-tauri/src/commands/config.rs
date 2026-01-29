@@ -111,7 +111,7 @@ pub async fn save_game_path_to_config(
         // Interrupt any ongoing downloads
         cancel_download();
         // Clear stale hash cache from old directory and reset download progress
-        clear_cache_internal().ok();
+        clear_cache_internal().await.ok();
         set_downloaded_bytes(0);
         let _ = window.emit("game_path_changed", &path);
     }
@@ -297,9 +297,9 @@ fn game_path_changed(previous: Option<&str>, next: &str) -> bool {
 
 /// Internal function to clear the hash cache.
 #[cfg(not(tarpaulin_include))]
-fn clear_cache_internal() -> Result<(), String> {
+async fn clear_cache_internal() -> Result<(), String> {
     // Clear the in-memory hash cache
-    let _ = clear_hash_cache();
+    clear_hash_cache().await;
     // Remove the disk cache file
     let cache_path = get_cache_file_path()?;
     if cache_path.exists() {

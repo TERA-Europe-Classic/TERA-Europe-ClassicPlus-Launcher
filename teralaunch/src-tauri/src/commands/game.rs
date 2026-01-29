@@ -126,14 +126,22 @@ pub async fn handle_launch_game(
     info!("Total time: {:?}", 3);
     let is_running = *state.status_receiver.lock().await.borrow();
 
-    let (account_name, characters_count, ticket, auth_key, user_no) = {
+    let (account_name, characters_count, ticket, auth_key, user_no, user_name) = {
         let auth_info = read_auth_info();
         let account_name = auth_info.user_no.to_string();
         let characters_count = auth_info.character_count.clone();
         let ticket = auth_info.auth_key.clone();
         let auth_key = auth_info.auth_key.clone();
         let user_no = auth_info.user_no;
-        (account_name, characters_count, ticket, auth_key, user_no)
+        let user_name = auth_info.user_name.clone();
+        (
+            account_name,
+            characters_count,
+            ticket,
+            auth_key,
+            user_no,
+            user_name,
+        )
     };
 
     let mut is_launching = state.is_launching.lock().await;
@@ -141,6 +149,10 @@ pub async fn handle_launch_game(
     if user_no == 0 {
         return Err("User not authenticated (user_no is 0)".to_string());
     }
+
+    // Note: Auth key refresh is handled by the frontend which performs a fresh login
+    // before every game launch. The ticket stored in auth state is already fresh.
+
     *is_launching = true;
     let (game_path, game_lang) = match load_config() {
         Ok(result) => result,

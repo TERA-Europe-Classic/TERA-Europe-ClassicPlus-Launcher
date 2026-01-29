@@ -166,9 +166,9 @@ fn main() {
             commands::config::save_language_to_config,
             // Download commands
             commands::download::download_all_files,
-            commands::download::update_file,
             commands::download::cancel_downloads,
             commands::download::get_downloaded_bytes,
+            commands::download::reset_download_state,
             // Game commands
             commands::game::handle_launch_game,
             commands::game::get_game_status,

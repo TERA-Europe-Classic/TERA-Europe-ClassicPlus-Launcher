@@ -38,7 +38,6 @@ pub fn list_commands() -> Vec<&'static str> {
         "save_language_to_config",
         // Download
         "download_all_files",
-        "update_file",
         "cancel_downloads",
         "get_downloaded_bytes",
         // Game
@@ -65,8 +64,8 @@ mod tests {
     #[test]
     fn list_commands_returns_expected_count() {
         let commands = list_commands();
-        // 4 auth + 5 config + 4 download + 3 game + 4 hash + 4 util = 24 commands
-        assert_eq!(commands.len(), 24);
+        // 4 auth + 5 config + 3 download + 3 game + 4 hash + 4 util = 23 commands
+        assert_eq!(commands.len(), 23);
     }
 
     #[test]

@@ -10,6 +10,11 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+/// Maximum username length
+const MAX_USERNAME_LENGTH: usize = 100;
+/// Maximum password length
+const MAX_PASSWORD_LENGTH: usize = 256;
+
 /// Result of a login attempt.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LoginResult {
@@ -66,6 +71,10 @@ impl std::fmt::Display for AuthError {
 /// assert!(validate_credentials("user", "").is_err());
 /// ```
 pub fn validate_credentials(username: &str, password: &str) -> Result<(), AuthError> {
+    // Trim whitespace
+    let username = username.trim();
+    let password = password.trim();
+
     if username.is_empty() {
         return Err(AuthError::InvalidCredentials(
             "Username cannot be empty".to_string(),
@@ -76,7 +85,67 @@ pub fn validate_credentials(username: &str, password: &str) -> Result<(), AuthEr
             "Password cannot be empty".to_string(),
         ));
     }
+    if username.len() > MAX_USERNAME_LENGTH {
+        return Err(AuthError::InvalidCredentials(format!(
+            "Username too long (max {} characters)", MAX_USERNAME_LENGTH
+        )));
+    }
+    if password.len() > MAX_PASSWORD_LENGTH {
+        return Err(AuthError::InvalidCredentials(format!(
+            "Password too long (max {} characters)", MAX_PASSWORD_LENGTH
+        )));
+    }
     Ok(())
+}
+
+/// Validates email format (basic validation, server will do full validation).
+///
+/// Checks for:
+/// - Exactly one @ symbol
+/// - Non-empty local part (before @)
+/// - Domain with at least one dot
+/// - Domain doesn't start or end with dot
+/// - No consecutive dots in domain
+///
+/// # Arguments
+/// * `email` - The email address to validate
+///
+/// # Returns
+/// `true` if the email format is valid, `false` otherwise
+fn validate_email_format(email: &str) -> bool {
+    let email = email.trim();
+
+    // Must have exactly one @
+    let at_count = email.chars().filter(|c| *c == '@').count();
+    if at_count != 1 {
+        return false;
+    }
+
+    // Split at @
+    let parts: Vec<&str> = email.split('@').collect();
+    if parts.len() != 2 {
+        return false;
+    }
+
+    let local = parts[0];
+    let domain = parts[1];
+
+    // Local part must not be empty
+    if local.is_empty() {
+        return false;
+    }
+
+    // Domain must have at least one dot, not start/end with dot
+    if !domain.contains('.') || domain.starts_with('.') || domain.ends_with('.') {
+        return false;
+    }
+
+    // Domain parts must not be empty (no consecutive dots)
+    if domain.split('.').any(|p| p.is_empty()) {
+        return false;
+    }
+
+    true
 }
 
 /// Validates registration fields.
@@ -105,8 +174,8 @@ pub fn validate_registration(login: &str, email: &str, password: &str) -> Result
             "Password cannot be empty".to_string(),
         ));
     }
-    // Basic email format check
-    if !email.contains('@') || !email.contains('.') {
+    // Improved email format check
+    if !validate_email_format(email) {
         return Err(AuthError::InvalidCredentials(
             "Invalid email format".to_string(),
         ));
@@ -334,9 +403,47 @@ mod tests {
 
     #[test]
     fn validate_credentials_whitespace_username() {
-        // Whitespace-only is not empty string, so passes current validation
-        // This tests current behavior, not necessarily desired behavior
-        assert!(validate_credentials("  ", "pass").is_ok());
+        // Whitespace-only should fail after trimming
+        let result = validate_credentials("  ", "pass");
+        assert!(matches!(result, Err(AuthError::InvalidCredentials(_))));
+        assert!(result.unwrap_err().to_string().contains("Username"));
+    }
+
+    #[test]
+    fn validate_credentials_whitespace_password() {
+        // Whitespace-only password should fail after trimming
+        let result = validate_credentials("user", "  ");
+        assert!(matches!(result, Err(AuthError::InvalidCredentials(_))));
+        assert!(result.unwrap_err().to_string().contains("Password"));
+    }
+
+    #[test]
+    fn validate_credentials_username_too_long() {
+        let long_username = "a".repeat(MAX_USERNAME_LENGTH + 1);
+        let result = validate_credentials(&long_username, "pass");
+        assert!(matches!(result, Err(AuthError::InvalidCredentials(_))));
+        assert!(result.unwrap_err().to_string().contains("too long"));
+    }
+
+    #[test]
+    fn validate_credentials_password_too_long() {
+        let long_password = "p".repeat(MAX_PASSWORD_LENGTH + 1);
+        let result = validate_credentials("user", &long_password);
+        assert!(matches!(result, Err(AuthError::InvalidCredentials(_))));
+        assert!(result.unwrap_err().to_string().contains("too long"));
+    }
+
+    #[test]
+    fn validate_credentials_max_length_valid() {
+        let max_username = "u".repeat(MAX_USERNAME_LENGTH);
+        let max_password = "p".repeat(MAX_PASSWORD_LENGTH);
+        assert!(validate_credentials(&max_username, &max_password).is_ok());
+    }
+
+    #[test]
+    fn validate_credentials_trimming() {
+        // Should trim leading/trailing whitespace and accept valid credentials
+        assert!(validate_credentials("  user  ", "  pass  ").is_ok());
     }
 
     // ========================================================================
@@ -377,6 +484,123 @@ mod tests {
     fn validate_registration_invalid_email_no_dot() {
         let result = validate_registration("user", "user@example", "pass");
         assert!(matches!(result, Err(AuthError::InvalidCredentials(_))));
+    }
+
+    // ========================================================================
+    // Tests for validate_email_format
+    // ========================================================================
+
+    #[test]
+    fn validate_email_format_valid_simple() {
+        assert!(validate_email_format("user@example.com"));
+    }
+
+    #[test]
+    fn validate_email_format_valid_with_numbers() {
+        assert!(validate_email_format("user123@example456.com"));
+    }
+
+    #[test]
+    fn validate_email_format_valid_with_plus() {
+        assert!(validate_email_format("user+tag@example.com"));
+    }
+
+    #[test]
+    fn validate_email_format_valid_with_dots() {
+        assert!(validate_email_format("first.last@example.com"));
+    }
+
+    #[test]
+    fn validate_email_format_valid_subdomain() {
+        assert!(validate_email_format("user@mail.example.com"));
+    }
+
+    #[test]
+    fn validate_email_format_valid_multiple_subdomains() {
+        assert!(validate_email_format("user@mail.internal.example.co.uk"));
+    }
+
+    #[test]
+    fn validate_email_format_valid_with_whitespace() {
+        // Should trim before validation
+        assert!(validate_email_format("  user@example.com  "));
+    }
+
+    #[test]
+    fn validate_email_format_invalid_no_at() {
+        assert!(!validate_email_format("userexample.com"));
+    }
+
+    #[test]
+    fn validate_email_format_invalid_multiple_at() {
+        assert!(!validate_email_format("user@@example.com"));
+        assert!(!validate_email_format("user@exam@ple.com"));
+    }
+
+    #[test]
+    fn validate_email_format_invalid_no_dot_in_domain() {
+        assert!(!validate_email_format("user@example"));
+    }
+
+    #[test]
+    fn validate_email_format_invalid_empty_local() {
+        assert!(!validate_email_format("@example.com"));
+    }
+
+    #[test]
+    fn validate_email_format_invalid_domain_starts_with_dot() {
+        assert!(!validate_email_format("user@.example.com"));
+    }
+
+    #[test]
+    fn validate_email_format_invalid_domain_ends_with_dot() {
+        assert!(!validate_email_format("user@example.com."));
+    }
+
+    #[test]
+    fn validate_email_format_invalid_consecutive_dots() {
+        assert!(!validate_email_format("user@example..com"));
+    }
+
+    #[test]
+    fn validate_email_format_invalid_consecutive_dots_multiple() {
+        assert!(!validate_email_format("user@ex..am..ple.com"));
+    }
+
+    #[test]
+    fn validate_email_format_invalid_domain_only_dot() {
+        assert!(!validate_email_format("user@."));
+    }
+
+    #[test]
+    fn validate_email_format_invalid_empty_email() {
+        assert!(!validate_email_format(""));
+    }
+
+    #[test]
+    fn validate_email_format_invalid_only_at() {
+        assert!(!validate_email_format("@"));
+    }
+
+    #[test]
+    fn validate_email_format_invalid_old_style_cases() {
+        // Cases that old validation would incorrectly accept
+        assert!(!validate_email_format("a@b."));       // Old validation would accept
+        assert!(!validate_email_format(".@."));        // Old validation would accept
+        assert!(!validate_email_format("@.com"));      // Old validation would accept
+    }
+
+    #[test]
+    fn validate_email_format_invalid_single_char_domain_part() {
+        // Actually valid - single character domain parts are technically OK
+        assert!(validate_email_format("user@a.b"));
+    }
+
+    #[test]
+    fn validate_email_format_valid_special_chars_in_local() {
+        assert!(validate_email_format("user+tag@example.com"));
+        assert!(validate_email_format("user_name@example.com"));
+        assert!(validate_email_format("user-name@example.com"));
     }
 
     // ========================================================================

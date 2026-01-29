@@ -10,6 +10,8 @@ pub mod download_state;
 pub use auth_state::{clear_auth_info, read_auth_info, set_auth_info};
 pub use download_state::{
     add_downloaded_bytes, cancel_download, clear_hash_cache, get_current_file_name,
-    get_downloaded_bytes, is_download_cancelled, is_download_complete, set_current_file_name,
-    set_download_cancelled, set_download_complete, set_downloaded_bytes, sub_downloaded_bytes,
+    get_download_generation, get_downloaded_bytes, increment_download_generation,
+    is_download_cancelled, is_download_complete, reset_download_state, set_current_file_name,
+    set_download_cancelled, set_download_complete, set_download_in_progress, set_downloaded_bytes,
+    sub_downloaded_bytes, try_start_download,
 };

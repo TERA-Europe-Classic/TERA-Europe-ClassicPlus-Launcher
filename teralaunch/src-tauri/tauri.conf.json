@@ -10,10 +10,59 @@
   },
   "tauri": {
     "allowlist": {
-      "all": true,
+      "all": false,
+      "fs": {
+        "all": false,
+        "readFile": true,
+        "writeFile": true,
+        "readDir": true,
+        "createDir": true,
+        "removeFile": true,
+        "exists": true,
+        "scope": ["$APP/*", "$RESOURCE/*"]
+      },
+      "path": {
+        "all": true
+      },
+      "dialog": {
+        "all": true
+      },
       "shell": {
-        "all": true,
-        "open": true
+        "all": false,
+        "open": true,
+        "scope": [
+          { "name": "open-url", "cmd": "cmd", "args": ["/C", "start", { "validator": "\\S+" }] }
+        ]
+      },
+      "window": {
+        "all": false,
+        "close": true,
+        "hide": true,
+        "show": true,
+        "minimize": true,
+        "maximize": true,
+        "unmaximize": true,
+        "setFocus": true
+      },
+      "process": {
+        "all": false,
+        "exit": true,
+        "relaunch": true
+      },
+      "http": {
+        "all": false,
+        "request": true,
+        "scope": [
+          "https://*.tera-europe.net/*",
+          "https://*.tera-germany.de/*",
+          "https://*.crazy-esports.com/*",
+          "https://auth.tera-europe.net/*",
+          "https://dl.tera-europe.net/*",
+          "https://web.tera-germany.de/*"
+        ]
+      },
+      "notification": {
+        "all": true
       }
     },
     "updater": {
@@ -37,7 +86,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https://*.tera-europe.net https://*.tera-germany.de https://*.crazy-esports.com https://web.tera-germany.de https://helpdesk.crazy-esports.com"
     },
     "bundle": {
       "active": true,

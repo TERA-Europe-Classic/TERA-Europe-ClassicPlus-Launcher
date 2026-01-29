@@ -1,3 +1,4 @@
+use log;
 use once_cell::sync::Lazy;
 use serde_json::Value;
 
@@ -17,10 +18,19 @@ pub fn get_config_value(key: &str) -> String {
 }
 
 pub fn get_relay_servers() -> Vec<Value> {
-    CONFIG_JSON["RELAY_SERVERS"]
-        .as_array()
-        .unwrap_or(&vec![])
-        .clone()
+    match CONFIG_JSON.get("RELAY_SERVERS") {
+        Some(value) => match value.as_array() {
+            Some(arr) => arr.clone(),
+            None => {
+                log::warn!("RELAY_SERVERS config value is not an array, returning empty list");
+                vec![]
+            }
+        },
+        None => {
+            log::debug!("RELAY_SERVERS not configured, returning empty list");
+            vec![]
+        }
+    }
 }
 
 #[cfg(test)]

@@ -20,6 +20,7 @@ use std::time::{Duration, Instant};
 use futures_util::StreamExt;
 use log::{error, info, warn};
 use reqwest::header::RANGE;
+use reqwest::Client;
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::fs::File;
@@ -29,26 +30,37 @@ use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 
 use crate::commands::config::get_game_path;
+use crate::domain::DownloadError;
 use crate::domain::{
     FileInfo, ProgressPayload, BUFFER_SIZE, BUFWRITER_CAPACITY, CHUNK_MIN_SIZE,
-    CONNECT_TIMEOUT_SECS, HTTP_POOL_MAX_IDLE_PER_HOST, MAX_CONCURRENT_DOWNLOADS,
-    MAX_PARTS, PART_ASSEMBLY_BUFFER_SIZE, PART_SIZE, PROGRESS_UPDATE_MS, STALL_TIMEOUT_SECS,
+    CONNECT_TIMEOUT_SECS, HTTP_POOL_MAX_IDLE_PER_HOST, MAX_CONCURRENT_DOWNLOADS, MAX_PARTS,
+    PART_ASSEMBLY_BUFFER_SIZE, PART_SIZE, PROGRESS_UPDATE_MS, STALL_TIMEOUT_SECS,
 };
 use crate::infrastructure::{EventEmitter, HttpClient, HttpResponse};
 use crate::services::download_service;
-use crate::state::{
-    add_downloaded_bytes, cancel_download, get_current_file_name,
-    get_downloaded_bytes as state_get_downloaded_bytes, is_download_cancelled,
-    is_download_complete, set_current_file_name, set_download_cancelled, set_download_complete,
-    set_downloaded_bytes, sub_downloaded_bytes,
-};
-use crate::domain::DownloadError;
 use crate::services::download_service::{
     classify_error, DownloadHealth, ErrorClassification, RetryPolicy,
 };
-use crate::utils::{
-    is_server_unreachable_error, stall_exceeded, validate_path_within_base, RetryDelays,
+use crate::state::{
+    add_downloaded_bytes, cancel_download, get_current_file_name, get_download_generation,
+    get_downloaded_bytes as state_get_downloaded_bytes, increment_download_generation,
+    is_download_cancelled, is_download_complete, reset_download_state as state_reset_download_state,
+    set_current_file_name, set_download_cancelled, set_download_complete, set_download_in_progress,
+    set_downloaded_bytes, sub_downloaded_bytes, try_start_download,
 };
+use crate::utils::{
+    is_server_unreachable_error, stall_exceeded, validate_download_url, validate_path_within_base,
+    RetryDelays,
+};
+
+/// Guard that ensures DOWNLOAD_IN_PROGRESS is reset when dropped
+struct DownloadGuard;
+
+impl Drop for DownloadGuard {
+    fn drop(&mut self) {
+        set_download_in_progress(false);
+    }
+}
 
 /// Gets the current downloaded byte count.
 #[tauri::command]
@@ -61,6 +73,21 @@ pub fn get_downloaded_bytes() -> u64 {
 #[cfg(not(tarpaulin_include))]
 pub fn cancel_downloads() {
     cancel_download();
+}
+
+/// Resets all download state to allow a fresh download attempt.
+///
+/// This is useful for recovering from "Download already in progress" errors
+/// when no download is actually running (e.g., after a crash or unexpected error).
+///
+/// # Safety
+/// This should only be called when you're certain no download is actually in progress,
+/// as it will allow a new download to start even if one is running.
+#[tauri::command]
+#[cfg(not(tarpaulin_include))]
+pub fn reset_download_state() {
+    info!("Resetting download state to allow fresh download attempt");
+    state_reset_download_state();
 }
 
 /// Downloads all files in the update list.
@@ -84,6 +111,15 @@ pub async fn download_all_files(
     files_to_update: Vec<FileInfo>,
     resume_downloaded: Option<u64>,
 ) -> Result<Vec<u64>, String> {
+    // Atomically check and set download in progress to prevent race conditions
+    if !try_start_download() {
+        return Err("Download already in progress".to_string());
+    }
+    let _download_guard = DownloadGuard;  // Will clean up on panic or return
+
+    // Increment generation to signal old progress tickers to exit
+    let session_generation = increment_download_generation();
+
     let total_files = files_to_update.len();
     let total_size: u64 = files_to_update.iter().map(|f| f.size).sum();
     let initial_downloaded =
@@ -106,11 +142,22 @@ pub async fn download_all_files(
     let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_DOWNLOADS));
     let global_start = Instant::now();
 
+    // Create HTTP client once for all downloads to enable connection pooling
+    let http_client = Arc::new(
+        Client::builder()
+            .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
+            .read_timeout(Duration::from_secs(STALL_TIMEOUT_SECS))
+            .pool_max_idle_per_host(HTTP_POOL_MAX_IDLE_PER_HOST)
+            .build()
+            .map_err(|e| format!("Failed to create HTTP client: {}", e))?,
+    );
+
     // Emit a smooth global progress tick to stabilize UI speed/ETA
     {
         let window_tick = window.clone();
         let total_bytes_tick = total_size;
         let total_files_tick = total_files;
+        let generation = session_generation;
         tauri::async_runtime::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_millis(PROGRESS_UPDATE_MS));
             let mut last_bytes = initial_downloaded;
@@ -118,6 +165,11 @@ pub async fn download_all_files(
             let mut consecutive_stalls: u8 = 0;
             loop {
                 interval.tick().await;
+
+                // Exit if a new download session started
+                if get_download_generation() != generation {
+                    break;
+                }
                 let d = state_get_downloaded_bytes();
                 let elapsed = global_start.elapsed();
                 let speed = if elapsed.as_secs() > 0 {
@@ -140,7 +192,10 @@ pub async fn download_all_files(
                     consecutive_stalls += 1;
                     if consecutive_stalls == 1 {
                         // First stall: warn and reset timer to allow recovery
-                        warn!("Download stall detected for {}, allowing recovery", current_file_name);
+                        warn!(
+                            "Download stall detected for {}, allowing recovery",
+                            current_file_name
+                        );
                         let _ = window_tick.emit(
                             "download_warning",
                             json!({
@@ -203,6 +258,7 @@ pub async fn download_all_files(
         let app_handle_cl = app_handle.clone();
         let window_cl = window.clone();
         let file_info_cl = file_info.clone();
+        let client_cl = http_client.clone();
         join_set.spawn(async move {
             let _permit = permit;
             let policy = RetryPolicy::default();
@@ -216,6 +272,7 @@ pub async fn download_all_files(
                     total_files,
                     index + 1,
                     total_size,
+                    client_cl.clone(),
                 )
                 .await;
 
@@ -321,7 +378,10 @@ pub async fn download_all_files(
                 failed_count - 5
             )
         } else {
-            format!("{} file(s) failed to download: {}", failed_count, error_summary)
+            format!(
+                "{} file(s) failed to download: {}",
+                failed_count, error_summary
+            )
         };
 
         let _ = window.emit(
@@ -374,6 +434,10 @@ pub async fn download_all_files(
                 // Delete wrong file and retry with exponential backoff
                 let _ = tokio::fs::remove_file(&file_path).await;
 
+                // Subtract the failed file's bytes from progress counter
+                // to prevent inflation during redownload
+                sub_downloaded_bytes(file_info.size);
+
                 let max_hash_retries: u8 = 3;
                 let mut hash_attempt: u8 = 0;
                 let mut redownload_success = false;
@@ -392,6 +456,7 @@ pub async fn download_all_files(
                         total_files,
                         0,
                         total_size,
+                        http_client.clone(),
                     )
                     .await;
 
@@ -408,7 +473,10 @@ pub async fn download_all_files(
 
                             match verify_hash {
                                 Ok(new_hash) if new_hash == expected_hash => {
-                                    info!("Successfully redownloaded and verified {}", file_info.path);
+                                    info!(
+                                        "Successfully redownloaded and verified {}",
+                                        file_info.path
+                                    );
                                     redownload_success = true;
                                     break;
                                 }
@@ -417,8 +485,9 @@ pub async fn download_all_files(
                                         "Redownload of {} still has hash mismatch: expected {}, got {}",
                                         file_info.path, expected_hash, new_hash
                                     );
-                                    // Delete and try again
+                                    // Delete and try again, subtract bytes to keep progress accurate
                                     let _ = tokio::fs::remove_file(&file_path).await;
+                                    sub_downloaded_bytes(file_info.size);
                                 }
                                 Err(e) => {
                                     warn!("Failed to verify hash after redownload: {}", e);
@@ -476,22 +545,21 @@ pub async fn download_all_files(
 
 /// Downloads a single file.
 ///
+/// This is an internal function called by `download_all_files`. It is not
+/// exposed as a Tauri command because it requires a shared HTTP client.
+///
 /// # Arguments
-/// * `_app_handle` - The Tauri app handle (unused but required for signature)
-/// * `_window` - The Tauri window (unused but required for signature)
 /// * `file_info` - Information about the file to download
-/// * `_total_files` - Total number of files (unused)
-/// * `_current_file_index` - Current file index (unused)
-/// * `_total_size` - Total download size (unused)
-#[tauri::command]
+/// * `client` - Shared HTTP client for connection pooling
 #[cfg(not(tarpaulin_include))]
-pub async fn update_file(
+async fn update_file(
     _app_handle: tauri::AppHandle,
     _window: tauri::Window,
     file_info: FileInfo,
     _total_files: usize,
     _current_file_index: usize,
     _total_size: u64,
+    client: Arc<Client>,
 ) -> Result<u64, String> {
     // Update the current file name for global progress tracking
     set_current_file_name(file_info.path.clone());
@@ -508,19 +576,17 @@ pub async fn update_file(
             .map_err(|e| e.to_string())?;
     }
 
-    // Don't set total timeout - it aborts large file downloads on slow connections
-    // Only use connect_timeout for initial connection and read_timeout for stalled reads
-    let client = reqwest::Client::builder()
-        .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
-        .read_timeout(Duration::from_secs(STALL_TIMEOUT_SECS))
-        .pool_max_idle_per_host(HTTP_POOL_MAX_IDLE_PER_HOST)
-        .build()
-        .map_err(|e| e.to_string())?;
+    // HTTP client is now passed as parameter and shared across all downloads
+    // This enables connection pooling and prevents connection exhaustion
 
     let mut corrected_url = file_info.url.clone();
     if let Some(pos) = corrected_url.find("/files/") {
         corrected_url = format!("{}{}", &corrected_url[..pos], &corrected_url[(pos + 7)..]);
     }
+
+    // Defense-in-depth: Validate URL domain even though hash.rs also validates
+    // This catches any code paths that bypass hash.rs validation
+    validate_download_url(&corrected_url)?;
 
     let file_size = file_info.size;
     let file_info_path = file_info.path.clone();
@@ -559,13 +625,6 @@ pub async fn update_file(
                 "Range not supported (status {}), resetting for fresh download",
                 range_probe.status()
             );
-            let current_bytes = state_get_downloaded_bytes();
-            if current_bytes < resume_from {
-                warn!(
-                    "Progress counter underflow detected: current {} < subtracting {}",
-                    current_bytes, resume_from
-                );
-            }
             sub_downloaded_bytes(resume_from);
             resume_from = 0;
             drop(file);
@@ -594,20 +653,14 @@ pub async fn update_file(
             if res.content_length() == Some(0) && (file_size - resume_from) > 0 {
                 return Err(format!(
                     "Server returned empty response for resume on {} (expected {} bytes remaining)",
-                    file_info.path, file_size - resume_from
+                    file_info.path,
+                    file_size - resume_from
                 ));
             }
 
             let status = res.status();
             let has_content_range = res.headers().get("content-range").is_some();
             if status != reqwest::StatusCode::PARTIAL_CONTENT && !has_content_range {
-                let current_bytes = state_get_downloaded_bytes();
-                if current_bytes < resume_from {
-                    warn!(
-                        "Progress counter underflow detected: current {} < subtracting {}",
-                        current_bytes, resume_from
-                    );
-                }
                 sub_downloaded_bytes(resume_from);
                 resume_from = 0;
                 drop(file);
@@ -635,13 +688,6 @@ pub async fn update_file(
             }
         }
 
-        let current_bytes = state_get_downloaded_bytes();
-        if current_bytes < resume_from {
-            warn!(
-                "Progress counter underflow detected: current {} < subtracting {}",
-                current_bytes, resume_from
-            );
-        }
         sub_downloaded_bytes(resume_from);
         drop(file);
         tokio::fs::remove_file(&file_path).await.ok();
@@ -701,16 +747,8 @@ pub async fn update_file(
                 std::cmp::min(MAX_PARTS as u64, file_size.div_ceil(PART_SIZE)) as usize,
             );
 
-            // Create shared client for all parts - uses read_timeout instead of total timeout
-            // to avoid aborting large parts on slow connections
-            let part_client = Arc::new(
-                reqwest::Client::builder()
-                    .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
-                    .read_timeout(Duration::from_secs(STALL_TIMEOUT_SECS))
-                    .pool_max_idle_per_host(HTTP_POOL_MAX_IDLE_PER_HOST)
-                    .build()
-                    .map_err(|e| e.to_string())?
-            );
+            // Use the shared client passed from download_all_files for connection pooling
+            let part_client = Arc::clone(&client);
 
             let mut join_set: JoinSet<Result<(), String>> = JoinSet::new();
 
@@ -729,11 +767,11 @@ pub async fn update_file(
                 let part_url = corrected_url.clone();
                 let part_path = file_path.with_extension(format!("part{}", part_idx));
                 let file_info_path_clone = file_info_path.clone();
-                let client = Arc::clone(&part_client);
+                let client_part = Arc::clone(&part_client);
 
                 join_set.spawn(async move {
                     let range_header = format!("bytes={}-{}", start, end);
-                    let res = client
+                    let res = client_part
                         .get(&part_url)
                         .header(RANGE, range_header)
                         .header("Accept-Encoding", "gzip, deflate, br")
@@ -782,14 +820,12 @@ pub async fn update_file(
                 match res {
                     Ok(Ok(())) => {}
                     Ok(Err(e)) => {
-                        // Clean up part files only for non-resumable errors (empty response, etc.)
-                        // For transient network errors, leave parts for potential manual cleanup
-                        // Note: The retry logic will recreate parts anyway, so cleanup is safe
-                        if e.contains("empty response") || e.contains("invalid") {
-                            for cleanup_idx in 0..num_parts {
-                                let part_path = file_path.with_extension(format!("part{}", cleanup_idx));
-                                let _ = tokio::fs::remove_file(&part_path).await;
-                            }
+                        // Clean up part files on any error to prevent disk space accumulation
+                        // The retry logic will recreate parts as needed
+                        for cleanup_idx in 0..num_parts {
+                            let part_path =
+                                file_path.with_extension(format!("part{}", cleanup_idx));
+                            let _ = tokio::fs::remove_file(&part_path).await;
                         }
                         return Err(e);
                     }
@@ -864,13 +900,6 @@ pub async fn update_file(
         );
         error!("{}", error_msg);
         // Subtract the incorrect bytes so progress tracking stays accurate
-        let current_bytes = state_get_downloaded_bytes();
-        if current_bytes < bytes_written {
-            warn!(
-                "Progress counter underflow detected: current {} < subtracting {}",
-                current_bytes, bytes_written
-            );
-        }
         sub_downloaded_bytes(bytes_written);
         // Delete the incomplete file
         if let Err(e) = tokio::fs::remove_file(&file_path).await {
@@ -1121,10 +1150,7 @@ where
                     ErrorClassification::ServerUnreachable => {
                         // Only retry unreachable twice before giving up
                         if attempt >= 2 {
-                            return Err(DownloadError::server_unreachable(
-                                attempt as u8 + 1,
-                                e,
-                            ));
+                            return Err(DownloadError::server_unreachable(attempt as u8 + 1, e));
                         }
                         health.record_retry();
                     }
@@ -1310,7 +1336,10 @@ fn calculate_file_hash<P: AsRef<std::path::Path>>(path: P) -> Result<String, Str
             Err(e) => {
                 attempt += 1;
                 if attempt >= MAX_OPEN_RETRIES {
-                    return Err(format!("Failed to open file after {} attempts: {}", MAX_OPEN_RETRIES, e));
+                    return Err(format!(
+                        "Failed to open file after {} attempts: {}",
+                        MAX_OPEN_RETRIES, e
+                    ));
                 }
                 // Exponential backoff: 100ms, 200ms, 400ms
                 let delay_ms = 100 * (1 << (attempt - 1));
@@ -2268,22 +2297,17 @@ mod tests {
         );
 
         let policy = RetryPolicy::default();
-        let result = download_with_resilience(
-            &mock,
-            url,
-            &file_path,
-            &policy,
-            || false,
-            |_| {},
-        )
-        .await;
+        let result =
+            download_with_resilience(&mock, url, &file_path, &policy, || false, |_| {}).await;
 
         assert!(result.is_ok());
         let download_result = result.unwrap();
         assert_eq!(download_result.bytes_written, content.len() as u64);
 
         // Verify file content
-        let written = tokio::fs::read(&file_path).await.expect("Failed to read file");
+        let written = tokio::fs::read(&file_path)
+            .await
+            .expect("Failed to read file");
         assert_eq!(written, content);
     }
 
@@ -2309,15 +2333,8 @@ mod tests {
         );
 
         let policy = RetryPolicy::default();
-        let result = download_with_resilience(
-            &mock,
-            url,
-            &file_path,
-            &policy,
-            || false,
-            |_| {},
-        )
-        .await;
+        let result =
+            download_with_resilience(&mock, url, &file_path, &policy, || false, |_| {}).await;
 
         assert!(result.is_ok());
     }
@@ -2341,15 +2358,8 @@ mod tests {
         );
 
         let policy = RetryPolicy::default();
-        let result = download_with_resilience(
-            &mock,
-            url,
-            &file_path,
-            &policy,
-            || false,
-            |_| {},
-        )
-        .await;
+        let result =
+            download_with_resilience(&mock, url, &file_path, &policy, || false, |_| {}).await;
 
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -2377,15 +2387,8 @@ mod tests {
             retry_stream_errors: true,
         };
 
-        let result = download_with_resilience(
-            &mock,
-            url,
-            &file_path,
-            &policy,
-            || false,
-            |_| {},
-        )
-        .await;
+        let result =
+            download_with_resilience(&mock, url, &file_path, &policy, || false, |_| {}).await;
 
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -2393,7 +2396,11 @@ mod tests {
         match err {
             DownloadError::ServerUnreachable { attempts, .. } => {
                 // Should fail after 3 attempts (0, 1, 2 - where 2 is the limit)
-                assert!(attempts <= 3, "Expected at most 3 attempts, got {}", attempts);
+                assert!(
+                    attempts <= 3,
+                    "Expected at most 3 attempts, got {}",
+                    attempts
+                );
             }
             _ => panic!("Expected ServerUnreachable error, got: {:?}", err),
         }
@@ -2452,15 +2459,8 @@ mod tests {
             retry_stream_errors: true,
         };
 
-        let result = download_with_resilience(
-            &mock,
-            url,
-            &file_path,
-            &policy,
-            || false,
-            |_| {},
-        )
-        .await;
+        let result =
+            download_with_resilience(&mock, url, &file_path, &policy, || false, |_| {}).await;
 
         // Should fail after max_retries
         assert!(result.is_err());
@@ -2601,18 +2601,22 @@ mod tests {
             classify_error("404 not found"),
             ErrorClassification::Permanent
         );
+        // Note: hash mismatch is now Transient (corruption, should retry)
+        // See test_classify_error_integration_transient for hash mismatch test
+    }
+
+    #[test]
+    fn test_classify_error_integration_hash_mismatch_is_transient() {
+        // Hash mismatch = file corruption during download, should delete and retry
         assert_eq!(
             classify_error("hash mismatch"),
-            ErrorClassification::Permanent
+            ErrorClassification::Transient
         );
     }
 
     #[test]
     fn test_classify_error_integration_cancelled() {
-        assert_eq!(
-            classify_error("cancelled"),
-            ErrorClassification::Cancelled
-        );
+        assert_eq!(classify_error("cancelled"), ErrorClassification::Cancelled);
     }
 
     #[test]

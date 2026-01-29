@@ -180,7 +180,19 @@ const createRouter = (App) => ({
      * Sets up event listeners for hash changes to trigger navigation.
      */
     setupEventListeners() {
-        window.addEventListener('hashchange', () => this.navigate());
+        // Store bound function reference for cleanup
+        this._hashChangeHandler = () => this.navigate();
+        window.addEventListener('hashchange', this._hashChangeHandler);
+    },
+
+    /**
+     * Cleans up event listeners.
+     */
+    cleanupEventListeners() {
+        if (this._hashChangeHandler) {
+            window.removeEventListener('hashchange', this._hashChangeHandler);
+            this._hashChangeHandler = null;
+        }
     }
 
 });

@@ -130,10 +130,15 @@
     text-align: left;
 }
 
-.login-error-msg,
 .login-form,
 .login-form-container {
     display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+}
+
+.login-error-msg {
+    display: none;
     align-items: flex-start;
     justify-content: flex-start;
 }

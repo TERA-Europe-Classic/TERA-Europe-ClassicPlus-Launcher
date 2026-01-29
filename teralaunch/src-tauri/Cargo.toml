@@ -12,7 +12,29 @@ tauri-build = { version = "1", features = [] }
 toml = "0.8"
 
 [dependencies]
-tauri = { version = "1.0", features = ["api-all", "updater", "dialog"] }
+tauri = { version = "1.0", features = [
+    "dialog-all",
+    "fs-create-dir",
+    "fs-exists",
+    "fs-read-dir",
+    "fs-read-file",
+    "fs-remove-file",
+    "fs-write-file",
+    "http-request",
+    "notification-all",
+    "path-all",
+    "process-exit",
+    "process-relaunch",
+    "shell-open",
+    "window-close",
+    "window-hide",
+    "window-maximize",
+    "window-minimize",
+    "window-set-focus",
+    "window-show",
+    "window-unmaximize",
+    "updater"
+] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.47.1", features = ["full"] }
@@ -44,6 +66,7 @@ tracing = "0.1"
 dotenvy = "0.15"
 cookie = "0.16"
 regex = "1.11.1"
+url = "2"
 dirs-next = "2"
 chrono = { version = "0.4", features = ["clock"] }
 faster-hex = "0.9"

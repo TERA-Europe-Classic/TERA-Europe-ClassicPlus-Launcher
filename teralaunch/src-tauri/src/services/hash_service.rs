@@ -10,7 +10,7 @@
 use sha2::{Digest, Sha256};
 use std::io::Read;
 
-use crate::domain::BUFFER_SIZE;
+use crate::domain::HASH_BUFFER_SIZE;
 
 /// Calculates SHA-256 hash from a reader.
 ///
@@ -33,7 +33,7 @@ use crate::domain::BUFFER_SIZE;
 #[cfg(not(tarpaulin_include))]
 pub fn calculate_hash_from_reader<R: Read>(mut reader: R) -> Result<String, String> {
     let mut hasher = Sha256::new();
-    let mut buffer = [0u8; BUFFER_SIZE];
+    let mut buffer = [0u8; HASH_BUFFER_SIZE];
 
     loop {
         let bytes_read = reader

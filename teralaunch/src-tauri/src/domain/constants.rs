@@ -7,6 +7,9 @@
 /// Buffer size for file I/O operations (64 KB)
 pub const BUFFER_SIZE: usize = 65_536;
 
+/// Buffer size for hash calculations (1 MB) - larger for better throughput on game files
+pub const HASH_BUFFER_SIZE: usize = 1024 * 1024;
+
 /// HTTP request timeout for downloads (5 minutes)
 pub const DOWNLOAD_TIMEOUT_SECS: u64 = 300;
 

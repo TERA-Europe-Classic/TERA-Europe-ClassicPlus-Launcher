@@ -18,6 +18,7 @@ use std::time::Duration;
 
 use crate::domain::{CONNECT_TIMEOUT_SECS, DOWNLOAD_TIMEOUT_SECS, HTTP_POOL_MAX_IDLE_PER_HOST};
 use crate::infrastructure::HttpClient;
+use crate::utils::validate_download_url;
 use teralib::config::get_config_value;
 
 /// Checks if the application is running in debug mode.
@@ -49,6 +50,25 @@ fn set_logging_inner(enabled: bool) -> Result<(), String> {
     teralib::enable_file_logging(enabled)
 }
 
+/// Checks if a path string contains shell metacharacters that could be used for injection.
+///
+/// # Arguments
+/// * `path_str` - The path string to validate
+///
+/// # Returns
+/// `true` if the path contains unsafe shell metacharacters, `false` otherwise
+fn is_unsafe_for_shell(path_str: &str) -> bool {
+    // Reject paths containing shell metacharacters that could be exploited
+    path_str.contains('&')
+        || path_str.contains('|')
+        || path_str.contains('>')
+        || path_str.contains('<')
+        || path_str.contains('^')
+        || path_str.contains('`')
+        || path_str.contains('$')
+        || path_str.contains(';')
+}
+
 /// Downloads and installs a launcher update.
 ///
 /// This command downloads the update from the specified URL, saves it to disk,
@@ -60,6 +80,9 @@ fn set_logging_inner(enabled: bool) -> Result<(), String> {
 #[tauri::command]
 #[cfg(not(tarpaulin_include))]
 pub async fn update_launcher(download_url: String) -> Result<(), String> {
+    // Validate URL domain to prevent downloading from arbitrary sources
+    validate_download_url(&download_url)?;
+
     let current_exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let exe_dir = current_exe.parent().ok_or("exe dir not found")?;
     let new_path = exe_dir.join("launcher_update.exe");
@@ -87,6 +110,15 @@ pub async fn update_launcher(download_url: String) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
+
+        // Validate paths don't contain shell metacharacters to prevent injection
+        let new_path_str = new_path.to_string_lossy();
+        let current_exe_str = current_exe.to_string_lossy();
+
+        if is_unsafe_for_shell(&new_path_str) || is_unsafe_for_shell(&current_exe_str) {
+            return Err("Unsafe path detected: paths must not contain shell metacharacters".to_string());
+        }
+
         let cmd = format!(
             "ping 127.0.0.1 -n 2 > NUL && move /Y \"{}\" \"{}\" && start \"\" \"{}\"",
             new_path.display(),
@@ -192,6 +224,81 @@ mod tests {
     use super::*;
     use crate::infrastructure::{HttpResponse, MockHttpClient};
     use tempfile::tempdir;
+
+    // ============================================================================
+    // is_unsafe_for_shell tests
+    // ============================================================================
+
+    #[test]
+    fn is_unsafe_for_shell_rejects_ampersand() {
+        assert!(is_unsafe_for_shell("C:\\path&malicious.exe"));
+    }
+
+    #[test]
+    fn is_unsafe_for_shell_rejects_pipe() {
+        assert!(is_unsafe_for_shell("C:\\path|dir.exe"));
+    }
+
+    #[test]
+    fn is_unsafe_for_shell_rejects_greater_than() {
+        assert!(is_unsafe_for_shell("C:\\path>output.txt"));
+    }
+
+    #[test]
+    fn is_unsafe_for_shell_rejects_less_than() {
+        assert!(is_unsafe_for_shell("C:\\path<input.txt"));
+    }
+
+    #[test]
+    fn is_unsafe_for_shell_rejects_caret() {
+        assert!(is_unsafe_for_shell("C:\\path^escape.exe"));
+    }
+
+    #[test]
+    fn is_unsafe_for_shell_rejects_backtick() {
+        assert!(is_unsafe_for_shell("C:\\path`command`.exe"));
+    }
+
+    #[test]
+    fn is_unsafe_for_shell_rejects_dollar() {
+        assert!(is_unsafe_for_shell("C:\\path$variable.exe"));
+    }
+
+    #[test]
+    fn is_unsafe_for_shell_rejects_semicolon() {
+        assert!(is_unsafe_for_shell("C:\\path;cmd.exe"));
+    }
+
+    #[test]
+    fn is_unsafe_for_shell_accepts_normal_windows_path() {
+        assert!(!is_unsafe_for_shell("C:\\Program Files\\Launcher\\launcher.exe"));
+    }
+
+    #[test]
+    fn is_unsafe_for_shell_accepts_path_with_spaces() {
+        assert!(!is_unsafe_for_shell("C:\\My Documents\\launcher.exe"));
+    }
+
+    #[test]
+    fn is_unsafe_for_shell_accepts_path_with_dash() {
+        assert!(!is_unsafe_for_shell("C:\\launcher-update.exe"));
+    }
+
+    #[test]
+    fn is_unsafe_for_shell_accepts_path_with_underscore() {
+        assert!(!is_unsafe_for_shell("C:\\launcher_update.exe"));
+    }
+
+    #[test]
+    fn is_unsafe_for_shell_accepts_path_with_dots() {
+        assert!(!is_unsafe_for_shell("C:\\path\\to\\launcher.v2.0.exe"));
+    }
+
+    #[test]
+    fn is_unsafe_for_shell_rejects_injection_attempt() {
+        // Classic injection: close quote, add command, reopen quote
+        assert!(is_unsafe_for_shell("C:\\path\\file.exe\" && malicious.exe && \""));
+    }
 
     // ============================================================================
     // is_debug tests

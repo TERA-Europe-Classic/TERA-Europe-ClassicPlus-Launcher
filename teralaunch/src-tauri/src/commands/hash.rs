@@ -21,7 +21,7 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant, SystemTime};
 
 use indicatif::{ProgressBar, ProgressStyle};
-use log::{error, info};
+use log::{error, info, warn};
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use rayon::prelude::*;
 use serde_json::json;
@@ -32,12 +32,12 @@ use walkdir::WalkDir;
 use crate::commands::config::{get_cache_file_path, get_game_path};
 use crate::domain::{
     CachedFileInfo, FileCheckProgress, FileInfo, BUFFER_SIZE, CONNECT_TIMEOUT_SECS,
-    DOWNLOAD_TIMEOUT_SECS, HTTP_POOL_MAX_IDLE_PER_HOST,
+    DOWNLOAD_TIMEOUT_SECS, HASH_BUFFER_SIZE, HTTP_POOL_MAX_IDLE_PER_HOST,
 };
 use crate::infrastructure::{EventEmitter, FileSystem};
 use crate::services::hash_service;
 use crate::state::clear_hash_cache;
-use crate::utils::{is_ignored, resume_offset, validate_path_within_base};
+use crate::utils::{is_ignored, resume_offset, validate_download_url, validate_path_within_base};
 use teralib::config::get_config_value;
 
 /// Clears the hash cache to force recalculation.
@@ -46,10 +46,10 @@ use teralib::config::get_config_value;
 /// the cache file and clears the in-memory cache.
 #[tauri::command]
 #[cfg(not(tarpaulin_include))]
-pub fn clear_cache() -> Result<(), String> {
+pub async fn clear_cache() -> Result<(), String> {
     // Clear the in-memory hash cache to prevent stale entries from old directory
-    let _ = clear_hash_cache(); // Ignore error if lock is held
-                                // Remove the disk cache file
+    clear_hash_cache().await;
+    // Remove the disk cache file
     let cache_path = get_cache_file_path()?;
     if cache_path.exists() {
         remove_file(cache_path).map_err(|e| e.to_string())?;
@@ -104,12 +104,11 @@ pub async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>,
     let cache = Arc::new(RwLock::new(loaded_cache));
 
     let progress_bar = ProgressBar::new(files.len() as u64);
-    progress_bar.set_style(
-        ProgressStyle::default_bar()
-            .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} {msg}")
-            .expect("Invalid progress bar template - this is a bug")
-            .progress_chars("##-"),
-    );
+    let progress_style = ProgressStyle::default_bar()
+        .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} {msg}")
+        .unwrap_or_else(|_| ProgressStyle::default_bar())
+        .progress_chars("##-");
+    progress_bar.set_style(progress_style);
 
     let processed_count = Arc::new(AtomicUsize::new(0));
     let files_to_update_count = Arc::new(AtomicUsize::new(0));
@@ -119,10 +118,41 @@ pub async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>,
         .par_iter()
         .enumerate()
         .filter_map(|(_index, file_info)| {
-            let path = file_info["path"].as_str().unwrap_or("");
-            let server_hash = file_info["hash"].as_str().unwrap_or("");
-            let size = file_info["size"].as_u64().unwrap_or(0);
-            let url = file_info["url"].as_str().unwrap_or("").to_string();
+            // Extract required fields with validation - reject entries with invalid/missing fields
+            let path = match file_info["path"].as_str() {
+                Some(p) if !p.is_empty() => p,
+                _ => {
+                    error!("Hash file entry missing or empty 'path' field: {:?}", file_info);
+                    return None;
+                }
+            };
+            let server_hash = match file_info["hash"].as_str() {
+                Some(h) if !h.is_empty() => h,
+                _ => {
+                    error!("Hash file entry '{}' missing or empty 'hash' field", path);
+                    return None;
+                }
+            };
+            let size = match file_info["size"].as_u64() {
+                Some(s) if s > 0 => s,
+                _ => {
+                    error!("Hash file entry '{}' has invalid or zero 'size' field", path);
+                    return None;
+                }
+            };
+            let url = match file_info["url"].as_str() {
+                Some(u) if !u.is_empty() => u.to_string(),
+                _ => {
+                    error!("Hash file entry '{}' missing or empty 'url' field", path);
+                    return None;
+                }
+            };
+
+            // Validate URL domain to prevent downloading from malicious sources
+            if let Err(e) = validate_download_url(&url) {
+                error!("URL validation failed for '{}': {}", path, e);
+                return None;
+            }
 
             let local_file_path = local_game_path.join(path);
 
@@ -184,18 +214,7 @@ pub async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>,
                 }
             };
 
-            let last_modified = metadata.modified().ok();
-
-            let cache_read = cache.read().unwrap_or_else(|e| e.into_inner());
-            if let Some(cached_info) = cache_read.get(path) {
-                if let Some(lm) = last_modified {
-                    if cached_info.last_modified == lm && cached_info.hash == server_hash {
-                        return None;
-                    }
-                }
-            }
-            drop(cache_read);
-
+            // Check size first - if it doesn't match, no need to check cache or hash
             if metadata.len() != size {
                 files_to_update_count.fetch_add(1, Ordering::SeqCst);
                 total_size.fetch_add(size, Ordering::SeqCst);
@@ -208,6 +227,20 @@ pub async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>,
                 });
             }
 
+            let last_modified = metadata.modified().ok();
+
+            // Check cache to skip expensive hash recalculation when file hasn't changed locally
+            let cache_read = cache.read().unwrap_or_else(|e| e.into_inner());
+            if let Some(cached_info) = cache_read.get(path) {
+                if let Some(lm) = last_modified {
+                    // Only skip hash calculation if BOTH mtime matches AND cached hash equals server hash
+                    if cached_info.last_modified == lm && cached_info.hash == server_hash {
+                        drop(cache_read);
+                        return None;
+                    }
+                }
+            }
+            drop(cache_read);
             let local_hash = match calculate_file_hash(&local_file_path) {
                 Ok(hash) => hash,
                 Err(_) => {
@@ -275,6 +308,7 @@ pub async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>,
     }
 
     let total_time = start_time.elapsed();
+
     info!(
         "File comparison completed. Files to update: {}",
         files_to_update.len()
@@ -454,7 +488,7 @@ pub async fn generate_hash_file(window: tauri::Window) -> Result<String, String>
 // Internal helper functions
 // ============================================================================
 
-/// Fetches the hash file from the server.
+/// Fetches the hash file from the server with retry logic.
 #[cfg(not(tarpaulin_include))]
 async fn get_server_hash_file() -> Result<serde_json::Value, String> {
     let client = reqwest::Client::builder()
@@ -462,15 +496,57 @@ async fn get_server_hash_file() -> Result<serde_json::Value, String> {
         .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
         .pool_max_idle_per_host(HTTP_POOL_MAX_IDLE_PER_HOST)
         .build()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
-    let res = client
-        .get(get_config_value("HASH_FILE_URL"))
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-    Ok(json)
+    let hash_file_url = get_config_value("HASH_FILE_URL");
+
+    let max_retries: u8 = 3;
+    let mut attempt: u8 = 0;
+
+    loop {
+        attempt += 1;
+
+        let result = client.get(&hash_file_url).send().await;
+
+        match result {
+            Ok(res) => {
+                let status = res.status();
+                if status.is_success() {
+                    let json: serde_json::Value = res
+                        .json()
+                        .await
+                        .map_err(|e| format!("Failed to parse hash file as JSON: {}", e))?;
+                    return Ok(json);
+                } else if status == reqwest::StatusCode::NOT_FOUND {
+                    // 404 is permanent - don't retry
+                    return Err(format!("Hash file not found at {}", hash_file_url));
+                } else {
+                    // Server error - may be transient
+                    if attempt < max_retries {
+                        log::warn!(
+                            "Hash file fetch attempt {}/{} failed with status {}, retrying...",
+                            attempt, max_retries, status
+                        );
+                        tokio::time::sleep(Duration::from_millis(500 * 2u64.pow(attempt as u32 - 1))).await;
+                        continue;
+                    }
+                    return Err(format!("Failed to fetch hash file: HTTP {}", status));
+                }
+            }
+            Err(e) => {
+                // Network error - likely transient
+                if attempt < max_retries {
+                    log::warn!(
+                        "Hash file fetch attempt {}/{} failed: {}, retrying...",
+                        attempt, max_retries, e
+                    );
+                    tokio::time::sleep(Duration::from_millis(500 * 2u64.pow(attempt as u32 - 1))).await;
+                    continue;
+                }
+                return Err(format!("Failed to fetch hash file from {}: {}", hash_file_url, e));
+            }
+        }
+    }
 }
 
 /// Calculates the SHA-256 hash of a file using std::fs.
@@ -479,7 +555,7 @@ async fn get_server_hash_file() -> Result<serde_json::Value, String> {
 #[cfg(not(tarpaulin_include))]
 fn calculate_file_hash<P: AsRef<std::path::Path>>(path: P) -> Result<String, String> {
     let file = File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
-    let reader = BufReader::with_capacity(BUFFER_SIZE, file);
+    let reader = BufReader::with_capacity(HASH_BUFFER_SIZE, file);
     hash_service::calculate_hash_from_reader(reader)
 }
 

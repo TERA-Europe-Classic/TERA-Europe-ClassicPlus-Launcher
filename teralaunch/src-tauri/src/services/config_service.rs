@@ -18,6 +18,9 @@ pub const PATH_KEY: &str = "path";
 /// Key name for the game language setting
 pub const LANG_KEY: &str = "lang";
 
+/// Valid language codes for the game
+const VALID_LANGUAGE_CODES: &[&str] = &["GER", "EUR", "FRA", "RUS"];
+
 /// Result of parsing a config file
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GameConfig {
@@ -125,6 +128,9 @@ pub fn update_path_in_config(content: &str, new_path: &Path) -> Result<String, S
 /// * `Ok(String)` - The updated INI content
 /// * `Err(String)` - Error message if update fails
 pub fn update_language_in_config(content: &str, new_lang: &str) -> Result<String, String> {
+    // Validate language code first
+    validate_language_code(new_lang)?;
+
     let mut ini =
         ini::Ini::load_from_str(content).map_err(|e| format!("Failed to parse config: {}", e))?;
 
@@ -177,6 +183,33 @@ pub fn get_legacy_config_paths(current_dir: Option<&Path>, exe_dir: Option<&Path
     }
 
     paths
+}
+
+/// Validates that a language code is in the allowed list
+///
+/// # Arguments
+/// * `lang` - The language code to validate
+///
+/// # Returns
+/// * `Ok(())` - If the language code is valid
+/// * `Err(String)` - Error message with valid codes if invalid
+///
+/// # Examples
+/// ```ignore
+/// validate_language_code("EUR")?;  // OK
+/// validate_language_code("eur")?;  // OK (case-insensitive)
+/// validate_language_code("XXX")?;  // Error
+/// ```
+pub fn validate_language_code(lang: &str) -> Result<(), String> {
+    let lang_upper = lang.to_uppercase();
+    if VALID_LANGUAGE_CODES.contains(&lang_upper.as_str()) {
+        Ok(())
+    } else {
+        Err(format!(
+            "Invalid language code '{}'. Valid codes: {:?}",
+            lang, VALID_LANGUAGE_CODES
+        ))
+    }
 }
 
 /// Validates that a path is a valid game directory.
@@ -493,5 +526,69 @@ mod tests {
         // It's okay if it fails due to empty values, but the structure should be valid
         // or it should at least contain the section marker
         assert!(DEFAULT_CONFIG_CONTENT.contains("[game]") || result.is_ok());
+    }
+
+    // ========================================================================
+    // Tests for validate_language_code
+    // ========================================================================
+
+    #[test]
+    fn validate_language_code_valid_uppercase() {
+        assert!(validate_language_code("GER").is_ok());
+        assert!(validate_language_code("EUR").is_ok());
+        assert!(validate_language_code("FRA").is_ok());
+        assert!(validate_language_code("RUS").is_ok());
+    }
+
+    #[test]
+    fn validate_language_code_valid_lowercase() {
+        // Should be case-insensitive
+        assert!(validate_language_code("ger").is_ok());
+        assert!(validate_language_code("eur").is_ok());
+        assert!(validate_language_code("fra").is_ok());
+        assert!(validate_language_code("rus").is_ok());
+    }
+
+    #[test]
+    fn validate_language_code_valid_mixed_case() {
+        assert!(validate_language_code("GeR").is_ok());
+        assert!(validate_language_code("eUr").is_ok());
+    }
+
+    #[test]
+    fn validate_language_code_invalid() {
+        let result = validate_language_code("XXX");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid language code"));
+        assert!(result.clone().unwrap_err().contains("XXX"));
+    }
+
+    #[test]
+    fn validate_language_code_empty() {
+        let result = validate_language_code("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn validate_language_code_invalid_partial_match() {
+        // Should not accept partial matches
+        let result = validate_language_code("EU");
+        assert!(result.is_err());
+        let result = validate_language_code("EUROPE");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn update_language_in_config_validates_code() {
+        let content = "[game]\npath=C:/Games/TERA\nlang=EUR\n";
+
+        // Valid language should work
+        let result = update_language_in_config(content, "GER");
+        assert!(result.is_ok());
+
+        // Invalid language should fail
+        let result = update_language_in_config(content, "XXX");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid language code"));
     }
 }
