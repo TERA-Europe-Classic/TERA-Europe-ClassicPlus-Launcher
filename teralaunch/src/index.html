@@ -3,37 +3,684 @@
 
 <head>
     <meta charset="UTF-8" />
-
-    <link rel="stylesheet" href="./login.css" />
-    <link rel="stylesheet" href="./index.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tauri App</title>
+    <title>TERA Europe Launcher</title>
 
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Raleway:wght@500;600;700&display=swap" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Swiper/8.4.5/swiper-bundle.min.css">
     <link rel="stylesheet" href="./modern.css" />
+
     <style>
-        #app {
-            position: relative;
-            height: 759px;
+        /* ============================================
+           SHADCN DESIGN SYSTEM - CSS VARIABLES
+           ============================================ */
+        :root {
+            --background: #171c28;
+            --foreground: #f0f2f5;
+            --primary: #5ab4e8;
+            --muted-foreground: #8b92a0;
+            --border: #3a4050;
+            --accent: #333a4a;
+            --destructive: #dc2626;
         }
 
-        .page {
-            position: absolute;
-            width: 100%;
-            opacity: 0;
+        /* ============================================
+           GLOBAL RESET & BASE STYLES
+           ============================================ */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
+
         body, html {
             margin: 0;
             padding: 0;
             height: 100%;
             overflow: hidden;
-            background: linear-gradient(135deg, #0f1b2c, #15294b);
-            color: #f0f0f0;
-            font-family: "Inter", sans-serif;
+            background: var(--background);
+            color: var(--foreground);
+            font-family: "Inter", system-ui, sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
         }
+
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        button {
+            font-family: inherit;
+            cursor: pointer;
+            border: none;
+            background: none;
+        }
+
+        input {
+            font-family: inherit;
+            border: none;
+            outline: none;
+        }
+
+        /* ============================================
+           MAIN LAYOUT
+           ============================================ */
+        .mainpage {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-image: url(./assets/login@3x.png);
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+
+        #app {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .page {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+        }
+
+        /* ============================================
+           HEADER - SHADCN DESIGN
+           ============================================ */
+        .header {
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            background: rgba(23, 28, 40, 0.5);
+            backdrop-filter: blur(4px);
+            border-bottom: 1px solid rgba(58, 64, 80, 0.1);
+            z-index: 1000;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .logo {
+            height: 20px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        /* Navigation Links */
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .nav-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            height: 32px;
+            padding: 0 12px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--muted-foreground);
+            border-radius: 6px;
+            transition: color 0.15s ease, background-color 0.15s ease;
+            -webkit-app-region: no-drag;
+        }
+
+        .nav-btn:hover {
+            color: var(--foreground);
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .nav-btn svg {
+            width: 14px;
+            height: 14px;
+            flex-shrink: 0;
+        }
+
+        /* Header Right Section */
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* Region Selector */
+        .region-select {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            -webkit-app-region: no-drag;
+        }
+
+        .region-label {
+            font-size: 12px;
+            color: var(--muted-foreground);
+        }
+
+        .region-btn {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            height: 28px;
+            padding: 0 8px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--foreground);
+            background: rgba(23, 28, 40, 0.5);
+            border: 1px solid rgba(58, 64, 80, 0.3);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: border-color 0.15s ease;
+        }
+
+        .region-btn:hover {
+            border-color: rgba(58, 64, 80, 0.5);
+        }
+
+        .region-btn svg {
+            width: 12px;
+            height: 12px;
+            opacity: 0.6;
+        }
+
+        /* Hidden native select for functionality */
+        #language-selector {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+            width: 0;
+            height: 0;
+        }
+
+        /* Region Dropdown */
+        .region-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 4px;
+            min-width: 120px;
+            background: var(--background);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 1001;
+            overflow: hidden;
+        }
+
+        .region-dropdown.open {
+            display: block;
+        }
+
+        .region-option {
+            display: block;
+            width: 100%;
+            padding: 8px 12px;
+            font-size: 12px;
+            color: var(--foreground);
+            text-align: left;
+            background: none;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+
+        .region-option:hover {
+            background-color: var(--accent);
+        }
+
+        .region-option.active {
+            color: var(--primary);
+        }
+
+        /* Wrapper for region select positioning */
+        .region-select-wrapper {
+            position: relative;
+        }
+
+        /* Settings Dropdown - Always visible */
+        .settings-dropdown {
+            position: relative;
+            display: block;
+            -webkit-app-region: no-drag;
+        }
+
+        .settings-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            height: 28px;
+            padding: 0 12px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--muted-foreground);
+            background: rgba(23, 28, 40, 0.5);
+            border: 1px solid rgba(58, 64, 80, 0.3);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: color 0.15s ease, border-color 0.15s ease;
+        }
+
+        .settings-btn:hover {
+            color: var(--foreground);
+            border-color: rgba(58, 64, 80, 0.5);
+        }
+
+        .settings-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        /* Settings Dropdown Menu */
+        #settings-dropdown-wrapper {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 4px;
+            min-width: 180px;
+            background: var(--background);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 1001;
+            overflow: hidden;
+        }
+
+        #settings-dropdown-wrapper.active {
+            display: block;
+        }
+
+        .dropdown-panel {
+            padding: 4px 0;
+        }
+
+        .user-menu {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .menu-item {
+            display: block;
+            padding: 8px 12px;
+            font-size: 12px;
+            color: var(--foreground);
+            text-decoration: none;
+            transition: background-color 0.15s ease;
+        }
+
+        .menu-item:hover {
+            background-color: var(--accent);
+        }
+
+        /* Logout link - hidden by default until logged in */
+        #logout-link {
+            display: none;
+        }
+
+        /* Divider */
+        .divider {
+            width: 1px;
+            height: 20px;
+            background-color: var(--border);
+            margin: 0 4px;
+        }
+
+        /* Login Form in Header */
+        .login-form-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            -webkit-app-region: no-drag;
+        }
+
+        /* Login Error Message */
+        .login-error-header {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: rgba(220, 38, 38, 0.9);
+            color: white;
+            font-size: 12px;
+            border-radius: 6px;
+            white-space: nowrap;
+            display: none;
+            z-index: 1000;
+            animation: shake 0.3s ease-in-out;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        .login-form-wrapper {
+            position: relative;
+        }
+
+        .login-input {
+            width: 96px;
+            height: 28px;
+            padding: 0 8px;
+            font-size: 12px;
+            color: var(--foreground);
+            background: rgba(23, 28, 40, 0.5);
+            border: 1px solid rgba(58, 64, 80, 0.3);
+            border-radius: 6px;
+            transition: border-color 0.15s ease;
+        }
+
+        .login-input::placeholder {
+            color: var(--muted-foreground);
+        }
+
+        .login-input:focus {
+            border-color: rgba(90, 180, 232, 0.5);
+        }
+
+        .login-btn {
+            height: 28px;
+            padding: 0 12px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--background);
+            background: var(--primary);
+            border-radius: 6px;
+            transition: opacity 0.15s ease;
+        }
+
+        .login-btn:hover {
+            opacity: 0.9;
+        }
+
+        .register-btn {
+            height: 28px;
+            padding: 0 12px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--foreground);
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            transition: background-color 0.15s ease, border-color 0.15s ease;
+        }
+
+        .register-btn:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+            border-color: rgba(58, 64, 80, 0.5);
+        }
+
+        /* User Display (when logged in) */
+        .user-display {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            -webkit-app-region: no-drag;
+        }
+
+        .user-display.visible {
+            display: flex;
+        }
+
+        .user-name {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--foreground);
+        }
+
+        /* Window Controls */
+        .window-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-left: 8px;
+            -webkit-app-region: no-drag;
+        }
+
+        .control-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            padding: 6px;
+            color: var(--muted-foreground);
+            border-radius: 6px;
+            transition: color 0.15s ease, background-color 0.15s ease;
+        }
+
+        .control-btn:hover {
+            color: var(--foreground);
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .control-btn.close:hover {
+            color: #fff;
+            background-color: rgba(220, 38, 38, 0.8);
+        }
+
+        .control-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        /* ============================================
+           GENERATE HASH FILE BUTTON (Admin)
+           ============================================ */
+        #generate-hash-file {
+            display: none;
+            height: 28px;
+            padding: 0 12px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--foreground);
+            background: rgba(23, 28, 40, 0.5);
+            border: 1px solid rgba(58, 64, 80, 0.3);
+            border-radius: 6px;
+            cursor: pointer;
+            -webkit-app-region: no-drag;
+        }
+
+        /* ============================================
+           LAUNCHER VERSION
+           ============================================ */
+        .launcher-version {
+            position: fixed;
+            bottom: 8px;
+            right: 12px;
+            color: var(--muted-foreground);
+            font-size: 10px;
+            z-index: 5;
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        /* ============================================
+           LOADING MODAL
+           ============================================ */
+        .loading-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            display: flex !important;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .loading-modal.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .loading-content {
+            background-color: var(--background);
+            border: 1px solid var(--border);
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            color: var(--foreground);
+            transform: scale(0.8);
+            opacity: 0;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+
+        .loading-modal.show .loading-content {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        .loading-spinner {
+            border: 3px solid rgba(58, 64, 80, 0.3);
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 16px;
+            margin-bottom: 15px;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .loading-modal.show .loading-text {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .loading-error {
+            color: var(--destructive);
+        }
+
+        .loading-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .action-button {
+            background-color: var(--primary);
+            color: var(--background);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: opacity 0.2s ease;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        .loading-modal.show .action-button {
+            opacity: 1;
+            transform: translateY(0);
+            transition-delay: 0.2s;
+        }
+
+        .action-button:hover {
+            opacity: 0.9;
+        }
+
+        /* ============================================
+           HASH FILE PROGRESS MODAL
+           ============================================ */
+        .hash-progress-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+        }
+
+        .hash-progress-modal-content {
+            background-color: var(--background);
+            border: 1px solid var(--border);
+            color: var(--foreground);
+            margin: 15% auto;
+            padding: 30px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+        }
+
+        .hash-progress-modal-content h2 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+
+        .hash-progress-bar-container {
+            width: 100%;
+            background-color: rgba(58, 64, 80, 0.3);
+            padding: 3px;
+            border-radius: 6px;
+            margin-top: 20px;
+        }
+
+        .hash-progress-bar {
+            display: block;
+            height: 20px;
+            background: linear-gradient(90deg, var(--primary), #2ecc71);
+            border-radius: 4px;
+            transition: width 0.4s ease;
+            text-align: center;
+            color: var(--background);
+            line-height: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        #hash-file-current-file,
+        #hash-file-progress-text {
+            margin-top: 15px;
+            font-size: 14px;
+            color: var(--muted-foreground);
+        }
+
+        /* ============================================
+           IFRAME CONTAINER
+           ============================================ */
         #iframeContainer {
             position: absolute;
             top: 0;
@@ -43,6 +690,7 @@
             display: none;
             opacity: 0;
             transition: opacity 0.5s ease, visibility 0.5s ease;
+            z-index: 500;
         }
 
         #iframeContainer.show {
@@ -55,7 +703,7 @@
             opacity: 0;
         }
 
-        iframe {
+        #iframeContainer iframe {
             width: 100%;
             height: 100%;
             border: none;
@@ -63,96 +711,305 @@
 
         #exitButton {
             position: fixed;
-            border-radius: 1px;
-            top: 15px;
-            right: 10px;
-            height: 45px;
-            width: 140px;
-            padding: 5px 10px;
-            background-color: #33B5E5;
-            color: #fff;
+            top: 60px;
+            right: 20px;
+            height: 36px;
+            padding: 0 16px;
+            background-color: var(--primary);
+            color: var(--background);
             border: none;
+            border-radius: 6px;
             cursor: pointer;
-            z-index: 1;
+            font-size: 12px;
+            font-weight: 500;
+            z-index: 501;
+            transition: opacity 0.2s ease;
+        }
+
+        #exitButton:hover {
+            opacity: 0.9;
+        }
+
+        /* ============================================
+           NOTIFICATION STYLES
+           ============================================ */
+        .custom-notification {
+            position: fixed;
+            top: 60px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            color: #fff;
+            z-index: 1004;
+            font-size: 14px;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .custom-notification.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .custom-notification.success {
+            background-color: rgba(34, 197, 94, 0.9);
+        }
+
+        .custom-notification.error {
+            background-color: rgba(220, 38, 38, 0.9);
         }
     </style>
 </head>
+
 <body>
     <div class="mainpage">
-        <header class="header1" data-tauri-drag-region>
-            <img class="logo-top-left" loading="lazy" alt="" src="./assets/icon.png" />
-            <div class="region-select1" style="-webkit-app-region: no-drag;">
-                <a class="region1">Region:</a>
-                <div class="select-wrapper">
-                    <select id="language-selector">
-                        <option value="GER">GERMAN</option>
-                        <option value="EUR">ENGLISH</option>
-                        <option value="FRA">FRENCH</option>
-                        <option value="RUS">RUSSIAN</option>
-                    </select>
-                    <div class="select-styled">ENGLISH</div>
-                    <ul class="select-options">
-                        <li rel="GER">GERMAN</li>
-                        <li rel="EUR">ENGLISH</li>
-                        <li rel="FRA">FRENCH</li>
-                        <li rel="RUS">RUSSIAN</li>
-                    </ul>
-                </div>
-                <div style="padding-left:4px;" data-translate="GAME_STATUS">Game Status:</div>
-                <div id="game-status" data-translate="GAME_STATUS_NOT_RUNNING" style="font-weight:700;"></div>
-                <button id="generate-hash-file" class="top-button" data-translate="GENERATE_HASH_FILE"
-                        style="display: none;">
-                    Generate Hash File
-                </button>
+        <header class="header" data-tauri-drag-region>
+            <!-- Left: Logo + Nav -->
+            <div class="header-left" style="-webkit-app-region: no-drag;">
+                <img class="logo" src="./assets/ces-logo.webp" alt="CES" />
+                <nav class="nav-links">
+                    <a href="https://discord.gg/teraeurope" target="_blank" class="nav-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20.317 4.369a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.009c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+                        </svg>
+                        <span data-translate="DISCORD">Discord</span>
+                    </a>
+                    <a href="https://forum.crazy-esports.com/startpage-en/" target="_blank" class="nav-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        <span data-translate="FORUM">Forum</span>
+                    </a>
+                    <a href="https://forum.crazy-esports.com/support/" target="_blank" class="nav-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                            <line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                        <span data-translate="SUPPORT">Support</span>
+                    </a>
+                    <a href="https://tera-europe-classic.com/" target="_blank" class="nav-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="2" y1="12" x2="22" y2="12"/>
+                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                        </svg>
+                        <span data-translate="WEBSITE">Website</span>
+                    </a>
+                </nav>
             </div>
-            <div class="app-btn">
-                <div class="app-btn-content">
-                    <div class="btn-minimize1" id="app-minimize" style="-webkit-app-region: no-drag;">
-                        <img class="minimize-icon1" loading="lazy" alt="" src="./assets/minimize.svg" />
+
+            <!-- Right: Region, Settings, Login, Window Controls -->
+            <div class="header-right" style="-webkit-app-region: no-drag;">
+                <!-- Region Selector -->
+                <div class="region-select">
+                    <span class="region-label" data-translate="REGION">Region:</span>
+                    <div class="region-select-wrapper">
+                        <button class="region-btn" id="region-btn-display">
+                            <span id="region-current">ENGLISH</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                        </button>
+                        <select id="language-selector">
+                            <option value="GER">GERMAN</option>
+                            <option value="EUR">ENGLISH</option>
+                            <option value="FRA">FRENCH</option>
+                            <option value="RUS">RUSSIAN</option>
+                        </select>
+                        <div class="region-dropdown" id="region-dropdown">
+                            <button class="region-option" data-lang="GER">GERMAN</button>
+                            <button class="region-option active" data-lang="EUR">ENGLISH</button>
+                            <button class="region-option" data-lang="FRA">FRENCH</button>
+                            <button class="region-option" data-lang="RUS">RUSSIAN</button>
+                        </div>
                     </div>
-                    <div class="btn-close1" id="app-close" style="-webkit-app-region: no-drag;">
-                        <img class="close-icon1" loading="lazy" alt="" src="./assets/close.svg" />
+                </div>
+
+                <!-- Admin: Generate Hash File (hidden by default) -->
+                <button id="generate-hash-file" data-translate="GENERATE_HASH_FILE">Generate Hash File</button>
+
+                <!-- Settings Dropdown (visible when logged in) -->
+                <div class="settings-dropdown" id="settings-dropdown">
+                    <button class="settings-btn" id="settings-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                        </svg>
+                        <span data-translate="SETTINGS">Settings</span>
+                    </button>
+                    <div id="settings-dropdown-wrapper">
+                        <div class="dropdown-panel">
+                            <nav class="user-menu">
+                                <a href="#" class="menu-item" id="check-launcher-update" data-translate="CHECK_LAUNCHER_UPDATE">Check Launcher Update</a>
+                                <a href="#" class="menu-item" id="check-game-files" data-translate="CHECK_REPAIR_FILES">Check & Repair Files</a>
+                                <a href="#" class="menu-item" id="openModal" data-translate="GAME_DIRECTORY">Game Directory</a>
+                                <a href="#" class="menu-item" id="logout-link" data-translate="LOGOUT">Logout</a>
+                            </nav>
+                        </div>
                     </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <!-- Login Form (visible when not logged in) -->
+                <div class="login-form-wrapper">
+                    <form class="login-form-header" id="login-form-header">
+                        <input type="text" placeholder="Username" class="login-input" id="header-username" data-translate-placeholder="USERNAME" />
+                        <input type="password" placeholder="Password" class="login-input" id="header-password" data-translate-placeholder="PASSWORD" />
+                        <button type="submit" class="login-btn" id="header-login-btn" data-translate="LOGIN">Login</button>
+                        <a href="https://tera-europe-classic.de/register.php?lang=de" target="_blank">
+                            <button type="button" class="register-btn" data-translate="REGISTER">Register</button>
+                        </a>
+                    </form>
+                    <div class="login-error-header" id="header-login-error"></div>
+                </div>
+
+                <!-- User Display (visible when logged in) -->
+                <div class="user-display" id="user-display">
+                    <span class="user-name" id="display-username"></span>
+                </div>
+
+                <!-- Window Controls -->
+                <div class="window-controls">
+                    <button class="control-btn minimize" id="app-minimize">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                    </button>
+                    <button class="control-btn close" id="app-close">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                    </button>
                 </div>
             </div>
         </header>
-        <div class="top-button-frame">
-            <button id="discord-button" class="top-button" style="-webkit-app-region: no-drag;" data-translate="DISCORD">Discord</button>
-            <button id="start-button" class="top-button" style="-webkit-app-region: no-drag;" data-translate="FORUM">Forum</button>
-            <button id="support-button" class="top-button" style="-webkit-app-region: no-drag;" data-translate="SUPPORT">Support</button>
-            <div class="settings-container">
-                <button id="settings-button" class="top-button" style="-webkit-app-region: no-drag;" data-translate="SETTINGS">Einstellungen</button>
-                <div id="settings-dropdown-wrapper" class="settings-dropdown-wrapper">
-                    <div class="dropdown-panel">
-                        <nav class="user-menu">
-                            <!-- <a href="https://www.tera-germany.com/profile" target="_blank" class="menu-item">Profil</a> -->
-                            <!-- <a href="https://forum.crazy-esports.com/jcoins-shop/" target="_blank" class="menu-item">Shop</a> -->
-                            <!-- <a href="https://tera-germany.com/community/twitch" target="_blank" class="menu-item">TwitchDrops</a> -->
-                            <!-- <a href="https://tera-germany.com/community/discord" target="_blank" class="menu-item">Discord Boost</a> -->
-                            <a href="#" class="menu-item" id="check-launcher-update" data-translate="CHECK_LAUNCHER_UPDATE">Check Launcher Update</a>
-                            <a href="#" class="menu-item" id="check-game-files" data-translate="CHECK_REPAIR_FILES">Datein prüfen und Reparieren</a>
-                            <a href="#" class="menu-item" id="openModal" data-translate="GAME_DIRECTORY">Spielverzeichniss</a>
-                            <a href="#" class="menu-item" id="logout-link" data-translate="LOGOUT">Logout</a>
-                            <!-- <a href="#" class="menu-item" id="toggle-logs" data-translate="LOGS">Logs</a> -->
-                        </nav>
-                    </div>
-                </div>
-            </div>
-            <a id="privacy-link" class="privacy-link" href="https://forum.crazy-esports.com/index.php?datenschutzerklaerung/" target="_blank" data-translate="PRIVACY_POLICY">Privacy Policy</a>
-        </div>
-        <span id="launcher-version" class="launcher-version"></span>
+
         <div id="app"></div>
     </div>
 
+    <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.4/gsap.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
-
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Swiper/8.4.5/swiper-bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/particles.js/2.0.0/particles.min.js"></script>
     <script src="router.js"></script>
     <script type="module" src="/app.js"></script>
 
+    <!-- Header Behavior Script -->
+    <script>
+        (function() {
+            // ========== REGION DROPDOWN ==========
+            const regionBtn = document.getElementById('region-btn-display');
+            const regionDropdown = document.getElementById('region-dropdown');
+            const regionCurrent = document.getElementById('region-current');
+            const languageSelector = document.getElementById('language-selector');
+            const regionOptions = document.querySelectorAll('.region-option');
 
+            // Toggle dropdown
+            regionBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                regionDropdown.classList.toggle('open');
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', function() {
+                regionDropdown.classList.remove('open');
+            });
+
+            // Handle option selection
+            regionOptions.forEach(function(option) {
+                option.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const lang = this.dataset.lang;
+
+                    // Update visual display
+                    regionOptions.forEach(function(opt) { opt.classList.remove('active'); });
+                    this.classList.add('active');
+                    regionCurrent.textContent = this.textContent;
+
+                    // Update hidden select and trigger change
+                    languageSelector.value = lang;
+                    languageSelector.dispatchEvent(new Event('change', { bubbles: true }));
+
+                    // Close dropdown
+                    regionDropdown.classList.remove('open');
+                });
+            });
+
+            // Sync with language selector changes from app.js
+            languageSelector.addEventListener('change', function() {
+                const lang = this.value;
+                regionOptions.forEach(function(opt) {
+                    if (opt.dataset.lang === lang) {
+                        opt.classList.add('active');
+                        regionCurrent.textContent = opt.textContent;
+                    } else {
+                        opt.classList.remove('active');
+                    }
+                });
+            });
+
+            // ========== HEADER LOGIN FORM ==========
+            const loginFormHeader = document.getElementById('login-form-header');
+            if (loginFormHeader) {
+                loginFormHeader.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    const username = document.getElementById('header-username').value;
+                    const password = document.getElementById('header-password').value;
+                    if (username && password && window.App && App.login) {
+                        await App.login(username, password);
+                    }
+                });
+            }
+
+            // ========== HEADER AUTH STATE ==========
+            // Global function to update header based on login state
+            window.updateIndexHeaderAuthState = function(isLoggedIn, username) {
+                const loginForm = document.getElementById('login-form-header');
+                const userDisplay = document.getElementById('user-display');
+                const logoutLink = document.getElementById('logout-link');
+
+                if (isLoggedIn) {
+                    if (loginForm) loginForm.style.display = 'none';
+                    if (userDisplay) {
+                        userDisplay.classList.add('visible');
+                        const displayUsername = document.getElementById('display-username');
+                        if (displayUsername) displayUsername.textContent = username || 'User';
+                    }
+                    // Show logout option in settings menu
+                    if (logoutLink) logoutLink.style.display = 'block';
+                } else {
+                    if (loginForm) loginForm.style.display = 'flex';
+                    if (userDisplay) userDisplay.classList.remove('visible');
+                    // Hide logout option when logged out
+                    if (logoutLink) logoutLink.style.display = 'none';
+                }
+                // Settings dropdown is always visible (even when logged out)
+            };
+
+            // ========== SETTINGS DROPDOWN TOGGLE ==========
+            const settingsBtn = document.getElementById('settings-button');
+            const settingsWrapper = document.getElementById('settings-dropdown-wrapper');
+
+            if (settingsBtn && settingsWrapper) {
+                settingsBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    settingsWrapper.classList.toggle('active');
+                });
+
+                // Close when clicking outside
+                document.addEventListener('click', function() {
+                    settingsWrapper.classList.remove('active');
+                });
+            }
+        })();
+    </script>
+
+    <!-- Loading Modal -->
     <div id="loading-modal" class="loading-modal">
         <div class="loading-content">
             <div class="loading-spinner"></div>
@@ -165,6 +1022,7 @@
         </div>
     </div>
 
+    <!-- Hash File Progress Modal -->
     <div id="hash-file-progress-modal" class="hash-progress-modal">
         <div class="hash-progress-modal-content">
             <h2 data-translate="GENERATING_HASH_FILE">Generating Hash File</h2>
@@ -175,15 +1033,24 @@
             <p id="hash-file-progress-text"></p>
         </div>
     </div>
+
+    <!-- Iframe Container -->
+    <div id="iframeContainer">
+        <iframe id="embeddedSite"></iframe>
+        <button id="exitButton" onclick="closeIframe()" data-translate="RETURN_BUTTON">RETURN</button>
+    </div>
+
+    <!-- Iframe Functions -->
     <script>
         function closeIframe() {
             document.getElementById('iframeContainer').classList.remove('show');
             document.getElementById('iframeContainer').classList.add('hide');
-            setTimeout(function () {
+            setTimeout(function() {
                 document.getElementById('iframeContainer').style.display = 'none';
                 document.getElementById('embeddedSite').src = '';
             }, 500);
         }
+
         function showIframe(thisurl) {
             document.getElementById('embeddedSite').src = thisurl;
             document.getElementById('iframeContainer').style.display = 'block';
@@ -195,18 +1062,14 @@
             try {
                 const response = await fetch(url);
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    throw new Error('HTTP error! status: ' + response.status);
                 }
                 return await response.json();
             } catch (error) {
                 console.error('There was a problem with the News fetch operation:', error);
-                return null;
             }
         }
     </script>
-    <div id="iframeContainer">
-        <iframe id="embeddedSite"></iframe>
-        <button id="exitButton" onclick="closeIframe()" data-translate="RETURN_BUTTON">RETURN</button>
-    </div>
 </body>
-</html >
+
+</html>

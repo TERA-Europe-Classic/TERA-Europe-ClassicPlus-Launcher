@@ -182,6 +182,148 @@ pub async fn write_update_file(data: &[u8], output_path: &Path) -> Result<(), St
         .map_err(|e| format!("Failed to write update file: {}", e))
 }
 
+/// Fetches the current player count from the game server API.
+///
+/// This bypasses CORS restrictions by making the request from the backend.
+///
+/// # Returns
+/// JSON string containing player count data
+#[tauri::command]
+#[cfg(not(tarpaulin_include))]
+pub async fn fetch_player_count() -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .connect_timeout(Duration::from_secs(5))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let response = client
+        .get("https://tera-europe-classic.com/api/player-count?server=classic")
+        .header("Accept", "application/json")
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch player count: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Server returned status: {}", response.status()));
+    }
+
+    response
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read response: {}", e))
+}
+
+/// Fetches the news RSS feed and returns parsed items.
+///
+/// This bypasses CORS restrictions by making the request from the backend.
+///
+/// # Returns
+/// JSON array of news items with title, link, and pubDate
+#[tauri::command]
+#[cfg(not(tarpaulin_include))]
+pub async fn fetch_news_feed() -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .connect_timeout(Duration::from_secs(5))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let response = client
+        .get("https://forum.crazy-esports.com/forum/thread-list-rss-feed/43/")
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch news feed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Server returned status: {}", response.status()));
+    }
+
+    let xml_text = response
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read response: {}", e))?;
+
+    // Parse RSS XML and extract items
+    parse_rss_to_json(&xml_text)
+}
+
+/// Parses RSS XML and returns a JSON array of news items.
+fn parse_rss_to_json(xml: &str) -> Result<String, String> {
+    use std::io::BufRead;
+
+    let mut items: Vec<serde_json::Value> = Vec::new();
+    let cursor = std::io::Cursor::new(xml);
+
+    let mut current_item: Option<serde_json::Map<String, serde_json::Value>> = None;
+    let mut current_tag = String::new();
+    let mut in_item = false;
+
+    for line in cursor.lines() {
+        let line = line.map_err(|e| e.to_string())?;
+        let trimmed = line.trim();
+
+        if trimmed.starts_with("<item>") || trimmed.starts_with("<item ") {
+            in_item = true;
+            current_item = Some(serde_json::Map::new());
+        } else if trimmed == "</item>" {
+            in_item = false;
+            if let Some(item) = current_item.take() {
+                items.push(serde_json::Value::Object(item));
+                if items.len() >= 5 {
+                    break; // Only need first 5 items
+                }
+            }
+        } else if in_item {
+            // Extract tag content
+            if let Some(item) = current_item.as_mut() {
+                if trimmed.starts_with("<title>") {
+                    if let Some(content) = extract_tag_content(trimmed, "title") {
+                        item.insert("title".to_string(), serde_json::Value::String(content));
+                    }
+                } else if trimmed.starts_with("<link>") {
+                    if let Some(content) = extract_tag_content(trimmed, "link") {
+                        item.insert("link".to_string(), serde_json::Value::String(content));
+                    }
+                } else if trimmed.starts_with("<pubDate>") {
+                    if let Some(content) = extract_tag_content(trimmed, "pubDate") {
+                        item.insert("pubDate".to_string(), serde_json::Value::String(content));
+                    }
+                } else if trimmed.starts_with("<dc:creator>") {
+                    if let Some(content) = extract_tag_content(trimmed, "dc:creator") {
+                        item.insert("author".to_string(), serde_json::Value::String(content));
+                    }
+                }
+            }
+        }
+    }
+
+    serde_json::to_string(&items).map_err(|e| e.to_string())
+}
+
+/// Extracts content from a simple XML tag.
+fn extract_tag_content(line: &str, tag: &str) -> Option<String> {
+    let start_tag = format!("<{}>", tag);
+    let end_tag = format!("</{}>", tag);
+
+    if let Some(start) = line.find(&start_tag) {
+        let content_start = start + start_tag.len();
+        if let Some(end) = line.find(&end_tag) {
+            let content = &line[content_start..end];
+            // Decode basic XML entities
+            return Some(
+                content
+                    .replace("&lt;", "<")
+                    .replace("&gt;", ">")
+                    .replace("&amp;", "&")
+                    .replace("&quot;", "\"")
+                    .replace("&#39;", "'"),
+            );
+        }
+    }
+    None
+}
+
 /// Checks if the file server is reachable.
 ///
 /// Makes a simple GET request to the file server and returns whether

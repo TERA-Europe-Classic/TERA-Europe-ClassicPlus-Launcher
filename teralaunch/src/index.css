@@ -230,7 +230,8 @@ table {
     color: #6c7389;
     font-size: 10px;
     font-family: "Inter", sans-serif;
-    z-index: 100;
+    z-index: 5; /* Behind launch button */
+    pointer-events: none;
 }
 
 .top-button:hover {
@@ -658,7 +659,10 @@ table {
     pointer-events: auto;
 }
 
-.home-content,
+.home-content {
+    display: none !important; /* Hidden - new logo in hero-section */
+}
+
 .home-wrapper {
     margin-left: 50px;
     display: flex;
@@ -667,17 +671,9 @@ table {
     max-width: 100%;
 }
 
+/* Old grid layout - hidden, replaced with new hero section */
 .home-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    grid-template-rows: 0.22fr 0.28fr 0.3fr;
-    grid-column-gap: 15px;
-    grid-row-gap: 17px;
-    position: fixed;
-    top: 11.5%;
-    bottom: -10%;
-    left: 0;
-    right: 0;
+    display: none !important;
     max-width: 96.5%;
     max-height: 91%;
     margin: 0 auto;
@@ -1042,8 +1038,9 @@ span#current-file {
     flex-wrap: nowrap;
     align-items: center;
     justify-content: flex-end;
-    gap: 11.3px;
+    gap: 20px;
     max-width: 100%;
+    padding-left: 20px;
 }
 
 .dl-speed-number,
@@ -1168,9 +1165,10 @@ span#current-file {
     bottom: 0;
     left: 0;
     right: 0;
-    padding: 0 20px 10px 0;
+    padding: 10px 20px 10px 20px;
     box-sizing: border-box;
-    z-index: 1000;
+    z-index: 100;
+    background: linear-gradient(180deg, transparent 0%, rgba(8, 12, 20, 0.98) 30%);
 }
 
 .home-container {
@@ -1197,6 +1195,11 @@ span#current-file {
     justify-content: flex-end;
     padding: 0 5px;
     box-sizing: border-box;
+}
+
+/* Ensure home-page doesn't block fixed positioned children */
+#home-page {
+    overflow: visible !important;
 }
 
 .mainpage {
@@ -1804,4 +1807,469 @@ body.light-mode {
 body.light-mode .modal-content {
     background-color: #fff;
     color: #000;
+}
+
+/* =============================================================================
+   REDESIGNED LAUNCHER UI - Clean, Premium Gaming Aesthetic
+   ============================================================================= */
+
+/* Import distinctive fonts */
+@import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700&family=Michroma&display=swap');
+
+/* CSS Variables for theming */
+:root {
+    --accent-primary: #3498db;
+    --accent-success: #2ecc71;
+    --accent-warning: #f39c12;
+    --accent-danger: #e74c3c;
+    --text-primary: rgba(255, 255, 255, 0.95);
+    --text-secondary: rgba(255, 255, 255, 0.65);
+    --text-muted: rgba(255, 255, 255, 0.4);
+    --glow-primary: rgba(52, 152, 219, 0.5);
+    --bg-dark: rgba(8, 12, 20, 0.85);
+}
+
+/* Subtle ambient glow background */
+.ambient-glow {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 0;
+    background: radial-gradient(ellipse at 50% 20%, rgba(52, 152, 219, 0.08) 0%, transparent 60%);
+}
+
+/* Card entrance animations */
+.card-animate {
+    opacity: 1;
+    transform: translateY(0);
+    animation: cardEntrance 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: calc(var(--delay) * 0.1s);
+}
+
+@keyframes cardEntrance {
+    from {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ===== HERO SECTION - Large Logo + Player Badge ===== */
+.hero-section {
+    position: fixed !important;
+    top: 50px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 8px !important;
+    z-index: 50 !important;
+    pointer-events: none;
+    width: auto;
+}
+
+.hero-section > * {
+    pointer-events: auto;
+}
+
+.hero-logo {
+    display: flex !important;
+    justify-content: center;
+    align-items: center;
+}
+
+.logo-image-large {
+    width: auto !important;
+    height: 130px !important;
+    max-width: 400px;
+    object-fit: contain;
+    filter: drop-shadow(0 8px 30px rgba(0, 0, 0, 0.6));
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), filter 0.4s ease;
+}
+
+.logo-image-large:hover {
+    transform: scale(1.03);
+    filter: drop-shadow(0 12px 40px rgba(52, 152, 219, 0.35));
+}
+
+/* ===== PLAYER BADGE - Compact Inline Display ===== */
+.player-badge {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    background: rgba(10, 20, 35, 0.95);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(52, 152, 219, 0.3);
+    border-radius: 20px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.pulse-dot-inline {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent-success);
+    box-shadow: 0 0 8px var(--accent-success);
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.pulse-dot-inline.offline {
+    background: var(--accent-danger);
+    box-shadow: 0 0 8px var(--accent-danger);
+    animation: none;
+}
+
+.pulse-dot-inline.maintenance {
+    background: var(--accent-warning);
+    box-shadow: 0 0 8px var(--accent-warning);
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.1); }
+}
+
+.player-count-inline {
+    font-family: 'Exo 2', sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: 0.5px;
+}
+
+.player-label-inline {
+    font-family: 'Exo 2', sans-serif;
+    font-size: 11px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: lowercase;
+    letter-spacing: 0.5px;
+}
+
+/* Maintenance notice in hero */
+.hero-section .maintenance-notice {
+    margin-top: 8px;
+}
+
+.maintenance-notice {
+    display: none;
+}
+
+.maintenance-text {
+    display: none;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, rgba(243, 156, 18, 0.15) 0%, rgba(231, 76, 60, 0.1) 100%);
+    border: 1px solid rgba(243, 156, 18, 0.3);
+    border-radius: 20px;
+    font-family: 'Exo 2', sans-serif;
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--accent-warning);
+    text-align: center;
+}
+
+/* ===== NEWS TICKER - Horizontal, Minimal ===== */
+.news-ticker {
+    position: fixed !important;
+    top: 230px !important; /* Below hero (50 + 130 logo + 8 gap + 30 badge + 12 margin) */
+    left: 25px !important;
+    right: 25px !important;
+    display: flex !important;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 14px;
+    background: rgba(10, 15, 25, 0.85);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    z-index: 90 !important;
+}
+
+.news-ticker-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Exo 2', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    color: var(--accent-primary);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: color 0.2s ease;
+}
+
+.news-ticker-label:hover {
+    color: var(--text-primary);
+}
+
+.news-ticker-icon {
+    width: 14px;
+    height: 14px;
+}
+
+.news-ticker-list {
+    flex: 1;
+    display: flex;
+    gap: 24px;
+    overflow: hidden;
+}
+
+.news-ticker-item {
+    font-family: 'Exo 2', sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    text-decoration: none;
+    transition: color 0.2s ease;
+    display: flex;
+    align-items: center;
+}
+
+.news-ticker-item:hover {
+    color: var(--text-primary);
+}
+
+.news-ticker-item::before {
+    content: '•';
+    margin-right: 12px;
+    color: rgba(255, 255, 255, 0.2);
+}
+
+.news-ticker-item:first-child::before {
+    display: none;
+}
+
+.news-ticker-item.loading {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.news-ticker-item.loading::before {
+    display: none;
+}
+
+/* ===== BOTTOM LINKS ROW ===== */
+.bottom-links {
+    position: fixed !important;
+    bottom: 85px !important; /* Above game-status (75px) + margin */
+    left: 25px !important;
+    right: 25px !important;
+    display: flex !important;
+    gap: 10px;
+    z-index: 90 !important; /* Below game-status (100) but visible */
+    height: 70px;
+}
+
+.bottom-link {
+    flex: 1;
+    position: relative;
+    height: 70px;
+    min-height: 70px;
+    max-height: 70px;
+    border-radius: 8px;
+    overflow: hidden;
+    text-decoration: none;
+    background: linear-gradient(135deg, rgba(20, 30, 50, 0.9) 0%, rgba(10, 15, 25, 0.95) 100%);
+    border: 1px solid rgba(52, 152, 219, 0.15);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    align-items: flex-end;
+}
+
+.bottom-link:hover {
+    transform: translateY(-2px);
+    border-color: rgba(52, 152, 219, 0.3);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+
+.bottom-link-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.4;
+    transition: opacity 0.3s ease, transform 0.4s ease;
+}
+
+.bottom-link:hover .bottom-link-bg {
+    opacity: 0.6;
+    transform: scale(1.05);
+}
+
+.bottom-link-label {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 10px 12px;
+    background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.9) 100%);
+    font-family: 'Exo 2', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    color: #fff;
+    letter-spacing: 0.2px;
+}
+
+/* ===== GAME STATUS AREA - Fixed Bottom Bar ===== */
+/* Patch notes / version text should be behind buttons */
+#patch-notes,
+.patch-notes {
+    z-index: 1 !important;
+    pointer-events: none;
+}
+
+/* Progress bar container alignment */
+.game-progress-parent {
+    align-items: center !important;
+    gap: 20px !important;
+    z-index: 10;
+}
+
+.game-progress {
+    padding: 0 !important;
+    margin-bottom: 0 !important;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: stretch;
+    flex: 1;
+    min-width: 350px;
+    max-width: 500px;
+}
+
+.progress-container {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.launch-game-parent {
+    padding: 0 !important;
+    margin-left: 0 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    z-index: 20;
+}
+
+/* Enhanced launch button */
+.btn-launch-game {
+    background: linear-gradient(135deg, var(--accent-primary) 0%, #2980b9 100%) !important;
+    border: none !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 20px rgba(52, 152, 219, 0.4);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    position: relative;
+    z-index: 25;
+}
+
+.btn-launch-game:hover:not(.disabled) {
+    transform: translateY(-2px) scale(1.02) !important;
+    box-shadow: 0 8px 30px rgba(52, 152, 219, 0.5) !important;
+}
+
+.launch-game {
+    font-family: 'Exo 2', sans-serif !important;
+    font-weight: 700 !important;
+    letter-spacing: 2px !important;
+    color: #fff !important;
+}
+
+/* Progress bar styling */
+.outer-progress {
+    background: rgba(0, 0, 0, 0.4) !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    border-radius: 4px !important;
+}
+
+.inner-progress {
+    background: linear-gradient(90deg, var(--accent-primary) 0%, #2ecc71 100%) !important;
+    border-radius: 3px !important;
+    box-shadow: 0 0 15px var(--glow-primary);
+    transition: width 0.3s ease;
+}
+
+/* Download info area */
+.download-info {
+    z-index: 5;
+}
+
+/* =============================================================================
+   HOME PAGE LAYOUT OVERRIDES
+   Ensures new layout works with legacy CSS
+   ============================================================================= */
+
+/* Make content fill the container */
+#home-page.content {
+    width: 100% !important;
+    height: 100% !important;
+    padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+/* Reset game-status for new layout */
+#home-page .game-status {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    width: 100% !important;
+    z-index: auto !important;
+}
+
+/* Reset game-progress-parent for new layout */
+#home-page .game-progress-parent {
+    justify-content: flex-start !important;
+}
+
+/* Reset game-progress for new layout */
+#home-page .game-progress {
+    padding: 0 !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+}
+
+/* Reset progress-container for new layout */
+#home-page .progress-container {
+    margin: 0 !important;
+}
+
+/* Reset launch-game-parent for new layout */
+#home-page .launch-game-parent {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: auto !important;
+}
+
+/* Reset download-speed positioning */
+#home-page .download-speed {
+    position: static !important;
+    transform: none !important;
+    bottom: auto !important;
+    left: auto !important;
+}
+
+/* Reset download-info */
+#home-page .download-info {
+    margin-top: 0 !important;
+}
+
+/* home-container resets */
+#home-page .home-container {
+    flex: none !important;
+    gap: 0 !important;
+    max-width: 100% !important;
 }

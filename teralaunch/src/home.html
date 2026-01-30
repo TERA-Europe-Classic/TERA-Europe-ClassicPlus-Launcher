@@ -1,337 +1,1583 @@
 <main class="content" id="home-page">
-    <div class="home-grid" id="my-home-grid">
-        <div class="home-1">
-            <img
-                class="home-entries"
-                id="Tera-Logo-home"
-                loading="lazy"
-                alt=""
-                src="./assets/tera-classic-logo.png"
-            />
-        </div>
-        <div class="home-2">
-            <div style="display: flex; flex-direction: column">
-                <img
-                    class="home-entries"
-                    style="display: none"
-                    id="NewsWartungImgId"
-                    loading="lazy"
-                    alt=""
-                    src="./assets/WARTUNG.png"
-                />
-                <div
-                    class="home-wartung-text"
-                    style="display: none"
-                    id="NewsWartungTextId"
-                ></div>
-            </div>
-        </div>
-        <div class="home-3">
-            <div>
-                <a
-                    id="NewsImgIdHref"
-                    href="https://tera-europe-classic.de/"
-                    target="_blank"
-                >
-                    <img
-                        class="home-entries"
-                        id="NewsImgId"
-                        loading="lazy"
-                        alt=""
-                        src=""
-                    />
+    <style>
+        /* ========== CSS VARIABLES - shadcn Dark Theme (matches index.html) ========== */
+        :root {
+            --background: #171c28;
+            --foreground: #f0f2f5;
+            --card: #161b24;
+            --popover: #12171f;
+            --primary: #5ab4e8;
+            --primary-foreground: #0f1219;
+            --secondary: #1e2430;
+            --muted: #1a1f28;
+            --muted-foreground: #8b92a0;
+            --accent: #333a4a;
+            --destructive: #dc2626;
+            --border: #3a4050;
+            --input: #1a1f28;
+            --ring: #5ab4e8;
+            --radius: 0.5rem;
+
+            /* Additional semantic colors */
+            --emerald-500: #10b981;
+            --emerald-400: #34d399;
+            --amber-500: #f59e0b;
+            --amber-400: #fbbf24;
+        }
+
+        /* ========== RESET & BASE ========== */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        #home-page {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+            background: var(--background);
+            overflow: hidden;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            /* Account for 48px header in index.html */
+            padding-top: 0;
+        }
+
+        /* ========== BACKGROUND CAROUSEL ========== */
+        #home-bg-container {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .bg-image {
+            position: absolute;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+        }
+
+        .bg-image.active {
+            opacity: 1;
+        }
+
+        #home-bg-container::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to right, rgba(15,18,25,0.95) 0%, rgba(15,18,25,0.6) 50%, rgba(15,18,25,0.3) 100%);
+            z-index: 1;
+        }
+
+        #home-bg-container::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to top, rgba(15,18,25,1) 0%, transparent 50%, rgba(15,18,25,0.4) 100%);
+            z-index: 2;
+        }
+
+
+        /* ========== MAIN CONTENT (flex-1, p-8 = 32px) ========== */
+        #home-main {
+            position: relative;
+            z-index: 5;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #home-info-section {
+            flex: 1;
+            display: flex;
+            align-items: flex-start;
+            padding: 48px 32px 32px 32px; /* Extra top padding to clear header */
+        }
+
+        .info-content {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start; /* Left-align all children */
+            gap: 24px; /* gap-6 */
+            max-width: 400px;
+        }
+
+        /* Logo: h-28 = 112px with drop-shadow-2xl, left-aligned */
+        #Tera-Logo-home {
+            display: block;
+            height: 112px;
+            width: auto;
+            object-fit: contain;
+            filter: drop-shadow(0 25px 25px rgba(0, 0, 0, 0.25));
+            /* Image has whitespace - compensate to align with text below */
+            margin-left: -65px !important;
+            margin-top: -15px !important;
+        }
+
+        /* Description: text-sm = 14px, text-muted-foreground/90, leading-relaxed = 1.625 */
+        #home-description {
+            font-size: 14px;
+            line-height: 1.625;
+            color: rgba(107, 114, 128, 0.9);
+            margin: 0;
+        }
+
+        /* Player Badge: px-4 = 16px, py-2.5 = 10px, rounded-lg, border-border/20 */
+        #home-player-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px; /* gap-3 */
+            padding: 10px 16px;
+            background: rgba(15, 18, 25, 0.3);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(45, 53, 72, 0.2);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: border-color 0.2s ease;
+            width: fit-content;
+        }
+
+        #home-player-badge:hover {
+            border-color: rgba(34, 211, 238, 0.3);
+        }
+
+        /* Pulse dot: h-2 w-2 = 8px with animate-ping */
+        .pulse-dot {
+            position: relative;
+            width: 8px;
+            height: 8px;
+        }
+
+        .pulse-dot::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: var(--emerald-400);
+            border-radius: 50%;
+            animation: pulse-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+
+        .pulse-dot::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: var(--emerald-500);
+            border-radius: 50%;
+        }
+
+        @keyframes pulse-ping {
+            75%, 100% {
+                transform: scale(2);
+                opacity: 0;
+            }
+        }
+
+        /* Player count: text-lg = 18px, font-bold */
+        #player-count {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--foreground);
+            font-variant-numeric: tabular-nums;
+            transition: color 0.2s ease;
+        }
+
+        #home-player-badge:hover #player-count {
+            color: var(--primary);
+        }
+
+        /* text-xs = 12px */
+        .player-label {
+            font-size: 12px;
+            color: var(--muted-foreground);
+        }
+
+        /* Maintenance Notice */
+        #maintenance-container {
+            display: none;
+            margin-top: 16px;
+        }
+
+        #maintenance-container.show {
+            display: block;
+        }
+
+        .maintenance-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 16px;
+            background: rgba(245, 158, 11, 0.15);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            border-radius: 8px;
+        }
+
+        .maintenance-icon {
+            font-size: 16px;
+        }
+
+        #NewsWartungTextId {
+            font-size: 13px;
+            color: #fcd34d;
+        }
+
+        /* ========== NEWS BAR (py-2.5 = 10px, px-6 = 24px) ========== */
+        #home-news-bar {
+            display: flex;
+            align-items: center;
+            gap: 24px; /* gap-6 */
+            padding: 10px 24px;
+            background: rgba(15, 18, 25, 0.3);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border-top: 1px solid rgba(45, 53, 72, 0.2);
+            border-bottom: 1px solid rgba(45, 53, 72, 0.2);
+        }
+
+        /* NEWS label: text-[10px] = 10px, font-bold, uppercase, tracking-widest, text-primary */
+        .news-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            text-decoration: none;
+            flex-shrink: 0;
+        }
+
+        .news-dot {
+            width: 4px;
+            height: 4px;
+            background: var(--primary);
+            border-radius: 50%;
+        }
+
+        /* News items: text-xs = 12px, text-muted-foreground, gap-6 = 24px */
+        #news-feed-list {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .news-item {
+            font-size: 12px;
+            color: var(--muted-foreground);
+            text-decoration: none;
+            transition: color 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .news-item:hover {
+            color: var(--foreground);
+        }
+
+        /* ========== FOOTER (p-4 = 16px, gap-4 = 16px) ========== */
+        #home-footer {
+            display: flex;
+            align-items: stretch;
+            gap: 16px;
+            padding: 16px;
+            background: rgba(15, 18, 25, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-top: 1px solid rgba(45, 53, 72, 0.2);
+        }
+
+        /* Promo Cards: grid-cols-3, gap-3 = 12px */
+        #home-promo-cards {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        /* Cards: aspect-ratio 2.2/1, border-border/20, hover: border-primary/40 */
+        .promo-card {
+            position: relative;
+            aspect-ratio: 2.2 / 1;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid rgba(45, 53, 72, 0.2);
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .promo-card:hover {
+            border-color: rgba(34, 211, 238, 0.4);
+        }
+
+        .promo-card-bg {
+            position: absolute;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+            transition: transform 0.5s ease;
+        }
+
+        .promo-card:hover .promo-card-bg {
+            transform: scale(1.05);
+        }
+
+        .promo-card-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to top, rgba(15, 18, 25, 0.9) 0%, rgba(15, 18, 25, 0.3) 50%, transparent 100%);
+        }
+
+        /* Title: text-xs = 12px, font-medium, bottom p-2.5 = 10px */
+        .promo-card-title {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--foreground);
+            transition: color 0.2s ease;
+        }
+
+        .promo-card:hover .promo-card-title {
+            color: var(--primary);
+        }
+
+        /* ========== LAUNCH SECTION (w-64 = 256px, p-4 = 16px) ========== */
+        #home-launch-section {
+            width: 256px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+            background: rgba(15, 18, 25, 0.4);
+            border-radius: 8px;
+            border: 1px solid rgba(45, 53, 72, 0.2);
+        }
+
+        /* Status area: h-[42px] = 42px */
+        #home-status-area {
+            height: 42px;
+            margin-bottom: 12px; /* gap-3 */
+        }
+
+        /* Status states container */
+        .status-state {
+            display: none;
+            height: 100%;
+        }
+
+        .status-state.active {
+            display: flex;
+        }
+
+        /* Login Required / Ready State: flex, items-center, gap-2 = 8px */
+        .status-simple {
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Status dot: w-1.5 h-1.5 = 6px */
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .status-dot.green { background: var(--emerald-500); }
+        .status-dot.amber { background: var(--amber-500); }
+
+        /* Status text: text-sm = 14px, font-medium */
+        .status-text {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .status-text.green { color: var(--emerald-400); }
+        .status-text.amber { color: var(--amber-400); }
+
+        /* Checking / Downloading State: flex-col, justify-between */
+        .status-progress {
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .progress-header-left {
+            display: flex;
+            align-items: center;
+            gap: 8px; /* gap-2 */
+        }
+
+        .spinner {
+            width: 14px;
+            height: 14px;
+            animation: spin 1s linear infinite;
+            flex-shrink: 0;
+        }
+
+        .spinner svg {
+            width: 100%;
+            height: 100%;
+            stroke: var(--primary);
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* text-xs = 12px, font-medium */
+        .progress-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--foreground);
+        }
+
+        /* text-xs = 12px, text-muted-foreground, tabular-nums */
+        .progress-percent {
+            font-size: 12px;
+            color: var(--muted-foreground);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Progress bar: h-1.5 = 6px */
+        .progress-track {
+            height: 6px;
+            background: rgba(34, 211, 238, 0.15);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        /* Footer info: text-[10px] = 10px */
+        .progress-footer {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: var(--muted-foreground);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ========== LAUNCH BUTTONS (gap-2 = 8px) ========== */
+        #home-launch-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* Pause button: w-12 = 48px, h-9 = 36px */
+        #btn-pause-resume {
+            width: 48px;
+            height: 36px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(15, 18, 25, 0.5);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        #btn-pause-resume:hover {
+            background: rgba(15, 18, 25, 0.7);
+            border-color: rgba(45, 53, 72, 0.5);
+        }
+
+        #btn-pause-resume.active {
+            display: flex;
+        }
+
+        #btn-pause-resume svg {
+            width: 16px;
+            height: 16px;
+            stroke: var(--foreground);
+            fill: none;
+        }
+
+        /* Launch button: h-9 = 36px, text-xs = 12px, font-bold */
+        #launch-game-btn {
+            flex: 1;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            background: var(--primary);
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--primary-foreground);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 16px rgba(34, 211, 238, 0.25);
+        }
+
+        #launch-game-btn:hover:not(.disabled) {
+            background: rgba(34, 211, 238, 0.9);
+            box-shadow: 0 6px 24px rgba(34, 211, 238, 0.4);
+        }
+
+        #launch-game-btn.disabled {
+            background: var(--muted);
+            color: var(--muted-foreground);
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        #launch-game-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        #launch-game-btn svg.play-icon {
+            fill: currentColor;
+            stroke: none;
+        }
+
+        #launch-game-btn svg.spinner-icon {
+            stroke: currentColor;
+            fill: none;
+            animation: spin 1s linear infinite;
+        }
+
+        /* ========== UPDATE NOTIFICATION TOAST ========== */
+        /* Position: fixed top-16 = 64px, right-4 = 16px, min-width 280px */
+        #update-notification {
+            position: fixed;
+            top: 64px;
+            right: 16px;
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            gap: 12px;
+            min-width: 280px;
+            padding: 16px;
+            background: rgba(23, 28, 40, 0.95);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        #update-notification.show {
+            display: flex;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Checking state: just spinner, no background */
+        .update-icon-wrapper.checking {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        /* Success/Error states: h-8 w-8 = 32px rounded-full with background */
+        .update-icon-wrapper.success,
+        .update-icon-wrapper.error {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .update-icon-wrapper.success {
+            background: rgba(16, 185, 129, 0.2);
+        }
+
+        .update-icon-wrapper.error {
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+        .update-spinner {
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        .update-spinner svg {
+            width: 100%;
+            height: 100%;
+            stroke: var(--primary);
+        }
+
+        .update-check-icon {
+            width: 16px;
+            height: 16px;
+            color: var(--emerald-500);
+        }
+
+        .update-check-icon svg {
+            width: 100%;
+            height: 100%;
+            stroke: currentColor;
+        }
+
+        .update-error-icon {
+            width: 16px;
+            height: 16px;
+            color: var(--destructive);
+        }
+
+        .update-error-icon svg {
+            width: 100%;
+            height: 100%;
+            stroke: currentColor;
+        }
+
+        .update-text-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .update-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--foreground);
+        }
+
+        .update-subtitle {
+            font-size: 12px;
+            color: var(--muted-foreground);
+        }
+
+        /* ========== GAME DIRECTORY DIALOG ========== */
+        /* Modal: max-w-[480px] */
+        #game-directory-dialog {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+
+        #game-directory-dialog.show {
+            display: flex;
+        }
+
+        .dialog-content {
+            width: 100%;
+            max-width: 480px;
+            padding: 24px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+        }
+
+        .dialog-header {
+            margin-bottom: 16px;
+        }
+
+        .dialog-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--foreground);
+            margin: 0 0 4px 0;
+        }
+
+        .dialog-description {
+            font-size: 14px;
+            color: var(--muted-foreground);
+            margin: 0;
+        }
+
+        /* Unified input group with border container like shadcn */
+        .dialog-input-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .dialog-input-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            background: rgba(26, 31, 40, 0.3);
+        }
+
+        .dialog-input-icon {
+            width: 16px;
+            height: 16px;
+            color: var(--muted-foreground);
+            flex-shrink: 0;
+            margin-right: 8px;
+        }
+
+        .dialog-input-icon svg {
+            width: 100%;
+            height: 100%;
+            stroke: currentColor;
+        }
+
+        .dialog-input {
+            flex: 1;
+            height: 24px;
+            padding: 0;
+            background: transparent;
+            border: none;
+            font-size: 14px;
+            color: var(--foreground);
+            outline: none;
+        }
+
+        .dialog-input::placeholder {
+            color: var(--muted-foreground);
+        }
+
+        .dialog-browse-btn {
+            height: 100%;
+            padding: 8px 16px;
+            background: transparent;
+            border: none;
+            border-left: 1px solid var(--border);
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--foreground);
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .dialog-browse-btn:hover {
+            background: rgba(26, 31, 40, 0.5);
+        }
+
+        .dialog-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        /* Cancel: ghost variant */
+        .dialog-cancel-btn {
+            height: 36px;
+            padding: 0 16px;
+            background: transparent;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--foreground);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .dialog-cancel-btn:hover {
+            background: var(--accent);
+        }
+
+        /* Save: primary variant */
+        .dialog-save-btn {
+            height: 36px;
+            padding: 0 16px;
+            background: var(--primary);
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--primary-foreground);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .dialog-save-btn:hover {
+            background: rgba(34, 211, 238, 0.9);
+        }
+
+        /* ========== HIDDEN COMPAT ELEMENTS ========== */
+        .hidden-compat {
+            display: none !important;
+        }
+
+        #NewsWartungImgId {
+            display: none;
+        }
+
+        /* ========== SETTINGS MODAL (LEGACY) ========== */
+        #modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+
+        #modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            width: 450px;
+            padding: 24px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content .close {
+            float: right;
+            font-size: 24px;
+            color: var(--muted-foreground);
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+
+        .modal-content .close:hover {
+            color: var(--foreground);
+        }
+
+        .settings-menu {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .menu-tab {
+            padding: 8px 16px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px;
+            color: var(--muted-foreground);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .menu-tab:hover {
+            color: var(--foreground);
+            background: var(--accent);
+        }
+
+        .menu-tab.active {
+            background: var(--primary);
+            color: var(--primary-foreground);
+            border-color: var(--primary);
+        }
+
+        .settings-section {
+            display: none;
+        }
+
+        .settings-section.active {
+            display: block;
+        }
+
+        .settings-section h2 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--foreground);
+            margin: 0 0 8px 0;
+        }
+
+        .settings-section p {
+            font-size: 13px;
+            color: var(--muted-foreground);
+            margin: 0 0 16px 0;
+        }
+
+        .settings-section input[type="text"] {
+            width: 100%;
+            height: 40px;
+            padding: 0 12px;
+            background: var(--input);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            color: var(--foreground);
+            outline: none;
+            cursor: pointer;
+        }
+
+        .settings-section input[type="text"]:focus {
+            border-color: var(--ring);
+        }
+
+        .notification {
+            margin-top: 12px;
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            display: none;
+        }
+    </style>
+
+    <!-- Background Carousel -->
+    <div id="home-bg-container">
+        <div class="bg-image active" style="background-image: url('./assets/bg-1.webp');"></div>
+        <div class="bg-image" style="background-image: url('./assets/bg-2.webp');"></div>
+        <div class="bg-image" style="background-image: url('./assets/bg-3.webp');"></div>
+        <div class="bg-image" style="background-image: url('./assets/bg-4.webp');"></div>
+        <div class="bg-image" style="background-image: url('./assets/bg-5.webp');"></div>
+    </div>
+
+    <!-- Main Content -->
+    <div id="home-main">
+        <!-- Info Section -->
+        <div id="home-info-section">
+            <div class="info-content">
+                <!-- TERA Logo -->
+                <img id="Tera-Logo-home" src="./assets/tera-classic-logo.png" alt="TERA Europe Classic" loading="lazy" />
+
+                <!-- Description -->
+                <p id="home-description">
+                    TERA is a fast-paced action MMORPG set in a breathtaking world conjured by two dreaming primal gods. Take your place as a soldier for the Valkyon Federation and fight alongside other races to forge a new future.
+                </p>
+
+                <!-- Player Count Badge -->
+                <a id="home-player-badge" href="https://stats.crazy-esports.com" target="_blank">
+                    <div class="pulse-dot"></div>
+                    <span id="player-count">--</span>
+                    <span class="player-label">players online</span>
                 </a>
+
+                <!-- Maintenance Notice -->
+                <div id="maintenance-container">
+                    <div class="maintenance-badge">
+                        <span class="maintenance-icon">&#9888;</span>
+                        <span id="NewsWartungTextId"></span>
+                    </div>
+                    <img id="NewsWartungImgId" src="./assets/WARTUNG.png" alt="" />
+                </div>
             </div>
         </div>
-        <div class="home-3-5">
-            <div class="top-overlay" id="NewsSideTitleTextId"></div>
-            <div
-                id="NewsTextId"
-                style="margin: 10px 0; text-align: center"
-            ></div>
-        </div>
-        <div class="home-4">
-            <a
-                id="AdImgId1Href"
-                href="https://tera-europe-classic.de/"
-                target="_blank"
-            >
-                <img
-                    class="home-entries"
-                    id="AdImgId1"
-                    loading="lazy"
-                    alt=""
-                    src=""
-                />
-            </a>
-            <div class="home-text-overlay" id="AdTextId1"></div>
-        </div>
-        <div class="home-5">
-            <a
-                id="AdImgId2Href"
-                href="https://tera-europe-classic.de/"
-                target="_blank"
-            >
-                <img
-                    class="home-entries"
-                    id="AdImgId2"
-                    loading="lazy"
-                    alt=""
-                    src=""
-                />
-            </a>
-            <div class="home-text-overlay" id="AdTextId2"></div>
-        </div>
-        <div class="home-6">
-            <a
-                id="AdImgId3Href"
-                href="https://tera-europe-classic.de/"
-                target="_blank"
-            >
-                <img
-                    class="home-entries"
-                    id="AdImgId3"
-                    loading="lazy"
-                    alt=""
-                    src=""
-                />
-            </a>
-            <div class="home-text-overlay" id="AdTextId3"></div>
+
+        <!-- Bottom Section -->
+        <div id="home-bottom-section">
+            <!-- News Bar -->
+            <div id="home-news-bar">
+                <a href="https://forum.crazy-esports.com/forum/board/43-tera-classic-news/" target="_blank" class="news-label">
+                    <span class="news-dot"></span>
+                    NEWS
+                </a>
+                <div id="news-feed-list">
+                    <span class="news-item" style="color: var(--muted-foreground);">Loading news...</span>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <footer id="home-footer">
+                <!-- Promo Cards -->
+                <div id="home-promo-cards">
+                    <a id="AdImgId1Href" href="https://tera-europe.net/" target="_blank" class="promo-card">
+                        <div id="AdImgBg1" class="promo-card-bg" style="background-image: url('./assets/promo-1.webp');"></div>
+                        <img id="AdImgId1" src="" alt="" class="hidden-compat" />
+                        <div class="promo-card-overlay"></div>
+                        <span id="AdTextId1" class="promo-card-title">Visit our partner!</span>
+                    </a>
+                    <a id="AdImgId2Href" href="https://forum.crazy-esports.com/" target="_blank" class="promo-card">
+                        <div id="AdImgBg2" class="promo-card-bg" style="background-image: url('./assets/promo-2.webp');"></div>
+                        <img id="AdImgId2" src="" alt="" class="hidden-compat" />
+                        <div class="promo-card-overlay"></div>
+                        <span id="AdTextId2" class="promo-card-title">Come to our forum!</span>
+                    </a>
+                    <a id="AdImgId3Href" href="https://tera-europe-classic.de/" target="_blank" class="promo-card">
+                        <div id="AdImgBg3" class="promo-card-bg" style="background-image: url('./assets/promo-3.webp');"></div>
+                        <img id="AdImgId3" src="" alt="" class="hidden-compat" />
+                        <div class="promo-card-overlay"></div>
+                        <span id="AdTextId3" class="promo-card-title">Join our team!</span>
+                    </a>
+                </div>
+
+                <!-- Launch Section -->
+                <div id="home-launch-section">
+                    <!-- Status Area -->
+                    <div id="home-status-area">
+                        <!-- State 1: Login Required (not logged in) -->
+                        <div id="status-login-required" class="status-state status-simple active">
+                            <span class="status-dot amber"></span>
+                            <span class="status-text amber" data-translate="LOGIN_REQUIRED">Login required</span>
+                        </div>
+
+                        <!-- State 2: Ready (logged in, no updates) -->
+                        <div id="status-ready" class="status-state status-simple">
+                            <span class="status-dot green"></span>
+                            <span id="status-string" class="status-text green" data-translate="READY_TO_PLAY">Ready to play</span>
+                        </div>
+
+                        <!-- State 3: Checking Files -->
+                        <div id="status-checking" class="status-state status-progress">
+                            <div class="progress-header">
+                                <div class="progress-header-left">
+                                    <span class="spinner">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+                                    </span>
+                                    <span class="progress-label">Checking files...</span>
+                                </div>
+                                <span id="check-percent" class="progress-percent">0%</span>
+                            </div>
+                            <div class="progress-track">
+                                <div id="check-progress-bar" class="progress-fill"></div>
+                            </div>
+                            <div class="progress-footer">
+                                <span><span id="checked-files">0</span> / <span id="total-files">0</span> files</span>
+                            </div>
+                        </div>
+
+                        <!-- State 4: Downloading -->
+                        <div id="status-downloading" class="status-state status-progress">
+                            <div class="progress-header">
+                                <span id="dl-status-label" class="progress-label">Downloading...</span>
+                                <span id="progress-percentage" class="progress-percent">0%</span>
+                            </div>
+                            <div class="progress-track">
+                                <div id="progress-percentage-div" class="progress-fill"></div>
+                            </div>
+                            <div class="progress-footer">
+                                <span><span id="downloaded-size">0</span> / <span id="total-size">0</span></span>
+                                <span id="download-speed">--</span>
+                            </div>
+                        </div>
+
+                        <!-- State 5: Paused (same as downloading but with "Paused" label) -->
+                    </div>
+
+                    <!-- Launch Buttons -->
+                    <div id="home-launch-buttons">
+                        <button id="btn-pause-resume" title="Pause/Resume">
+                            <!-- Pause Icon (default) -->
+                            <svg id="pause-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="6" y="4" width="4" height="16"></rect>
+                                <rect x="14" y="4" width="4" height="16"></rect>
+                            </svg>
+                            <!-- Play Icon (when paused) -->
+                            <svg id="resume-icon" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display: none;">
+                                <polygon points="5,3 19,12 5,21"></polygon>
+                            </svg>
+                        </button>
+                        <button id="launch-game-btn" class="disabled" disabled>
+                            <!-- Play Icon -->
+                            <svg id="launch-play-icon" class="play-icon" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"></polygon></svg>
+                            <!-- Spinner Icon (when checking) -->
+                            <svg id="launch-spinner-icon" class="spinner-icon" viewBox="0 0 24 24" style="display: none;"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+                            <span id="launch-btn-text" data-translate="LAUNCH_GAME">LAUNCH</span>
+                        </button>
+                    </div>
+                </div>
+            </footer>
         </div>
     </div>
-    <section class="home-container">
-        <div class="home-wrapper">
-            <div class="home-content">
-                <img
-                    class="tera-logo-icon"
-                    loading="lazy"
-                    alt=""
-                    src="./assets/tera-logo@2x.png"
-                />
+
+    <!-- Update Notification Toast -->
+    <div id="update-notification">
+        <!-- Checking state -->
+        <div class="update-icon-wrapper checking" id="update-icon-checking">
+            <span class="update-spinner">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+            </span>
+        </div>
+        <!-- Success state -->
+        <div class="update-icon-wrapper success" id="update-icon-success" style="display: none;">
+            <span class="update-check-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </span>
+        </div>
+        <!-- Error state -->
+        <div class="update-icon-wrapper error" id="update-icon-error" style="display: none;">
+            <span class="update-error-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            </span>
+        </div>
+        <div class="update-text-wrapper">
+            <span class="update-title" id="update-notification-title">Checking for updates...</span>
+            <span class="update-subtitle" id="update-notification-subtitle">Please wait</span>
+        </div>
+    </div>
+
+    <!-- Game Directory Dialog -->
+    <div id="game-directory-dialog">
+        <div class="dialog-content">
+            <div class="dialog-header">
+                <h3 class="dialog-title">Game Directory</h3>
+                <p class="dialog-description">Choose where TERA Europe Classic is installed.</p>
             </div>
-            <div class="user-panel">
-                <div class="btn-user-avatar">
-                    <img
-                        class="user-icon"
-                        loading="lazy"
-                        alt=""
-                        src="./assets/avatar.png"
-                    />
+            <div class="dialog-input-group">
+                <div class="dialog-input-wrapper">
+                    <span class="dialog-input-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                    </span>
+                    <input type="text" id="game-directory-input" class="dialog-input" placeholder="C:\Games\TERA" />
                 </div>
-                <div class="dropdown-panel-wrapper">
-                    <div class="dropdown-panel">
-                        <div class="user-name-container">
-                            <span class="hey"></span>
-                            <span class="username" id="userName">User</span>
-                        </div>
-                        <div class="menu-divider"></div>
-                        <nav class="user-menu">
-                            <a
-                                href="https://tera-europe-classic.de/profile.php?lang=en"
-                                target="_blank"
-                                class="menu-item"
-                                data-translate="ACCOUNT_DETAILS"
-                                >ACCOUNT DETAILS</a
-                            >
-                            <a
-                                href="https://status.crazy-esports.com/"
-                                target="_blank"
-                                class="menu-item"
-                                >SERVICE STATUS</a
-                            >
-                            <a
-                                href="https://forum.crazy-esports.com/jcoins-shop/"
-                                target="_blank"
-                                class="menu-item"
-                                >SHOP/COINS PURCHASE</a
-                            >
-                            <a
-                                href="https://www.tera-germany.com/profile#twitch"
-                                target="_blank"
-                                class="menu-item"
-                                >LINK TWITCH ACCOUNT</a
-                            >
-                            <a
-                                href="https://tera-germany.com/community/twitch"
-                                target="_blank"
-                                class="menu-item"
-                                >CLAIM TWITCH DROPS</a
-                            >
-                            <a
-                                href="#"
-                                class="menu-item"
-                                id="openModal"
-                                data-translate="SETTINGS"
-                                >SETTINGS</a
-                            >
-                            <a
-                                href="#"
-                                class="menu-item"
-                                id="check-game-files"
-                                data-translate="CHECK_REPAIR_FILES"
-                                >RECHECK & REPAIR FILES</a
-                            >
-                            <a
-                                href="#"
-                                class="menu-item"
-                                id="check-launcher-update"
-                                data-translate="CHECK_LAUNCHER_UPDATE"
-                                >CHECK LAUNCHER UPDATE</a
-                            >
-                            <!-- <a href="#" class="menu-item" id="view-logs" data-translate="VIEW_LOGS">VIEW LOGS</a> -->
-                            <a
-                                href="#"
-                                class="menu-item"
-                                id="toggle-theme"
-                                data-translate="TOGGLE_THEME"
-                                >TOGGLE THEME</a
-                            >
-                            <a
-                                href="#"
-                                class="menu-item"
-                                id="logout-link"
-                                data-translate="SIGN_OUT"
-                                >SIGN OUT</a
-                            >
-                            <a
-                                href="#"
-                                class="menu-item"
-                                id="app-quit"
-                                data-translate="EXIT"
-                                >EXIT</a
-                            >
-                        </nav>
+                <button class="dialog-browse-btn" onclick="browseGameDirectory()">Browse</button>
+            </div>
+            <div class="dialog-buttons">
+                <button class="dialog-cancel-btn" onclick="closeGameDirectoryDialog()">Cancel</button>
+                <button class="dialog-save-btn" onclick="saveGameDirectory()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden compatibility elements for existing JS -->
+    <span id="server-status-text" class="hidden-compat">ONLINE</span>
+    <span id="player-delta" class="hidden-compat"></span>
+    <span id="player-typical" class="hidden-compat"></span>
+    <span id="current-file" class="hidden-compat"></span>
+    <span id="files-progress" class="hidden-compat"></span>
+    <span id="time-remaining" class="hidden-compat"></span>
+    <div id="size-progress" class="hidden-compat"></div>
+    <div id="download-speed-div" class="hidden-compat"></div>
+    <div id="patch-notes" class="hidden-compat"></div>
+    <div id="error-container" class="hidden-compat"></div>
+    <div id="dl-status-string" class="hidden-compat"></div>
+
+    <!-- Hidden legacy wrappers for JS compatibility -->
+    <div class="home-wrapper hidden-compat">
+        <div class="home-content">
+            <img class="tera-logo-icon" loading="lazy" alt="" src="./assets/tera-logo@2x.png" />
+        </div>
+        <div class="user-panel">
+            <div class="btn-user-avatar">
+                <img class="user-icon" loading="lazy" alt="" src="./assets/avatar.png" />
+            </div>
+            <div class="dropdown-panel-wrapper">
+                <div class="dropdown-panel">
+                    <div class="user-name-container">
+                        <span class="hey"></span>
+                        <span class="username" id="userName">User</span>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
+
+    <section class="home-container hidden-compat">
         <div class="game-status">
-            <div id="patch-notes" class="patch-notes"></div>
-            <div id="error-container" class="error-message" style="display: none;"></div>
             <div class="game-progress-parent">
                 <div class="game-progress">
                     <div class="progress-container">
                         <div class="content-parent-parent">
-                            <div class="content-parent">
-                                <div
-                                    class="dl-status-string"
-                                    id="dl-status-string"
-                                >
-                                    <span id="status-string"></span>
-                                    <span id="files-progress"></span>
-                                </div>
-                            </div>
-                            <div
-                                class="dl-status-percentage"
-                                id="progress-percentage"
-                            ></div>
+                            <div class="content-parent"></div>
+                            <div class="dl-status-percentage"></div>
                         </div>
                         <div class="outer-progress">
-                            <div
-                                class="inner-progress"
-                                id="progress-percentage-div"
-                                style="width: 0%"
-                            >
-                                <span id="current-file"></span>
-                            </div>
+                            <div class="inner-progress"></div>
                         </div>
                     </div>
                 </div>
-                <div class="btn-pause" style="display: none">
-                    <img
-                        class="pause-icon"
-                        alt=""
-                        src="./assets/pause-icon.svg"
-                    />
-                </div>
-                <div class="btn-restart" style="display: none">
-                    <img
-                        class="vector-icon"
-                        loading="lazy"
-                        alt=""
-                        src="./assets/vector-3.svg"
-                    />
-                </div>
-                <div class="launch-game-parent">
-                    <button class="btn-launch-game" id="launch-game-btn">
-                        <b class="launch-game" data-translate="LAUNCH_GAME"
-                            >LAUNCH GAME</b
-                        >
-                    </button>
-                </div>
-            </div>
-            <div class="download-info">
-                <div
-                    id="size-progress"
-                    class="size-progress"
-                    style="display: none"
-                >
-                    <span id="downloaded-size"></span>
-                    <span class="size-separator">/</span>
-                    <span id="total-size"></span>
-                </div>
-                <div
-                    class="download-speed move-up-15px"
-                    id="download-speed-div"
-                >
-                    <div class="dl-speed-string" data-translate="SPEED_LABEL">
-                        Speed:
-                    </div>
-                    <div class="speed-value-container">
-                        <div class="dl-speed-number" id="download-speed">
-                            --
-                        </div>
-                    </div>
-                    <div
-                        class="tr-string"
-                        data-translate="TIME_REMAINING_LABEL"
-                    >
-                        Time remaining:
-                    </div>
-                    <div class="tr-time" id="time-remaining">--</div>
-                </div>
+                <div class="btn-pause"><img class="pause-icon" alt="" src="./assets/pause-icon.svg" /></div>
+                <div class="btn-restart"><img class="vector-icon" loading="lazy" alt="" src="./assets/vector-3.svg" /></div>
+                <div class="launch-game-parent"></div>
             </div>
         </div>
     </section>
 </main>
+
+<!-- Settings Modal (Legacy) -->
 <div id="modal" class="modal">
     <div class="modal-content">
         <span class="close">&times;</span>
         <div class="settings-menu">
-            <button
-                class="menu-tab active"
-                data-section="folder"
-                data-translate="SETTINGS_GAME_FOLDER"
-            >
-                Spieleordner
-            </button>
-            <button
-                class="menu-tab"
-                data-section="version"
-                data-translate="SETTINGS_VERSION_INFO"
-            >
-                Versions Info
-            </button>
+            <button class="menu-tab active" data-section="folder" data-translate="SETTINGS_GAME_FOLDER">Game Folder</button>
+            <button class="menu-tab" data-section="version" data-translate="SETTINGS_VERSION_INFO">Version Info</button>
         </div>
         <div class="settings-section active" id="settings-folder">
             <h2 data-translate="CHOOSE_GAME_FOLDER">Choose Your Game Folder</h2>
-            <p data-translate="CLICK_INPUT_INSTRUCTION">
-                Just click inside the input
-            </p>
-            <input
-                type="text"
-                id="gameFolder"
-                data-translate-placeholder="LOCATE_GAME_FOLDER"
-            />
+            <p data-translate="CLICK_INPUT_INSTRUCTION">Just click inside the input</p>
+            <input type="text" id="gameFolder" data-translate-placeholder="LOCATE_GAME_FOLDER" />
             <div id="notification" class="notification"></div>
         </div>
-        <div
-            class="settings-section"
-            id="settings-version"
-            style="display: none"
-        >
+        <div class="settings-section" id="settings-version" style="display: none">
             <h2 data-translate="SETTINGS_VERSION_INFO">Version Info</h2>
             <p id="version-info"></p>
         </div>
     </div>
 </div>
+
+<script>
+    // ========== AUTH STATE UPDATE (called from index.html) ==========
+    function updateHeaderAuthState(isLoggedIn, username) {
+        const statusLoginRequired = document.getElementById('status-login-required');
+        const statusReady = document.getElementById('status-ready');
+        const launchBtn = document.getElementById('launch-game-btn');
+
+        if (isLoggedIn) {
+            // Switch to ready state
+            if (statusLoginRequired) statusLoginRequired.classList.remove('active');
+            if (statusReady) statusReady.classList.add('active');
+
+            // Enable launch button
+            if (launchBtn) {
+                launchBtn.classList.remove('disabled');
+                launchBtn.disabled = false;
+            }
+        } else {
+            // Switch to login required state
+            hideAllStatusStates();
+            if (statusLoginRequired) statusLoginRequired.classList.add('active');
+
+            // Disable launch button
+            if (launchBtn) {
+                launchBtn.classList.add('disabled');
+                launchBtn.disabled = true;
+            }
+        }
+
+        // Also update the index.html header (login form, user display, settings dropdown)
+        if (typeof window.updateIndexHeaderAuthState === 'function') {
+            window.updateIndexHeaderAuthState(isLoggedIn, username);
+        }
+    }
+    window.updateHeaderAuthState = updateHeaderAuthState;
+
+    // ========== STATUS STATE HELPERS ==========
+    function hideAllStatusStates() {
+        document.querySelectorAll('#home-status-area .status-state').forEach(s => {
+            s.classList.remove('active');
+        });
+    }
+
+    function showCheckingState(checked, total) {
+        hideAllStatusStates();
+        const statusChecking = document.getElementById('status-checking');
+        if (statusChecking) statusChecking.classList.add('active');
+
+        // Show spinner on launch button
+        const playIcon = document.getElementById('launch-play-icon');
+        const spinnerIcon = document.getElementById('launch-spinner-icon');
+        const btnText = document.getElementById('launch-btn-text');
+        const launchBtn = document.getElementById('launch-game-btn');
+
+        if (playIcon) playIcon.style.display = 'none';
+        if (spinnerIcon) spinnerIcon.style.display = 'block';
+        if (btnText) btnText.textContent = 'CHECKING';
+        if (launchBtn) {
+            launchBtn.classList.add('disabled');
+            launchBtn.disabled = true;
+        }
+
+        // Hide pause button
+        const pauseBtn = document.getElementById('btn-pause-resume');
+        if (pauseBtn) pauseBtn.classList.remove('active');
+
+        updateCheckingProgress(checked, total);
+    }
+    window.showCheckingState = showCheckingState;
+
+    function updateCheckingProgress(checked, total) {
+        const checkedEl = document.getElementById('checked-files');
+        const totalEl = document.getElementById('total-files');
+        const progressBar = document.getElementById('check-progress-bar');
+        const percentEl = document.getElementById('check-percent');
+
+        const checkedNum = checked || 0;
+        const totalNum = total || 0;
+        const percent = totalNum > 0 ? Math.round((checkedNum / totalNum) * 100) : 0;
+
+        if (checkedEl) checkedEl.textContent = checkedNum.toLocaleString();
+        if (totalEl) totalEl.textContent = totalNum.toLocaleString();
+        if (percentEl) percentEl.textContent = `${percent}%`;
+        if (progressBar) progressBar.style.width = `${percent}%`;
+    }
+    window.updateCheckingProgress = updateCheckingProgress;
+
+    function hideCheckingState() {
+        const statusChecking = document.getElementById('status-checking');
+        if (statusChecking) statusChecking.classList.remove('active');
+
+        // Reset launch button
+        const playIcon = document.getElementById('launch-play-icon');
+        const spinnerIcon = document.getElementById('launch-spinner-icon');
+        const btnText = document.getElementById('launch-btn-text');
+
+        if (playIcon) playIcon.style.display = 'block';
+        if (spinnerIcon) spinnerIcon.style.display = 'none';
+        if (btnText) btnText.textContent = 'LAUNCH';
+    }
+    window.hideCheckingState = hideCheckingState;
+
+    function showDownloadingState() {
+        hideAllStatusStates();
+        const statusDownloading = document.getElementById('status-downloading');
+        if (statusDownloading) statusDownloading.classList.add('active');
+
+        // Show pause button
+        const pauseBtn = document.getElementById('btn-pause-resume');
+        if (pauseBtn) pauseBtn.classList.add('active');
+
+        // Update pause button to show pause icon
+        const pauseIcon = document.getElementById('pause-icon');
+        const resumeIcon = document.getElementById('resume-icon');
+        if (pauseIcon) pauseIcon.style.display = 'block';
+        if (resumeIcon) resumeIcon.style.display = 'none';
+
+        // Update download label
+        const dlLabel = document.getElementById('dl-status-label');
+        if (dlLabel) dlLabel.textContent = 'Downloading...';
+
+        // Disable launch button during download
+        const launchBtn = document.getElementById('launch-game-btn');
+        const playIcon = document.getElementById('launch-play-icon');
+        const spinnerIcon = document.getElementById('launch-spinner-icon');
+        const btnText = document.getElementById('launch-btn-text');
+
+        if (launchBtn) {
+            launchBtn.classList.add('disabled');
+            launchBtn.disabled = true;
+        }
+        if (playIcon) playIcon.style.display = 'block';
+        if (spinnerIcon) spinnerIcon.style.display = 'none';
+        if (btnText) btnText.textContent = 'LAUNCH';
+    }
+    window.showDownloadingState = showDownloadingState;
+
+    function updateDownloadProgress(progress, downloaded, total, speed) {
+        const progressBar = document.getElementById('progress-percentage-div');
+        const percentEl = document.getElementById('progress-percentage');
+        const downloadedEl = document.getElementById('downloaded-size');
+        const totalEl = document.getElementById('total-size');
+        const speedEl = document.getElementById('download-speed');
+
+        const percent = Math.round(progress || 0);
+
+        if (progressBar) progressBar.style.width = `${percent}%`;
+        if (percentEl) percentEl.textContent = `${percent}%`;
+        if (downloadedEl) downloadedEl.textContent = downloaded || '0';
+        if (totalEl) totalEl.textContent = total || '0';
+        if (speedEl) speedEl.textContent = speed || '--';
+    }
+    window.updateDownloadProgress = updateDownloadProgress;
+
+    function showPausedState() {
+        // Keep downloading state visible but update UI
+        const dlLabel = document.getElementById('dl-status-label');
+        if (dlLabel) dlLabel.textContent = 'Paused';
+
+        // Show resume icon on pause button
+        const pauseIcon = document.getElementById('pause-icon');
+        const resumeIcon = document.getElementById('resume-icon');
+        if (pauseIcon) pauseIcon.style.display = 'none';
+        if (resumeIcon) resumeIcon.style.display = 'block';
+    }
+    window.showPausedState = showPausedState;
+
+    function showReadyState() {
+        hideAllStatusStates();
+        const statusReady = document.getElementById('status-ready');
+        if (statusReady) statusReady.classList.add('active');
+
+        // Hide pause button
+        const pauseBtn = document.getElementById('btn-pause-resume');
+        if (pauseBtn) pauseBtn.classList.remove('active');
+
+        // Enable launch button
+        const launchBtn = document.getElementById('launch-game-btn');
+        const playIcon = document.getElementById('launch-play-icon');
+        const spinnerIcon = document.getElementById('launch-spinner-icon');
+        const btnText = document.getElementById('launch-btn-text');
+
+        if (launchBtn) {
+            launchBtn.classList.remove('disabled');
+            launchBtn.disabled = false;
+        }
+        if (playIcon) playIcon.style.display = 'block';
+        if (spinnerIcon) spinnerIcon.style.display = 'none';
+        if (btnText) btnText.textContent = 'LAUNCH';
+    }
+    window.showReadyState = showReadyState;
+
+    // ========== UPDATE NOTIFICATION ==========
+    // state: 'checking' | 'upToDate' | 'error'
+    function showUpdateNotification(state, title, subtitle) {
+        const notification = document.getElementById('update-notification');
+        const titleEl = document.getElementById('update-notification-title');
+        const subtitleEl = document.getElementById('update-notification-subtitle');
+        const iconChecking = document.getElementById('update-icon-checking');
+        const iconSuccess = document.getElementById('update-icon-success');
+        const iconError = document.getElementById('update-icon-error');
+
+        if (!notification) return;
+
+        // Update text
+        if (titleEl) titleEl.textContent = title || 'Checking for updates...';
+        if (subtitleEl) subtitleEl.textContent = subtitle || 'Please wait';
+
+        // Update icon visibility
+        if (iconChecking) iconChecking.style.display = state === 'checking' ? 'flex' : 'none';
+        if (iconSuccess) iconSuccess.style.display = state === 'upToDate' ? 'flex' : 'none';
+        if (iconError) iconError.style.display = state === 'error' ? 'flex' : 'none';
+
+        // Show notification
+        notification.classList.add('show');
+
+        // Auto-hide after 4 seconds for success/error states
+        if (state === 'upToDate' || state === 'error') {
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 4000);
+        }
+    }
+    window.showUpdateNotification = showUpdateNotification;
+
+    function hideUpdateNotification() {
+        const notification = document.getElementById('update-notification');
+        if (notification) {
+            notification.classList.remove('show');
+        }
+    }
+    window.hideUpdateNotification = hideUpdateNotification;
+
+    // ========== SETTINGS MENU HANDLERS (exposed for index.html) ==========
+    function handleCheckLauncherUpdate() {
+        // This function is called from index.html's settings menu
+        if (window.App && App.checkForLauncherUpdates) {
+            App.checkForLauncherUpdates();
+        }
+    }
+    window.handleCheckLauncherUpdate = handleCheckLauncherUpdate;
+
+    function handleCheckRepairFiles() {
+        // This function is called from index.html's settings menu
+        if (window.App && App.revalidateAndUpdateGame) {
+            App.revalidateAndUpdateGame();
+        }
+    }
+    window.handleCheckRepairFiles = handleCheckRepairFiles;
+
+    // ========== GAME DIRECTORY DIALOG ==========
+    function openGameDirectoryDialog(currentPath) {
+        const dialog = document.getElementById('game-directory-dialog');
+        const input = document.getElementById('game-directory-input');
+
+        if (dialog) {
+            dialog.classList.add('show');
+
+            // Set current path if provided
+            if (currentPath && input) {
+                input.value = currentPath;
+            } else if (window.App && App.loadConfig) {
+                // Load current path if available
+                App.loadConfig('gamePath').then(path => {
+                    if (path && input) {
+                        input.value = path;
+                    }
+                });
+            }
+        }
+    }
+    window.openGameDirectoryDialog = openGameDirectoryDialog;
+
+    function closeGameDirectoryDialog() {
+        const dialog = document.getElementById('game-directory-dialog');
+        if (dialog) {
+            dialog.classList.remove('show');
+        }
+    }
+    window.closeGameDirectoryDialog = closeGameDirectoryDialog;
+
+    async function browseGameDirectory() {
+        if (window.__TAURI__) {
+            try {
+                const selected = await window.__TAURI__.dialog.open({
+                    directory: true,
+                    multiple: false,
+                    title: 'Select Game Directory'
+                });
+                if (selected) {
+                    document.getElementById('game-directory-input').value = selected;
+                }
+            } catch (e) {
+                console.error('Failed to open directory dialog:', e);
+            }
+        }
+    }
+
+    async function saveGameDirectory() {
+        const input = document.getElementById('game-directory-input');
+        const path = input?.value;
+
+        if (path && window.App && App.saveConfig) {
+            try {
+                await App.saveConfig('gamePath', path);
+                closeGameDirectoryDialog();
+            } catch (e) {
+                console.error('Failed to save game directory:', e);
+            }
+        }
+    }
+
+    // Close dialog when clicking backdrop
+    document.getElementById('game-directory-dialog')?.addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeGameDirectoryDialog();
+        }
+    });
+
+    // Legacy modal opener for backwards compatibility
+    function openSettingsModal() {
+        openGameDirectoryDialog();
+    }
+    window.openSettingsModal = openSettingsModal;
+
+    // ========== BACKGROUND CAROUSEL ==========
+    function initBackgroundCarousel() {
+        const bgImages = document.querySelectorAll('#home-bg-container .bg-image');
+        if (bgImages.length <= 1) return;
+
+        let currentIndex = 0;
+        setInterval(() => {
+            bgImages[currentIndex].classList.remove('active');
+            currentIndex = (currentIndex + 1) % bgImages.length;
+            bgImages[currentIndex].classList.add('active');
+        }, 8000);
+    }
+
+    // Initialize carousel when page loads
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initBackgroundCarousel);
+    } else {
+        initBackgroundCarousel();
+    }
+</script>

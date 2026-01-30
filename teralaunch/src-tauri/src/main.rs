@@ -183,6 +183,8 @@ fn main() {
             commands::util::set_logging,
             commands::util::update_launcher,
             commands::util::check_server_connection,
+            commands::util::fetch_player_count,
+            commands::util::fetch_news_feed,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

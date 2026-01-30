@@ -6,14 +6,8 @@ const createRouter = (App) => ({
         home: {
             title: 'Home',
             file: 'home.html',
-            protected: true,
-            init: 'initHome'
-        },
-        login: {
-            title: 'Login',
-            file: 'login.html',
             public: true,
-            init: 'initLogin'
+            init: 'initHome'
         },
     },
 
@@ -60,17 +54,15 @@ const createRouter = (App) => ({
      * @returns {string|null} The determined route or null if navigation should be cancelled.
      */
     async determineRoute(route) {
+        // Always default to home - login is handled in the header
         route = route || window.location.hash.replace('#', '') || 'home';
 
         // Check authentication asynchronously
         await App.checkAuthentication();
 
-        if (this.routes[route]?.protected && !App.state.isAuthenticated) {
-            return 'login';
-        }
-
-        if (route === 'login' && App.state.isAuthenticated) {
-            return 'home';
+        // Always use home if route doesn't exist
+        if (!this.routes[route]) {
+            route = 'home';
         }
 
         if (this.currentRoute === route) {

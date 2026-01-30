@@ -221,7 +221,8 @@ const App = {
       this.resetState();
       this.updateUI();
 
-      if (this.state.isAuthenticated && this.Router.currentRoute === "home") {
+      // Always load player count and news on home page
+      if (this.Router.currentRoute === "home") {
         LoadStartPage();
 
         if (!UPDATE_CHECK_ENABLED) {
@@ -278,7 +279,7 @@ const App = {
         password,
       });
       alert("Registration successful!");
-      this.Router.navigate("login");
+      this.Router.navigate("home");
     } catch (err) {
       console.error(err);
       if (errorMsg) {
@@ -898,6 +899,11 @@ const App = {
       totalFiles: total_files,
       currentUpdateMode: "file_check",
     });
+
+    // Update new checking state UI
+    if (typeof window.showCheckingState === 'function') {
+      window.showCheckingState(current_count, total_files);
+    }
   },
 
   /**
@@ -923,6 +929,12 @@ const App = {
       isUpdateAvailable: hasUpdates,
       // Don't change mode here - let checkForUpdates handle the transition
     });
+
+    // Hide checking state UI
+    if (typeof window.hideCheckingState === 'function') {
+      window.hideCheckingState();
+    }
+
     if (!hasUpdates) {
       this.handleCompletion();
     }
@@ -1044,12 +1056,36 @@ const App = {
       (this.state.currentUpdateMode === "download" ||
         this.state.currentUpdateMode === "paused");
 
+    // Update new UI state sections
+    const statusReady = document.getElementById("status-ready");
+    const statusDownloading = document.getElementById("status-downloading");
+    const btnPauseResume = document.getElementById("btn-pause-resume");
+
+    if (statusReady && statusDownloading) {
+      if (showProgress) {
+        statusReady.classList.add("hidden");
+        statusDownloading.classList.add("active");
+      } else {
+        statusReady.classList.remove("hidden");
+        statusDownloading.classList.remove("active");
+      }
+    }
+
+    // Show/hide pause button
+    if (btnPauseResume) {
+      if (showProgress) {
+        btnPauseResume.classList.add("active");
+      } else {
+        btnPauseResume.classList.remove("active");
+      }
+    }
+
     if (elements.progressPercentage) {
       if (!showProgress) {
         elements.progressPercentage.style.display = "none";
       } else {
         elements.progressPercentage.style.display = "inline";
-        elements.progressPercentage.textContent = `(${Math.round(progress)}%)`;
+        elements.progressPercentage.textContent = `${Math.round(progress)}%`;
       }
     }
     if (elements.progressPercentageDiv && showProgress) {
@@ -1376,6 +1412,11 @@ const App = {
     this.updateLaunchGameButton(true);
     this.toggleLanguageSelector(false);
 
+    // Show checking state UI
+    if (typeof window.showCheckingState === 'function') {
+      window.showCheckingState(0, 0);
+    }
+
     try {
       const filesToUpdate = await invoke("get_files_to_update");
 
@@ -1385,6 +1426,10 @@ const App = {
           isFileCheckComplete: true,
           currentUpdateMode: "complete",
         });
+        // Hide checking state UI
+        if (typeof window.hideCheckingState === 'function') {
+          window.hideCheckingState();
+        }
         // Re-enable elements if no update is needed
         this.updateLaunchGameButton(false);
         this.toggleLanguageSelector(true);
@@ -1421,6 +1466,10 @@ const App = {
       console.error("Error checking for updates:", error);
       this.resetState();
       this.showErrorMessage(this.t("UPDATE_SERVER_UNREACHABLE"));
+      // Hide checking state UI on error
+      if (typeof window.hideCheckingState === 'function') {
+        window.hideCheckingState();
+      }
       // Re-enable elements in case of error
       this.updateLaunchGameButton(false);
       this.toggleLanguageSelector(true);
@@ -1573,17 +1622,16 @@ const App = {
     if (this.state.isLoggingIn) return;
 
     this.setState({ isLoggingIn: true });
-    const loginButton = document.getElementById("login-button");
-    const loginErrorMsg = document.getElementById("login-error-msg");
+    // Use header login elements
+    const loginButton = document.getElementById("header-login-btn");
+    const loginErrorMsg = document.getElementById("header-login-error");
 
     if (loginButton) {
       loginButton.disabled = true;
-      loginButton.textContent = this.t("LOGIN_IN_PROGRESS");
     }
 
     if (loginErrorMsg) {
       loginErrorMsg.style.display = "none";
-      loginErrorMsg.style.opacity = 0;
     }
 
     try {
@@ -1639,20 +1687,22 @@ const App = {
       if (loginErrorMsg) {
         const message = error && (error.message || error);
         if (message === "INVALID_CREDENTIALS") {
-          loginErrorMsg.textContent = this.t("LOGIN_ERROR");
+          loginErrorMsg.textContent = this.t("LOGIN_ERROR") || "Invalid username or password";
         } else if (message && typeof message === "string") {
           loginErrorMsg.textContent = message;
         } else {
-          loginErrorMsg.textContent = this.t("SERVER_CONNECTION_ERROR");
+          loginErrorMsg.textContent = this.t("SERVER_CONNECTION_ERROR") || "Connection error";
         }
-        loginErrorMsg.style.display = "flex";
-        loginErrorMsg.style.opacity = 1;
+        loginErrorMsg.style.display = "block";
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+          if (loginErrorMsg) loginErrorMsg.style.display = "none";
+        }, 5000);
       }
     } finally {
       this.setState({ isLoggingIn: false });
       if (loginButton) {
         loginButton.disabled = false;
-        loginButton.textContent = this.t("LOGIN_BUTTON");
       }
     }
   },
@@ -1741,6 +1791,10 @@ const App = {
   async logout() {
     if (this.state.isLoggingOut) return;
 
+    // Close settings dropdown immediately
+    const settingsWrapper = document.getElementById("settings-dropdown-wrapper");
+    if (settingsWrapper) settingsWrapper.classList.remove("active");
+
     this.setState({ isLoggingOut: true });
     try {
       await invoke("handle_logout");
@@ -1765,8 +1819,7 @@ const App = {
         updateCheckPerformedOnLogin: false,
         updateCheckPerformedOnRefresh: false,
       });
-      this.Router.navigate("login");
-      this.resetState();
+      // Stay on current page, just update auth state in header
       this.checkAuthentication();
     } catch (error) {
       console.error("Error during logout:", error);
@@ -1895,6 +1948,11 @@ const App = {
   },
 
   async handleLaunchGame() {
+    // Early exit if not authenticated
+    if (!this.state.isAuthenticated) {
+      console.log("Cannot launch game: not authenticated");
+      return;
+    }
     if (UPDATE_CHECK_ENABLED && this.state.isUpdateAvailable) return;
     if (this.state.isGameLaunching) return;
 
@@ -2656,7 +2714,7 @@ const App = {
 
     if (backBtn) {
       backBtn.addEventListener("click", () => {
-        this.Router.navigate("login");
+        this.Router.navigate("home");
       });
     }
   },
@@ -2702,6 +2760,9 @@ const App = {
     this.setupHomePageElements();
     this.setupHomePageEventListeners();
     await this.initializeHomePageComponents();
+
+    // Re-check authentication to update UI state after home page is loaded
+    this.checkAuthentication();
   },
 
   /**
@@ -2747,6 +2808,9 @@ const App = {
     if (logoutButton) {
       logoutButton.addEventListener("click", async (e) => {
         e.preventDefault();
+        // Close settings dropdown
+        const settingsWrapper = document.getElementById("settings-dropdown-wrapper");
+        if (settingsWrapper) settingsWrapper.classList.remove("active");
         await this.logout();
       });
     }
@@ -3145,6 +3209,108 @@ const App = {
   },
 
   /**
+   * Generic config loader for the new UI.
+   * @param {string} key - The config key to load ('gamePath' supported)
+   * @returns {Promise<string|null>}
+   */
+  async loadConfig(key) {
+    try {
+      if (key === 'gamePath') {
+        return await invoke("get_game_path_from_config");
+      }
+      return null;
+    } catch (error) {
+      console.error(`Error loading config ${key}:`, error);
+      return null;
+    }
+  },
+
+  /**
+   * Generic config saver for the new UI.
+   * @param {string} key - The config key to save ('gamePath' supported)
+   * @param {string} value - The value to save
+   * @returns {Promise<void>}
+   */
+  async saveConfig(key, value) {
+    try {
+      if (key === 'gamePath') {
+        await this.saveGamePath(value);
+      }
+    } catch (error) {
+      console.error(`Error saving config ${key}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * Force revalidates all game files and updates if necessary.
+   * Triggered from the Settings menu.
+   */
+  async revalidateAndUpdateGame() {
+    if (this.state.isCheckingForUpdates || this.state.isDownloading) {
+      console.log("Already checking or downloading, skipping");
+      return;
+    }
+
+    // Show update notification
+    if (typeof window.showUpdateNotification === 'function') {
+      window.showUpdateNotification('Checking files...', false);
+    }
+
+    try {
+      await this.checkForUpdates();
+    } finally {
+      // Hide notification after a delay if no update needed
+      if (!this.state.isUpdateAvailable) {
+        if (typeof window.showUpdateNotification === 'function') {
+          window.showUpdateNotification('All files verified', true);
+        }
+      } else {
+        if (typeof window.hideUpdateNotification === 'function') {
+          window.hideUpdateNotification();
+        }
+      }
+    }
+  },
+
+  /**
+   * Checks for launcher updates and shows notification.
+   * Uses Tauri's built-in updater.
+   */
+  async checkForLauncherUpdates() {
+    if (typeof window.showUpdateNotification === 'function') {
+      window.showUpdateNotification('Checking for launcher updates...', false);
+    }
+
+    try {
+      // Tauri updater handles this via dialog:true in tauri.conf.json
+      // This is just for manual trigger from menu
+      const { checkUpdate } = window.__TAURI__.updater;
+      if (checkUpdate) {
+        const { shouldUpdate, manifest } = await checkUpdate();
+        if (shouldUpdate) {
+          if (typeof window.showUpdateNotification === 'function') {
+            window.showUpdateNotification(`Update available: ${manifest?.version}`, true);
+          }
+        } else {
+          if (typeof window.showUpdateNotification === 'function') {
+            window.showUpdateNotification('Launcher is up to date', true);
+          }
+        }
+      } else {
+        if (typeof window.showUpdateNotification === 'function') {
+          window.showUpdateNotification('Launcher is up to date', true);
+        }
+      }
+    } catch (error) {
+      console.error("Error checking for launcher updates:", error);
+      if (typeof window.showUpdateNotification === 'function') {
+        window.showUpdateNotification('Update check failed', true);
+      }
+    }
+  },
+
+  /**
    * Sets up the event listeners for the window controls (minimize and close buttons)
    * to allow the user to interact with the window.
    */
@@ -3306,9 +3472,19 @@ const App = {
    * considered authenticated, otherwise they are not.
    */
   checkAuthentication() {
-    this.setState({
-      isAuthenticated: localStorage.getItem("authKey") !== null,
-    });
+    const isAuthenticated = localStorage.getItem("authKey") !== null;
+    const userName = localStorage.getItem("userName");
+    this.setState({ isAuthenticated });
+
+    // Update index.html header (login form, user display) - always available
+    if (typeof window.updateIndexHeaderAuthState === "function") {
+      window.updateIndexHeaderAuthState(isAuthenticated, userName);
+    }
+
+    // Update home.html UI (launch button, status) - only when home page is loaded
+    if (typeof window.updateHeaderAuthState === "function") {
+      window.updateHeaderAuthState(isAuthenticated, userName);
+    }
   },
 
   /**
@@ -3607,6 +3783,13 @@ const App = {
   },
 };
 function LoadStartPage() {
+  // Load player count from API
+  loadPlayerCount();
+
+  // Load news from RSS feed
+  loadNewsFeed();
+
+  // Load original news data for ads/links
   fetchData(URLS.content.news).then((jsonNews) => {
     if (!jsonNews) {
       console.warn("Failed to load news data");
@@ -3614,79 +3797,157 @@ function LoadStartPage() {
     }
     //MAINTENANCE INFO
     if (jsonNews.WARTUNG_enabled) {
-      document.getElementById("NewsWartungImgId").style.display = "block";
-      document.getElementById("NewsWartungTextId").style.display = "flex";
-      document.getElementById("NewsWartungTextId").textContent =
-        jsonNews.WARTUNG_info_text;
+      const maintenanceContainer = document.getElementById("maintenance-container");
+      if (maintenanceContainer) {
+        maintenanceContainer.classList.add("show");
+      }
+      const wartungText = document.getElementById("NewsWartungTextId");
+      if (wartungText) {
+        wartungText.textContent = jsonNews.WARTUNG_info_text;
+      }
     } else {
-      document.getElementById("NewsWartungImgId").style.display = "none";
-      document.getElementById("NewsWartungTextId").style.display = "none";
-      document.getElementById("NewsWartungTextId").textContent = "";
-    }
-
-    //BIG NEWS TOP RIGHT
-    if (!!jsonNews.News_img_url) {
-      document.getElementById("NewsImgId").src = jsonNews.News_img_url;
-      document.getElementById("NewsSideTitleTextId").textContent =
-        jsonNews.News_side_title_text;
-      document.getElementById("NewsTextId").textContent =
-        jsonNews.News_side_text;
-    } else {
-      document.getElementById("NewsImgId").src = "";
-      document.getElementById("NewsTextId").textContent = "";
-    }
-    if (!!jsonNews.News_img_link_url) {
-      document.getElementById("NewsImgIdHref").href =
-        jsonNews.News_img_link_url;
+      const maintenanceContainer = document.getElementById("maintenance-container");
+      if (maintenanceContainer) {
+        maintenanceContainer.classList.remove("show");
+      }
+      const wartungText = document.getElementById("NewsWartungTextId");
+      if (wartungText) {
+        wartungText.textContent = "";
+      }
     }
 
     //ADVERTISEMENT LEFT
-    if (!!jsonNews.Advertisement_left_img_url) {
-      document.getElementById("AdImgId1").src =
-        jsonNews.Advertisement_left_img_url;
-      document.getElementById("AdTextId1").textContent =
-        jsonNews.Advertisement_left_text;
-    } else {
-      document.getElementById("AdImgId1").src = "";
-      document.getElementById("AdTextId1").textContent = "";
+    const adBg1 = document.getElementById("AdImgBg1");
+    if (jsonNews.Advertisement_left_img_url && adBg1) {
+      adBg1.style.backgroundImage = `url('${jsonNews.Advertisement_left_img_url}')`;
+      document.getElementById("AdTextId1").textContent = jsonNews.Advertisement_left_text || "";
     }
-    if (!!jsonNews.Advertisement_left_img_link_url) {
-      document.getElementById("AdImgId1Href").href =
-        jsonNews.Advertisement_left_img_link_url;
+    if (jsonNews.Advertisement_left_img_link_url) {
+      document.getElementById("AdImgId1Href").href = jsonNews.Advertisement_left_img_link_url;
     }
 
     //ADVERTISEMENT MIDDLE
-    if (!!jsonNews.Advertisement_mid_img_url) {
-      document.getElementById("AdImgId2").src =
-        jsonNews.Advertisement_mid_img_url;
-      document.getElementById("AdTextId2").textContent =
-        jsonNews.Advertisement_mid_text;
-    } else {
-      document.getElementById("AdImgId2").src = "";
-      document.getElementById("AdTextId2").textContent = "";
+    const adBg2 = document.getElementById("AdImgBg2");
+    if (jsonNews.Advertisement_mid_img_url && adBg2) {
+      adBg2.style.backgroundImage = `url('${jsonNews.Advertisement_mid_img_url}')`;
+      document.getElementById("AdTextId2").textContent = jsonNews.Advertisement_mid_text || "";
     }
-    if (!!jsonNews.Advertisement_mid_img_link_url) {
-      document.getElementById("AdImgId2Href").href =
-        jsonNews.Advertisement_mid_img_link_url;
+    if (jsonNews.Advertisement_mid_img_link_url) {
+      document.getElementById("AdImgId2Href").href = jsonNews.Advertisement_mid_img_link_url;
     }
 
     //ADVERTISEMENT RIGHT
-    if (!!jsonNews.Advertisement_right_img_url) {
-      document.getElementById("AdImgId3").src =
-        jsonNews.Advertisement_right_img_url;
-      document.getElementById("AdTextId3").textContent =
-        jsonNews.Advertisement_right_text;
-    } else {
-      document.getElementById("AdImgId3").src = "";
-      document.getElementById("AdTextId3").textContent = "";
+    const adBg3 = document.getElementById("AdImgBg3");
+    if (jsonNews.Advertisement_right_img_url && adBg3) {
+      adBg3.style.backgroundImage = `url('${jsonNews.Advertisement_right_img_url}')`;
+      document.getElementById("AdTextId3").textContent = jsonNews.Advertisement_right_text || "";
     }
-    if (!!jsonNews.Advertisement_right_img_link_url) {
-      document.getElementById("AdImgId3Href").href =
-        jsonNews.Advertisement_right_img_link_url;
+    if (jsonNews.Advertisement_right_img_link_url) {
+      document.getElementById("AdImgId3Href").href = jsonNews.Advertisement_right_img_link_url;
     }
   }).catch((error) => {
     console.error("Error loading start page:", error);
   });
+}
+
+/**
+ * Fetches and displays the current player count from the server API.
+ * Updates the compact player badge with count and status.
+ */
+async function loadPlayerCount() {
+  const playerCountEl = document.getElementById("player-count");
+  const serverPulseEl = document.getElementById("server-pulse");
+
+  if (!playerCountEl) return;
+
+  try {
+    // Use Tauri backend to avoid CORS issues
+    const jsonString = await invoke("fetch_player_count");
+    const data = JSON.parse(jsonString);
+
+    if (data.latest) {
+      // Animate the player count
+      animateNumber(playerCountEl, data.latest.players);
+
+      // Update server status indicator
+      if (data.latest.maintenance) {
+        if (serverPulseEl) serverPulseEl.classList.add("maintenance");
+      } else {
+        if (serverPulseEl) serverPulseEl.classList.remove("maintenance", "offline");
+      }
+    }
+  } catch (error) {
+    console.error("Error loading player count:", error);
+    if (playerCountEl) playerCountEl.textContent = "--";
+    if (serverPulseEl) serverPulseEl.classList.add("offline");
+  }
+}
+
+/**
+ * Animates a number from 0 to the target value.
+ */
+function animateNumber(element, target, duration = 1000) {
+  const start = 0;
+  const startTime = performance.now();
+
+  function update(currentTime) {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+
+    // Ease out cubic
+    const easeOut = 1 - Math.pow(1 - progress, 3);
+    const current = Math.round(start + (target - start) * easeOut);
+
+    element.textContent = current;
+
+    if (progress < 1) {
+      requestAnimationFrame(update);
+    }
+  }
+
+  requestAnimationFrame(update);
+}
+
+/**
+ * Fetches and displays news in the horizontal ticker.
+ */
+async function loadNewsFeed() {
+  const newsFeedList = document.getElementById("news-feed-list");
+  if (!newsFeedList) return;
+
+  try {
+    // Use Tauri backend to avoid CORS issues (returns pre-parsed JSON)
+    const jsonString = await invoke("fetch_news_feed");
+    const items = JSON.parse(jsonString);
+
+    // Clear loading state
+    newsFeedList.innerHTML = "";
+
+    // Display news items as vertical list in sidebar
+    const maxItems = Math.min(items.length, 5);
+    for (let i = 0; i < maxItems; i++) {
+      const item = items[i];
+      const title = item.title || "Untitled";
+      const link = item.link || "#";
+
+      const newsItem = document.createElement("a");
+      newsItem.href = link;
+      newsItem.target = "_blank";
+      // Inline styles for vertical news list
+      // Horizontal news bar style
+      newsItem.className = 'news-item';
+      newsItem.textContent = escapeHtml(title);
+      newsFeedList.appendChild(newsItem);
+    }
+
+    // If no items, show placeholder
+    if (maxItems === 0) {
+      newsFeedList.innerHTML = `<span class="news-item" style="color: var(--text-muted);">No news available</span>`;
+    }
+  } catch (error) {
+    console.error("Error loading news feed:", error);
+    newsFeedList.innerHTML = `<span class="news-item" style="color: var(--text-muted);">Unable to load news</span>`;
+  }
 }
 
 // Create the Router and attach it to App

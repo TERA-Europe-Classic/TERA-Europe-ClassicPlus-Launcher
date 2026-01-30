@@ -1,5 +1,13 @@
 {
     "FRA": {
+        "LOGIN_REQUIRED": "Connexion requise",
+        "READY_TO_PLAY": "Prêt à jouer",
+        "WEBSITE": "Site web",
+        "REGION": "Région:",
+        "LOGIN": "Connexion",
+        "REGISTER": "S'inscrire",
+        "USERNAME": "Nom d'utilisateur",
+        "PASSWORD": "Mot de passe",
         "RECHECK_GAME_FILES": null,
         "UPDATE_CHECK_FAILED": "Échec de la vérification des mises à jour. Veuillez réessayer.",
         "LOGIN_TITLE": "Connexion",
@@ -85,6 +93,14 @@
         "CHECK_LAUNCHER_UPDATE": "Vérifier la mise à jour du lanceur"
     },
     "EUR": {
+        "LOGIN_REQUIRED": "Login required",
+        "READY_TO_PLAY": "Ready to play",
+        "WEBSITE": "Website",
+        "REGION": "Region:",
+        "LOGIN": "Login",
+        "REGISTER": "Register",
+        "USERNAME": "Username",
+        "PASSWORD": "Password",
         "UPDATE_CHECK_FAILED": "Failed to check for updates. Please try again.",
         "LOGIN_TITLE": "Login",
         "REGISTER_TITLE": "Register",
@@ -169,6 +185,14 @@
         "CHECK_LAUNCHER_UPDATE": "Check Launcher Update"
     },
     "RUS": {
+        "LOGIN_REQUIRED": "Требуется вход",
+        "READY_TO_PLAY": "Готов к игре",
+        "WEBSITE": "Сайт",
+        "REGION": "Регион:",
+        "LOGIN": "Войти",
+        "REGISTER": "Регистрация",
+        "USERNAME": "Имя пользователя",
+        "PASSWORD": "Пароль",
         "UPDATE_CHECK_FAILED": "Не удалось проверить обновления. Пожалуйста, попробуйте снова.",
         "LOGIN_TITLE": "Вход",
         "REGISTER_TITLE": "Регистрация",
@@ -253,6 +277,14 @@
         "CHECK_LAUNCHER_UPDATE": "Проверить обновление лаунчера"
     },
     "GER": {
+        "LOGIN_REQUIRED": "Anmeldung erforderlich",
+        "READY_TO_PLAY": "Bereit zum Spielen",
+        "WEBSITE": "Webseite",
+        "REGION": "Region:",
+        "LOGIN": "Anmelden",
+        "REGISTER": "Registrieren",
+        "USERNAME": "Benutzername",
+        "PASSWORD": "Passwort",
         "UPDATE_CHECK_FAILED": "Updateprüfung fehlgeschlagen. Bitte erneut versuchen.",
         "LOGIN_TITLE": "Anmelden",
         "REGISTER_TITLE": "Registrieren",
