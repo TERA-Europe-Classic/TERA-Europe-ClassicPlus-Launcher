@@ -1,633 +1,27 @@
 <main class="content" id="home-page">
-    <style>
-        /* ========== CSS VARIABLES - shadcn Dark Theme (converted from OKLCH) ========== */
-        :root {
-            --background: #141922;
-            --foreground: #f0f2f5;
-            --card: #1a1f2a;
-            --popover: #161b24;
-            --primary: #22d3ee;
-            --primary-foreground: #141922;
-            --secondary: #1e2430;
-            --muted: #2a303c;
-            --muted-foreground: #8b92a0;
-            --accent: #333a4a;
-            --destructive: #dc2626;
-            --border: #3a4555;
-            --input: #2a303c;
-            --ring: #22d3ee;
-            --radius: 0.5rem;
-
-            /* Additional semantic colors */
-            --emerald-500: #10b981;
-            --emerald-400: #34d399;
-            --amber-500: #f59e0b;
-            --amber-400: #fbbf24;
-        }
-
-        /* ========== RESET & BASE ========== */
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        #home-page {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            display: flex;
-            flex-direction: column;
-            background: var(--background);
-            overflow: hidden;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            /* Account for 48px header in index.html */
-            padding-top: 0;
-        }
-
-        /* ========== BACKGROUND CAROUSEL ========== */
-        #home-bg-container {
-            position: absolute;
-            inset: 0;
-            z-index: 0;
-            overflow: hidden;
-        }
-
-        .bg-image {
-            position: absolute;
-            inset: 0;
-            background-size: cover;
-            background-position: center;
-            opacity: 0;
-            transition: opacity 1s ease-in-out;
-        }
-
-        .bg-image.active {
-            opacity: 1;
-        }
-
-        #home-bg-container::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(to right, rgba(15,18,25,0.95) 0%, rgba(15,18,25,0.6) 50%, rgba(15,18,25,0.3) 100%);
-            z-index: 1;
-        }
-
-        #home-bg-container::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(to top, rgba(15,18,25,1) 0%, transparent 50%, rgba(15,18,25,0.4) 100%);
-            z-index: 2;
-        }
-
-
-        /* ========== MAIN CONTENT (flex-1, p-8 = 32px) ========== */
-        #home-main {
-            position: relative;
-            z-index: 5;
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-
-        #home-info-section {
-            flex: 1;
-            display: flex;
-            align-items: flex-start;
-            padding: 56px 40px 40px 40px; /* Extra top padding to clear header */
-        }
-
-        .info-content {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start; /* Left-align all children */
-            gap: 28px; /* scaled up from 24px */
-            max-width: 480px; /* scaled up from 400px */
-        }
-
-        /* Logo: scaled up ~20% from 112px to 135px */
-        #Tera-Logo-home {
-            display: block;
-            height: 135px;
-            width: auto;
-            object-fit: contain;
-            filter: drop-shadow(0 25px 25px rgba(0, 0, 0, 0.25));
-            /* Image has whitespace - compensate to align with text below */
-            margin-left: -78px !important;
-            margin-top: -18px !important;
-        }
-
-        /* Description: scaled up from 14px to 15px */
-        #home-description {
-            font-size: 15px;
-            line-height: 1.625;
-            color: rgba(107, 114, 128, 0.9);
-            margin: 0;
-        }
-
-        /* Player Badge: px-4 = 16px, py-2.5 = 10px, rounded-lg, border-border/20 */
-        #home-player-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 12px; /* gap-3 */
-            padding: 10px 16px;
-            background: rgba(15, 18, 25, 0.3);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            border: 1px solid rgba(45, 53, 72, 0.2);
-            border-radius: 8px;
-            cursor: pointer;
-            transition: border-color 0.2s ease;
-            width: fit-content;
-        }
-
-        #home-player-badge:hover {
-            border-color: rgba(34, 211, 238, 0.3);
-        }
-
-        /* Pulse dot: h-2 w-2 = 8px with animate-ping */
-        .pulse-dot {
-            position: relative;
-            width: 8px;
-            height: 8px;
-        }
-
-        .pulse-dot::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: var(--emerald-400);
-            border-radius: 50%;
-            animation: pulse-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
-        }
-
-        .pulse-dot::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: var(--emerald-500);
-            border-radius: 50%;
-        }
-
-        @keyframes pulse-ping {
-            75%, 100% {
-                transform: scale(2);
-                opacity: 0;
-            }
-        }
-
-        /* Player count: scaled up from 18px to 22px */
-        #player-count {
-            font-size: 22px;
-            font-weight: 700;
-            color: var(--foreground);
-            font-variant-numeric: tabular-nums;
-            transition: color 0.2s ease;
-        }
-
-        #home-player-badge:hover #player-count {
-            color: var(--primary);
-        }
-
-        /* text-xs = 12px */
-        .player-label {
-            font-size: 12px;
-            color: var(--muted-foreground);
-        }
-
-        /* Maintenance Notice */
-        #maintenance-container {
-            display: none;
-            margin-top: 16px;
-        }
-
-        #maintenance-container.show {
-            display: block;
-        }
-
-        .maintenance-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 16px;
-            background: rgba(245, 158, 11, 0.15);
-            border: 1px solid rgba(245, 158, 11, 0.3);
-            border-radius: 8px;
-        }
-
-        .maintenance-icon {
-            font-size: 16px;
-        }
-
-        #NewsWartungTextId {
-            font-size: 13px;
-            color: #fcd34d;
-        }
-
-        /* ========== NEWS BAR (scaled up padding) ========== */
-        #home-news-bar {
-            display: flex;
-            align-items: center;
-            gap: 28px;
-            padding: 14px 28px;
-            background: rgba(15, 18, 25, 0.3);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            border-top: 1px solid rgba(45, 53, 72, 0.2);
-            border-bottom: 1px solid rgba(45, 53, 72, 0.2);
-        }
-
-        /* NEWS label: scaled up from 10px to 12px */
-        .news-label {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 12px;
-            font-weight: 700;
-            color: var(--primary);
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            text-decoration: none;
-            flex-shrink: 0;
-        }
-
-        .news-dot {
-            width: 6px;
-            height: 6px;
-            background: var(--primary);
-            border-radius: 50%;
-        }
-
-        /* News items: text-xs = 12px, text-muted-foreground, gap-6 = 24px */
-        #news-feed-list {
-            display: flex;
-            align-items: center;
-            gap: 24px;
-        }
-
-        .news-item {
-            font-size: 14px;
-            color: var(--muted-foreground);
-            text-decoration: none;
-            transition: color 0.2s ease;
-            white-space: nowrap;
-        }
-
-        .news-item:hover {
-            color: var(--foreground);
-        }
-
-        /* ========== FOOTER (scaled up padding from 16px to 20px) ========== */
-        #home-footer {
-            display: flex;
-            align-items: stretch;
-            gap: 20px;
-            padding: 20px;
-            background: rgba(15, 18, 25, 0.6);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border-top: 1px solid rgba(45, 53, 72, 0.2);
-        }
-
-        /* Promo Cards: grid-cols-3, gap-3 = 12px */
-        #home-promo-cards {
-            flex: 1;
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-        }
-
-        /* Cards: aspect-ratio 2.2/1, border-border/20, hover: border-primary/40 */
-        .promo-card {
-            position: relative;
-            aspect-ratio: 2.2 / 1;
-            border-radius: 8px;
-            overflow: hidden;
-            border: 1px solid rgba(45, 53, 72, 0.2);
-            text-decoration: none;
-            transition: all 0.3s ease;
-        }
-
-        .promo-card:hover {
-            border-color: rgba(34, 211, 238, 0.4);
-        }
-
-        .promo-card-bg {
-            position: absolute;
-            inset: 0;
-            background-size: cover;
-            background-position: center;
-            transition: transform 0.5s ease;
-        }
-
-        .promo-card:hover .promo-card-bg {
-            transform: scale(1.05);
-        }
-
-        .promo-card-overlay {
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(to top, rgba(15, 18, 25, 0.9) 0%, rgba(15, 18, 25, 0.3) 50%, transparent 100%);
-        }
-
-        /* Title: scaled up from 12px to 14px */
-        .promo-card-title {
-            position: absolute;
-            bottom: 14px;
-            left: 14px;
-            right: 14px;
-            font-size: 14px;
-            font-weight: 500;
-            color: var(--foreground);
-            transition: color 0.2s ease;
-        }
-
-        .promo-card:hover .promo-card-title {
-            color: var(--primary);
-        }
-
-        /* ========== LAUNCH SECTION (scaled up from 256px to 280px) ========== */
-        #home-launch-section {
-            width: 280px;
-            flex-shrink: 0;
-            display: flex;
-            flex-direction: column;
-            padding: 18px;
-            background: rgba(20, 25, 34, 0.4);
-            border-radius: 8px;
-            border: 1px solid rgba(58, 69, 85, 0.2);
-        }
-
-        /* Status area: h-[42px] = 42px */
-        #home-status-area {
-            height: 42px;
-            margin-bottom: 12px; /* gap-3 */
-        }
-
-        /* Status states container */
-        .status-state {
-            display: none;
-            height: 100%;
-        }
-
-        .status-state.active {
-            display: flex;
-        }
-
-        /* Login Required / Ready State: flex, items-center, gap-2 = 8px */
-        .status-simple {
-            align-items: center;
-            gap: 8px;
-        }
-
-        /* Status dot: scaled up from 6px to 10px */
-        .status-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            flex-shrink: 0;
-        }
-
-        .status-dot.green { background: var(--emerald-500); }
-        .status-dot.amber { background: var(--amber-500); }
-
-        /* Status text: scaled up from 14px to 16px */
-        .status-text {
-            font-size: 16px;
-            font-weight: 500;
-        }
-
-        .status-text.green { color: var(--emerald-400); }
-        .status-text.amber { color: var(--amber-400); }
-
-        /* Checking / Downloading State: flex-col, justify-between */
-        .status-progress {
-            flex-direction: column;
-            justify-content: space-between;
-        }
-
-        .progress-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 4px;
-        }
-
-        .progress-header-left {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .spinner {
-            width: 14px;
-            height: 14px;
-            animation: spin 1s linear infinite;
-            flex-shrink: 0;
-        }
-
-        .spinner svg {
-            width: 100%;
-            height: 100%;
-            stroke: var(--primary);
-        }
-
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-
-        /* Progress label: larger for readability */
-        .progress-label {
-            font-size: 14px;
-            font-weight: 500;
-            color: var(--foreground);
-            line-height: 1;
-        }
-
-        /* Progress percent: larger for readability */
-        .progress-percent {
-            font-size: 14px;
-            color: var(--muted-foreground);
-            font-variant-numeric: tabular-nums;
-            line-height: 1;
-        }
-
-        /* Progress bar: h-1.5 = 6px */
-        .progress-track {
-            height: 6px;
-            background: rgba(34, 211, 238, 0.15);
-            border-radius: 3px;
-            overflow: hidden;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: var(--primary);
-            border-radius: 3px;
-            transition: width 0.3s ease;
-            width: 0%;
-        }
-
-        /* Footer info: larger for readability */
-        .progress-footer {
-            display: flex;
-            justify-content: space-between;
-            font-size: 12px;
-            color: var(--muted-foreground);
-            font-variant-numeric: tabular-nums;
-        }
-
-        /* ========== LAUNCH BUTTONS (gap-2 = 8px) ========== */
-        #home-launch-buttons {
-            display: flex;
-            gap: 8px;
-        }
-
-        /* Pause button: w-12 = 48px, same height as launch button */
-        #btn-pause-resume {
-            width: 48px;
-            height: 42px;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            background: rgba(15, 18, 25, 0.5);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            flex-shrink: 0;
-        }
-
-        #btn-pause-resume:hover {
-            background: rgba(15, 18, 25, 0.7);
-            border-color: rgba(45, 53, 72, 0.5);
-        }
-
-        #btn-pause-resume.active {
-            display: flex;
-        }
-
-        #btn-pause-resume svg {
-            width: 16px;
-            height: 16px;
-            stroke: var(--foreground);
-            fill: none;
-        }
-
-        /* Launch button */
-        #launch-game-btn {
-            flex: 1;
-            height: 42px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            background: var(--primary);
-            border: none;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 700;
-            letter-spacing: 0.025em;
-            color: var(--primary-foreground);
-            cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 4px 16px rgba(34, 211, 238, 0.25);
-        }
-
-        #launch-game-btn:hover:not(.disabled) {
-            background: rgba(34, 211, 238, 0.9);
-            box-shadow: 0 6px 24px rgba(34, 211, 238, 0.4);
-        }
-
-        #launch-game-btn.disabled {
-            background: var(--muted);
-            color: var(--muted-foreground);
-            cursor: not-allowed;
-            box-shadow: none;
-        }
-
-        #launch-game-btn svg {
-            width: 15px;
-            height: 15px;
-        }
-
-        #launch-game-btn svg.play-icon {
-            fill: currentColor;
-            stroke: none;
-        }
-
-        #launch-game-btn svg.spinner-icon {
-            stroke: currentColor;
-            fill: none;
-            animation: spin 1s linear infinite;
-        }
-
-        /* ========== WINDOW DRAGGING ========== */
-        /* Make main areas draggable */
-        #home-page,
-        #home-bg-container,
-        #home-main,
-        #home-info-section,
-        .info-content,
-        #home-news-bar,
-        #home-footer {
-            -webkit-app-region: drag;
-        }
-
-        /* Exclude interactive elements from dragging */
-        button,
-        a,
-        input,
-        select,
-        textarea,
-        #home-launch-section,
-        #home-promo-cards,
-        .promo-card,
-        #home-player-badge,
-        .news-item,
-        .news-label {
-            -webkit-app-region: no-drag;
-        }
-
-        /* ========== HIDDEN COMPAT ELEMENTS ========== */
-        .hidden-compat {
-            display: none !important;
-        }
-
-        #NewsWartungImgId {
-            display: none;
-        }
-
-    </style>
-
     <!-- Background Carousel -->
     <div id="home-bg-container">
-        <div class="bg-image active" style="background-image: url('./assets/bg-1.webp');"></div>
-        <div class="bg-image" style="background-image: url('./assets/bg-2.webp');"></div>
-        <div class="bg-image" style="background-image: url('./assets/bg-3.webp');"></div>
-        <div class="bg-image" style="background-image: url('./assets/bg-4.webp');"></div>
-        <div class="bg-image" style="background-image: url('./assets/bg-5.webp');"></div>
+        <div class="bg-image" data-bg="./assets/bg-1.webp"></div>
+        <div class="bg-image" data-bg="./assets/bg-2.webp"></div>
+        <div class="bg-image" data-bg="./assets/bg-3.webp"></div>
+        <div class="bg-image" data-bg="./assets/bg-4.webp"></div>
+        <div class="bg-image" data-bg="./assets/bg-5.webp"></div>
         <!-- TERA Screenshots -->
-        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20250921_154024.png');"></div>
-        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251020_144430.png');"></div>
-        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251020_144748.png');"></div>
-        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251020_164230.png');"></div>
-        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251031_224427.png');"></div>
-        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251031_225023.png');"></div>
-        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251031_234446.png');"></div>
-        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251031_235811.png');"></div>
-        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251101_000035.png');"></div>
-        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251101_002433.png');"></div>
-        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251101_004052.png');"></div>
-        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251101_004531.png');"></div>
-        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251101_010311_1.png');"></div>
-        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251117_193545.png');"></div>
-        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251117_200150.png');"></div>
+        <div class="bg-image" data-bg="./assets/TERA_ScreenShot_20250921_154024.png"></div>
+        <div class="bg-image" data-bg="./assets/TERA_ScreenShot_20251020_144430.png"></div>
+        <div class="bg-image" data-bg="./assets/TERA_ScreenShot_20251020_144748.png"></div>
+        <div class="bg-image" data-bg="./assets/TERA_ScreenShot_20251020_164230.png"></div>
+        <div class="bg-image" data-bg="./assets/TERA_ScreenShot_20251031_224427.png"></div>
+        <div class="bg-image" data-bg="./assets/TERA_ScreenShot_20251031_225023.png"></div>
+        <div class="bg-image" data-bg="./assets/TERA_ScreenShot_20251031_234446.png"></div>
+        <div class="bg-image" data-bg="./assets/TERA_ScreenShot_20251031_235811.png"></div>
+        <div class="bg-image" data-bg="./assets/TERA_ScreenShot_20251101_000035.png"></div>
+        <div class="bg-image" data-bg="./assets/TERA_ScreenShot_20251101_002433.png"></div>
+        <div class="bg-image" data-bg="./assets/TERA_ScreenShot_20251101_004052.png"></div>
+        <div class="bg-image" data-bg="./assets/TERA_ScreenShot_20251101_004531.png"></div>
+        <div class="bg-image" data-bg="./assets/TERA_ScreenShot_20251101_010311_1.png"></div>
+        <div class="bg-image" data-bg="./assets/TERA_ScreenShot_20251117_193545.png"></div>
+        <div class="bg-image" data-bg="./assets/TERA_ScreenShot_20251117_200150.png"></div>
     </div>
 
     <!-- Main Content -->
@@ -656,7 +50,6 @@
                         <span class="maintenance-icon">&#9888;</span>
                         <span id="NewsWartungTextId"></span>
                     </div>
-                    <img id="NewsWartungImgId" src="./assets/WARTUNG.png" alt="" />
                 </div>
             </div>
         </div>
@@ -670,7 +63,7 @@
                     NEWS
                 </a>
                 <div id="news-feed-list">
-                    <span class="news-item" style="color: var(--muted-foreground);">Loading news...</span>
+                    <span class="news-item news-loading">Loading news...</span>
                 </div>
             </div>
 
@@ -679,20 +72,17 @@
                 <!-- Promo Cards -->
                 <div id="home-promo-cards">
                     <a id="AdImgId1Href" href="https://tera-europe.net/" target="_blank" class="promo-card">
-                        <div id="AdImgBg1" class="promo-card-bg" style="background-image: url('./assets/promo-1.webp');"></div>
-                        <img id="AdImgId1" src="" alt="" class="hidden-compat" />
+                        <div id="AdImgBg1" class="promo-card-bg" data-bg="./assets/promo-1.webp"></div>
                         <div class="promo-card-overlay"></div>
                         <span id="AdTextId1" class="promo-card-title">Visit our partner!</span>
                     </a>
                     <a id="AdImgId2Href" href="https://forum.crazy-esports.com/" target="_blank" class="promo-card">
-                        <div id="AdImgBg2" class="promo-card-bg" style="background-image: url('./assets/promo-2.webp');"></div>
-                        <img id="AdImgId2" src="" alt="" class="hidden-compat" />
+                        <div id="AdImgBg2" class="promo-card-bg" data-bg="./assets/promo-2.webp"></div>
                         <div class="promo-card-overlay"></div>
                         <span id="AdTextId2" class="promo-card-title">Come to our forum!</span>
                     </a>
                     <a id="AdImgId3Href" href="https://tera-europe-classic.de/" target="_blank" class="promo-card">
-                        <div id="AdImgBg3" class="promo-card-bg" style="background-image: url('./assets/promo-3.webp');"></div>
-                        <img id="AdImgId3" src="" alt="" class="hidden-compat" />
+                        <div id="AdImgBg3" class="promo-card-bg" data-bg="./assets/promo-3.webp"></div>
                         <div class="promo-card-overlay"></div>
                         <span id="AdTextId3" class="promo-card-title">Join our team!</span>
                     </a>
@@ -702,8 +92,8 @@
                 <div id="home-launch-section">
                     <!-- Status Area -->
                     <div id="home-status-area">
-                        <!-- State 1: Login Required (not logged in) -->
-                        <div id="status-login-required" class="status-state status-simple">
+                        <!-- State 1: Login Required (DEFAULT - will be updated by JS based on auth) -->
+                        <div id="status-login-required" class="status-state status-simple active">
                             <span class="status-dot amber"></span>
                             <span class="status-text amber" data-translate="LOGIN_REQUIRED">Login required</span>
                         </div>
@@ -714,8 +104,8 @@
                             <span id="status-string" class="status-text green" data-translate="READY_TO_PLAY">Ready to play</span>
                         </div>
 
-                        <!-- State 3: Checking Files (DEFAULT on page load) -->
-                        <div id="status-checking" class="status-state status-progress active">
+                        <!-- State 3: Checking Files (activated by JS when checking starts) -->
+                        <div id="status-checking" class="status-state status-progress">
                             <div class="progress-header">
                                 <div class="progress-header-left">
                                     <span class="spinner">
@@ -729,7 +119,7 @@
                                 <div id="check-progress-bar" class="progress-fill"></div>
                             </div>
                             <div class="progress-footer">
-                                <span><span id="checked-files">0</span> / <span id="total-files">0</span> files</span>
+                                <span>Initializing...</span>
                             </div>
                         </div>
 
@@ -747,8 +137,6 @@
                                 <span id="download-speed">--</span>
                             </div>
                         </div>
-
-                        <!-- State 5: Paused (same as downloading but with "Paused" label) -->
                     </div>
 
                     <!-- Launch Buttons -->
@@ -760,76 +148,20 @@
                                 <rect x="14" y="4" width="4" height="16"></rect>
                             </svg>
                             <!-- Play Icon (when paused) -->
-                            <svg id="resume-icon" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display: none;">
+                            <svg id="resume-icon" class="hidden-icon" viewBox="0 0 24 24" fill="currentColor" stroke="none">
                                 <polygon points="5,3 19,12 5,21"></polygon>
                             </svg>
                         </button>
                         <button id="launch-game-btn" class="disabled" disabled>
-                            <!-- Play Icon (hidden during checking) -->
-                            <svg id="launch-play-icon" class="play-icon" viewBox="0 0 24 24" style="display: none;"><polygon points="5,3 19,12 5,21"></polygon></svg>
-                            <!-- Spinner Icon (shown during checking - DEFAULT) -->
-                            <svg id="launch-spinner-icon" class="spinner-icon" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
-                            <span id="launch-btn-text" data-translate="CHECKING_BTN">CHECKING</span>
+                            <!-- Play Icon (shown by default) -->
+                            <svg id="launch-play-icon" class="play-icon" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"></polygon></svg>
+                            <!-- Spinner Icon (hidden by default, shown during checking) -->
+                            <svg id="launch-spinner-icon" class="spinner-icon hidden-icon" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+                            <span id="launch-btn-text" data-translate="LAUNCH_GAME">LAUNCH</span>
                         </button>
                     </div>
                 </div>
             </footer>
         </div>
     </div>
-
-    <!-- Hidden compatibility elements for existing JS -->
-    <span id="server-status-text" class="hidden-compat">ONLINE</span>
-    <span id="player-delta" class="hidden-compat"></span>
-    <span id="player-typical" class="hidden-compat"></span>
-    <span id="current-file" class="hidden-compat"></span>
-    <span id="files-progress" class="hidden-compat"></span>
-    <span id="time-remaining" class="hidden-compat"></span>
-    <div id="size-progress" class="hidden-compat"></div>
-    <div id="download-speed-div" class="hidden-compat"></div>
-    <div id="patch-notes" class="hidden-compat"></div>
-    <div id="error-container" class="hidden-compat"></div>
-    <div id="dl-status-string" class="hidden-compat"></div>
-
-    <!-- Hidden legacy wrappers for JS compatibility -->
-    <div class="home-wrapper hidden-compat">
-        <div class="home-content">
-            <img class="tera-logo-icon" loading="lazy" alt="" src="./assets/tera-logo@2x.png" />
-        </div>
-        <div class="user-panel">
-            <div class="btn-user-avatar">
-                <img class="user-icon" loading="lazy" alt="" src="./assets/avatar.png" />
-            </div>
-            <div class="dropdown-panel-wrapper">
-                <div class="dropdown-panel">
-                    <div class="user-name-container">
-                        <span class="hey"></span>
-                        <span class="username" id="userName">User</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <section class="home-container hidden-compat">
-        <div class="game-status">
-            <div class="game-progress-parent">
-                <div class="game-progress">
-                    <div class="progress-container">
-                        <div class="content-parent-parent">
-                            <div class="content-parent"></div>
-                            <div class="dl-status-percentage"></div>
-                        </div>
-                        <div class="outer-progress">
-                            <div class="inner-progress"></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="btn-pause"><img class="pause-icon" alt="" src="./assets/pause-icon.svg" /></div>
-                <div class="btn-restart"><img class="vector-icon" loading="lazy" alt="" src="./assets/vector-3.svg" /></div>
-                <div class="launch-game-parent"></div>
-            </div>
-        </div>
-    </section>
 </main>
-
-<!-- Status UI functions moved to app.js (innerHTML doesn't execute scripts) -->

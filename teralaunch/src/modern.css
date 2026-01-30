@@ -1,50 +1,13 @@
-body {
-    font-family: 'Inter', sans-serif;
-    background: linear-gradient(145deg, #1b2735, #090a0f);
-    color: #f0f0f0;
-    height: 100%;
-}
+/* Modern CSS - Base styles for Tauri launcher */
+/* Main styling is in index.html and home.html inline styles */
 
-header.header1 {
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-    padding: 8px 16px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.6);
-}
-
-.top-button {
-    background: #2d6cdf;
-    border: none;
-    border-radius: 4px;
-    color: #fff;
-    transition: background 0.3s ease;
-}
-
-.top-button:hover {
-    background: #3c7eff;
-}
-
-.btn-launch-game {
-    background: #223e74;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    padding: 10px 20px;
-    transition: background 0.3s ease;
-    box-shadow: 0 0 15px rgba(34,62,116,0.4);
-}
-
-.btn-launch-game:hover {
-    background: #2e5f9d;
-}
-
+/* Loading modal backdrop */
 .loading-modal {
-    background: rgba(0,0,0,0.7);
+    background: rgba(0, 0, 0, 0.7);
     backdrop-filter: blur(4px);
 }
 
-/* Login page overrides */
+/* Login form styles (for compatibility) */
 .login-form-container-wrapper {
     min-height: 100vh;
     display: flex;
@@ -53,28 +16,16 @@ header.header1 {
 }
 
 .login-form {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.1);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    background: rgba(20, 25, 34, 0.95);
+    border: 1px solid var(--border, #3a4555);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
     backdrop-filter: blur(10px);
+    border-radius: var(--radius, 0.5rem);
 }
 
 .input-text,
 .input-text1 {
-    background: rgba(255,255,255,0.1);
-    border: 1px solid rgba(255,255,255,0.2);
-    color: #fff;
-}
-
-.btn {
-    background: #2463eb;
-    border: none;
-    border-radius: 4px;
-    color: #fff;
-    box-shadow: 0 0 15px rgba(36,99,235,0.4);
-    transition: background 0.3s ease;
-}
-
-.btn:hover {
-    background: #3483ff;
+    background: var(--input, #2a303c);
+    border: 1px solid var(--border, #3a4555);
+    color: var(--foreground, #f0f2f5);
 }

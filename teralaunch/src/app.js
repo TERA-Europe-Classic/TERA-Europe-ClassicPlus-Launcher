@@ -85,8 +85,8 @@ function showCheckingState(checked, total) {
   const btnText = document.getElementById('launch-btn-text');
   const launchBtn = document.getElementById('launch-game-btn');
 
-  if (playIcon) playIcon.style.display = 'none';
-  if (spinnerIcon) spinnerIcon.style.display = 'block';
+  if (playIcon) playIcon.classList.add('hidden-icon');
+  if (spinnerIcon) spinnerIcon.classList.remove('hidden-icon');
   if (btnText) btnText.textContent = getTranslation('CHECKING_BTN');
   if (launchBtn) {
     launchBtn.classList.add('disabled');
@@ -127,16 +127,16 @@ function updateCheckingProgress(checked, total) {
 window.updateCheckingProgress = updateCheckingProgress;
 
 function hideCheckingState() {
-  const statusChecking = document.getElementById('status-checking');
-  if (statusChecking) statusChecking.classList.remove('active');
+  // Clear all status states first to ensure clean transition
+  hideAllStatusStates();
 
   // Reset launch button icons
   const playIcon = document.getElementById('launch-play-icon');
   const spinnerIcon = document.getElementById('launch-spinner-icon');
   const btnText = document.getElementById('launch-btn-text');
 
-  if (playIcon) playIcon.style.display = 'block';
-  if (spinnerIcon) spinnerIcon.style.display = 'none';
+  if (playIcon) playIcon.classList.remove('hidden-icon');
+  if (spinnerIcon) spinnerIcon.classList.add('hidden-icon');
   if (btnText) btnText.textContent = getTranslation('LAUNCH_GAME');
 
   // Show appropriate status based on authentication
@@ -146,14 +146,12 @@ function hideCheckingState() {
   const launchBtn = document.getElementById('launch-game-btn');
 
   if (isAuthenticated) {
-    if (statusLoginRequired) statusLoginRequired.classList.remove('active');
     if (statusReady) statusReady.classList.add('active');
     if (launchBtn) {
       launchBtn.classList.remove('disabled');
       launchBtn.disabled = false;
     }
   } else {
-    if (statusReady) statusReady.classList.remove('active');
     if (statusLoginRequired) statusLoginRequired.classList.add('active');
     if (launchBtn) {
       launchBtn.classList.add('disabled');
@@ -175,8 +173,8 @@ function showDownloadingState() {
   // Update pause button to show pause icon
   const pauseIcon = document.getElementById('pause-icon');
   const resumeIcon = document.getElementById('resume-icon');
-  if (pauseIcon) pauseIcon.style.display = 'block';
-  if (resumeIcon) resumeIcon.style.display = 'none';
+  if (pauseIcon) pauseIcon.classList.remove('hidden-icon');
+  if (resumeIcon) resumeIcon.classList.add('hidden-icon');
 
   // Update download label
   const dlLabel = document.getElementById('dl-status-label');
@@ -196,8 +194,8 @@ function showDownloadingState() {
     launchBtn.classList.add('disabled');
     launchBtn.disabled = true;
   }
-  if (playIcon) playIcon.style.display = 'block';
-  if (spinnerIcon) spinnerIcon.style.display = 'none';
+  if (playIcon) playIcon.classList.remove('hidden-icon');
+  if (spinnerIcon) spinnerIcon.classList.add('hidden-icon');
   if (btnText) btnText.textContent = getTranslation('LAUNCH_GAME');
 }
 window.showDownloadingState = showDownloadingState;
@@ -227,8 +225,8 @@ function showPausedState() {
   // Show resume icon on pause button
   const pauseIcon = document.getElementById('pause-icon');
   const resumeIcon = document.getElementById('resume-icon');
-  if (pauseIcon) pauseIcon.style.display = 'none';
-  if (resumeIcon) resumeIcon.style.display = 'block';
+  if (pauseIcon) pauseIcon.classList.add('hidden-icon');
+  if (resumeIcon) resumeIcon.classList.remove('hidden-icon');
 
   // Hide download speed when paused (shadcn behavior)
   const speedEl = document.getElementById('download-speed');
@@ -236,10 +234,58 @@ function showPausedState() {
 }
 window.showPausedState = showPausedState;
 
+/**
+ * Initializes the status UI based on current authentication state.
+ * Called at app startup to ensure correct initial state is shown.
+ * This replaces the HTML default state with the appropriate state.
+ */
+function initializeStatusUI() {
+  const isAuthenticated = localStorage.getItem('authKey') !== null;
+  hideAllStatusStates();
+
+  const statusLoginRequired = document.getElementById('status-login-required');
+  const statusReady = document.getElementById('status-ready');
+  const launchBtn = document.getElementById('launch-game-btn');
+  const playIcon = document.getElementById('launch-play-icon');
+  const spinnerIcon = document.getElementById('launch-spinner-icon');
+  const btnText = document.getElementById('launch-btn-text');
+
+  if (isAuthenticated) {
+    // Show ready state for authenticated users
+    if (statusReady) statusReady.classList.add('active');
+    if (launchBtn) {
+      launchBtn.classList.remove('disabled');
+      launchBtn.disabled = false;
+    }
+  } else {
+    // Show login required state for non-authenticated users
+    if (statusLoginRequired) statusLoginRequired.classList.add('active');
+    if (launchBtn) {
+      launchBtn.classList.add('disabled');
+      launchBtn.disabled = true;
+    }
+  }
+
+  // Ensure play icon is shown (not spinner) by default
+  if (playIcon) playIcon.classList.remove('hidden-icon');
+  if (spinnerIcon) spinnerIcon.classList.add('hidden-icon');
+  if (btnText) btnText.textContent = getTranslation('LAUNCH_GAME');
+}
+window.initializeStatusUI = initializeStatusUI;
+
 function showReadyState() {
   hideAllStatusStates();
+
+  // Check authentication to show correct status
+  const isAuthenticated = localStorage.getItem('authKey') !== null;
   const statusReady = document.getElementById('status-ready');
-  if (statusReady) statusReady.classList.add('active');
+  const statusLoginRequired = document.getElementById('status-login-required');
+
+  if (isAuthenticated) {
+    if (statusReady) statusReady.classList.add('active');
+  } else {
+    if (statusLoginRequired) statusLoginRequired.classList.add('active');
+  }
 
   // Hide pause button
   const pauseBtn = document.getElementById('btn-pause-resume');
@@ -251,8 +297,6 @@ function showReadyState() {
   const spinnerIcon = document.getElementById('launch-spinner-icon');
   const btnText = document.getElementById('launch-btn-text');
 
-  // Check authentication before enabling
-  const isAuthenticated = localStorage.getItem('authKey') !== null;
   if (launchBtn) {
     if (isAuthenticated) {
       launchBtn.classList.remove('disabled');
@@ -262,8 +306,8 @@ function showReadyState() {
       launchBtn.disabled = true;
     }
   }
-  if (playIcon) playIcon.style.display = 'block';
-  if (spinnerIcon) spinnerIcon.style.display = 'none';
+  if (playIcon) playIcon.classList.remove('hidden-icon');
+  if (spinnerIcon) spinnerIcon.classList.add('hidden-icon');
   if (btnText) btnText.textContent = getTranslation('LAUNCH_GAME');
 }
 window.showReadyState = showReadyState;
@@ -271,22 +315,33 @@ window.showReadyState = showReadyState;
 function updateHeaderAuthState(isLoggedIn, username) {
   const statusLoginRequired = document.getElementById('status-login-required');
   const statusReady = document.getElementById('status-ready');
+  const statusChecking = document.getElementById('status-checking');
+  const statusDownloading = document.getElementById('status-downloading');
   const launchBtn = document.getElementById('launch-game-btn');
 
-  if (isLoggedIn) {
-    // Switch to ready state
-    if (statusLoginRequired) statusLoginRequired.classList.remove('active');
-    if (statusReady) statusReady.classList.add('active');
+  // Don't change status states if we're in the middle of checking or downloading
+  // Only update auth-related UI (login button state)
+  const isInProgress = (statusChecking && statusChecking.classList.contains('active')) ||
+                       (statusDownloading && statusDownloading.classList.contains('active'));
 
-    // Enable launch button
-    if (launchBtn) {
+  if (isLoggedIn) {
+    // Only switch to ready state if not in progress
+    if (!isInProgress) {
+      hideAllStatusStates();
+      if (statusReady) statusReady.classList.add('active');
+    }
+
+    // Enable launch button (unless checking/downloading)
+    if (launchBtn && !isInProgress) {
       launchBtn.classList.remove('disabled');
       launchBtn.disabled = false;
     }
   } else {
-    // Switch to login required state
-    hideAllStatusStates();
-    if (statusLoginRequired) statusLoginRequired.classList.add('active');
+    // Switch to login required state (but not during progress)
+    if (!isInProgress) {
+      hideAllStatusStates();
+      if (statusLoginRequired) statusLoginRequired.classList.add('active');
+    }
 
     // Disable launch button
     if (launchBtn) {
@@ -302,9 +357,41 @@ function updateHeaderAuthState(isLoggedIn, username) {
 }
 window.updateHeaderAuthState = updateHeaderAuthState;
 
+/**
+ * Applies background images from data-bg attributes.
+ * This is needed because inline style attributes don't work properly
+ * when HTML is loaded via innerHTML in WebView2 release mode.
+ */
+function applyDataBackgrounds() {
+  const elements = document.querySelectorAll('[data-bg]');
+  elements.forEach(el => {
+    const bgUrl = el.dataset.bg;
+    if (bgUrl) {
+      el.style.backgroundImage = `url('${bgUrl}')`;
+    }
+  });
+}
+window.applyDataBackgrounds = applyDataBackgrounds;
+
 function initBackgroundCarousel() {
+  // First, apply background images from data-bg attributes
+  applyDataBackgrounds();
+
+  const bgContainer = document.getElementById('home-bg-container');
   const bgImages = Array.from(document.querySelectorAll('#home-bg-container .bg-image'));
-  if (bgImages.length <= 1) return;
+
+  if (bgImages.length === 0) {
+    // No images, just mark as initialized
+    if (bgContainer) bgContainer.classList.add('initialized');
+    return;
+  }
+
+  if (bgImages.length === 1) {
+    // Single image - just show it
+    bgImages[0].classList.add('active');
+    if (bgContainer) bgContainer.classList.add('initialized');
+    return;
+  }
 
   // Create shuffled order at launch (Fisher-Yates shuffle)
   const order = bgImages.map((_, i) => i);
@@ -319,6 +406,9 @@ function initBackgroundCarousel() {
     img.classList.toggle('active', i === order[0]);
   });
 
+  // Mark carousel as initialized (triggers fade-in)
+  if (bgContainer) bgContainer.classList.add('initialized');
+
   // Cycle through shuffled order every 15 minutes
   setInterval(() => {
     bgImages[order[orderIndex]].classList.remove('active');
@@ -327,6 +417,525 @@ function initBackgroundCarousel() {
   }, 15 * 60 * 1000); // 15 minutes
 }
 window.initBackgroundCarousel = initBackgroundCarousel;
+
+// ========== SETTINGS MENU HANDLERS ==========
+// These must be in app.js (not inline script) because WebView2 release mode
+// doesn't properly execute inline script code.
+
+// Store original path to restore on cancel
+let originalGamePath = '';
+
+/**
+ * Shows the update notification toast with the given state, title, and subtitle.
+ * @param {string} state - The state: 'checking', 'upToDate', 'success', or 'error'
+ * @param {string} title - The main title text
+ * @param {string} subtitle - The subtitle text
+ */
+function showUpdateNotification(state, title, subtitle) {
+  const toast = document.getElementById('update-toast');
+  const icon = document.getElementById('toast-icon');
+  const titleEl = document.getElementById('toast-title');
+  const subtitleEl = document.getElementById('toast-subtitle');
+
+  if (!toast) {
+    console.error('update-toast element not found!');
+    return;
+  }
+
+  // Update text
+  if (titleEl) titleEl.textContent = title || 'Checking...';
+  if (subtitleEl) subtitleEl.textContent = subtitle || '';
+
+  // Update icon based on state
+  if (icon) {
+    icon.className = 'update-toast-icon ' + state;
+    if (state === 'checking') {
+      icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>';
+    } else if (state === 'upToDate' || state === 'success') {
+      icon.className = 'update-toast-icon success';
+      icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+    } else if (state === 'error') {
+      icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
+    }
+  }
+
+  // Show toast
+  toast.classList.add('show');
+
+  // Auto-hide after 4 seconds for non-checking states
+  if (state !== 'checking') {
+    setTimeout(function() {
+      toast.classList.remove('show');
+    }, 4000);
+  }
+}
+window.showUpdateNotification = showUpdateNotification;
+
+/**
+ * Hides the update notification toast.
+ */
+function hideUpdateNotification() {
+  const toast = document.getElementById('update-toast');
+  if (toast) {
+    toast.classList.remove('show');
+  }
+}
+window.hideUpdateNotification = hideUpdateNotification;
+
+/**
+ * Handler for Check Launcher Update menu item.
+ */
+async function handleCheckLauncherUpdate() {
+  // Close dropdown immediately for visual feedback
+  if (typeof window.closeSettingsDropdown === 'function') {
+    window.closeSettingsDropdown();
+  }
+
+  // Show notification IMMEDIATELY before any async operations
+  showUpdateNotification('checking', 'Checking for updates...', 'Please wait...');
+
+  try {
+    // Get current launcher version
+    let currentVersion = 'unknown';
+    try {
+      if (window.__TAURI__?.app?.getVersion) {
+        currentVersion = await window.__TAURI__.app.getVersion();
+      }
+    } catch (e) {
+      console.warn('Could not get version:', e);
+    }
+
+    if (window.__TAURI__ && window.__TAURI__.updater) {
+      const { checkUpdate } = window.__TAURI__.updater;
+      if (checkUpdate) {
+        const { shouldUpdate, manifest } = await checkUpdate();
+        if (shouldUpdate) {
+          showUpdateNotification('upToDate', 'Update available: ' + (manifest?.version || 'new version'), 'Current version: ' + currentVersion);
+        } else {
+          showUpdateNotification('upToDate', 'Launcher is up to date (v' + currentVersion + ')', 'No updates available');
+        }
+      } else {
+        // checkUpdate not available
+        showUpdateNotification('upToDate', 'Launcher v' + currentVersion, 'Update check not available');
+      }
+    } else {
+      // Fallback if Tauri updater not available
+      showUpdateNotification('upToDate', 'Launcher v' + currentVersion, 'Updater not available');
+    }
+  } catch (error) {
+    console.error('Error checking for updates:', error);
+    showUpdateNotification('error', 'Update check failed', error.message || 'Unknown error');
+  }
+}
+window.handleCheckLauncherUpdate = handleCheckLauncherUpdate;
+
+/**
+ * Handler for Check & Repair Files menu item.
+ */
+function handleCheckRepairFiles() {
+  // Close dropdown immediately for visual feedback
+  if (typeof window.closeSettingsDropdown === 'function') {
+    window.closeSettingsDropdown();
+  }
+  try {
+    if (window.App && typeof App.revalidateAndUpdateGame === 'function') {
+      App.revalidateAndUpdateGame();
+    } else {
+      console.error('App.revalidateAndUpdateGame not available');
+    }
+  } catch (error) {
+    console.error('Error in handleCheckRepairFiles:', error);
+  }
+}
+window.handleCheckRepairFiles = handleCheckRepairFiles;
+
+/**
+ * Handler for Logout menu item.
+ */
+function handleLogout() {
+  if (window.App && App.logout) {
+    App.logout();
+  }
+}
+window.handleLogout = handleLogout;
+
+/**
+ * Opens the game directory dialog.
+ * @param {string} [currentPath] - Optional current path to pre-fill
+ */
+async function openGameDirectoryDialog(currentPath) {
+  // Close dropdown immediately for visual feedback
+  if (typeof window.closeSettingsDropdown === 'function') {
+    window.closeSettingsDropdown();
+  }
+  try {
+    const dialog = document.getElementById('game-directory-dialog');
+    const input = document.getElementById('game-directory-input');
+
+    if (!dialog) {
+      console.error('game-directory-dialog element not found');
+      return;
+    }
+
+    // Load current path and store it
+    if (currentPath) {
+      originalGamePath = currentPath;
+      if (input) input.value = currentPath;
+    } else if (window.App && typeof App.loadConfig === 'function') {
+      try {
+        const path = await App.loadConfig('gamePath');
+        originalGamePath = path || '';
+        if (input) input.value = originalGamePath;
+      } catch (e) {
+        console.warn('Could not load gamePath:', e);
+        originalGamePath = '';
+        if (input) input.value = '';
+      }
+    }
+
+    dialog.classList.add('show');
+  } catch (error) {
+    console.error('Error in openGameDirectoryDialog:', error);
+  }
+}
+window.openGameDirectoryDialog = openGameDirectoryDialog;
+
+/**
+ * Closes the game directory dialog and restores original path.
+ */
+function closeGameDirectoryDialog() {
+  const dialog = document.getElementById('game-directory-dialog');
+  const input = document.getElementById('game-directory-input');
+
+  // Restore original value on close (cancel behavior)
+  if (input) input.value = originalGamePath;
+
+  if (dialog) {
+    dialog.classList.remove('show');
+  }
+}
+window.closeGameDirectoryDialog = closeGameDirectoryDialog;
+
+/**
+ * Opens file browser to select game directory.
+ */
+async function browseGameDirectory() {
+  if (window.__TAURI__) {
+    try {
+      const selected = await window.__TAURI__.dialog.open({
+        directory: true,
+        multiple: false,
+        title: 'Select Game Directory'
+      });
+      if (selected) {
+        // Only update the input field, don't save yet
+        document.getElementById('game-directory-input').value = selected;
+      }
+    } catch (e) {
+      console.error('Failed to open directory dialog:', e);
+    }
+  }
+}
+window.browseGameDirectory = browseGameDirectory;
+
+/**
+ * Saves the game directory from the dialog input.
+ */
+async function saveGameDirectory() {
+  const input = document.getElementById('game-directory-input');
+  const dialog = document.getElementById('game-directory-dialog');
+  const path = input?.value?.trim();
+
+  if (!path) {
+    showUpdateNotification('error', 'Invalid path', 'Please enter a valid game directory');
+    return;
+  }
+
+  // Save to config
+  if (window.App && App.saveConfig) {
+    try {
+      await App.saveConfig('gamePath', path);
+      // Update the stored original path since we saved successfully
+      originalGamePath = path;
+      // Close the dialog
+      if (dialog) dialog.classList.remove('show');
+      // Show success notification
+      showUpdateNotification('success', 'Game directory saved', path);
+    } catch (e) {
+      console.error('Failed to save game directory:', e);
+      showUpdateNotification('error', 'Failed to save', e.message || 'Unknown error');
+      // Don't close dialog on error
+    }
+  } else {
+    showUpdateNotification('error', 'App not ready', 'Please wait and try again');
+  }
+}
+window.saveGameDirectory = saveGameDirectory;
+
+// ========== IFRAME FUNCTIONS ==========
+/**
+ * Closes the iframe container with animation.
+ */
+function closeIframe() {
+  const container = document.getElementById('iframeContainer');
+  const iframe = document.getElementById('embeddedSite');
+  if (container) {
+    container.classList.remove('show');
+    container.classList.add('hide');
+    setTimeout(function() {
+      container.style.display = 'none';
+      if (iframe) iframe.src = '';
+    }, 500);
+  }
+}
+window.closeIframe = closeIframe;
+
+/**
+ * Shows the iframe container with the given URL.
+ * @param {string} url - The URL to load in the iframe
+ */
+function showIframe(url) {
+  const container = document.getElementById('iframeContainer');
+  const iframe = document.getElementById('embeddedSite');
+  if (iframe) iframe.src = url;
+  if (container) {
+    container.style.display = 'block';
+    container.classList.remove('hide');
+    container.classList.add('show');
+  }
+}
+window.showIframe = showIframe;
+
+/**
+ * Fetches JSON data from a URL.
+ * @param {string} url - The URL to fetch from
+ * @returns {Promise<any>} The parsed JSON data
+ */
+async function fetchData(url) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error('HTTP error! status: ' + response.status);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('There was a problem with the News fetch operation:', error);
+  }
+}
+window.fetchData = fetchData;
+
+// ========== HEADER AUTH STATE ==========
+/**
+ * Updates the header UI based on login state.
+ * @param {boolean} isLoggedIn - Whether the user is logged in
+ * @param {string} username - The username to display
+ */
+function updateIndexHeaderAuthState(isLoggedIn, username) {
+  const loginForm = document.getElementById('login-form-header');
+  const userDisplay = document.getElementById('user-display');
+  const logoutLink = document.getElementById('logout-link');
+
+  if (isLoggedIn) {
+    if (loginForm) loginForm.style.display = 'none';
+    if (userDisplay) {
+      userDisplay.classList.add('visible');
+      const displayUsername = document.getElementById('display-username');
+      if (displayUsername) displayUsername.textContent = username || 'User';
+    }
+    // Show logout option in settings menu
+    if (logoutLink) logoutLink.style.display = 'block';
+  } else {
+    if (loginForm) loginForm.style.display = 'flex';
+    if (userDisplay) userDisplay.classList.remove('visible');
+    // Hide logout option when logged out
+    if (logoutLink) logoutLink.style.display = 'none';
+  }
+}
+window.updateIndexHeaderAuthState = updateIndexHeaderAuthState;
+
+// ========== HEADER INITIALIZATION ==========
+/**
+ * Initializes header UI elements (region dropdown, login form, dialogs).
+ * Called when DOM is ready.
+ */
+function initializeHeaderUI() {
+  // ========== REGION DROPDOWN ==========
+  const regionBtn = document.getElementById('region-btn-display');
+  const regionDropdown = document.getElementById('region-dropdown');
+  const regionCurrent = document.getElementById('region-current');
+  const languageSelector = document.getElementById('language-selector');
+  const regionOptions = document.querySelectorAll('.region-option');
+  const regionFlag = document.getElementById('region-flag');
+
+  if (regionBtn && regionDropdown) {
+    // Toggle dropdown
+    regionBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      regionDropdown.classList.toggle('open');
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function() {
+      regionDropdown.classList.remove('open');
+    });
+  }
+
+  // Handle region option selection
+  if (regionOptions.length > 0) {
+    regionOptions.forEach(function(option) {
+      option.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const lang = this.dataset.lang;
+
+        // Update visual display
+        regionOptions.forEach(function(opt) { opt.classList.remove('active'); });
+        this.classList.add('active');
+
+        // Get language name (last text node, after the SVG)
+        const langName = this.textContent.trim();
+        if (regionCurrent) regionCurrent.textContent = langName;
+
+        // Clone the SVG flag from the selected option
+        const flagSvg = this.querySelector('.flag-icon');
+        if (regionFlag && flagSvg) {
+          regionFlag.innerHTML = '';
+          regionFlag.appendChild(flagSvg.cloneNode(true));
+        }
+
+        // Update hidden select and trigger change
+        if (languageSelector) {
+          languageSelector.value = lang;
+          languageSelector.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        // Close dropdown
+        if (regionDropdown) regionDropdown.classList.remove('open');
+      });
+    });
+  }
+
+  // Sync with language selector changes from app.js
+  if (languageSelector) {
+    languageSelector.addEventListener('change', function() {
+      const lang = this.value;
+      regionOptions.forEach(function(opt) {
+        if (opt.dataset.lang === lang) {
+          opt.classList.add('active');
+          const langName = opt.textContent.trim();
+          if (regionCurrent) regionCurrent.textContent = langName;
+          // Clone the SVG flag
+          const flagSvg = opt.querySelector('.flag-icon');
+          if (regionFlag && flagSvg) {
+            regionFlag.innerHTML = '';
+            regionFlag.appendChild(flagSvg.cloneNode(true));
+          }
+        } else {
+          opt.classList.remove('active');
+        }
+      });
+    });
+  }
+
+  // ========== HEADER LOGIN FORM ==========
+  const loginFormHeader = document.getElementById('login-form-header');
+  if (loginFormHeader) {
+    loginFormHeader.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const username = document.getElementById('header-username')?.value;
+      const password = document.getElementById('header-password')?.value;
+      if (username && password && window.App && App.login) {
+        await App.login(username, password);
+      }
+    });
+  }
+
+  // ========== GAME DIRECTORY DIALOG ==========
+  const gameDirDialog = document.getElementById('game-directory-dialog');
+  if (gameDirDialog) {
+    // Close on backdrop click
+    gameDirDialog.addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeGameDirectoryDialog();
+      }
+    });
+  }
+
+  // Game directory dialog buttons
+  const btnBrowseGameDir = document.getElementById('btn-browse-game-dir');
+  if (btnBrowseGameDir) {
+    btnBrowseGameDir.addEventListener('click', function(e) {
+      e.preventDefault();
+      browseGameDirectory();
+    });
+  }
+
+  const btnCancelGameDir = document.getElementById('btn-cancel-game-dir');
+  if (btnCancelGameDir) {
+    btnCancelGameDir.addEventListener('click', function(e) {
+      e.preventDefault();
+      closeGameDirectoryDialog();
+    });
+  }
+
+  const btnSaveGameDir = document.getElementById('btn-save-game-dir');
+  if (btnSaveGameDir) {
+    btnSaveGameDir.addEventListener('click', function(e) {
+      e.preventDefault();
+      saveGameDirectory();
+    });
+  }
+
+  // ========== SETTINGS MENU ITEMS ==========
+  const menuCheckLauncherUpdate = document.getElementById('menu-check-launcher-update');
+  if (menuCheckLauncherUpdate) {
+    menuCheckLauncherUpdate.addEventListener('click', function(e) {
+      e.preventDefault();
+      handleCheckLauncherUpdate();
+    });
+  }
+
+  const menuCheckRepairFiles = document.getElementById('menu-check-repair-files');
+  if (menuCheckRepairFiles) {
+    menuCheckRepairFiles.addEventListener('click', function(e) {
+      e.preventDefault();
+      handleCheckRepairFiles();
+    });
+  }
+
+  const menuGameDirectory = document.getElementById('menu-game-directory');
+  if (menuGameDirectory) {
+    menuGameDirectory.addEventListener('click', function(e) {
+      e.preventDefault();
+      openGameDirectoryDialog();
+    });
+  }
+
+  const logoutLink = document.getElementById('logout-link');
+  if (logoutLink) {
+    logoutLink.addEventListener('click', function(e) {
+      e.preventDefault();
+      handleLogout();
+    });
+  }
+
+  // ========== IFRAME EXIT BUTTON ==========
+  const exitButton = document.getElementById('exitButton');
+  if (exitButton) {
+    exitButton.addEventListener('click', function(e) {
+      e.preventDefault();
+      closeIframe();
+    });
+  }
+}
+window.initializeHeaderUI = initializeHeaderUI;
+
+// Initialize header UI when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeHeaderUI);
+} else {
+  // DOM already loaded, initialize immediately
+  initializeHeaderUI();
+}
 
 /**
  * Escapes HTML special characters to prevent XSS attacks.
@@ -477,6 +1086,11 @@ const App = {
       if (savedTheme === "light") {
         document.body.classList.add("light-mode");
       }
+
+      // Show the page now that basic styles are applied (prevents FOUC)
+      const mainpage = document.querySelector('.mainpage');
+      if (mainpage) mainpage.classList.add('ready');
+
     invoke("set_logging", { enabled: false });
       this.setupEventListeners();
       this.setupWindowControls();
@@ -501,6 +1115,9 @@ const App = {
       this.checkAuthentication();
       this.resetState();
       this.updateUI();
+
+      // Initialize status UI based on current auth state (before any async operations)
+      this.initializeStatusUI();
 
       // Always load player count and news on home page
       if (this.Router.currentRoute === "home") {
@@ -531,11 +1148,19 @@ const App = {
           }
         } else {
           console.error("Failed to connect to server on refresh");
-          // Handle connection error (e.g., display a message to the user)
+          // Hide checking state and show appropriate status based on auth
+          if (typeof window.hideCheckingState === 'function') {
+            window.hideCheckingState();
+          }
+          this.updateLaunchGameButton(false);
         }
       }
     } catch (error) {
       console.error("Error during app initialization:", error);
+      // Clear checking state on error to prevent UI from being stuck
+      if (typeof window.hideCheckingState === 'function') {
+        window.hideCheckingState();
+      }
     }
   },
 
@@ -1637,6 +2262,10 @@ const App = {
           isUpdateComplete: true,
           currentUpdateMode: "ready",
         });
+        // Show the ready state UI
+        if (typeof window.showReadyState === 'function') {
+          window.showReadyState();
+        }
       }, 1500);
     }, 500);
   },
@@ -1668,7 +2297,13 @@ const App = {
       ? !this.state.updateCheckPerformedOnLogin
       : !this.state.updateCheckPerformedOnRefresh;
 
-    if (!checkNeeded) return;
+    if (!checkNeeded) {
+      // Update check already performed - clear checking state and show ready
+      if (typeof window.hideCheckingState === 'function') {
+        window.hideCheckingState();
+      }
+      return;
+    }
 
     try {
       await this.initializeHomePage();
@@ -1692,6 +2327,10 @@ const App = {
         updateError: true,
         isCheckingForUpdates: false
       });
+      // Clear checking state on error
+      if (typeof window.hideCheckingState === 'function') {
+        window.hideCheckingState();
+      }
     }
   },
 
@@ -2467,9 +3106,11 @@ const App = {
     try {
       const data = await fetchData(URLS.content.serverStatus);
       if (data && data.servers && data.servers.length > 0) {
-        const statusEl = document.getElementById("game-status");
-        statusEl.textContent =
-          data.servers[0].available === 1 ? "Online" : "Offline";
+        const statusEl = document.getElementById("game-status") || document.querySelector(".game-status");
+        if (statusEl) {
+          statusEl.textContent =
+            data.servers[0].available === 1 ? "Online" : "Offline";
+        }
       }
     } catch (e) {
       console.error("Failed to load server status", e);
@@ -2481,7 +3122,9 @@ const App = {
       const notes = await fetchData(URLS.content.patchNotes);
       if (notes && notes.notes && Array.isArray(notes.notes)) {
         const container = document.getElementById("patch-notes");
-        container.innerHTML = notes.notes.map((n) => `<p>${escapeHtml(n)}</p>`).join("");
+        if (container) {
+          container.innerHTML = notes.notes.map((n) => `<p>${escapeHtml(n)}</p>`).join("");
+        }
       }
     } catch (e) {
       console.error("Failed to load patch notes", e);
@@ -3076,6 +3719,10 @@ const App = {
    * @returns {Promise<void>}
    */
   async initHome() {
+    // Initialize status UI immediately based on auth state
+    // This overrides the HTML defaults before any async operations
+    this.initializeStatusUI();
+
     // Initialize background carousel for home page
     initBackgroundCarousel();
 
@@ -3539,12 +4186,22 @@ const App = {
         const isConnected = await this.checkServerConnection();
         if (isConnected) {
           this.checkForUpdates(); // Don't await - let it run in background
+        } else {
+          // Server not connected - clear checking state
+          if (typeof window.hideCheckingState === 'function') {
+            window.hideCheckingState();
+          }
+          this.updateLaunchGameButton(false);
         }
       }
     } catch (error) {
       console.error("Error saving game path:", error);
       if (typeof window.showUpdateNotification === 'function') {
         window.showUpdateNotification('error', this.t("GAME_PATH_SAVE_ERROR"), error.message || '');
+      }
+      // Clear checking state on error
+      if (typeof window.hideCheckingState === 'function') {
+        window.hideCheckingState();
       }
       throw error;
     }
@@ -3748,6 +4405,7 @@ const App = {
 
   /**
    * Checks if an element is interactive (button, link, input, etc.)
+   * Also checks if the element is INSIDE an interactive element (e.g., SVG inside button)
    */
   isInteractiveElement(element) {
     const interactiveTags = ["BUTTON", "A", "INPUT", "SELECT", "TEXTAREA"];
@@ -3755,13 +4413,25 @@ const App = {
       return true;
     }
 
-    // Check for interactive class names
+    // Check if element is inside an interactive element (e.g., SVG inside button)
+    if (element.closest("button, a, input, select, textarea")) {
+      return true;
+    }
+
+    // Check for interactive class names on element itself
     const interactiveClasses = [
       "nav-btn", "control-btn", "region-btn", "login-btn", "register-btn",
       "menu-item", "region-option", "promo-card", "news-item", "news-label"
     ];
     for (const cls of interactiveClasses) {
       if (element.classList.contains(cls)) {
+        return true;
+      }
+    }
+
+    // Check if element is inside an element with interactive class
+    for (const cls of interactiveClasses) {
+      if (element.closest(`.${cls}`)) {
         return true;
       }
     }
@@ -3943,6 +4613,16 @@ const App = {
     // Update home.html UI (launch button, status) - only when home page is loaded
     if (typeof window.updateHeaderAuthState === "function") {
       window.updateHeaderAuthState(isAuthenticated, userName);
+    }
+  },
+
+  /**
+   * Initializes the status UI based on authentication state.
+   * Called at app startup to set the correct initial state before any async operations.
+   */
+  initializeStatusUI() {
+    if (typeof window.initializeStatusUI === "function") {
+      window.initializeStatusUI();
     }
   },
 
@@ -4401,11 +5081,11 @@ async function loadNewsFeed() {
 
     // If no items, show placeholder
     if (maxItems === 0) {
-      newsFeedList.innerHTML = `<span class="news-item" style="color: var(--text-muted);">No news available</span>`;
+      newsFeedList.innerHTML = `<span class="news-item news-muted">No news available</span>`;
     }
   } catch (error) {
     console.error("Error loading news feed:", error);
-    newsFeedList.innerHTML = `<span class="news-item" style="color: var(--text-muted);">Unable to load news</span>`;
+    newsFeedList.innerHTML = `<span class="news-item news-muted">Unable to load news</span>`;
   }
 }
 

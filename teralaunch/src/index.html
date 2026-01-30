@@ -48,6 +48,26 @@
             line-height: 1.5;
         }
 
+        /* Prevent FOUC - hide until ready */
+        .mainpage {
+            opacity: 0;
+            transition: opacity 0.15s ease-in;
+        }
+
+        .mainpage.ready {
+            opacity: 1;
+        }
+
+        /* Hide carousel until initialized */
+        #home-bg-container {
+            opacity: 0;
+            transition: opacity 0.5s ease-in;
+        }
+
+        #home-bg-container.initialized {
+            opacity: 1;
+        }
+
         a {
             text-decoration: none;
             color: inherit;
@@ -1017,6 +1037,560 @@
             font-size: 12px;
             color: var(--muted-foreground);
         }
+
+        /* ============================================
+           HOME PAGE STYLES
+           ============================================ */
+        :root {
+            --card: #1a1f2a;
+            --popover: #161b24;
+            --secondary: #1e2430;
+            --input: #2a303c;
+            --ring: #22d3ee;
+            --radius: 0.5rem;
+            --emerald-500: #10b981;
+            --emerald-400: #34d399;
+            --amber-500: #f59e0b;
+            --amber-400: #fbbf24;
+        }
+
+        #home-page {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+            background: var(--background);
+            overflow: hidden;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            padding-top: 0;
+        }
+
+        #home-bg-container {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .bg-image {
+            position: absolute;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+        }
+
+        .bg-image.active {
+            opacity: 1;
+        }
+
+        #home-bg-container::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to right, rgba(15,18,25,0.95) 0%, rgba(15,18,25,0.6) 50%, rgba(15,18,25,0.3) 100%);
+            z-index: 1;
+        }
+
+        #home-bg-container::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to top, rgba(15,18,25,1) 0%, transparent 50%, rgba(15,18,25,0.4) 100%);
+            z-index: 2;
+        }
+
+        #home-main {
+            position: relative;
+            z-index: 5;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #home-info-section {
+            flex: 1;
+            display: flex;
+            align-items: flex-start;
+            padding: 56px 40px 40px 40px;
+        }
+
+        .info-content {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 28px;
+            max-width: 480px;
+        }
+
+        #Tera-Logo-home {
+            display: block;
+            height: 135px;
+            width: auto;
+            object-fit: contain;
+            filter: drop-shadow(0 25px 25px rgba(0, 0, 0, 0.25));
+            margin-left: -78px !important;
+            margin-top: -18px !important;
+        }
+
+        #home-description {
+            font-size: 15px;
+            line-height: 1.625;
+            color: rgba(107, 114, 128, 0.9);
+            margin: 0;
+        }
+
+        #home-player-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            background: rgba(15, 18, 25, 0.3);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(45, 53, 72, 0.2);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: border-color 0.2s ease;
+            width: fit-content;
+        }
+
+        #home-player-badge:hover {
+            border-color: rgba(34, 211, 238, 0.3);
+        }
+
+        .pulse-dot {
+            position: relative;
+            width: 8px;
+            height: 8px;
+        }
+
+        .pulse-dot::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: var(--emerald-400);
+            border-radius: 50%;
+            animation: pulse-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+
+        .pulse-dot::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: var(--emerald-500);
+            border-radius: 50%;
+        }
+
+        @keyframes pulse-ping {
+            75%, 100% {
+                transform: scale(2);
+                opacity: 0;
+            }
+        }
+
+        #player-count {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--foreground);
+            font-variant-numeric: tabular-nums;
+            transition: color 0.2s ease;
+        }
+
+        #home-player-badge:hover #player-count {
+            color: var(--primary);
+        }
+
+        .player-label {
+            font-size: 12px;
+            color: var(--muted-foreground);
+        }
+
+        #maintenance-container {
+            display: none;
+            margin-top: 16px;
+        }
+
+        #maintenance-container.show {
+            display: block;
+        }
+
+        .maintenance-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 16px;
+            background: rgba(245, 158, 11, 0.15);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            border-radius: 8px;
+        }
+
+        .maintenance-icon {
+            font-size: 16px;
+        }
+
+        #NewsWartungTextId {
+            font-size: 13px;
+            color: #fcd34d;
+        }
+
+        #home-news-bar {
+            display: flex;
+            align-items: center;
+            gap: 28px;
+            padding: 14px 28px;
+            background: rgba(15, 18, 25, 0.3);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border-top: 1px solid rgba(45, 53, 72, 0.2);
+            border-bottom: 1px solid rgba(45, 53, 72, 0.2);
+        }
+
+        .news-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            text-decoration: none;
+            flex-shrink: 0;
+        }
+
+        .news-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--primary);
+            border-radius: 50%;
+        }
+
+        #news-feed-list {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .news-item {
+            font-size: 14px;
+            color: var(--muted-foreground);
+            text-decoration: none;
+            transition: color 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .news-item:hover {
+            color: var(--foreground);
+        }
+
+        #home-footer {
+            display: flex;
+            align-items: stretch;
+            gap: 20px;
+            padding: 20px;
+            background: rgba(15, 18, 25, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-top: 1px solid rgba(45, 53, 72, 0.2);
+        }
+
+        #home-promo-cards {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        .promo-card {
+            position: relative;
+            aspect-ratio: 2.2 / 1;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid rgba(45, 53, 72, 0.2);
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .promo-card:hover {
+            border-color: rgba(34, 211, 238, 0.4);
+        }
+
+        .promo-card-bg {
+            position: absolute;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+            transition: transform 0.5s ease;
+        }
+
+        .promo-card:hover .promo-card-bg {
+            transform: scale(1.05);
+        }
+
+        .promo-card-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to top, rgba(15, 18, 25, 0.9) 0%, rgba(15, 18, 25, 0.3) 50%, transparent 100%);
+        }
+
+        .promo-card-title {
+            position: absolute;
+            bottom: 14px;
+            left: 14px;
+            right: 14px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--foreground);
+            transition: color 0.2s ease;
+        }
+
+        .promo-card:hover .promo-card-title {
+            color: var(--primary);
+        }
+
+        #home-launch-section {
+            width: 280px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            padding: 18px;
+            background: rgba(20, 25, 34, 0.4);
+            border-radius: 8px;
+            border: 1px solid rgba(58, 69, 85, 0.2);
+        }
+
+        #home-status-area {
+            height: 42px;
+            margin-bottom: 12px;
+        }
+
+        .status-state {
+            display: none;
+            height: 100%;
+        }
+
+        .status-state.active {
+            display: flex;
+        }
+
+        .status-simple {
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .status-dot.green { background: var(--emerald-500); }
+        .status-dot.amber { background: var(--amber-500); }
+
+        .status-text {
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .status-text.green { color: var(--emerald-400); }
+        .status-text.amber { color: var(--amber-400); }
+
+        .status-progress {
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .progress-header-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .spinner {
+            width: 14px;
+            height: 14px;
+            animation: spin 1s linear infinite;
+            flex-shrink: 0;
+        }
+
+        .spinner svg {
+            width: 100%;
+            height: 100%;
+            stroke: var(--primary);
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .progress-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--foreground);
+            line-height: 1;
+        }
+
+        .progress-percent {
+            font-size: 14px;
+            color: var(--muted-foreground);
+            font-variant-numeric: tabular-nums;
+            line-height: 1;
+        }
+
+        .progress-track {
+            height: 6px;
+            background: rgba(34, 211, 238, 0.15);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .progress-footer {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--muted-foreground);
+            font-variant-numeric: tabular-nums;
+        }
+
+        #home-launch-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        #btn-pause-resume {
+            width: 48px;
+            height: 42px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(15, 18, 25, 0.5);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        #btn-pause-resume:hover {
+            background: rgba(15, 18, 25, 0.7);
+            border-color: rgba(45, 53, 72, 0.5);
+        }
+
+        #btn-pause-resume.active {
+            display: flex;
+        }
+
+        #btn-pause-resume svg {
+            width: 16px;
+            height: 16px;
+            stroke: var(--foreground);
+            fill: none;
+        }
+
+        #launch-game-btn {
+            flex: 1;
+            height: 42px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            background: var(--primary);
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.025em;
+            color: var(--primary-foreground);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 16px rgba(34, 211, 238, 0.25);
+        }
+
+        #launch-game-btn:hover:not(.disabled) {
+            background: rgba(34, 211, 238, 0.9);
+            box-shadow: 0 6px 24px rgba(34, 211, 238, 0.4);
+        }
+
+        #launch-game-btn.disabled {
+            background: var(--muted);
+            color: var(--muted-foreground);
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        #launch-game-btn svg {
+            width: 15px;
+            height: 15px;
+        }
+
+        #launch-game-btn svg.play-icon {
+            fill: currentColor;
+            stroke: none;
+        }
+
+        #launch-game-btn svg.spinner-icon {
+            stroke: currentColor;
+            fill: none;
+            animation: spin 1s linear infinite;
+        }
+
+        /* Hidden icon class - replaces inline style="display: none" */
+        .hidden-icon {
+            display: none !important;
+        }
+
+        /* News loading state color */
+        .news-loading,
+        .news-muted {
+            color: var(--muted-foreground);
+        }
+
+        /* Window Dragging for Home Page */
+        #home-page,
+        #home-bg-container,
+        #home-main,
+        #home-info-section,
+        .info-content,
+        #home-news-bar,
+        #home-footer {
+            -webkit-app-region: drag;
+        }
+
+        button,
+        a,
+        input,
+        select,
+        textarea,
+        #home-launch-section,
+        #home-promo-cards,
+        .promo-card,
+        #home-player-badge,
+        .news-item,
+        .news-label {
+            -webkit-app-region: no-drag;
+        }
     </style>
 </head>
 
@@ -1135,7 +1709,7 @@
                         <div id="settings-dropdown-wrapper" class="settings-dropdown-wrapper">
                             <div class="dropdown-panel">
                                 <div class="user-menu">
-                                    <a href="#" class="menu-item" onclick="handleCheckLauncherUpdate(); return false;">
+                                    <a href="#" class="menu-item" id="menu-check-launcher-update">
                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                             <path d="M21 2v6h-6"></path>
                                             <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
@@ -1144,7 +1718,7 @@
                                         </svg>
                                         <span data-translate="CHECK_LAUNCHER_UPDATE">Check Launcher Update</span>
                                     </a>
-                                    <a href="#" class="menu-item" onclick="handleCheckRepairFiles(); return false;">
+                                    <a href="#" class="menu-item" id="menu-check-repair-files">
                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                                             <polyline points="7 10 12 15 17 10"></polyline>
@@ -1152,13 +1726,13 @@
                                         </svg>
                                         <span data-translate="CHECK_REPAIR_FILES">Check & Repair Files</span>
                                     </a>
-                                    <a href="#" class="menu-item" onclick="openGameDirectoryDialog(); return false;">
+                                    <a href="#" class="menu-item" id="menu-game-directory">
                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
                                         </svg>
                                         <span data-translate="SETTINGS_GAME_FOLDER">Game Directory</span>
                                     </a>
-                                    <a href="#" class="menu-item" id="logout-link" onclick="handleLogout(); return false;">
+                                    <a href="#" class="menu-item" id="logout-link">
                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
                                             <polyline points="16 17 21 12 16 7"></polyline>
@@ -1193,321 +1767,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Swiper/8.4.5/swiper-bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/particles.js/2.0.0/particles.min.js"></script>
-    <script src="router.js"></script>
-    <script type="module" src="/app.js"></script>
-
-    <!-- Header Behavior Script -->
-    <script>
-        (function() {
-            // ========== REGION DROPDOWN ==========
-            const regionBtn = document.getElementById('region-btn-display');
-            const regionDropdown = document.getElementById('region-dropdown');
-            const regionCurrent = document.getElementById('region-current');
-            const languageSelector = document.getElementById('language-selector');
-            const regionOptions = document.querySelectorAll('.region-option');
-
-            // Toggle dropdown
-            regionBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                regionDropdown.classList.toggle('open');
-            });
-
-            // Close dropdown when clicking outside
-            document.addEventListener('click', function() {
-                regionDropdown.classList.remove('open');
-            });
-
-            // Handle option selection
-            const regionFlag = document.getElementById('region-flag');
-            regionOptions.forEach(function(option) {
-                option.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    const lang = this.dataset.lang;
-
-                    // Update visual display
-                    regionOptions.forEach(function(opt) { opt.classList.remove('active'); });
-                    this.classList.add('active');
-
-                    // Get language name (last text node, after the SVG)
-                    const langName = this.textContent.trim();
-                    regionCurrent.textContent = langName;
-
-                    // Clone the SVG flag from the selected option
-                    const flagSvg = this.querySelector('.flag-icon');
-                    if (regionFlag && flagSvg) {
-                        regionFlag.innerHTML = '';
-                        regionFlag.appendChild(flagSvg.cloneNode(true));
-                    }
-
-                    // Update hidden select and trigger change
-                    languageSelector.value = lang;
-                    languageSelector.dispatchEvent(new Event('change', { bubbles: true }));
-
-                    // Close dropdown
-                    regionDropdown.classList.remove('open');
-                });
-            });
-
-            // Sync with language selector changes from app.js
-            languageSelector.addEventListener('change', function() {
-                const lang = this.value;
-                regionOptions.forEach(function(opt) {
-                    if (opt.dataset.lang === lang) {
-                        opt.classList.add('active');
-                        const langName = opt.textContent.trim();
-                        regionCurrent.textContent = langName;
-                        // Clone the SVG flag
-                        const flagSvg = opt.querySelector('.flag-icon');
-                        if (regionFlag && flagSvg) {
-                            regionFlag.innerHTML = '';
-                            regionFlag.appendChild(flagSvg.cloneNode(true));
-                        }
-                    } else {
-                        opt.classList.remove('active');
-                    }
-                });
-            });
-
-            // ========== HEADER LOGIN FORM ==========
-            const loginFormHeader = document.getElementById('login-form-header');
-            if (loginFormHeader) {
-                loginFormHeader.addEventListener('submit', async function(e) {
-                    e.preventDefault();
-                    const username = document.getElementById('header-username').value;
-                    const password = document.getElementById('header-password').value;
-                    if (username && password && window.App && App.login) {
-                        await App.login(username, password);
-                    }
-                });
-            }
-
-            // ========== HEADER AUTH STATE ==========
-            // Global function to update header based on login state
-            window.updateIndexHeaderAuthState = function(isLoggedIn, username) {
-                const loginForm = document.getElementById('login-form-header');
-                const userDisplay = document.getElementById('user-display');
-                const logoutLink = document.getElementById('logout-link');
-
-                if (isLoggedIn) {
-                    if (loginForm) loginForm.style.display = 'none';
-                    if (userDisplay) {
-                        userDisplay.classList.add('visible');
-                        const displayUsername = document.getElementById('display-username');
-                        if (displayUsername) displayUsername.textContent = username || 'User';
-                    }
-                    // Show logout option in settings menu
-                    if (logoutLink) logoutLink.style.display = 'block';
-                } else {
-                    if (loginForm) loginForm.style.display = 'flex';
-                    if (userDisplay) userDisplay.classList.remove('visible');
-                    // Hide logout option when logged out
-                    if (logoutLink) logoutLink.style.display = 'none';
-                }
-                // Settings dropdown is always visible (even when logged out)
-            };
-
-            // ========== SETTINGS DROPDOWN TOGGLE ==========
-            const settingsBtn = document.getElementById('settings-button');
-            const settingsWrapper = document.getElementById('settings-dropdown-wrapper');
-
-            // Settings dropdown is handled by app.js with GSAP animations
-            // closeSettingsDropdown() is defined in app.js
-
-            // ========== SETTINGS MENU HANDLERS ==========
-            // Check for launcher updates
-            window.handleCheckLauncherUpdate = async function() {
-                // Get current launcher version
-                const currentVersion = await window.__TAURI__?.app?.getVersion?.() || 'unknown';
-
-                // Show checking notification
-                if (typeof window.showUpdateNotification === 'function') {
-                    window.showUpdateNotification('checking', 'Checking for updates...', 'Current version: ' + currentVersion);
-                }
-
-                try {
-                    if (window.__TAURI__ && window.__TAURI__.updater) {
-                        const { checkUpdate } = window.__TAURI__.updater;
-                        if (checkUpdate) {
-                            const { shouldUpdate, manifest } = await checkUpdate();
-                            if (shouldUpdate) {
-                                if (typeof window.showUpdateNotification === 'function') {
-                                    window.showUpdateNotification('upToDate', 'Update available: ' + (manifest?.version || 'new version'), 'Current version: ' + currentVersion);
-                                }
-                            } else {
-                                if (typeof window.showUpdateNotification === 'function') {
-                                    window.showUpdateNotification('upToDate', 'Launcher is up to date (v' + currentVersion + ')', 'No updates available');
-                                }
-                            }
-                        }
-                    } else {
-                        // Fallback if Tauri updater not available
-                        if (typeof window.showUpdateNotification === 'function') {
-                            window.showUpdateNotification('upToDate', 'Launcher is up to date (v' + currentVersion + ')', 'No updates available');
-                        }
-                    }
-                } catch (error) {
-                    console.error('Error checking for updates:', error);
-                    if (typeof window.showUpdateNotification === 'function') {
-                        window.showUpdateNotification('error', 'Update check failed', 'Current version: ' + currentVersion);
-                    }
-                }
-            };
-
-            // Check and repair game files
-            window.handleCheckRepairFiles = function() {
-                if (window.App && App.revalidateAndUpdateGame) {
-                    App.revalidateAndUpdateGame();
-                }
-            };
-
-            // Logout handler
-            window.handleLogout = function() {
-                if (window.App && App.logout) {
-                    App.logout();
-                }
-            };
-
-            // Store original path to restore on cancel
-            let originalGamePath = '';
-
-            // Open game directory dialog
-            window.openGameDirectoryDialog = async function(currentPath) {
-                const dialog = document.getElementById('game-directory-dialog');
-                const input = document.getElementById('game-directory-input');
-
-                if (dialog) {
-                    // Load current path and store it
-                    if (currentPath) {
-                        originalGamePath = currentPath;
-                        if (input) input.value = currentPath;
-                    } else if (window.App && App.loadConfig) {
-                        try {
-                            const path = await App.loadConfig('gamePath');
-                            originalGamePath = path || '';
-                            if (input) input.value = originalGamePath;
-                        } catch (e) {
-                            originalGamePath = '';
-                            if (input) input.value = '';
-                        }
-                    }
-
-                    dialog.classList.add('show');
-                }
-            };
-
-            window.closeGameDirectoryDialog = function() {
-                const dialog = document.getElementById('game-directory-dialog');
-                const input = document.getElementById('game-directory-input');
-
-                // Restore original value on close (cancel behavior)
-                if (input) input.value = originalGamePath;
-
-                if (dialog) {
-                    dialog.classList.remove('show');
-                }
-            };
-
-            window.browseGameDirectory = async function() {
-                if (window.__TAURI__) {
-                    try {
-                        const selected = await window.__TAURI__.dialog.open({
-                            directory: true,
-                            multiple: false,
-                            title: 'Select Game Directory'
-                        });
-                        if (selected) {
-                            // Only update the input field, don't save yet
-                            document.getElementById('game-directory-input').value = selected;
-                        }
-                    } catch (e) {
-                        console.error('Failed to open directory dialog:', e);
-                    }
-                }
-            };
-
-            window.saveGameDirectory = async function() {
-                const input = document.getElementById('game-directory-input');
-                const dialog = document.getElementById('game-directory-dialog');
-                const path = input?.value?.trim();
-
-                if (!path) {
-                    window.showUpdateNotification('error', 'Invalid path', 'Please enter a valid game directory');
-                    return;
-                }
-
-                // Save to config
-                if (window.App && App.saveConfig) {
-                    try {
-                        await App.saveConfig('gamePath', path);
-                        // Update the stored original path since we saved successfully
-                        originalGamePath = path;
-                        // Close the dialog - app.js saveGamePath will show the toast
-                        if (dialog) dialog.classList.remove('show');
-                    } catch (e) {
-                        console.error('Failed to save game directory:', e);
-                        window.showUpdateNotification('error', 'Failed to save', e.message || 'Unknown error');
-                        // Don't close dialog on error
-                    }
-                } else {
-                    window.showUpdateNotification('error', 'App not ready', 'Please wait and try again');
-                }
-            };
-
-            // Close dialog when clicking backdrop
-            const gameDirDialog = document.getElementById('game-directory-dialog');
-            if (gameDirDialog) {
-                gameDirDialog.addEventListener('click', function(e) {
-                    if (e.target === this) {
-                        window.closeGameDirectoryDialog();
-                    }
-                });
-            }
-
-            // ========== UPDATE NOTIFICATION TOAST ==========
-            window.showUpdateNotification = function(state, title, subtitle) {
-                const toast = document.getElementById('update-toast');
-                const icon = document.getElementById('toast-icon');
-                const titleEl = document.getElementById('toast-title');
-                const subtitleEl = document.getElementById('toast-subtitle');
-
-                if (!toast) return;
-
-                // Update text
-                if (titleEl) titleEl.textContent = title || 'Checking...';
-                if (subtitleEl) subtitleEl.textContent = subtitle || '';
-
-                // Update icon based on state
-                if (icon) {
-                    icon.className = 'update-toast-icon ' + state;
-                    if (state === 'checking') {
-                        icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>';
-                    } else if (state === 'upToDate' || state === 'success') {
-                        icon.className = 'update-toast-icon success';
-                        icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>';
-                    } else if (state === 'error') {
-                        icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
-                    }
-                }
-
-                // Show toast
-                toast.classList.add('show');
-
-                // Auto-hide after 4 seconds for non-checking states
-                if (state !== 'checking') {
-                    setTimeout(function() {
-                        toast.classList.remove('show');
-                    }, 4000);
-                }
-            };
-
-            window.hideUpdateNotification = function() {
-                const toast = document.getElementById('update-toast');
-                if (toast) {
-                    toast.classList.remove('show');
-                }
-            };
-        })();
-    </script>
+    <script src="./router.js"></script>
+    <script type="module" src="./app.js"></script>
 
     <!-- Update Notification Toast -->
     <div id="update-toast" class="update-toast">
@@ -1561,11 +1822,11 @@
                     </svg>
                     <input type="text" id="game-directory-input" class="game-dir-input" placeholder="C:\Games\TERA Europe Classic" />
                 </div>
-                <button class="game-dir-browse-btn" onclick="browseGameDirectory()" data-translate="BROWSE">Browse</button>
+                <button class="game-dir-browse-btn" id="btn-browse-game-dir" data-translate="BROWSE">Browse</button>
             </div>
             <div class="game-dir-buttons">
-                <button class="game-dir-cancel-btn" onclick="closeGameDirectoryDialog()" data-translate="CANCEL">Cancel</button>
-                <button class="game-dir-save-btn" onclick="saveGameDirectory()" data-translate="SAVE">Save</button>
+                <button class="game-dir-cancel-btn" id="btn-cancel-game-dir" data-translate="CANCEL">Cancel</button>
+                <button class="game-dir-save-btn" id="btn-save-game-dir" data-translate="SAVE">Save</button>
             </div>
         </div>
     </div>
@@ -1573,39 +1834,8 @@
     <!-- Iframe Container -->
     <div id="iframeContainer">
         <iframe id="embeddedSite"></iframe>
-        <button id="exitButton" onclick="closeIframe()" data-translate="RETURN_BUTTON">RETURN</button>
+        <button id="exitButton" data-translate="RETURN_BUTTON">RETURN</button>
     </div>
-
-    <!-- Iframe Functions -->
-    <script>
-        function closeIframe() {
-            document.getElementById('iframeContainer').classList.remove('show');
-            document.getElementById('iframeContainer').classList.add('hide');
-            setTimeout(function() {
-                document.getElementById('iframeContainer').style.display = 'none';
-                document.getElementById('embeddedSite').src = '';
-            }, 500);
-        }
-
-        function showIframe(thisurl) {
-            document.getElementById('embeddedSite').src = thisurl;
-            document.getElementById('iframeContainer').style.display = 'block';
-            document.getElementById('iframeContainer').classList.remove('hide');
-            document.getElementById('iframeContainer').classList.add('show');
-        }
-
-        async function fetchData(url) {
-            try {
-                const response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error('HTTP error! status: ' + response.status);
-                }
-                return await response.json();
-            } catch (error) {
-                console.error('There was a problem with the News fetch operation:', error);
-            }
-        }
-    </script>
 </body>
 
 </html>

@@ -256,7 +256,7 @@ fn parse_rss_to_json(xml: &str) -> Result<String, String> {
     let cursor = std::io::Cursor::new(xml);
 
     let mut current_item: Option<serde_json::Map<String, serde_json::Value>> = None;
-    let mut current_tag = String::new();
+    let current_tag = String::new();
     let mut in_item = false;
 
     for line in cursor.lines() {

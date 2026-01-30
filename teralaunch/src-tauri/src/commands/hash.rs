@@ -21,7 +21,7 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant, SystemTime};
 
 use indicatif::{ProgressBar, ProgressStyle};
-use log::{error, info, warn};
+use log::{error, info};
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use rayon::prelude::*;
 use serde_json::json;
