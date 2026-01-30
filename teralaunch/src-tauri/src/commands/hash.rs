@@ -167,7 +167,8 @@ pub async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>,
                 };
 
             let current_count = processed_count.fetch_add(1, Ordering::SeqCst) + 1;
-            if current_count % 100 == 0 || current_count == files.len() {
+            // Emit progress every file for smooth UI updates
+            {
                 let progress_payload = FileCheckProgress {
                     current_file: path.to_string(),
                     progress: (current_count as f64 / files.len() as f64) * 100.0,

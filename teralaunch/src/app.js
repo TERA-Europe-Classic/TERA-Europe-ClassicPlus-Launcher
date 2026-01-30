@@ -36,7 +36,7 @@ const URLS = {
   external: {
     register: "https://reg.tera-europe-classic.de/register.php",
     forum: "https://forum.crazy-esports.com/forum/board/42-tera-europe-classic/",
-    discord: "https://discord.gg/DARHAaNBYS",
+    discord: "https://discord.com/invite/crazyesports",
     support: "https://helpdesk.crazy-esports.com",
     privacy: "https://forum.crazy-esports.com/index.php?datenschutzerklaerung/",
   },
@@ -46,6 +46,287 @@ const REQUIRED_PRIVILEGE_LEVEL = 3;
 const UPDATE_CHECK_ENABLED = true;
 // Local launcher release date used for update comparisons
 const CURRENT_RELEASE_DATE = "2024-06-07";
+
+// ========== HOME PAGE STATUS UI FUNCTIONS ==========
+// These functions update the status area and launch button in home.html.
+// They must be in app.js (not home.html) because innerHTML doesn't execute scripts.
+
+// Helper to get translation - uses App.t() if available, otherwise returns key
+function getTranslation(key) {
+  if (window.App && typeof App.t === 'function') {
+    return App.t(key);
+  }
+  // Fallback defaults for when App isn't ready yet
+  const fallbacks = {
+    'CHECKING_BTN': 'CHECKING',
+    'LAUNCH_GAME': 'LAUNCH',
+    'DOWNLOADING_FILES': 'Downloading...',
+    'PAUSED': 'Paused',
+    'INITIALIZING': 'Initializing...',
+    'FILES': 'files'
+  };
+  return fallbacks[key] || key;
+}
+
+function hideAllStatusStates() {
+  document.querySelectorAll('#home-status-area .status-state').forEach(s => {
+    s.classList.remove('active');
+  });
+}
+
+function showCheckingState(checked, total) {
+  hideAllStatusStates();
+  const statusChecking = document.getElementById('status-checking');
+  if (statusChecking) statusChecking.classList.add('active');
+
+  // Show spinner on launch button
+  const playIcon = document.getElementById('launch-play-icon');
+  const spinnerIcon = document.getElementById('launch-spinner-icon');
+  const btnText = document.getElementById('launch-btn-text');
+  const launchBtn = document.getElementById('launch-game-btn');
+
+  if (playIcon) playIcon.style.display = 'none';
+  if (spinnerIcon) spinnerIcon.style.display = 'block';
+  if (btnText) btnText.textContent = getTranslation('CHECKING_BTN');
+  if (launchBtn) {
+    launchBtn.classList.add('disabled');
+    launchBtn.disabled = true;
+  }
+
+  // Hide pause button
+  const pauseBtn = document.getElementById('btn-pause-resume');
+  if (pauseBtn) pauseBtn.classList.remove('active');
+
+  updateCheckingProgress(checked, total);
+}
+window.showCheckingState = showCheckingState;
+
+function updateCheckingProgress(checked, total) {
+  const checkedEl = document.getElementById('checked-files');
+  const totalEl = document.getElementById('total-files');
+  const progressBar = document.getElementById('check-progress-bar');
+  const percentEl = document.getElementById('check-percent');
+  const progressFooter = document.querySelector('#status-checking .progress-footer');
+
+  const checkedNum = checked || 0;
+  const totalNum = total || 0;
+  const percent = totalNum > 0 ? Math.round((checkedNum / totalNum) * 100) : 0;
+
+  // Hide file count when initializing (0/0), show "Initializing..."
+  if (totalNum === 0) {
+    if (progressFooter) progressFooter.innerHTML = '<span>Initializing...</span>';
+    if (percentEl) percentEl.textContent = '';
+  } else {
+    if (progressFooter) {
+      progressFooter.innerHTML = `<span><span id="checked-files">${checkedNum.toLocaleString()}</span> / <span id="total-files">${totalNum.toLocaleString()}</span> files</span>`;
+    }
+    if (percentEl) percentEl.textContent = `${percent}%`;
+  }
+  if (progressBar) progressBar.style.width = `${percent}%`;
+}
+window.updateCheckingProgress = updateCheckingProgress;
+
+function hideCheckingState() {
+  const statusChecking = document.getElementById('status-checking');
+  if (statusChecking) statusChecking.classList.remove('active');
+
+  // Reset launch button icons
+  const playIcon = document.getElementById('launch-play-icon');
+  const spinnerIcon = document.getElementById('launch-spinner-icon');
+  const btnText = document.getElementById('launch-btn-text');
+
+  if (playIcon) playIcon.style.display = 'block';
+  if (spinnerIcon) spinnerIcon.style.display = 'none';
+  if (btnText) btnText.textContent = getTranslation('LAUNCH_GAME');
+
+  // Show appropriate status based on authentication
+  const isAuthenticated = localStorage.getItem('authKey') !== null;
+  const statusLoginRequired = document.getElementById('status-login-required');
+  const statusReady = document.getElementById('status-ready');
+  const launchBtn = document.getElementById('launch-game-btn');
+
+  if (isAuthenticated) {
+    if (statusLoginRequired) statusLoginRequired.classList.remove('active');
+    if (statusReady) statusReady.classList.add('active');
+    if (launchBtn) {
+      launchBtn.classList.remove('disabled');
+      launchBtn.disabled = false;
+    }
+  } else {
+    if (statusReady) statusReady.classList.remove('active');
+    if (statusLoginRequired) statusLoginRequired.classList.add('active');
+    if (launchBtn) {
+      launchBtn.classList.add('disabled');
+      launchBtn.disabled = true;
+    }
+  }
+}
+window.hideCheckingState = hideCheckingState;
+
+function showDownloadingState() {
+  hideAllStatusStates();
+  const statusDownloading = document.getElementById('status-downloading');
+  if (statusDownloading) statusDownloading.classList.add('active');
+
+  // Show pause button
+  const pauseBtn = document.getElementById('btn-pause-resume');
+  if (pauseBtn) pauseBtn.classList.add('active');
+
+  // Update pause button to show pause icon
+  const pauseIcon = document.getElementById('pause-icon');
+  const resumeIcon = document.getElementById('resume-icon');
+  if (pauseIcon) pauseIcon.style.display = 'block';
+  if (resumeIcon) resumeIcon.style.display = 'none';
+
+  // Update download label
+  const dlLabel = document.getElementById('dl-status-label');
+  if (dlLabel) dlLabel.textContent = getTranslation('DOWNLOADING_FILES');
+
+  // Show download speed (may have been hidden when paused)
+  const speedEl = document.getElementById('download-speed');
+  if (speedEl) speedEl.style.display = '';
+
+  // Disable launch button during download
+  const launchBtn = document.getElementById('launch-game-btn');
+  const playIcon = document.getElementById('launch-play-icon');
+  const spinnerIcon = document.getElementById('launch-spinner-icon');
+  const btnText = document.getElementById('launch-btn-text');
+
+  if (launchBtn) {
+    launchBtn.classList.add('disabled');
+    launchBtn.disabled = true;
+  }
+  if (playIcon) playIcon.style.display = 'block';
+  if (spinnerIcon) spinnerIcon.style.display = 'none';
+  if (btnText) btnText.textContent = getTranslation('LAUNCH_GAME');
+}
+window.showDownloadingState = showDownloadingState;
+
+function updateDownloadProgress(progress, downloaded, total, speed) {
+  const progressBar = document.getElementById('progress-percentage-div');
+  const percentEl = document.getElementById('progress-percentage');
+  const downloadedEl = document.getElementById('downloaded-size');
+  const totalEl = document.getElementById('total-size');
+  const speedEl = document.getElementById('download-speed');
+
+  const percent = Math.round(progress || 0);
+
+  if (progressBar) progressBar.style.width = `${percent}%`;
+  if (percentEl) percentEl.textContent = `${percent}%`;
+  if (downloadedEl) downloadedEl.textContent = downloaded || '0';
+  if (totalEl) totalEl.textContent = total || '0';
+  if (speedEl) speedEl.textContent = speed || '--';
+}
+window.updateDownloadProgress = updateDownloadProgress;
+
+function showPausedState() {
+  // Keep downloading state visible but update UI
+  const dlLabel = document.getElementById('dl-status-label');
+  if (dlLabel) dlLabel.textContent = getTranslation('PAUSED');
+
+  // Show resume icon on pause button
+  const pauseIcon = document.getElementById('pause-icon');
+  const resumeIcon = document.getElementById('resume-icon');
+  if (pauseIcon) pauseIcon.style.display = 'none';
+  if (resumeIcon) resumeIcon.style.display = 'block';
+
+  // Hide download speed when paused (shadcn behavior)
+  const speedEl = document.getElementById('download-speed');
+  if (speedEl) speedEl.style.display = 'none';
+}
+window.showPausedState = showPausedState;
+
+function showReadyState() {
+  hideAllStatusStates();
+  const statusReady = document.getElementById('status-ready');
+  if (statusReady) statusReady.classList.add('active');
+
+  // Hide pause button
+  const pauseBtn = document.getElementById('btn-pause-resume');
+  if (pauseBtn) pauseBtn.classList.remove('active');
+
+  // Enable launch button only if authenticated
+  const launchBtn = document.getElementById('launch-game-btn');
+  const playIcon = document.getElementById('launch-play-icon');
+  const spinnerIcon = document.getElementById('launch-spinner-icon');
+  const btnText = document.getElementById('launch-btn-text');
+
+  // Check authentication before enabling
+  const isAuthenticated = localStorage.getItem('authKey') !== null;
+  if (launchBtn) {
+    if (isAuthenticated) {
+      launchBtn.classList.remove('disabled');
+      launchBtn.disabled = false;
+    } else {
+      launchBtn.classList.add('disabled');
+      launchBtn.disabled = true;
+    }
+  }
+  if (playIcon) playIcon.style.display = 'block';
+  if (spinnerIcon) spinnerIcon.style.display = 'none';
+  if (btnText) btnText.textContent = getTranslation('LAUNCH_GAME');
+}
+window.showReadyState = showReadyState;
+
+function updateHeaderAuthState(isLoggedIn, username) {
+  const statusLoginRequired = document.getElementById('status-login-required');
+  const statusReady = document.getElementById('status-ready');
+  const launchBtn = document.getElementById('launch-game-btn');
+
+  if (isLoggedIn) {
+    // Switch to ready state
+    if (statusLoginRequired) statusLoginRequired.classList.remove('active');
+    if (statusReady) statusReady.classList.add('active');
+
+    // Enable launch button
+    if (launchBtn) {
+      launchBtn.classList.remove('disabled');
+      launchBtn.disabled = false;
+    }
+  } else {
+    // Switch to login required state
+    hideAllStatusStates();
+    if (statusLoginRequired) statusLoginRequired.classList.add('active');
+
+    // Disable launch button
+    if (launchBtn) {
+      launchBtn.classList.add('disabled');
+      launchBtn.disabled = true;
+    }
+  }
+
+  // Also update the index.html header (login form, user display, settings dropdown)
+  if (typeof window.updateIndexHeaderAuthState === 'function') {
+    window.updateIndexHeaderAuthState(isLoggedIn, username);
+  }
+}
+window.updateHeaderAuthState = updateHeaderAuthState;
+
+function initBackgroundCarousel() {
+  const bgImages = Array.from(document.querySelectorAll('#home-bg-container .bg-image'));
+  if (bgImages.length <= 1) return;
+
+  // Create shuffled order at launch (Fisher-Yates shuffle)
+  const order = bgImages.map((_, i) => i);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+
+  // Start with first image in shuffled order
+  let orderIndex = 0;
+  bgImages.forEach((img, i) => {
+    img.classList.toggle('active', i === order[0]);
+  });
+
+  // Cycle through shuffled order every 15 minutes
+  setInterval(() => {
+    bgImages[order[orderIndex]].classList.remove('active');
+    orderIndex = (orderIndex + 1) % order.length;
+    bgImages[order[orderIndex]].classList.add('active');
+  }, 15 * 60 * 1000); // 15 minutes
+}
+window.initBackgroundCarousel = initBackgroundCarousel;
 
 /**
  * Escapes HTML special characters to prevent XSS attacks.
@@ -232,6 +513,11 @@ const App = {
             currentUpdateMode: "complete",
             currentProgress: 100,
           });
+          // Update the status UI to show ready state since no checking is needed
+          if (typeof window.hideCheckingState === 'function') {
+            window.hideCheckingState();
+          }
+          this.updateLaunchGameButton(false);
           return;
         }
 
@@ -638,31 +924,38 @@ const App = {
         y: 0,
         ease: "power2.out",
       });
-      settingsBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if (!open) {
-          tl.play();
-        } else {
-          tl.reverse().then(() =>
-            gsap.set(settingsDropdown, { display: "none" }),
-          );
-        }
-        open = !open;
-      });
-      document.addEventListener("click", () => {
+
+      // Close function - exposed globally for menu items
+      const closeDropdown = () => {
         if (open) {
           tl.reverse().then(() =>
             gsap.set(settingsDropdown, { display: "none" }),
           );
           open = false;
         }
+      };
+      window.closeSettingsDropdown = closeDropdown;
+
+      settingsBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (!open) {
+          tl.play();
+          open = true;
+        } else {
+          closeDropdown();
+        }
+      });
+      document.addEventListener("click", () => {
+        closeDropdown();
       });
       settingsDropdown.addEventListener("click", (event) => {
-        event.stopPropagation();
+        // Only stop propagation for external links, let menu item clicks through
         if (event.target.tagName === "A" && event.target.target === "_blank") {
+          event.stopPropagation();
           event.preventDefault();
           this.openExternal(event.target.href);
         }
+        // Menu items (.menu-item) will bubble up to document and close the dropdown
       });
     }
 
@@ -930,14 +1223,14 @@ const App = {
       // Don't change mode here - let checkForUpdates handle the transition
     });
 
-    // Hide checking state UI
-    if (typeof window.hideCheckingState === 'function') {
-      window.hideCheckingState();
-    }
-
     if (!hasUpdates) {
+      // Only hide checking state and show ready when there are NO updates
+      if (typeof window.hideCheckingState === 'function') {
+        window.hideCheckingState();
+      }
       this.handleCompletion();
     }
+    // If hasUpdates is true, the download will start and showDownloadingState will handle the UI transition
   },
 
   /**
@@ -1026,8 +1319,13 @@ const App = {
     if (elements.dlStatusString) {
       elements.dlStatusString.textContent = this.getDlStatusString();
     }
-    if (elements.statusString)
+    // Only update status-string in ready state - not during download/check/complete
+    // The new UI handles status display through separate state divs
+    const mode = this.state.currentUpdateMode;
+    const skipStatusUpdate = mode === "download" || mode === "paused" || mode === "file_check" || mode === "complete";
+    if (elements.statusString && !skipStatusUpdate) {
       elements.statusString.textContent = this.getStatusText();
+    }
     if (elements.currentFile)
       elements.currentFile.textContent = this.getFileName(
         this.state.currentFileName,
@@ -1056,24 +1354,34 @@ const App = {
       (this.state.currentUpdateMode === "download" ||
         this.state.currentUpdateMode === "paused");
 
-    // Update new UI state sections
-    const statusReady = document.getElementById("status-ready");
+    // Update new UI state sections - only for download/pause states
+    // Don't interfere with checking state
+    const isCheckingMode = this.state.currentUpdateMode === "file_check";
     const statusDownloading = document.getElementById("status-downloading");
     const btnPauseResume = document.getElementById("btn-pause-resume");
 
-    if (statusReady && statusDownloading) {
+    if (!isCheckingMode && statusDownloading) {
       if (showProgress) {
-        statusReady.classList.add("hidden");
-        statusDownloading.classList.add("active");
+        // Use the proper state function to handle transitions
+        const isPaused = this.state.currentUpdateMode === "paused";
+        if (isPaused && typeof window.showPausedState === 'function') {
+          // Ensure downloading state is visible first, then update to paused
+          if (!statusDownloading.classList.contains('active')) {
+            statusDownloading.classList.add('active');
+          }
+          window.showPausedState();
+        } else if (typeof window.showDownloadingState === 'function') {
+          window.showDownloadingState();
+        }
       } else {
-        statusReady.classList.remove("hidden");
         statusDownloading.classList.remove("active");
+        // Don't auto-show ready state here - let the proper state functions handle it
       }
     }
 
     // Show/hide pause button
     if (btnPauseResume) {
-      if (showProgress) {
+      if (showProgress && !isCheckingMode) {
         btnPauseResume.classList.add("active");
       } else {
         btnPauseResume.classList.remove("active");
@@ -1348,6 +1656,11 @@ const App = {
         currentUpdateMode: "complete",
         currentProgress: 100,
       });
+      // Update the status UI to show ready state since no checking is needed
+      if (typeof window.hideCheckingState === 'function') {
+        window.hideCheckingState();
+      }
+      this.updateLaunchGameButton(false);
       return;
     }
 
@@ -1447,20 +1760,9 @@ const App = {
             0,
           ),
         });
-        // Clear any existing pending download timeout
-        if (this.pendingDownloadTimeout) {
-          clearTimeout(this.pendingDownloadTimeout);
-        }
-        this.pendingDownloadTimeout = setTimeout(async () => {
-          this.pendingDownloadTimeout = null;
-          // Safety check: only proceed if we're still in "complete" mode (not paused, cancelled, etc.)
-          if (this.state.currentUpdateMode !== "complete") {
-            console.log("Download aborted: mode changed to", this.state.currentUpdateMode);
-            return;
-          }
-          this.setState({ currentUpdateMode: "download" });
-          await this.runPatchSystem(filesToUpdate);
-        }, 2000);
+        // Start download immediately
+        this.setState({ currentUpdateMode: "download" });
+        await this.runPatchSystem(filesToUpdate);
       }
     } catch (error) {
       console.error("Error checking for updates:", error);
@@ -1509,6 +1811,11 @@ const App = {
         this.updateLaunchGameButton(false);
         this.toggleLanguageSelector(true);
         return;
+      }
+
+      // Transition UI from checking to downloading state
+      if (typeof window.showDownloadingState === 'function') {
+        window.showDownloadingState();
       }
 
       const downloadedSizes = await invoke("download_all_files", {
@@ -1876,8 +2183,11 @@ const App = {
           : "GAME_STATUS_NOT_RUNNING",
       );
     }
-    if (this.launchGameBtn) {
-      this.launchGameBtn.textContent = this.t("LAUNCH_GAME");
+    // Update only the text span inside the launch button, not the entire button
+    // (preserves SVG icons)
+    const launchBtnText = document.getElementById("launch-btn-text");
+    if (launchBtnText) {
+      launchBtnText.textContent = this.t("LAUNCH_GAME");
     }
   },
 
@@ -2063,6 +2373,12 @@ const App = {
    */
   updateLaunchGameButton(disabled) {
     if (!this.launchGameBtn) return;
+    // Always disable if not authenticated
+    if (!this.state.isAuthenticated) {
+      this.launchGameBtn.disabled = true;
+      this.launchGameBtn.classList.add("disabled");
+      return;
+    }
     const shouldDisable = shouldDisableLaunch({
       disabled,
       currentUpdateMode: this.state.currentUpdateMode,
@@ -2575,6 +2891,7 @@ const App = {
     try {
       this.currentLanguage = await invoke("get_language_from_config");
 
+      // Update legacy select wrapper if present
       const selectWrapper = document.querySelector(".select-wrapper");
       const selectStyled = selectWrapper?.querySelector(".select-styled");
       const selectOptions = selectWrapper?.querySelector(".select-options");
@@ -2588,9 +2905,10 @@ const App = {
           this.languages[this.currentLanguage] || this.currentLanguage;
         selectStyled.textContent = currentLanguageName;
         originalSelect.value = this.currentLanguage;
-      } else {
-        console.warn("Language selector elements not found in the DOM");
       }
+
+      // Update the new shadcn dropdown in index.html
+      this.syncShadcnLanguageDropdown();
 
       await this.loadTranslations();
       await this.updateAllTranslations();
@@ -2600,6 +2918,38 @@ const App = {
       await this.loadTranslations();
       await this.updateAllTranslations();
     }
+  },
+
+  /**
+   * Syncs the shadcn-style language dropdown in index.html with the current language.
+   */
+  syncShadcnLanguageDropdown() {
+    const languageSelector = document.getElementById("language-selector");
+    const regionCurrent = document.getElementById("region-current");
+    const regionFlag = document.getElementById("region-flag");
+    const regionOptions = document.querySelectorAll(".region-option");
+
+    if (languageSelector) {
+      languageSelector.value = this.currentLanguage;
+    }
+
+    // Update the visual dropdown state
+    regionOptions.forEach((opt) => {
+      if (opt.dataset.lang === this.currentLanguage) {
+        opt.classList.add("active");
+        if (regionCurrent) {
+          regionCurrent.textContent = opt.textContent.trim();
+        }
+        // Clone the SVG flag
+        const flagSvg = opt.querySelector(".flag-icon");
+        if (regionFlag && flagSvg) {
+          regionFlag.innerHTML = "";
+          regionFlag.appendChild(flagSvg.cloneNode(true));
+        }
+      } else {
+        opt.classList.remove("active");
+      }
+    });
   },
 
   /**
@@ -2726,6 +3076,9 @@ const App = {
    * @returns {Promise<void>}
    */
   async initHome() {
+    // Initialize background carousel for home page
+    initBackgroundCarousel();
+
     const sliderContainer = document.querySelector(".slider-container");
 
     const swiper = new Swiper(".news-slider", {
@@ -2828,7 +3181,7 @@ const App = {
       appQuitButton.addEventListener("click", () => this.appQuit());
     }
 
-    const pauseButton = document.querySelector(".btn-pause");
+    const pauseButton = document.getElementById("btn-pause-resume");
     if (pauseButton) {
       pauseButton.addEventListener("click", () => {
         this.togglePauseResume();
@@ -2977,12 +3330,16 @@ const App = {
         if (selectedPath) {
           input.value = selectedPath;
           await this.saveGamePath(selectedPath);
-          this.showNotification(this.t("FOLDER_SAVED_SUCCESS"), "success");
+          if (typeof window.showUpdateNotification === 'function') {
+            window.showUpdateNotification('success', this.t("FOLDER_SAVED_SUCCESS"), selectedPath);
+          }
           this.closeModal(modal);
         }
       } catch (error) {
         console.error("Error selecting game folder:", error);
-        this.showNotification(this.t("FOLDER_SELECTION_ERROR"), "error");
+        if (typeof window.showUpdateNotification === 'function') {
+          window.showUpdateNotification('error', this.t("FOLDER_SELECTION_ERROR"), error.message || '');
+        }
       }
     };
 
@@ -3149,23 +3506,46 @@ const App = {
       await invoke("save_game_path_to_config", { path });
       if (this.state.isFirstLaunch) {
         this.completeFirstLaunch();
-        this.showCustomNotification(
-          this.t("GAME_PATH_SET_FIRST_LAUNCH"),
-          "success",
-        );
+        if (typeof window.showUpdateNotification === 'function') {
+          window.showUpdateNotification('success', this.t("GAME_PATH_SET_FIRST_LAUNCH"), path);
+        }
       } else {
-        this.showCustomNotification(this.t("GAME_PATH_UPDATED"), "success");
+        if (typeof window.showUpdateNotification === 'function') {
+          window.showUpdateNotification('success', this.t("GAME_PATH_UPDATED"), path);
+        }
+
+        // Cancel any ongoing downloads/checks before starting new check
+        try {
+          await invoke("cancel_downloads");
+        } catch (e) {
+          console.warn("Failed to cancel ongoing downloads:", e);
+        }
+
+        // Clear any pending download timeout
+        if (this.pendingDownloadTimeout) {
+          clearTimeout(this.pendingDownloadTimeout);
+          this.pendingDownloadTimeout = null;
+        }
+
         this.setState(getPathChangeResetState());
         this.updateLaunchGameButton(true);
         this.toggleLanguageSelector(false);
+
+        // Show checking state and start file check for new folder
+        if (typeof window.showCheckingState === 'function') {
+          window.showCheckingState(0, 0);
+        }
+
         const isConnected = await this.checkServerConnection();
         if (isConnected) {
-          await this.checkForUpdates();
+          this.checkForUpdates(); // Don't await - let it run in background
         }
       }
     } catch (error) {
       console.error("Error saving game path:", error);
-      this.showCustomNotification(this.t("GAME_PATH_SAVE_ERROR"), "error");
+      if (typeof window.showUpdateNotification === 'function') {
+        window.showUpdateNotification('error', this.t("GAME_PATH_SAVE_ERROR"), error.message || '');
+      }
       throw error;
     }
   },
@@ -3245,6 +3625,7 @@ const App = {
   /**
    * Force revalidates all game files and updates if necessary.
    * Triggered from the Settings menu.
+   * Status is shown in the bottom status area, no popup notification needed.
    */
   async revalidateAndUpdateGame() {
     if (this.state.isCheckingForUpdates || this.state.isDownloading) {
@@ -3252,25 +3633,8 @@ const App = {
       return;
     }
 
-    // Show update notification
-    if (typeof window.showUpdateNotification === 'function') {
-      window.showUpdateNotification('Checking files...', false);
-    }
-
-    try {
-      await this.checkForUpdates();
-    } finally {
-      // Hide notification after a delay if no update needed
-      if (!this.state.isUpdateAvailable) {
-        if (typeof window.showUpdateNotification === 'function') {
-          window.showUpdateNotification('All files verified', true);
-        }
-      } else {
-        if (typeof window.hideUpdateNotification === 'function') {
-          window.hideUpdateNotification();
-        }
-      }
-    }
+    // Just run the file check - status area handles the UI
+    await this.checkForUpdates();
   },
 
   /**
@@ -3323,6 +3687,101 @@ const App = {
     const appCloseBtn = document.getElementById("app-close");
     if (appCloseBtn) {
       appCloseBtn.addEventListener("click", () => this.appQuit());
+    }
+
+    // Set up window dragging for areas with data-tauri-drag-region or -webkit-app-region: drag
+    this.setupWindowDragging();
+
+    // Set up language selector listener for the new shadcn dropdown
+    this.setupLanguageSelectorListener();
+  },
+
+  /**
+   * Sets up window dragging functionality. In Tauri with decorations disabled,
+   * we need to call appWindow.startDragging() on mousedown for drag regions.
+   */
+  setupWindowDragging() {
+    // Handle mousedown on elements with data-tauri-drag-region attribute
+    document.addEventListener("mousedown", async (e) => {
+      // Check if the clicked element or any parent has the drag region attribute
+      const target = e.target;
+
+      // Skip if clicking on interactive elements
+      if (this.isInteractiveElement(target)) {
+        return;
+      }
+
+      // Check for data-tauri-drag-region attribute
+      const hasDragRegion = target.closest("[data-tauri-drag-region]");
+      if (hasDragRegion) {
+        await appWindow.startDragging();
+        return;
+      }
+
+      // Check for CSS -webkit-app-region: drag (computed style check)
+      const computedStyle = window.getComputedStyle(target);
+      // Note: -webkit-app-region is not exposed via getComputedStyle in all browsers
+      // So we check if the element matches our known draggable selectors
+      const draggableSelectors = [
+        "#home-page",
+        "#home-bg-container",
+        "#home-main",
+        "#home-info-section",
+        ".info-content",
+        "#home-news-bar",
+        "#home-footer",
+        ".header"
+      ];
+
+      for (const selector of draggableSelectors) {
+        if (target.matches(selector) || target.closest(selector)) {
+          // Make sure we're not clicking on an interactive child
+          const interactiveChild = target.closest("button, a, input, select, textarea, #home-launch-section, .promo-card, #home-player-badge, .news-item, .news-label, .nav-btn, .control-btn, .region-btn, .login-input, .login-btn, .register-btn, .menu-item, .region-option");
+          if (!interactiveChild) {
+            await appWindow.startDragging();
+            return;
+          }
+        }
+      }
+    });
+  },
+
+  /**
+   * Checks if an element is interactive (button, link, input, etc.)
+   */
+  isInteractiveElement(element) {
+    const interactiveTags = ["BUTTON", "A", "INPUT", "SELECT", "TEXTAREA"];
+    if (interactiveTags.includes(element.tagName)) {
+      return true;
+    }
+
+    // Check for interactive class names
+    const interactiveClasses = [
+      "nav-btn", "control-btn", "region-btn", "login-btn", "register-btn",
+      "menu-item", "region-option", "promo-card", "news-item", "news-label"
+    ];
+    for (const cls of interactiveClasses) {
+      if (element.classList.contains(cls)) {
+        return true;
+      }
+    }
+
+    return false;
+  },
+
+  /**
+   * Sets up the language selector listener for the new shadcn-style dropdown.
+   * The dropdown in index.html dispatches change events on #language-selector.
+   */
+  setupLanguageSelectorListener() {
+    const languageSelector = document.getElementById("language-selector");
+    if (languageSelector) {
+      languageSelector.addEventListener("change", async (e) => {
+        const newLang = e.target.value;
+        if (newLang && newLang !== this.currentLanguage) {
+          await this.changeLanguage(newLang);
+        }
+      });
     }
   },
 

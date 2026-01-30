@@ -6,7 +6,7 @@
   },
   "package": {
     "productName": "TERA-Europe-Launcher",
-    "version": "1.8.3"
+    "version": "1.8.4"
   },
   "tauri": {
     "allowlist": {
@@ -31,7 +31,11 @@
         "all": false,
         "open": true,
         "scope": [
-          { "name": "open-url", "cmd": "cmd", "args": ["/C", "start", { "validator": "\\S+" }] }
+          {
+            "name": "open-url",
+            "cmd": "cmd",
+            "args": ["/C", "start", { "validator": "\\S+" }]
+          }
         ]
       },
       "window": {
@@ -42,7 +46,8 @@
         "minimize": true,
         "maximize": true,
         "unmaximize": true,
-        "setFocus": true
+        "setFocus": true,
+        "startDragging": true
       },
       "process": {
         "all": false,

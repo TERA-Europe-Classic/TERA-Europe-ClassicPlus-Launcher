@@ -12,7 +12,7 @@ tauri-build = { version = "1", features = [] }
 toml = "0.8"
 
 [dependencies]
-tauri = { version = "1.0", features = [
+tauri = { version = "1.0", features = [ "window-start-dragging",
     "dialog-all",
     "fs-create-dir",
     "fs-exists",

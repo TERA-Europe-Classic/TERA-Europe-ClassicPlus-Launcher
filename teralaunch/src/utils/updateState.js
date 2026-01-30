@@ -105,8 +105,8 @@ export function getPathChangeResetState() {
 
 export function getStatusKey(state) {
   if (state.updateError) return "UPDATE_ERROR_MESSAGE";
-  if (state.isDownloadComplete) return "DOWNLOAD_COMPLETE";
-  if (!state.isUpdateAvailable) return "NO_UPDATE_REQUIRED";
+  if (state.isDownloadComplete) return "READY_TO_PLAY";
+  if (!state.isUpdateAvailable) return "READY_TO_PLAY";
   if (state.currentUpdateMode === "file_check") return "VERIFYING_FILES";
   return "DOWNLOADING_FILES";
 }

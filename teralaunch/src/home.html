@@ -1,21 +1,21 @@
 <main class="content" id="home-page">
     <style>
-        /* ========== CSS VARIABLES - shadcn Dark Theme (matches index.html) ========== */
+        /* ========== CSS VARIABLES - shadcn Dark Theme (converted from OKLCH) ========== */
         :root {
-            --background: #171c28;
+            --background: #141922;
             --foreground: #f0f2f5;
-            --card: #161b24;
-            --popover: #12171f;
-            --primary: #5ab4e8;
-            --primary-foreground: #0f1219;
+            --card: #1a1f2a;
+            --popover: #161b24;
+            --primary: #22d3ee;
+            --primary-foreground: #141922;
             --secondary: #1e2430;
-            --muted: #1a1f28;
+            --muted: #2a303c;
             --muted-foreground: #8b92a0;
             --accent: #333a4a;
             --destructive: #dc2626;
-            --border: #3a4050;
-            --input: #1a1f28;
-            --ring: #5ab4e8;
+            --border: #3a4555;
+            --input: #2a303c;
+            --ring: #22d3ee;
             --radius: 0.5rem;
 
             /* Additional semantic colors */
@@ -98,32 +98,32 @@
             flex: 1;
             display: flex;
             align-items: flex-start;
-            padding: 48px 32px 32px 32px; /* Extra top padding to clear header */
+            padding: 56px 40px 40px 40px; /* Extra top padding to clear header */
         }
 
         .info-content {
             display: flex;
             flex-direction: column;
             align-items: flex-start; /* Left-align all children */
-            gap: 24px; /* gap-6 */
-            max-width: 400px;
+            gap: 28px; /* scaled up from 24px */
+            max-width: 480px; /* scaled up from 400px */
         }
 
-        /* Logo: h-28 = 112px with drop-shadow-2xl, left-aligned */
+        /* Logo: scaled up ~20% from 112px to 135px */
         #Tera-Logo-home {
             display: block;
-            height: 112px;
+            height: 135px;
             width: auto;
             object-fit: contain;
             filter: drop-shadow(0 25px 25px rgba(0, 0, 0, 0.25));
             /* Image has whitespace - compensate to align with text below */
-            margin-left: -65px !important;
-            margin-top: -15px !important;
+            margin-left: -78px !important;
+            margin-top: -18px !important;
         }
 
-        /* Description: text-sm = 14px, text-muted-foreground/90, leading-relaxed = 1.625 */
+        /* Description: scaled up from 14px to 15px */
         #home-description {
-            font-size: 14px;
+            font-size: 15px;
             line-height: 1.625;
             color: rgba(107, 114, 128, 0.9);
             margin: 0;
@@ -180,9 +180,9 @@
             }
         }
 
-        /* Player count: text-lg = 18px, font-bold */
+        /* Player count: scaled up from 18px to 22px */
         #player-count {
-            font-size: 18px;
+            font-size: 22px;
             font-weight: 700;
             color: var(--foreground);
             font-variant-numeric: tabular-nums;
@@ -228,12 +228,12 @@
             color: #fcd34d;
         }
 
-        /* ========== NEWS BAR (py-2.5 = 10px, px-6 = 24px) ========== */
+        /* ========== NEWS BAR (scaled up padding) ========== */
         #home-news-bar {
             display: flex;
             align-items: center;
-            gap: 24px; /* gap-6 */
-            padding: 10px 24px;
+            gap: 28px;
+            padding: 14px 28px;
             background: rgba(15, 18, 25, 0.3);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
@@ -241,12 +241,12 @@
             border-bottom: 1px solid rgba(45, 53, 72, 0.2);
         }
 
-        /* NEWS label: text-[10px] = 10px, font-bold, uppercase, tracking-widest, text-primary */
+        /* NEWS label: scaled up from 10px to 12px */
         .news-label {
             display: flex;
             align-items: center;
-            gap: 6px;
-            font-size: 10px;
+            gap: 8px;
+            font-size: 12px;
             font-weight: 700;
             color: var(--primary);
             text-transform: uppercase;
@@ -256,8 +256,8 @@
         }
 
         .news-dot {
-            width: 4px;
-            height: 4px;
+            width: 6px;
+            height: 6px;
             background: var(--primary);
             border-radius: 50%;
         }
@@ -270,7 +270,7 @@
         }
 
         .news-item {
-            font-size: 12px;
+            font-size: 14px;
             color: var(--muted-foreground);
             text-decoration: none;
             transition: color 0.2s ease;
@@ -281,12 +281,12 @@
             color: var(--foreground);
         }
 
-        /* ========== FOOTER (p-4 = 16px, gap-4 = 16px) ========== */
+        /* ========== FOOTER (scaled up padding from 16px to 20px) ========== */
         #home-footer {
             display: flex;
             align-items: stretch;
-            gap: 16px;
-            padding: 16px;
+            gap: 20px;
+            padding: 20px;
             background: rgba(15, 18, 25, 0.6);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
@@ -334,13 +334,13 @@
             background: linear-gradient(to top, rgba(15, 18, 25, 0.9) 0%, rgba(15, 18, 25, 0.3) 50%, transparent 100%);
         }
 
-        /* Title: text-xs = 12px, font-medium, bottom p-2.5 = 10px */
+        /* Title: scaled up from 12px to 14px */
         .promo-card-title {
             position: absolute;
-            bottom: 10px;
-            left: 10px;
-            right: 10px;
-            font-size: 12px;
+            bottom: 14px;
+            left: 14px;
+            right: 14px;
+            font-size: 14px;
             font-weight: 500;
             color: var(--foreground);
             transition: color 0.2s ease;
@@ -350,16 +350,16 @@
             color: var(--primary);
         }
 
-        /* ========== LAUNCH SECTION (w-64 = 256px, p-4 = 16px) ========== */
+        /* ========== LAUNCH SECTION (scaled up from 256px to 280px) ========== */
         #home-launch-section {
-            width: 256px;
+            width: 280px;
             flex-shrink: 0;
             display: flex;
             flex-direction: column;
-            padding: 16px;
-            background: rgba(15, 18, 25, 0.4);
+            padding: 18px;
+            background: rgba(20, 25, 34, 0.4);
             border-radius: 8px;
-            border: 1px solid rgba(45, 53, 72, 0.2);
+            border: 1px solid rgba(58, 69, 85, 0.2);
         }
 
         /* Status area: h-[42px] = 42px */
@@ -384,10 +384,10 @@
             gap: 8px;
         }
 
-        /* Status dot: w-1.5 h-1.5 = 6px */
+        /* Status dot: scaled up from 6px to 10px */
         .status-dot {
-            width: 6px;
-            height: 6px;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
             flex-shrink: 0;
         }
@@ -395,9 +395,9 @@
         .status-dot.green { background: var(--emerald-500); }
         .status-dot.amber { background: var(--amber-500); }
 
-        /* Status text: text-sm = 14px, font-medium */
+        /* Status text: scaled up from 14px to 16px */
         .status-text {
-            font-size: 14px;
+            font-size: 16px;
             font-weight: 500;
         }
 
@@ -414,12 +414,13 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin-bottom: 4px;
         }
 
         .progress-header-left {
             display: flex;
             align-items: center;
-            gap: 8px; /* gap-2 */
+            gap: 8px;
         }
 
         .spinner {
@@ -440,18 +441,20 @@
             to { transform: rotate(360deg); }
         }
 
-        /* text-xs = 12px, font-medium */
+        /* Progress label: larger for readability */
         .progress-label {
-            font-size: 12px;
+            font-size: 14px;
             font-weight: 500;
             color: var(--foreground);
+            line-height: 1;
         }
 
-        /* text-xs = 12px, text-muted-foreground, tabular-nums */
+        /* Progress percent: larger for readability */
         .progress-percent {
-            font-size: 12px;
+            font-size: 14px;
             color: var(--muted-foreground);
             font-variant-numeric: tabular-nums;
+            line-height: 1;
         }
 
         /* Progress bar: h-1.5 = 6px */
@@ -470,11 +473,11 @@
             width: 0%;
         }
 
-        /* Footer info: text-[10px] = 10px */
+        /* Footer info: larger for readability */
         .progress-footer {
             display: flex;
             justify-content: space-between;
-            font-size: 10px;
+            font-size: 12px;
             color: var(--muted-foreground);
             font-variant-numeric: tabular-nums;
         }
@@ -485,16 +488,16 @@
             gap: 8px;
         }
 
-        /* Pause button: w-12 = 48px, h-9 = 36px */
+        /* Pause button: w-12 = 48px, same height as launch button */
         #btn-pause-resume {
             width: 48px;
-            height: 36px;
+            height: 42px;
             display: none;
             align-items: center;
             justify-content: center;
             background: rgba(15, 18, 25, 0.5);
             border: 1px solid var(--border);
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
             transition: all 0.2s ease;
             flex-shrink: 0;
@@ -516,19 +519,20 @@
             fill: none;
         }
 
-        /* Launch button: h-9 = 36px, text-xs = 12px, font-bold */
+        /* Launch button */
         #launch-game-btn {
             flex: 1;
-            height: 36px;
+            height: 42px;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
+            gap: 8px;
             background: var(--primary);
             border: none;
-            border-radius: 4px;
-            font-size: 12px;
+            border-radius: 6px;
+            font-size: 14px;
             font-weight: 700;
+            letter-spacing: 0.025em;
             color: var(--primary-foreground);
             cursor: pointer;
             transition: all 0.2s ease;
@@ -548,8 +552,8 @@
         }
 
         #launch-game-btn svg {
-            width: 14px;
-            height: 14px;
+            width: 15px;
+            height: 15px;
         }
 
         #launch-game-btn svg.play-icon {
@@ -563,272 +567,31 @@
             animation: spin 1s linear infinite;
         }
 
-        /* ========== UPDATE NOTIFICATION TOAST ========== */
-        /* Position: fixed top-16 = 64px, right-4 = 16px, min-width 280px */
-        #update-notification {
-            position: fixed;
-            top: 64px;
-            right: 16px;
-            z-index: 1000;
-            display: none;
-            align-items: center;
-            gap: 12px;
-            min-width: 280px;
-            padding: 16px;
-            background: rgba(23, 28, 40, 0.95);
-            backdrop-filter: blur(4px);
-            -webkit-backdrop-filter: blur(4px);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
-            animation: slideIn 0.3s ease-out;
+        /* ========== WINDOW DRAGGING ========== */
+        /* Make main areas draggable */
+        #home-page,
+        #home-bg-container,
+        #home-main,
+        #home-info-section,
+        .info-content,
+        #home-news-bar,
+        #home-footer {
+            -webkit-app-region: drag;
         }
 
-        #update-notification.show {
-            display: flex;
-        }
-
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* Checking state: just spinner, no background */
-        .update-icon-wrapper.checking {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-
-        /* Success/Error states: h-8 w-8 = 32px rounded-full with background */
-        .update-icon-wrapper.success,
-        .update-icon-wrapper.error {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-
-        .update-icon-wrapper.success {
-            background: rgba(16, 185, 129, 0.2);
-        }
-
-        .update-icon-wrapper.error {
-            background: rgba(239, 68, 68, 0.2);
-        }
-
-        .update-spinner {
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
-        }
-
-        .update-spinner svg {
-            width: 100%;
-            height: 100%;
-            stroke: var(--primary);
-        }
-
-        .update-check-icon {
-            width: 16px;
-            height: 16px;
-            color: var(--emerald-500);
-        }
-
-        .update-check-icon svg {
-            width: 100%;
-            height: 100%;
-            stroke: currentColor;
-        }
-
-        .update-error-icon {
-            width: 16px;
-            height: 16px;
-            color: var(--destructive);
-        }
-
-        .update-error-icon svg {
-            width: 100%;
-            height: 100%;
-            stroke: currentColor;
-        }
-
-        .update-text-wrapper {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-
-        .update-title {
-            font-size: 14px;
-            font-weight: 500;
-            color: var(--foreground);
-        }
-
-        .update-subtitle {
-            font-size: 12px;
-            color: var(--muted-foreground);
-        }
-
-        /* ========== GAME DIRECTORY DIALOG ========== */
-        /* Modal: max-w-[480px] */
-        #game-directory-dialog {
-            display: none;
-            position: fixed;
-            inset: 0;
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(4px);
-            -webkit-backdrop-filter: blur(4px);
-        }
-
-        #game-directory-dialog.show {
-            display: flex;
-        }
-
-        .dialog-content {
-            width: 100%;
-            max-width: 480px;
-            padding: 24px;
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
-        }
-
-        .dialog-header {
-            margin-bottom: 16px;
-        }
-
-        .dialog-title {
-            font-size: 18px;
-            font-weight: 600;
-            color: var(--foreground);
-            margin: 0 0 4px 0;
-        }
-
-        .dialog-description {
-            font-size: 14px;
-            color: var(--muted-foreground);
-            margin: 0;
-        }
-
-        /* Unified input group with border container like shadcn */
-        .dialog-input-group {
-            display: flex;
-            align-items: center;
-            margin-bottom: 20px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            overflow: hidden;
-        }
-
-        .dialog-input-wrapper {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            padding: 8px 12px;
-            background: rgba(26, 31, 40, 0.3);
-        }
-
-        .dialog-input-icon {
-            width: 16px;
-            height: 16px;
-            color: var(--muted-foreground);
-            flex-shrink: 0;
-            margin-right: 8px;
-        }
-
-        .dialog-input-icon svg {
-            width: 100%;
-            height: 100%;
-            stroke: currentColor;
-        }
-
-        .dialog-input {
-            flex: 1;
-            height: 24px;
-            padding: 0;
-            background: transparent;
-            border: none;
-            font-size: 14px;
-            color: var(--foreground);
-            outline: none;
-        }
-
-        .dialog-input::placeholder {
-            color: var(--muted-foreground);
-        }
-
-        .dialog-browse-btn {
-            height: 100%;
-            padding: 8px 16px;
-            background: transparent;
-            border: none;
-            border-left: 1px solid var(--border);
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--foreground);
-            cursor: pointer;
-            transition: background-color 0.2s ease;
-        }
-
-        .dialog-browse-btn:hover {
-            background: rgba(26, 31, 40, 0.5);
-        }
-
-        .dialog-buttons {
-            display: flex;
-            justify-content: flex-end;
-            gap: 8px;
-        }
-
-        /* Cancel: ghost variant */
-        .dialog-cancel-btn {
-            height: 36px;
-            padding: 0 16px;
-            background: transparent;
-            border: none;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--foreground);
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .dialog-cancel-btn:hover {
-            background: var(--accent);
-        }
-
-        /* Save: primary variant */
-        .dialog-save-btn {
-            height: 36px;
-            padding: 0 16px;
-            background: var(--primary);
-            border: none;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--primary-foreground);
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .dialog-save-btn:hover {
-            background: rgba(34, 211, 238, 0.9);
+        /* Exclude interactive elements from dragging */
+        button,
+        a,
+        input,
+        select,
+        textarea,
+        #home-launch-section,
+        #home-promo-cards,
+        .promo-card,
+        #home-player-badge,
+        .news-item,
+        .news-label {
+            -webkit-app-region: no-drag;
         }
 
         /* ========== HIDDEN COMPAT ELEMENTS ========== */
@@ -840,119 +603,6 @@
             display: none;
         }
 
-        /* ========== SETTINGS MODAL (LEGACY) ========== */
-        #modal {
-            display: none;
-            position: fixed;
-            inset: 0;
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(4px);
-            -webkit-backdrop-filter: blur(4px);
-        }
-
-        #modal.show {
-            display: flex;
-        }
-
-        .modal-content {
-            width: 450px;
-            padding: 24px;
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
-        }
-
-        .modal-content .close {
-            float: right;
-            font-size: 24px;
-            color: var(--muted-foreground);
-            cursor: pointer;
-            transition: color 0.2s ease;
-        }
-
-        .modal-content .close:hover {
-            color: var(--foreground);
-        }
-
-        .settings-menu {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 20px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .menu-tab {
-            padding: 8px 16px;
-            background: transparent;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            font-size: 13px;
-            color: var(--muted-foreground);
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .menu-tab:hover {
-            color: var(--foreground);
-            background: var(--accent);
-        }
-
-        .menu-tab.active {
-            background: var(--primary);
-            color: var(--primary-foreground);
-            border-color: var(--primary);
-        }
-
-        .settings-section {
-            display: none;
-        }
-
-        .settings-section.active {
-            display: block;
-        }
-
-        .settings-section h2 {
-            font-size: 16px;
-            font-weight: 600;
-            color: var(--foreground);
-            margin: 0 0 8px 0;
-        }
-
-        .settings-section p {
-            font-size: 13px;
-            color: var(--muted-foreground);
-            margin: 0 0 16px 0;
-        }
-
-        .settings-section input[type="text"] {
-            width: 100%;
-            height: 40px;
-            padding: 0 12px;
-            background: var(--input);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            font-size: 14px;
-            color: var(--foreground);
-            outline: none;
-            cursor: pointer;
-        }
-
-        .settings-section input[type="text"]:focus {
-            border-color: var(--ring);
-        }
-
-        .notification {
-            margin-top: 12px;
-            padding: 10px 12px;
-            border-radius: 6px;
-            font-size: 13px;
-            display: none;
-        }
     </style>
 
     <!-- Background Carousel -->
@@ -962,6 +612,22 @@
         <div class="bg-image" style="background-image: url('./assets/bg-3.webp');"></div>
         <div class="bg-image" style="background-image: url('./assets/bg-4.webp');"></div>
         <div class="bg-image" style="background-image: url('./assets/bg-5.webp');"></div>
+        <!-- TERA Screenshots -->
+        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20250921_154024.png');"></div>
+        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251020_144430.png');"></div>
+        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251020_144748.png');"></div>
+        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251020_164230.png');"></div>
+        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251031_224427.png');"></div>
+        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251031_225023.png');"></div>
+        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251031_234446.png');"></div>
+        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251031_235811.png');"></div>
+        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251101_000035.png');"></div>
+        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251101_002433.png');"></div>
+        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251101_004052.png');"></div>
+        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251101_004531.png');"></div>
+        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251101_010311_1.png');"></div>
+        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251117_193545.png');"></div>
+        <div class="bg-image" style="background-image: url('./assets/TERA_ScreenShot_20251117_200150.png');"></div>
     </div>
 
     <!-- Main Content -->
@@ -981,7 +647,7 @@
                 <a id="home-player-badge" href="https://stats.crazy-esports.com" target="_blank">
                     <div class="pulse-dot"></div>
                     <span id="player-count">--</span>
-                    <span class="player-label">players online</span>
+                    <span class="player-label" data-translate="PLAYERS_ONLINE">players online</span>
                 </a>
 
                 <!-- Maintenance Notice -->
@@ -1037,7 +703,7 @@
                     <!-- Status Area -->
                     <div id="home-status-area">
                         <!-- State 1: Login Required (not logged in) -->
-                        <div id="status-login-required" class="status-state status-simple active">
+                        <div id="status-login-required" class="status-state status-simple">
                             <span class="status-dot amber"></span>
                             <span class="status-text amber" data-translate="LOGIN_REQUIRED">Login required</span>
                         </div>
@@ -1048,14 +714,14 @@
                             <span id="status-string" class="status-text green" data-translate="READY_TO_PLAY">Ready to play</span>
                         </div>
 
-                        <!-- State 3: Checking Files -->
-                        <div id="status-checking" class="status-state status-progress">
+                        <!-- State 3: Checking Files (DEFAULT on page load) -->
+                        <div id="status-checking" class="status-state status-progress active">
                             <div class="progress-header">
                                 <div class="progress-header-left">
                                     <span class="spinner">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
                                     </span>
-                                    <span class="progress-label">Checking files...</span>
+                                    <span class="progress-label" data-translate="CHECKING_FILES">Checking files...</span>
                                 </div>
                                 <span id="check-percent" class="progress-percent">0%</span>
                             </div>
@@ -1070,7 +736,7 @@
                         <!-- State 4: Downloading -->
                         <div id="status-downloading" class="status-state status-progress">
                             <div class="progress-header">
-                                <span id="dl-status-label" class="progress-label">Downloading...</span>
+                                <span id="dl-status-label" class="progress-label" data-translate="DOWNLOADING_FILES">Downloading...</span>
                                 <span id="progress-percentage" class="progress-percent">0%</span>
                             </div>
                             <div class="progress-track">
@@ -1099,64 +765,15 @@
                             </svg>
                         </button>
                         <button id="launch-game-btn" class="disabled" disabled>
-                            <!-- Play Icon -->
-                            <svg id="launch-play-icon" class="play-icon" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"></polygon></svg>
-                            <!-- Spinner Icon (when checking) -->
-                            <svg id="launch-spinner-icon" class="spinner-icon" viewBox="0 0 24 24" style="display: none;"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
-                            <span id="launch-btn-text" data-translate="LAUNCH_GAME">LAUNCH</span>
+                            <!-- Play Icon (hidden during checking) -->
+                            <svg id="launch-play-icon" class="play-icon" viewBox="0 0 24 24" style="display: none;"><polygon points="5,3 19,12 5,21"></polygon></svg>
+                            <!-- Spinner Icon (shown during checking - DEFAULT) -->
+                            <svg id="launch-spinner-icon" class="spinner-icon" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+                            <span id="launch-btn-text" data-translate="CHECKING_BTN">CHECKING</span>
                         </button>
                     </div>
                 </div>
             </footer>
-        </div>
-    </div>
-
-    <!-- Update Notification Toast -->
-    <div id="update-notification">
-        <!-- Checking state -->
-        <div class="update-icon-wrapper checking" id="update-icon-checking">
-            <span class="update-spinner">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
-            </span>
-        </div>
-        <!-- Success state -->
-        <div class="update-icon-wrapper success" id="update-icon-success" style="display: none;">
-            <span class="update-check-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            </span>
-        </div>
-        <!-- Error state -->
-        <div class="update-icon-wrapper error" id="update-icon-error" style="display: none;">
-            <span class="update-error-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-            </span>
-        </div>
-        <div class="update-text-wrapper">
-            <span class="update-title" id="update-notification-title">Checking for updates...</span>
-            <span class="update-subtitle" id="update-notification-subtitle">Please wait</span>
-        </div>
-    </div>
-
-    <!-- Game Directory Dialog -->
-    <div id="game-directory-dialog">
-        <div class="dialog-content">
-            <div class="dialog-header">
-                <h3 class="dialog-title">Game Directory</h3>
-                <p class="dialog-description">Choose where TERA Europe Classic is installed.</p>
-            </div>
-            <div class="dialog-input-group">
-                <div class="dialog-input-wrapper">
-                    <span class="dialog-input-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                    </span>
-                    <input type="text" id="game-directory-input" class="dialog-input" placeholder="C:\Games\TERA" />
-                </div>
-                <button class="dialog-browse-btn" onclick="browseGameDirectory()">Browse</button>
-            </div>
-            <div class="dialog-buttons">
-                <button class="dialog-cancel-btn" onclick="closeGameDirectoryDialog()">Cancel</button>
-                <button class="dialog-save-btn" onclick="saveGameDirectory()">Save</button>
-            </div>
         </div>
     </div>
 
@@ -1215,369 +832,4 @@
     </section>
 </main>
 
-<!-- Settings Modal (Legacy) -->
-<div id="modal" class="modal">
-    <div class="modal-content">
-        <span class="close">&times;</span>
-        <div class="settings-menu">
-            <button class="menu-tab active" data-section="folder" data-translate="SETTINGS_GAME_FOLDER">Game Folder</button>
-            <button class="menu-tab" data-section="version" data-translate="SETTINGS_VERSION_INFO">Version Info</button>
-        </div>
-        <div class="settings-section active" id="settings-folder">
-            <h2 data-translate="CHOOSE_GAME_FOLDER">Choose Your Game Folder</h2>
-            <p data-translate="CLICK_INPUT_INSTRUCTION">Just click inside the input</p>
-            <input type="text" id="gameFolder" data-translate-placeholder="LOCATE_GAME_FOLDER" />
-            <div id="notification" class="notification"></div>
-        </div>
-        <div class="settings-section" id="settings-version" style="display: none">
-            <h2 data-translate="SETTINGS_VERSION_INFO">Version Info</h2>
-            <p id="version-info"></p>
-        </div>
-    </div>
-</div>
-
-<script>
-    // ========== AUTH STATE UPDATE (called from index.html) ==========
-    function updateHeaderAuthState(isLoggedIn, username) {
-        const statusLoginRequired = document.getElementById('status-login-required');
-        const statusReady = document.getElementById('status-ready');
-        const launchBtn = document.getElementById('launch-game-btn');
-
-        if (isLoggedIn) {
-            // Switch to ready state
-            if (statusLoginRequired) statusLoginRequired.classList.remove('active');
-            if (statusReady) statusReady.classList.add('active');
-
-            // Enable launch button
-            if (launchBtn) {
-                launchBtn.classList.remove('disabled');
-                launchBtn.disabled = false;
-            }
-        } else {
-            // Switch to login required state
-            hideAllStatusStates();
-            if (statusLoginRequired) statusLoginRequired.classList.add('active');
-
-            // Disable launch button
-            if (launchBtn) {
-                launchBtn.classList.add('disabled');
-                launchBtn.disabled = true;
-            }
-        }
-
-        // Also update the index.html header (login form, user display, settings dropdown)
-        if (typeof window.updateIndexHeaderAuthState === 'function') {
-            window.updateIndexHeaderAuthState(isLoggedIn, username);
-        }
-    }
-    window.updateHeaderAuthState = updateHeaderAuthState;
-
-    // ========== STATUS STATE HELPERS ==========
-    function hideAllStatusStates() {
-        document.querySelectorAll('#home-status-area .status-state').forEach(s => {
-            s.classList.remove('active');
-        });
-    }
-
-    function showCheckingState(checked, total) {
-        hideAllStatusStates();
-        const statusChecking = document.getElementById('status-checking');
-        if (statusChecking) statusChecking.classList.add('active');
-
-        // Show spinner on launch button
-        const playIcon = document.getElementById('launch-play-icon');
-        const spinnerIcon = document.getElementById('launch-spinner-icon');
-        const btnText = document.getElementById('launch-btn-text');
-        const launchBtn = document.getElementById('launch-game-btn');
-
-        if (playIcon) playIcon.style.display = 'none';
-        if (spinnerIcon) spinnerIcon.style.display = 'block';
-        if (btnText) btnText.textContent = 'CHECKING';
-        if (launchBtn) {
-            launchBtn.classList.add('disabled');
-            launchBtn.disabled = true;
-        }
-
-        // Hide pause button
-        const pauseBtn = document.getElementById('btn-pause-resume');
-        if (pauseBtn) pauseBtn.classList.remove('active');
-
-        updateCheckingProgress(checked, total);
-    }
-    window.showCheckingState = showCheckingState;
-
-    function updateCheckingProgress(checked, total) {
-        const checkedEl = document.getElementById('checked-files');
-        const totalEl = document.getElementById('total-files');
-        const progressBar = document.getElementById('check-progress-bar');
-        const percentEl = document.getElementById('check-percent');
-
-        const checkedNum = checked || 0;
-        const totalNum = total || 0;
-        const percent = totalNum > 0 ? Math.round((checkedNum / totalNum) * 100) : 0;
-
-        if (checkedEl) checkedEl.textContent = checkedNum.toLocaleString();
-        if (totalEl) totalEl.textContent = totalNum.toLocaleString();
-        if (percentEl) percentEl.textContent = `${percent}%`;
-        if (progressBar) progressBar.style.width = `${percent}%`;
-    }
-    window.updateCheckingProgress = updateCheckingProgress;
-
-    function hideCheckingState() {
-        const statusChecking = document.getElementById('status-checking');
-        if (statusChecking) statusChecking.classList.remove('active');
-
-        // Reset launch button
-        const playIcon = document.getElementById('launch-play-icon');
-        const spinnerIcon = document.getElementById('launch-spinner-icon');
-        const btnText = document.getElementById('launch-btn-text');
-
-        if (playIcon) playIcon.style.display = 'block';
-        if (spinnerIcon) spinnerIcon.style.display = 'none';
-        if (btnText) btnText.textContent = 'LAUNCH';
-    }
-    window.hideCheckingState = hideCheckingState;
-
-    function showDownloadingState() {
-        hideAllStatusStates();
-        const statusDownloading = document.getElementById('status-downloading');
-        if (statusDownloading) statusDownloading.classList.add('active');
-
-        // Show pause button
-        const pauseBtn = document.getElementById('btn-pause-resume');
-        if (pauseBtn) pauseBtn.classList.add('active');
-
-        // Update pause button to show pause icon
-        const pauseIcon = document.getElementById('pause-icon');
-        const resumeIcon = document.getElementById('resume-icon');
-        if (pauseIcon) pauseIcon.style.display = 'block';
-        if (resumeIcon) resumeIcon.style.display = 'none';
-
-        // Update download label
-        const dlLabel = document.getElementById('dl-status-label');
-        if (dlLabel) dlLabel.textContent = 'Downloading...';
-
-        // Disable launch button during download
-        const launchBtn = document.getElementById('launch-game-btn');
-        const playIcon = document.getElementById('launch-play-icon');
-        const spinnerIcon = document.getElementById('launch-spinner-icon');
-        const btnText = document.getElementById('launch-btn-text');
-
-        if (launchBtn) {
-            launchBtn.classList.add('disabled');
-            launchBtn.disabled = true;
-        }
-        if (playIcon) playIcon.style.display = 'block';
-        if (spinnerIcon) spinnerIcon.style.display = 'none';
-        if (btnText) btnText.textContent = 'LAUNCH';
-    }
-    window.showDownloadingState = showDownloadingState;
-
-    function updateDownloadProgress(progress, downloaded, total, speed) {
-        const progressBar = document.getElementById('progress-percentage-div');
-        const percentEl = document.getElementById('progress-percentage');
-        const downloadedEl = document.getElementById('downloaded-size');
-        const totalEl = document.getElementById('total-size');
-        const speedEl = document.getElementById('download-speed');
-
-        const percent = Math.round(progress || 0);
-
-        if (progressBar) progressBar.style.width = `${percent}%`;
-        if (percentEl) percentEl.textContent = `${percent}%`;
-        if (downloadedEl) downloadedEl.textContent = downloaded || '0';
-        if (totalEl) totalEl.textContent = total || '0';
-        if (speedEl) speedEl.textContent = speed || '--';
-    }
-    window.updateDownloadProgress = updateDownloadProgress;
-
-    function showPausedState() {
-        // Keep downloading state visible but update UI
-        const dlLabel = document.getElementById('dl-status-label');
-        if (dlLabel) dlLabel.textContent = 'Paused';
-
-        // Show resume icon on pause button
-        const pauseIcon = document.getElementById('pause-icon');
-        const resumeIcon = document.getElementById('resume-icon');
-        if (pauseIcon) pauseIcon.style.display = 'none';
-        if (resumeIcon) resumeIcon.style.display = 'block';
-    }
-    window.showPausedState = showPausedState;
-
-    function showReadyState() {
-        hideAllStatusStates();
-        const statusReady = document.getElementById('status-ready');
-        if (statusReady) statusReady.classList.add('active');
-
-        // Hide pause button
-        const pauseBtn = document.getElementById('btn-pause-resume');
-        if (pauseBtn) pauseBtn.classList.remove('active');
-
-        // Enable launch button
-        const launchBtn = document.getElementById('launch-game-btn');
-        const playIcon = document.getElementById('launch-play-icon');
-        const spinnerIcon = document.getElementById('launch-spinner-icon');
-        const btnText = document.getElementById('launch-btn-text');
-
-        if (launchBtn) {
-            launchBtn.classList.remove('disabled');
-            launchBtn.disabled = false;
-        }
-        if (playIcon) playIcon.style.display = 'block';
-        if (spinnerIcon) spinnerIcon.style.display = 'none';
-        if (btnText) btnText.textContent = 'LAUNCH';
-    }
-    window.showReadyState = showReadyState;
-
-    // ========== UPDATE NOTIFICATION ==========
-    // state: 'checking' | 'upToDate' | 'error'
-    function showUpdateNotification(state, title, subtitle) {
-        const notification = document.getElementById('update-notification');
-        const titleEl = document.getElementById('update-notification-title');
-        const subtitleEl = document.getElementById('update-notification-subtitle');
-        const iconChecking = document.getElementById('update-icon-checking');
-        const iconSuccess = document.getElementById('update-icon-success');
-        const iconError = document.getElementById('update-icon-error');
-
-        if (!notification) return;
-
-        // Update text
-        if (titleEl) titleEl.textContent = title || 'Checking for updates...';
-        if (subtitleEl) subtitleEl.textContent = subtitle || 'Please wait';
-
-        // Update icon visibility
-        if (iconChecking) iconChecking.style.display = state === 'checking' ? 'flex' : 'none';
-        if (iconSuccess) iconSuccess.style.display = state === 'upToDate' ? 'flex' : 'none';
-        if (iconError) iconError.style.display = state === 'error' ? 'flex' : 'none';
-
-        // Show notification
-        notification.classList.add('show');
-
-        // Auto-hide after 4 seconds for success/error states
-        if (state === 'upToDate' || state === 'error') {
-            setTimeout(() => {
-                notification.classList.remove('show');
-            }, 4000);
-        }
-    }
-    window.showUpdateNotification = showUpdateNotification;
-
-    function hideUpdateNotification() {
-        const notification = document.getElementById('update-notification');
-        if (notification) {
-            notification.classList.remove('show');
-        }
-    }
-    window.hideUpdateNotification = hideUpdateNotification;
-
-    // ========== SETTINGS MENU HANDLERS (exposed for index.html) ==========
-    function handleCheckLauncherUpdate() {
-        // This function is called from index.html's settings menu
-        if (window.App && App.checkForLauncherUpdates) {
-            App.checkForLauncherUpdates();
-        }
-    }
-    window.handleCheckLauncherUpdate = handleCheckLauncherUpdate;
-
-    function handleCheckRepairFiles() {
-        // This function is called from index.html's settings menu
-        if (window.App && App.revalidateAndUpdateGame) {
-            App.revalidateAndUpdateGame();
-        }
-    }
-    window.handleCheckRepairFiles = handleCheckRepairFiles;
-
-    // ========== GAME DIRECTORY DIALOG ==========
-    function openGameDirectoryDialog(currentPath) {
-        const dialog = document.getElementById('game-directory-dialog');
-        const input = document.getElementById('game-directory-input');
-
-        if (dialog) {
-            dialog.classList.add('show');
-
-            // Set current path if provided
-            if (currentPath && input) {
-                input.value = currentPath;
-            } else if (window.App && App.loadConfig) {
-                // Load current path if available
-                App.loadConfig('gamePath').then(path => {
-                    if (path && input) {
-                        input.value = path;
-                    }
-                });
-            }
-        }
-    }
-    window.openGameDirectoryDialog = openGameDirectoryDialog;
-
-    function closeGameDirectoryDialog() {
-        const dialog = document.getElementById('game-directory-dialog');
-        if (dialog) {
-            dialog.classList.remove('show');
-        }
-    }
-    window.closeGameDirectoryDialog = closeGameDirectoryDialog;
-
-    async function browseGameDirectory() {
-        if (window.__TAURI__) {
-            try {
-                const selected = await window.__TAURI__.dialog.open({
-                    directory: true,
-                    multiple: false,
-                    title: 'Select Game Directory'
-                });
-                if (selected) {
-                    document.getElementById('game-directory-input').value = selected;
-                }
-            } catch (e) {
-                console.error('Failed to open directory dialog:', e);
-            }
-        }
-    }
-
-    async function saveGameDirectory() {
-        const input = document.getElementById('game-directory-input');
-        const path = input?.value;
-
-        if (path && window.App && App.saveConfig) {
-            try {
-                await App.saveConfig('gamePath', path);
-                closeGameDirectoryDialog();
-            } catch (e) {
-                console.error('Failed to save game directory:', e);
-            }
-        }
-    }
-
-    // Close dialog when clicking backdrop
-    document.getElementById('game-directory-dialog')?.addEventListener('click', function(e) {
-        if (e.target === this) {
-            closeGameDirectoryDialog();
-        }
-    });
-
-    // Legacy modal opener for backwards compatibility
-    function openSettingsModal() {
-        openGameDirectoryDialog();
-    }
-    window.openSettingsModal = openSettingsModal;
-
-    // ========== BACKGROUND CAROUSEL ==========
-    function initBackgroundCarousel() {
-        const bgImages = document.querySelectorAll('#home-bg-container .bg-image');
-        if (bgImages.length <= 1) return;
-
-        let currentIndex = 0;
-        setInterval(() => {
-            bgImages[currentIndex].classList.remove('active');
-            currentIndex = (currentIndex + 1) % bgImages.length;
-            bgImages[currentIndex].classList.add('active');
-        }, 8000);
-    }
-
-    // Initialize carousel when page loads
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initBackgroundCarousel);
-    } else {
-        initBackgroundCarousel();
-    }
-</script>
+<!-- Status UI functions moved to app.js (innerHTML doesn't execute scripts) -->
