@@ -140,12 +140,14 @@ fn main() {
                     if should_show_window {
                         if let Some(win) = app_handle_for_update.get_window("main") {
                             let _ = win.show();
-                            let _ = win.set_focus();
+                            // Note: Removed set_focus() - it can cause foreground lock issues
+                            // on Windows with transparent WebView2 windows. show() is sufficient.
                         }
                     }
                 } else if let Some(win) = app_handle_for_update.get_window("main") {
                     let _ = win.show();
-                    let _ = win.set_focus();
+                    // Note: Removed set_focus() - it can cause foreground lock issues
+                    // on Windows with transparent WebView2 windows. show() is sufficient.
                 }
             });
 

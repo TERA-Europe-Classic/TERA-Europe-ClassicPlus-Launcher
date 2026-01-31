@@ -30,7 +30,6 @@ tauri = { version = "1.0", features = [ "window-start-dragging",
     "window-hide",
     "window-maximize",
     "window-minimize",
-    "window-set-focus",
     "window-show",
     "window-unmaximize",
     "updater"

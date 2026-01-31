@@ -46,7 +46,7 @@
         "minimize": true,
         "maximize": true,
         "unmaximize": true,
-        "setFocus": true,
+        "setFocus": false,
         "startDragging": true
       },
       "process": {
