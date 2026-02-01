@@ -110,26 +110,6 @@ fn main() {
                 .expect("Main window not found - check tauri.conf.json");
             info!("Tauri setup started");
 
-            // Adjust window size for high DPI displays
-            // The base design is 1282x759 at 100% scaling
-            if let Ok(scale_factor) = window.scale_factor() {
-                if scale_factor > 1.0 {
-                    // Increase window size proportionally to the scale factor
-                    // This ensures all content remains visible at high DPI
-                    let base_width = 1282.0;
-                    let base_height = 759.0;
-                    let new_width = (base_width * scale_factor).round() as u32;
-                    let new_height = (base_height * scale_factor).round() as u32;
-
-                    info!("High DPI detected (scale: {}), resizing window to {}x{}",
-                          scale_factor, new_width, new_height);
-
-                    let _ = window.set_size(tauri::PhysicalSize::new(new_width, new_height));
-                    // Re-center after resize
-                    let _ = window.center();
-                }
-            }
-
             // Ensure window stays hidden until updater check completes (if auto-install is enabled)
             let _ = window.hide();
 

@@ -1482,33 +1482,110 @@ const App = {
 
   // Function to show a custom modal for first launch
   showFirstLaunchModal() {
+    // SVG flags matching the header dropdown
+    const flagSvgs = {
+      GER: '<svg class="flag-icon" viewBox="0 0 640 480"><path fill="#ffce00" d="M0 320h640v160H0z"/><path d="M0 0h640v160H0z"/><path fill="#d00" d="M0 160h640v160H0z"/></svg>',
+      EUR: '<svg class="flag-icon" viewBox="0 0 640 480"><path fill="#012169" d="M0 0h640v480H0z"/><path fill="#FFF" d="m75 0 244 181L562 0h78v62L400 241l240 178v61h-80L320 301 81 480H0v-60l239-178L0 64V0z"/><path fill="#C8102E" d="m424 281 216 159v40L369 281zm-184 20 6 35L54 480H0zM640 0v3L391 191l2-44L590 0zM0 0l239 176h-60L0 42z"/><path fill="#FFF" d="M241 0v480h160V0zM0 160v160h640V160z"/><path fill="#C8102E" d="M0 193v96h640v-96zM273 0v480h96V0z"/></svg>',
+      FRA: '<svg class="flag-icon" viewBox="0 0 640 480"><path fill="#fff" d="M0 0h640v480H0z"/><path fill="#002654" d="M0 0h213.3v480H0z"/><path fill="#ce1126" d="M426.7 0H640v480H426.7z"/></svg>',
+      RUS: '<svg class="flag-icon" viewBox="0 0 640 480"><path fill="#fff" d="M0 0h640v160H0z"/><path fill="#0039a6" d="M0 160h640v160H0z"/><path fill="#d52b1e" d="M0 320h640v160H0z"/></svg>',
+    };
+
     const modal = document.createElement("div");
     modal.id = "first-launch-modal";
     modal.innerHTML = `
-            <div class="first-launch-modal-content">
-                <h2>${this.t("WELCOME_TO_LAUNCHER")}</h2>
-                <p>${this.t("FIRST_LAUNCH_MESSAGE")}</p>
-                <label for="first-launch-language" style="display:block;margin-bottom:8px;">
-                    ${this.t("CHOOSE_DEFAULT_LANGUAGE")}
-                </label>
-                <select id="first-launch-language" style="margin-bottom:15px;padding:8px;border-radius:4px;"></select>
-                <button id="set-game-path-btn">${this.t("SET_GAME_PATH")}</button>
-            </div>
-        `;
+      <div class="first-launch-content">
+        <div class="first-launch-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            <polyline points="9 12 12 15 16 10"></polyline>
+          </svg>
+        </div>
+        <h2 class="first-launch-title">${this.t("WELCOME_TO_LAUNCHER")}</h2>
+        <p class="first-launch-subtitle">${this.t("FIRST_LAUNCH_MESSAGE")}</p>
+        <div class="first-launch-form">
+          <label class="first-launch-label">
+            ${this.t("CHOOSE_DEFAULT_LANGUAGE")}
+          </label>
+          <div class="first-launch-dropdown-wrapper">
+            <button class="first-launch-dropdown-btn" id="first-launch-lang-btn">
+              <span class="first-launch-lang-flag" id="first-launch-flag"></span>
+              <span class="first-launch-lang-name" id="first-launch-lang-name"></span>
+              <svg class="first-launch-dropdown-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <div class="first-launch-dropdown" id="first-launch-dropdown"></div>
+          </div>
+          <button id="set-game-path-btn" class="first-launch-continue-btn">
+            ${this.t("SET_GAME_PATH")}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+          </button>
+        </div>
+      </div>
+    `;
     document.body.appendChild(modal);
-    const languageSelect = document.getElementById("first-launch-language");
+
+    // Populate dropdown options
+    const dropdown = document.getElementById("first-launch-dropdown");
+    const flagDisplay = document.getElementById("first-launch-flag");
+    const nameDisplay = document.getElementById("first-launch-lang-name");
+    const dropdownBtn = document.getElementById("first-launch-lang-btn");
+    let selectedLang = this.currentLanguage;
+
     for (const [code, name] of Object.entries(this.languages)) {
-      const option = document.createElement("option");
-      option.value = code;
-      option.textContent = name;
-      languageSelect.appendChild(option);
+      const option = document.createElement("button");
+      option.className = "first-launch-dropdown-option";
+      option.dataset.lang = code;
+      option.innerHTML = `${flagSvgs[code] || ""}<span>${name}</span>`;
+      if (code === selectedLang) {
+        option.classList.add("active");
+      }
+      dropdown.appendChild(option);
     }
-    languageSelect.value = this.currentLanguage;
+
+    // Set initial display
+    flagDisplay.innerHTML = flagSvgs[selectedLang] || "";
+    nameDisplay.textContent = this.languages[selectedLang] || "";
+
+    // Toggle dropdown
+    dropdownBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      dropdown.classList.toggle("open");
+    });
+
+    // Handle option selection
+    dropdown.addEventListener("click", (e) => {
+      const option = e.target.closest(".first-launch-dropdown-option");
+      if (!option) return;
+
+      const lang = option.dataset.lang;
+      selectedLang = lang;
+
+      // Update display
+      flagDisplay.innerHTML = flagSvgs[lang] || "";
+      nameDisplay.textContent = this.languages[lang] || "";
+
+      // Update active state
+      dropdown.querySelectorAll(".first-launch-dropdown-option").forEach(opt => {
+        opt.classList.toggle("active", opt.dataset.lang === lang);
+      });
+
+      dropdown.classList.remove("open");
+    });
+
+    // Close dropdown when clicking outside
+    modal.addEventListener("click", (e) => {
+      if (!e.target.closest(".first-launch-dropdown-wrapper")) {
+        dropdown.classList.remove("open");
+      }
+    });
 
     const setGamePathBtn = document.getElementById("set-game-path-btn");
     setGamePathBtn.addEventListener("click", async () => {
-      const newLang = languageSelect.value;
-      await this.changeLanguage(newLang);
+      await this.changeLanguage(selectedLang);
       this.closeFirstLaunchModal();
       this.openGamePathSettings();
     });
@@ -1516,8 +1593,16 @@ const App = {
     anime({
       targets: modal,
       opacity: [0, 1],
-      scale: [0.9, 1],
       duration: 300,
+      easing: "easeOutQuad",
+    });
+
+    anime({
+      targets: ".first-launch-content",
+      opacity: [0, 1],
+      scale: [0.95, 1],
+      duration: 400,
+      delay: 50,
       easing: "easeOutQuad",
     });
   },
@@ -1525,11 +1610,21 @@ const App = {
   // Function to close the first launch modal
   closeFirstLaunchModal() {
     const modal = document.getElementById("first-launch-modal");
+    if (!modal) return;
+
+    anime({
+      targets: ".first-launch-content",
+      opacity: 0,
+      scale: 0.95,
+      duration: 200,
+      easing: "easeInQuad",
+    });
+
     anime({
       targets: modal,
       opacity: 0,
-      scale: 0.9,
-      duration: 300,
+      duration: 250,
+      delay: 50,
       easing: "easeInQuad",
       complete: () => {
         modal.remove();
@@ -1539,9 +1634,8 @@ const App = {
 
   // Function to open game path settings
   openGamePathSettings() {
-    const settingsBtn = document.getElementById("openModal");
-    if (settingsBtn) {
-      settingsBtn.click();
+    if (typeof window.openGameDirectoryDialog === 'function') {
+      window.openGameDirectoryDialog();
     }
   },
 
