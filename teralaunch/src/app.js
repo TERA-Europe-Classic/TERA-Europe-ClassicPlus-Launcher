@@ -1030,6 +1030,7 @@ const App = {
   // Store unlisteners for cleanup
   updateListeners: [],
   gameStatusListeners: [],
+  gameStatusRecoveryInterval: null,
   errorListener: null,
 
   // Track pending download timeout so it can be cancelled
@@ -1252,9 +1253,41 @@ const App = {
     this.gameStatusListeners.push(gameStatusChangedListener);
 
     const gameEndedListener = await listen("game_ended", async () => {
-      this.updateUIForGameStatus(false);
+      // Force sync with backend state to ensure UI is correct
+      await this.updateGameStatus();
+      // Also call reset_launch_state to ensure backend state is clean
+      try {
+        await invoke("reset_launch_state");
+      } catch (e) {
+        console.warn("Failed to reset launch state:", e);
+      }
     });
     this.gameStatusListeners.push(gameEndedListener);
+
+    // Add visibility change listener to poll game status when launcher regains focus
+    // This recovers from stuck states when game is killed via taskbar
+    const visibilityHandler = async () => {
+      if (document.visibilityState === 'visible') {
+        // Small delay to let any pending events process first
+        setTimeout(async () => {
+          await this.updateGameStatus();
+        }, 100);
+      }
+    };
+    document.addEventListener('visibilitychange', visibilityHandler);
+    // Store cleanup function for visibility handler
+    this.gameStatusListeners.push(() => {
+      document.removeEventListener('visibilitychange', visibilityHandler);
+    });
+
+    // Add window focus listener as additional recovery mechanism
+    const focusHandler = async () => {
+      await this.updateGameStatus();
+    };
+    window.addEventListener('focus', focusHandler);
+    this.gameStatusListeners.push(() => {
+      window.removeEventListener('focus', focusHandler);
+    });
   },
 
   /**
@@ -1393,6 +1426,12 @@ const App = {
    * the component is being destroyed (e.g., on logout or route change).
    */
   cleanupGameStatusListeners() {
+    // Clear the recovery interval if it exists
+    if (this.gameStatusRecoveryInterval) {
+      clearInterval(this.gameStatusRecoveryInterval);
+      this.gameStatusRecoveryInterval = null;
+    }
+
     for (const unlisten of this.gameStatusListeners) {
       if (typeof unlisten === 'function') {
         try {
@@ -2939,6 +2978,10 @@ const App = {
       }
 
       await invoke("handle_launch_game");
+
+      // Start a recovery interval that periodically syncs game status with backend
+      // This recovers from stuck states when game is killed via taskbar or crashes
+      this.startGameStatusRecoveryInterval();
     } catch (error) {
       console.error("Error initiating game launch:", error);
 
@@ -2959,6 +3002,42 @@ const App = {
     } finally {
       this.setState({ isGameLaunching: false });
     }
+  },
+
+  /**
+   * Starts a recovery interval that periodically checks game status with the backend.
+   * Stops automatically when the game is no longer running.
+   * This recovers from stuck states when the game is killed via taskbar or crashes.
+   */
+  startGameStatusRecoveryInterval() {
+    // Clear any existing interval
+    if (this.gameStatusRecoveryInterval) {
+      clearInterval(this.gameStatusRecoveryInterval);
+      this.gameStatusRecoveryInterval = null;
+    }
+
+    // Check game status every 5 seconds while game is supposed to be running
+    this.gameStatusRecoveryInterval = setInterval(async () => {
+      try {
+        const isRunning = await invoke("get_game_status");
+        this.updateUIForGameStatus(isRunning);
+
+        // If game is no longer running, clear the interval
+        if (!isRunning) {
+          console.log("Game status recovery: game no longer running, clearing interval");
+          clearInterval(this.gameStatusRecoveryInterval);
+          this.gameStatusRecoveryInterval = null;
+          // Ensure backend state is clean
+          try {
+            await invoke("reset_launch_state");
+          } catch (e) {
+            console.warn("Failed to reset launch state:", e);
+          }
+        }
+      } catch (error) {
+        console.warn("Game status recovery check failed:", error);
+      }
+    }, 5000); // Check every 5 seconds
   },
 
   /**
