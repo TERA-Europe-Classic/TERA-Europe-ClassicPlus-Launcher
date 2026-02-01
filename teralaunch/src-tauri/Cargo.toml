@@ -1,6 +1,6 @@
 [package]
 name = "tera-europe-launcher"
-version = "1.8.5"
+version = "1.8.6"
 description = "A Tauri App"
 authors = ["TNC97"]
 edition = "2021"

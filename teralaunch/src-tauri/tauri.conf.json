@@ -6,7 +6,7 @@
   },
   "package": {
     "productName": "TERA-Europe-Launcher",
-    "version": "1.8.5"
+    "version": "1.8.6"
   },
   "tauri": {
     "allowlist": {
@@ -81,7 +81,9 @@
         "title": "TERA-Europe-Launcher",
         "width": 1282,
         "height": 759,
-        "resizable": false,
+        "minWidth": 1024,
+        "minHeight": 600,
+        "resizable": true,
         "decorations": false,
         "transparent": true,
         "center": true,
