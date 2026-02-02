@@ -4615,7 +4615,7 @@ const App = {
       for (const selector of draggableSelectors) {
         if (target.matches(selector) || target.closest(selector)) {
           // Make sure we're not clicking on an interactive child
-          const interactiveChild = target.closest("button, a, input, select, textarea, #home-launch-section, .promo-card, #home-player-badge, .news-item, .news-label, .nav-btn, .control-btn, .region-btn, .login-input, .login-btn, .register-btn, .menu-item, .region-option");
+          const interactiveChild = target.closest("button, a, input, select, textarea, #home-launch-section, .promo-card, #home-player-badge, .news-item, .news-label, .nav-btn, .control-btn, .region-btn, .login-input, .login-btn, .register-btn, .menu-item, .region-option, .account-manager, .account-dropdown-item, .account-btn, .account-add-btn, .account-register-btn");
           if (!interactiveChild) {
             await appWindow.startDragging();
             return;
@@ -4643,7 +4643,9 @@ const App = {
     // Check for interactive class names on element itself
     const interactiveClasses = [
       "nav-btn", "control-btn", "region-btn", "login-btn", "register-btn",
-      "menu-item", "region-option", "promo-card", "news-item", "news-label"
+      "menu-item", "region-option", "promo-card", "news-item", "news-label",
+      "account-manager", "account-dropdown-item", "account-btn", "account-add-btn",
+      "account-register-btn", "account-delete-btn"
     ];
     for (const cls of interactiveClasses) {
       if (element.classList.contains(cls)) {
