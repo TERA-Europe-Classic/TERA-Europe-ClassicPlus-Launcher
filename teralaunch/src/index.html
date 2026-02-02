@@ -548,6 +548,358 @@
         }
 
         /* ============================================
+           ACCOUNT MANAGER DROPDOWN
+           ============================================ */
+        .account-manager {
+            position: relative;
+            display: flex;
+            align-items: center;
+            -webkit-app-region: no-drag;
+        }
+
+        .account-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            height: 36px;
+            padding: 0 12px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--foreground);
+            background: transparent;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+
+        .account-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .account-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #22c55e;
+            display: none;
+        }
+
+        .account-status-dot.playing {
+            display: block;
+        }
+
+        .account-btn-name {
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .account-btn-arrow {
+            width: 14px;
+            height: 14px;
+            color: var(--muted-foreground);
+            transition: transform 0.2s ease;
+        }
+
+        .account-manager.open .account-btn-arrow {
+            transform: rotate(180deg);
+        }
+
+        .account-dropdown {
+            display: none;
+            position: absolute;
+            top: calc(100% + 4px);
+            right: 0;
+            min-width: 200px;
+            background: var(--background);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            overflow: hidden;
+            z-index: 2001;
+        }
+
+        .account-manager.open .account-dropdown {
+            display: block;
+        }
+
+        .account-dropdown-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .account-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            padding: 10px 14px;
+            font-size: 14px;
+            color: var(--foreground);
+            background: none;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+            text-align: left;
+        }
+
+        .account-dropdown-item:hover {
+            background: var(--accent);
+        }
+
+        .account-dropdown-item:hover .account-delete-btn {
+            opacity: 1;
+        }
+
+        .account-item-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .account-item-badge {
+            font-size: 11px;
+            padding: 2px 6px;
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+            border-radius: 4px;
+        }
+
+        .account-delete-btn {
+            width: 24px;
+            height: 24px;
+            padding: 4px;
+            color: var(--muted-foreground);
+            background: none;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+        }
+
+        .account-delete-btn:hover {
+            color: var(--destructive);
+            background: rgba(220, 38, 38, 0.1);
+        }
+
+        .account-dropdown-divider {
+            height: 1px;
+            background: var(--border);
+            margin: 4px 0;
+        }
+
+        .account-add-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            padding: 10px 14px;
+            font-size: 14px;
+            color: var(--primary);
+            background: none;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+
+        .account-add-btn:hover {
+            background: var(--accent);
+        }
+
+        .account-add-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Add Account Modal */
+        #add-account-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 3000;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+        }
+
+        #add-account-modal.show {
+            display: flex;
+        }
+
+        .add-account-content {
+            width: 100%;
+            max-width: 360px;
+            padding: 24px;
+            background: var(--background);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+        }
+
+        .add-account-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--foreground);
+            margin: 0 0 16px 0;
+        }
+
+        .add-account-form {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .add-account-input {
+            height: 40px;
+            padding: 0 12px;
+            font-size: 14px;
+            color: var(--foreground);
+            background: rgba(26, 31, 40, 0.5);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        .add-account-input:focus {
+            border-color: var(--primary);
+        }
+
+        .add-account-input::placeholder {
+            color: var(--muted-foreground);
+        }
+
+        .add-account-error {
+            font-size: 13px;
+            color: var(--destructive);
+            display: none;
+        }
+
+        .add-account-error.show {
+            display: block;
+        }
+
+        .add-account-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .add-account-cancel {
+            height: 36px;
+            padding: 0 16px;
+            font-size: 14px;
+            color: var(--muted-foreground);
+            background: none;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: color 0.15s ease, background-color 0.15s ease;
+        }
+
+        .add-account-cancel:hover {
+            color: var(--foreground);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .add-account-submit {
+            height: 36px;
+            padding: 0 20px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--primary-foreground);
+            background: var(--primary);
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: opacity 0.15s ease;
+        }
+
+        .add-account-submit:hover {
+            opacity: 0.9;
+        }
+
+        .add-account-submit:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Delete Confirmation Modal */
+        #delete-account-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 3001;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+        }
+
+        #delete-account-modal.show {
+            display: flex;
+        }
+
+        .delete-account-content {
+            width: 100%;
+            max-width: 320px;
+            padding: 24px;
+            background: var(--background);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+
+        .delete-account-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--foreground);
+            margin: 0 0 8px 0;
+        }
+
+        .delete-account-message {
+            font-size: 14px;
+            color: var(--muted-foreground);
+            margin: 0 0 20px 0;
+        }
+
+        .delete-account-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .delete-account-cancel {
+            height: 36px;
+            padding: 0 16px;
+            font-size: 14px;
+            color: var(--muted-foreground);
+            background: none;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .delete-account-confirm {
+            height: 36px;
+            padding: 0 16px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+            background: var(--destructive);
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        /* ============================================
            GENERATE HASH FILE BUTTON (Admin)
            ============================================ */
         #generate-hash-file {
@@ -1935,9 +2287,28 @@
                     <div class="login-error-header" id="header-login-error"></div>
                 </div>
 
-                <!-- User Display (visible when logged in) -->
-                <div class="user-display" id="user-display">
-                    <span class="user-name" id="display-username"></span>
+                <!-- Account Manager -->
+                <div class="account-manager" id="account-manager">
+                    <button class="account-btn" id="account-btn">
+                        <span class="account-status-dot" id="account-status-dot"></span>
+                        <span class="account-btn-name" id="account-btn-name">Not logged in</span>
+                        <svg class="account-btn-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </button>
+                    <div class="account-dropdown" id="account-dropdown">
+                        <div class="account-dropdown-list" id="account-dropdown-list">
+                            <!-- Populated by JS -->
+                        </div>
+                        <div class="account-dropdown-divider"></div>
+                        <button class="account-add-btn" id="account-add-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            Add Account
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Window Controls -->
@@ -2079,6 +2450,34 @@
     <div id="iframeContainer">
         <iframe id="embeddedSite"></iframe>
         <button id="exitButton" data-translate="RETURN_BUTTON">RETURN</button>
+    </div>
+
+    <!-- Add Account Modal -->
+    <div id="add-account-modal">
+        <div class="add-account-content">
+            <h3 class="add-account-title">Add Account</h3>
+            <div class="add-account-form">
+                <input type="text" class="add-account-input" id="add-account-username" placeholder="Username">
+                <input type="password" class="add-account-input" id="add-account-password" placeholder="Password">
+                <p class="add-account-error" id="add-account-error"></p>
+                <div class="add-account-buttons">
+                    <button class="add-account-cancel" id="add-account-cancel">Cancel</button>
+                    <button class="add-account-submit" id="add-account-submit">Add Account</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Account Confirmation Modal -->
+    <div id="delete-account-modal">
+        <div class="delete-account-content">
+            <h3 class="delete-account-title">Remove Account?</h3>
+            <p class="delete-account-message" id="delete-account-message">Remove this account from the launcher?</p>
+            <div class="delete-account-buttons">
+                <button class="delete-account-cancel" id="delete-account-cancel">Cancel</button>
+                <button class="delete-account-confirm" id="delete-account-confirm">Remove</button>
+            </div>
+        </div>
     </div>
 </body>
 
