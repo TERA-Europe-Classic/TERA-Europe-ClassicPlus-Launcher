@@ -405,104 +405,6 @@
             margin: 0 4px;
         }
 
-        /* Login Form in Header */
-        .login-form-header {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            -webkit-app-region: no-drag;
-        }
-
-        /* Login Error Message */
-        .login-error-header {
-            position: absolute;
-            top: 100%;
-            right: 0;
-            margin-top: 8px;
-            padding: 8px 12px;
-            background: rgba(220, 38, 38, 0.9);
-            color: white;
-            font-size: 12px;
-            border-radius: 6px;
-            white-space: nowrap;
-            display: none;
-            z-index: 1000;
-            animation: shake 0.3s ease-in-out;
-        }
-
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-5px); }
-            75% { transform: translateX(5px); }
-        }
-
-        .login-form-wrapper {
-            position: relative;
-        }
-
-        .login-input {
-            width: 110px;
-            height: 36px;
-            padding: 0 12px;
-            font-size: 14px;
-            color: var(--foreground);
-            background: rgba(23, 28, 40, 0.5);
-            border: 1px solid rgba(58, 64, 80, 0.3);
-            border-radius: 6px;
-            transition: border-color 0.15s ease;
-        }
-
-        .login-input::placeholder {
-            color: var(--muted-foreground);
-        }
-
-        .login-input:focus {
-            border-color: rgba(90, 180, 232, 0.5);
-        }
-
-        .login-btn {
-            height: 36px;
-            padding: 0 16px;
-            font-size: 14px;
-            font-weight: 500;
-            color: var(--background);
-            background: var(--primary);
-            border-radius: 6px;
-            transition: opacity 0.15s ease;
-        }
-
-        .login-btn:hover {
-            opacity: 0.9;
-        }
-
-        .register-btn {
-            height: 36px;
-            padding: 0 16px;
-            font-size: 14px;
-            font-weight: 500;
-            color: var(--foreground);
-            background: transparent;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            transition: background-color 0.15s ease, border-color 0.15s ease;
-        }
-
-        .register-btn:hover {
-            background-color: rgba(255, 255, 255, 0.05);
-            border-color: rgba(58, 64, 80, 0.5);
-        }
-
-        /* User Display (when logged in) */
-        .user-display {
-            display: none;
-            align-items: center;
-            gap: 8px;
-            -webkit-app-region: no-drag;
-        }
-
-        .user-display.visible {
-            display: flex;
-        }
 
         .user-name {
             font-size: 12px;
@@ -711,6 +613,35 @@
         }
 
         .account-add-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .account-register-link {
+            text-decoration: none;
+            display: block;
+        }
+
+        .account-register-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            padding: 10px 14px;
+            font-size: 14px;
+            color: var(--muted-foreground);
+            background: none;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.15s ease, color 0.15s ease;
+        }
+
+        .account-register-btn:hover {
+            background: var(--accent);
+            color: var(--foreground);
+        }
+
+        .account-register-btn svg {
             width: 16px;
             height: 16px;
         }
@@ -2274,19 +2205,6 @@
 
                 <div class="divider"></div>
 
-                <!-- Login Form (visible when not logged in) -->
-                <div class="login-form-wrapper">
-                    <form class="login-form-header" id="login-form-header">
-                        <input type="text" placeholder="Username" class="login-input" id="header-username" data-translate-placeholder="USERNAME" />
-                        <input type="password" placeholder="Password" class="login-input" id="header-password" data-translate-placeholder="PASSWORD" />
-                        <button type="submit" class="login-btn" id="header-login-btn" data-translate="LOGIN">Login</button>
-                        <a href="https://tera-europe-classic.de/register.php?lang=de" target="_blank">
-                            <button type="button" class="register-btn" data-translate="REGISTER">Register</button>
-                        </a>
-                    </form>
-                    <div class="login-error-header" id="header-login-error"></div>
-                </div>
-
                 <!-- Account Manager -->
                 <div class="account-manager" id="account-manager">
                     <button class="account-btn" id="account-btn">
@@ -2306,8 +2224,19 @@
                                 <line x1="12" y1="5" x2="12" y2="19"></line>
                                 <line x1="5" y1="12" x2="19" y2="12"></line>
                             </svg>
-                            Add Account
+                            <span data-translate="LOGIN">Login</span>
                         </button>
+                        <a href="https://tera-europe-classic.de/register.php?lang=de" target="_blank" class="account-register-link" id="account-register-link">
+                            <button class="account-register-btn" type="button">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="8.5" cy="7" r="4"></circle>
+                                    <line x1="20" y1="8" x2="20" y2="14"></line>
+                                    <line x1="23" y1="11" x2="17" y2="11"></line>
+                                </svg>
+                                <span data-translate="REGISTER">Register</span>
+                            </button>
+                        </a>
                     </div>
                 </div>
 

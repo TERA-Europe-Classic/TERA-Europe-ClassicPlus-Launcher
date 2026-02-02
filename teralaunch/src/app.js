@@ -732,24 +732,19 @@ window.fetchData = fetchData;
  * @param {string} username - The username to display
  */
 function updateIndexHeaderAuthState(isLoggedIn, username) {
-  const loginForm = document.getElementById('login-form-header');
-  const userDisplay = document.getElementById('user-display');
   const logoutLink = document.getElementById('logout-link');
 
   if (isLoggedIn) {
-    if (loginForm) loginForm.style.display = 'none';
-    if (userDisplay) {
-      userDisplay.classList.add('visible');
-      const displayUsername = document.getElementById('display-username');
-      if (displayUsername) displayUsername.textContent = username || 'User';
-    }
     // Show logout option in settings menu
     if (logoutLink) logoutLink.style.display = 'block';
   } else {
-    if (loginForm) loginForm.style.display = 'flex';
-    if (userDisplay) userDisplay.classList.remove('visible');
     // Hide logout option when logged out
     if (logoutLink) logoutLink.style.display = 'none';
+  }
+
+  // Update account manager display (handled by AccountManager module)
+  if (window.App && App.updateAccountDisplay) {
+    App.updateAccountDisplay();
   }
 }
 window.updateIndexHeaderAuthState = updateIndexHeaderAuthState;
@@ -834,19 +829,6 @@ function initializeHeaderUI() {
           opt.classList.remove('active');
         }
       });
-    });
-  }
-
-  // ========== HEADER LOGIN FORM ==========
-  const loginFormHeader = document.getElementById('login-form-header');
-  if (loginFormHeader) {
-    loginFormHeader.addEventListener('submit', async function(e) {
-      e.preventDefault();
-      const username = document.getElementById('header-username')?.value;
-      const password = document.getElementById('header-password')?.value;
-      if (username && password && window.App && App.login) {
-        await App.login(username, password);
-      }
     });
   }
 
@@ -2707,17 +2689,6 @@ const App = {
     if (this.state.isLoggingIn) return;
 
     this.setState({ isLoggingIn: true });
-    // Use header login elements
-    const loginButton = document.getElementById("header-login-btn");
-    const loginErrorMsg = document.getElementById("header-login-error");
-
-    if (loginButton) {
-      loginButton.disabled = true;
-    }
-
-    if (loginErrorMsg) {
-      loginErrorMsg.style.display = "none";
-    }
 
     try {
       const response = await invoke("login", { username, password });
@@ -2769,26 +2740,19 @@ const App = {
       }
     } catch (error) {
       console.error("Error during login:", error);
-      if (loginErrorMsg) {
-        const message = error && (error.message || error);
-        if (message === "INVALID_CREDENTIALS") {
-          loginErrorMsg.textContent = this.t("LOGIN_ERROR") || "Invalid username or password";
-        } else if (message && typeof message === "string") {
-          loginErrorMsg.textContent = message;
-        } else {
-          loginErrorMsg.textContent = this.t("SERVER_CONNECTION_ERROR") || "Connection error";
-        }
-        loginErrorMsg.style.display = "block";
-        // Auto-hide after 5 seconds
-        setTimeout(() => {
-          if (loginErrorMsg) loginErrorMsg.style.display = "none";
-        }, 5000);
+      const message = error && (error.message || error);
+      let errorText;
+      if (message === "INVALID_CREDENTIALS") {
+        errorText = this.t("LOGIN_ERROR") || "Invalid username or password";
+      } else if (message && typeof message === "string") {
+        errorText = message;
+      } else {
+        errorText = this.t("SERVER_CONNECTION_ERROR") || "Connection error";
       }
+      // Show error via toast notification
+      window.showUpdateNotification('error', this.t('LOGIN_FAILED') || 'Login Failed', errorText);
     } finally {
       this.setState({ isLoggingIn: false });
-      if (loginButton) {
-        loginButton.disabled = false;
-      }
     }
   },
 
