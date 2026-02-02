@@ -3055,6 +3055,13 @@ const App = {
     if (UPDATE_CHECK_ENABLED && this.state.isUpdateAvailable) return;
     if (this.state.isGameLaunching) return;
 
+    // Check if active account already has a running game
+    const activeAccount = AccountManager.getActiveAccount();
+    if (activeAccount && AccountManager.isAccountInGame(activeAccount.userNo)) {
+      window.showUpdateNotification('warning', this.t('ALREADY_RUNNING') || 'Already Running', this.t('ACCOUNT_ALREADY_RUNNING') || 'This account already has a game running');
+      return;
+    }
+
     this.setState({ isGameLaunching: true });
 
     try {
@@ -3062,33 +3069,40 @@ const App = {
       if (this.statusEl) this.statusEl.textContent = this.t("LAUNCHING_GAME");
 
       // Silently refresh auth before launching to ensure valid session
-      const storedCred = localStorage.getItem('_cred');
-      if (storedCred) {
-        const cred = JSON.parse(atob(storedCred));
+      const activeAccountForAuth = AccountManager.getActiveAccount();
+      if (activeAccountForAuth && activeAccountForAuth.credentials) {
+        const cred = JSON.parse(atob(activeAccountForAuth.credentials));
         console.log("Refreshing auth before game launch...");
         const refreshed = await this.silentAuthRefresh(cred.u, cred.p);
         if (!refreshed) {
           console.error("Auth refresh failed");
-          await message(this.t("SESSION_EXPIRED_MESSAGE"), {
-            title: this.t("ERROR"),
-            type: "error",
-          });
-          await this.logout();
+          window.showUpdateNotification('error', this.t('LOGIN_FAILED') || 'Login Failed', this.t('PLEASE_REENTER_PASSWORD') || 'Please re-enter your password');
+          this.openAddAccountModal(activeAccountForAuth.userName);
+          this.setState({ isGameLaunching: false });
+          this.updateUIForGameStatus(false);
           return;
         }
         console.log("Auth refreshed, launching game...");
       } else {
-        // No stored credentials - user needs to login
-        console.log("No stored credentials, redirecting to login...");
-        await message(this.t("SESSION_EXPIRED_MESSAGE"), {
-          title: this.t("ERROR"),
-          type: "error",
-        });
-        await this.logout();
+        // No active account with credentials - show add account modal
+        console.log("No active account with credentials");
+        window.showUpdateNotification('error', this.t('LOGIN_FAILED') || 'Login Failed', this.t('PLEASE_REENTER_PASSWORD') || 'Please re-enter your password');
+        this.openAddAccountModal();
+        this.setState({ isGameLaunching: false });
+        this.updateUIForGameStatus(false);
         return;
       }
 
       await invoke("handle_launch_game");
+
+      // Register this game as running for this account
+      const launchedAccount = AccountManager.getActiveAccount();
+      if (launchedAccount) {
+        // Use timestamp as pseudo-ID since we don't get actual process ID from backend
+        AccountManager.registerRunningGame(launchedAccount.userNo, Date.now());
+        this.updateAccountDisplay();
+        this.updateLaunchButtonState();
+      }
 
       // Start a recovery interval that periodically syncs game status with backend
       // This recovers from stuck states when game is killed via taskbar or crashes
@@ -3138,6 +3152,15 @@ const App = {
           console.log("Game status recovery: game no longer running, clearing interval");
           clearInterval(this.gameStatusRecoveryInterval);
           this.gameStatusRecoveryInterval = null;
+
+          // Unregister running game when it exits
+          const exitedAccount = AccountManager.getActiveAccount();
+          if (exitedAccount) {
+            AccountManager.unregisterRunningGame(exitedAccount.userNo);
+            this.updateAccountDisplay();
+            this.updateLaunchButtonState();
+          }
+
           // Ensure backend state is clean
           try {
             await invoke("reset_launch_state");
