@@ -1070,6 +1070,18 @@ const App = {
       AccountManager.getInstanceId(); // Ensure instance ID exists
 
       this.initAccountManager();
+
+      // If there's an active account, do silent auth refresh to populate localStorage
+      const activeAccount = AccountManager.getActiveAccount();
+      if (activeAccount && activeAccount.credentials) {
+        try {
+          const cred = JSON.parse(atob(activeAccount.credentials));
+          await this.silentAuthRefresh(cred.u, cred.p);
+        } catch (e) {
+          console.warn("Failed to auto-refresh auth for active account:", e);
+        }
+      }
+
       this.disableContextMenu();
       const savedTheme = localStorage.getItem("theme");
       if (savedTheme === "light") {
@@ -2994,13 +3006,32 @@ const App = {
       const jsonResponse = JSON.parse(response);
 
       if (jsonResponse && jsonResponse.Return && jsonResponse.Msg === "success") {
-        // Store auth info in backend (no UI updates)
+        const authKey = jsonResponse.Return.AuthKey;
+        const userNo = Number(jsonResponse.Return.UserNo);
+        const characterCount = jsonResponse.Return.CharacterCount;
+
+        // Update localStorage so isAuthenticated checks pass
+        localStorage.setItem("authKey", authKey);
+        localStorage.setItem("userName", username);
+        localStorage.setItem("userNo", userNo.toString());
+        localStorage.setItem("characterCount", characterCount.toString());
+
+        // Store auth info in backend
         await invoke("set_auth_info", {
-          authKey: jsonResponse.Return.AuthKey,
+          authKey: authKey,
           userName: username,
-          userNo: Number(jsonResponse.Return.UserNo),
-          characterCount: jsonResponse.Return.CharacterCount,
+          userNo: userNo,
+          characterCount: characterCount,
         });
+
+        // Update app state
+        this.setState({ isAuthenticated: true });
+
+        // Update header UI
+        if (typeof window.updateIndexHeaderAuthState === "function") {
+          window.updateIndexHeaderAuthState(true, username);
+        }
+
         return true;
       }
       return false;
