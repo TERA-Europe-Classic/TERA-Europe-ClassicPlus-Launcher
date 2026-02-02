@@ -100,7 +100,14 @@
         "BROWSE": "Parcourir",
         "CANCEL": "Annuler",
         "SAVE": "Enregistrer",
-        "REFRESH": "Rafraîchir"
+        "REFRESH": "Rafraîchir",
+        "IN_GAME": "En jeu",
+        "LOGIN_FAILED": "Échec de connexion",
+        "PLEASE_REENTER_PASSWORD": "Veuillez ressaisir votre mot de passe",
+        "ACCOUNT_ADDED": "Compte ajouté",
+        "ACCOUNT_REMOVED": "Compte supprimé",
+        "ALREADY_RUNNING": "Déjà en cours",
+        "ACCOUNT_ALREADY_RUNNING": "Ce compte a déjà une partie en cours"
     },
     "EUR": {
         "LOGIN_REQUIRED": "Login required",
@@ -203,7 +210,14 @@
         "PAUSED": "Paused",
         "INITIALIZING": "Initializing...",
         "PLAYERS_ONLINE": "players online",
-        "FILES": "files"
+        "FILES": "files",
+        "IN_GAME": "In Game",
+        "LOGIN_FAILED": "Login Failed",
+        "PLEASE_REENTER_PASSWORD": "Please re-enter your password",
+        "ACCOUNT_ADDED": "Account Added",
+        "ACCOUNT_REMOVED": "Account Removed",
+        "ALREADY_RUNNING": "Already Running",
+        "ACCOUNT_ALREADY_RUNNING": "This account already has a game running"
     },
     "RUS": {
         "LOGIN_REQUIRED": "Требуется вход",
@@ -306,7 +320,14 @@
         "PAUSED": "Пауза",
         "INITIALIZING": "Инициализация...",
         "PLAYERS_ONLINE": "игроков онлайн",
-        "FILES": "файлов"
+        "FILES": "файлов",
+        "IN_GAME": "В игре",
+        "LOGIN_FAILED": "Ошибка входа",
+        "PLEASE_REENTER_PASSWORD": "Пожалуйста, введите пароль заново",
+        "ACCOUNT_ADDED": "Аккаунт добавлен",
+        "ACCOUNT_REMOVED": "Аккаунт удалён",
+        "ALREADY_RUNNING": "Уже запущено",
+        "ACCOUNT_ALREADY_RUNNING": "У этого аккаунта уже запущена игра"
     },
     "GER": {
         "LOGIN_REQUIRED": "Anmeldung erforderlich",
@@ -409,6 +430,13 @@
         "PAUSED": "Pausiert",
         "INITIALIZING": "Initialisierung...",
         "PLAYERS_ONLINE": "Spieler online",
-        "FILES": "Dateien"
+        "FILES": "Dateien",
+        "IN_GAME": "Im Spiel",
+        "LOGIN_FAILED": "Anmeldung fehlgeschlagen",
+        "PLEASE_REENTER_PASSWORD": "Bitte geben Sie Ihr Passwort erneut ein",
+        "ACCOUNT_ADDED": "Konto hinzugefügt",
+        "ACCOUNT_REMOVED": "Konto entfernt",
+        "ALREADY_RUNNING": "Läuft bereits",
+        "ACCOUNT_ALREADY_RUNNING": "Dieses Konto hat bereits ein laufendes Spiel"
     }
 }
