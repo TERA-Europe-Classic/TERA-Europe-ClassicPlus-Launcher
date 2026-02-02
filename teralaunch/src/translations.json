@@ -107,7 +107,8 @@
         "ACCOUNT_ADDED": "Compte ajouté",
         "ACCOUNT_REMOVED": "Compte supprimé",
         "ALREADY_RUNNING": "Déjà en cours",
-        "ACCOUNT_ALREADY_RUNNING": "Ce compte a déjà une partie en cours"
+        "ACCOUNT_ALREADY_RUNNING": "Ce compte a déjà une partie en cours",
+        "ADD_ACCOUNT": "Ajouter un compte"
     },
     "EUR": {
         "LOGIN_REQUIRED": "Login required",
@@ -217,7 +218,8 @@
         "ACCOUNT_ADDED": "Account Added",
         "ACCOUNT_REMOVED": "Account Removed",
         "ALREADY_RUNNING": "Already Running",
-        "ACCOUNT_ALREADY_RUNNING": "This account already has a game running"
+        "ACCOUNT_ALREADY_RUNNING": "This account already has a game running",
+        "ADD_ACCOUNT": "Add Account"
     },
     "RUS": {
         "LOGIN_REQUIRED": "Требуется вход",
@@ -327,7 +329,8 @@
         "ACCOUNT_ADDED": "Аккаунт добавлен",
         "ACCOUNT_REMOVED": "Аккаунт удалён",
         "ALREADY_RUNNING": "Уже запущено",
-        "ACCOUNT_ALREADY_RUNNING": "У этого аккаунта уже запущена игра"
+        "ACCOUNT_ALREADY_RUNNING": "У этого аккаунта уже запущена игра",
+        "ADD_ACCOUNT": "Добавить аккаунт"
     },
     "GER": {
         "LOGIN_REQUIRED": "Anmeldung erforderlich",
@@ -437,6 +440,7 @@
         "ACCOUNT_ADDED": "Konto hinzugefügt",
         "ACCOUNT_REMOVED": "Konto entfernt",
         "ALREADY_RUNNING": "Läuft bereits",
-        "ACCOUNT_ALREADY_RUNNING": "Dieses Konto hat bereits ein laufendes Spiel"
+        "ACCOUNT_ALREADY_RUNNING": "Dieses Konto hat bereits ein laufendes Spiel",
+        "ADD_ACCOUNT": "Konto hinzufügen"
     }
 }
