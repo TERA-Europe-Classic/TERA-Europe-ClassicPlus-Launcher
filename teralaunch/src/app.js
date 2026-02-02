@@ -1069,6 +1069,17 @@ const App = {
       AccountManager.migrateFromLegacyStorage();
       AccountManager.getInstanceId(); // Ensure instance ID exists
 
+      // If no active account but accounts exist, select the most recently used one
+      if (!AccountManager.getActiveAccountId()) {
+        const accounts = AccountManager.getAccounts();
+        if (accounts.length > 0) {
+          // Sort by lastUsed descending, pick first
+          accounts.sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0));
+          AccountManager.setActiveAccountId(accounts[0].userNo);
+          console.log('Auto-selected account:', accounts[0].userName);
+        }
+      }
+
       this.initAccountManager();
 
       // If there's an active account, do silent auth refresh to populate localStorage
@@ -1076,7 +1087,10 @@ const App = {
       if (activeAccount && activeAccount.credentials) {
         try {
           const cred = JSON.parse(atob(activeAccount.credentials));
-          await this.silentAuthRefresh(cred.u, cred.p);
+          const success = await this.silentAuthRefresh(cred.u, cred.p);
+          if (success) {
+            this.updateAccountDisplay();
+          }
         } catch (e) {
           console.warn("Failed to auto-refresh auth for active account:", e);
         }
@@ -5208,9 +5222,16 @@ const App = {
     list.querySelectorAll('.account-dropdown-item').forEach(item => {
       item.addEventListener('click', async (e) => {
         if (e.target.closest('.account-delete-btn')) return;
+        e.preventDefault();
+        e.stopPropagation();
         const userNo = item.dataset.userNo;
+        console.log('Switching to account:', userNo);
+        try {
+          await App.switchAccount(userNo);
+        } catch (err) {
+          console.error('Error switching account:', err);
+        }
         document.getElementById('account-manager').classList.remove('open');
-        await App.switchAccount(userNo);
       });
     });
 
@@ -5250,15 +5271,22 @@ const App = {
    * Switch to a different account.
    */
   async switchAccount(userNo) {
+    console.log('switchAccount called with userNo:', userNo);
     const account = AccountManager.getAccount(userNo);
-    if (!account) return;
+    if (!account) {
+      console.error('Account not found for userNo:', userNo);
+      return;
+    }
+    console.log('Found account:', account.userName);
 
     AccountManager.setActiveAccountId(userNo);
 
     // Do silent auth refresh
     try {
       const cred = JSON.parse(atob(account.credentials));
+      console.log('Attempting silent auth refresh for:', cred.u);
       const success = await this.silentAuthRefresh(cred.u, cred.p);
+      console.log('Silent auth refresh result:', success);
       if (!success) {
         this.openAddAccountModal(account.userName); // Pre-fill username for re-auth
         window.showUpdateNotification('error', this.t('LOGIN_FAILED') || 'Login Failed', this.t('PLEASE_REENTER_PASSWORD') || 'Please re-enter your password');
@@ -5270,6 +5298,7 @@ const App = {
       return;
     }
 
+    console.log('Updating account display and launch button state');
     this.updateAccountDisplay();
     this.updateLaunchButtonState();
   },
