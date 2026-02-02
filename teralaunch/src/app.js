@@ -5152,6 +5152,7 @@ const App = {
     const accountBtn = document.getElementById('account-btn');
     const accountManager = document.getElementById('account-manager');
     const accountAddBtn = document.getElementById('account-add-btn');
+    const accountDropdownList = document.getElementById('account-dropdown-list');
 
     if (!accountBtn || !accountManager) return;
 
@@ -5176,6 +5177,37 @@ const App = {
       accountAddBtn.addEventListener('click', () => {
         accountManager.classList.remove('open');
         this.openAddAccountModal();
+      });
+    }
+
+    // Event delegation for dropdown list - handles both account switch and delete
+    if (accountDropdownList) {
+      accountDropdownList.addEventListener('click', async (e) => {
+        // Check if delete button was clicked
+        const deleteBtn = e.target.closest('.account-delete-btn');
+        if (deleteBtn) {
+          e.stopPropagation();
+          const userNo = deleteBtn.dataset.userNo;
+          const account = AccountManager.getAccount(userNo);
+          if (account) {
+            App.openDeleteAccountModal(account);
+          }
+          return;
+        }
+
+        // Check if account item was clicked (for switching)
+        const accountItem = e.target.closest('.account-dropdown-item');
+        if (accountItem) {
+          e.stopPropagation();
+          const userNo = accountItem.dataset.userNo;
+          console.log('Switching to account:', userNo);
+          try {
+            await App.switchAccount(userNo);
+          } catch (err) {
+            console.error('Error switching account:', err);
+          }
+          accountManager.classList.remove('open');
+        }
       });
     }
 
@@ -5217,33 +5249,7 @@ const App = {
         </div>
       `;
     }).join('');
-
-    // Add click handlers for switching
-    list.querySelectorAll('.account-dropdown-item').forEach(item => {
-      item.addEventListener('click', async (e) => {
-        if (e.target.closest('.account-delete-btn')) return;
-        e.preventDefault();
-        e.stopPropagation();
-        const userNo = item.dataset.userNo;
-        console.log('Switching to account:', userNo);
-        try {
-          await App.switchAccount(userNo);
-        } catch (err) {
-          console.error('Error switching account:', err);
-        }
-        document.getElementById('account-manager').classList.remove('open');
-      });
-    });
-
-    // Add click handlers for delete
-    list.querySelectorAll('.account-delete-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const userNo = btn.dataset.userNo;
-        const account = AccountManager.getAccount(userNo);
-        App.openDeleteAccountModal(account);
-      });
-    });
+    // Event handlers are managed via event delegation in initAccountManager
   },
 
   /**
