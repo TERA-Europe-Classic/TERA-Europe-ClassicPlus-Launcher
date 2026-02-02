@@ -7,6 +7,7 @@ import {
   getPathChangeResetState,
   shouldDisableLaunch,
 } from "./utils/updateState.js";
+import * as AccountManager from './accountManager.js';
 
 const { invoke } = window.__TAURI__.tauri;
 const { listen } = window.__TAURI__.event;
@@ -1082,6 +1083,10 @@ const App = {
    */
   async init() {
     try {
+      // Migrate legacy single-account storage to multi-account
+      AccountManager.migrateFromLegacyStorage();
+      AccountManager.getInstanceId(); // Ensure instance ID exists
+
       this.disableContextMenu();
       const savedTheme = localStorage.getItem("theme");
       if (savedTheme === "light") {
@@ -2730,7 +2735,7 @@ const App = {
           Permission: Number(jsonResponse.Return.Permission),
           Privilege: 0,
         };
-        await this.storeAuthInfo(jsonResponseFormatted);
+        await this.storeAuthInfo(jsonResponseFormatted, username, password);
 
         // Store credentials for automatic re-login (base64 encoded for basic obfuscation)
         // Uses localStorage so credentials persist across launcher restarts
@@ -2797,7 +2802,7 @@ const App = {
    * @param {number} jsonResponse.Permission - The permission level
    * @param {number} jsonResponse.Privilege - The privilege level
    */
-  async storeAuthInfo(jsonResponse) {
+  async storeAuthInfo(jsonResponse, username, password) {
     localStorage.setItem("authKey", jsonResponse.AuthKey);
     localStorage.setItem("userName", jsonResponse.UserName);
     localStorage.setItem("userNo", jsonResponse.UserNo.toString());
@@ -2818,6 +2823,17 @@ const App = {
     } catch (error) {
       console.error("Failed to set auth info in backend:", error);
       // Continue anyway - localStorage has the data as backup
+    }
+
+    // Also update AccountManager for multi-account support
+    if (username && password) {
+      const credentials = btoa(JSON.stringify({ u: username, p: password }));
+      AccountManager.addAccount({
+        userNo: jsonResponse.UserNo,
+        userName: jsonResponse.UserName,
+        credentials: credentials
+      });
+      AccountManager.setActiveAccountId(jsonResponse.UserNo);
     }
 
     this.checkAuthentication();
