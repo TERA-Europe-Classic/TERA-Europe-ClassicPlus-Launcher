@@ -5339,33 +5339,38 @@ const App = {
 
     try {
       const response = await invoke('login', { username, password });
+      const jsonResponse = JSON.parse(response);
 
-      if (response && response.success) {
+      if (jsonResponse && jsonResponse.Return && jsonResponse.Msg === 'success') {
+        const userNo = Number(jsonResponse.Return.UserNo).toString();
+        const authKey = jsonResponse.Return.AuthKey;
+        const characterCount = jsonResponse.Return.CharacterCount;
+
         // Check if account already exists
         const existingAccounts = AccountManager.getAccounts();
-        const exists = existingAccounts.some(a => a.userNo === response.user_no);
+        const exists = existingAccounts.some(a => a.userNo === userNo);
 
         const credentials = btoa(JSON.stringify({ u: username, p: password }));
 
         if (exists) {
           // Update credentials for existing account
-          AccountManager.updateAccountCredentials(response.user_no, credentials);
+          AccountManager.updateAccountCredentials(userNo, credentials);
         } else {
           // Add new account
           AccountManager.addAccount({
-            userNo: response.user_no,
-            userName: response.user_name,
+            userNo: userNo,
+            userName: username,
             credentials: credentials
           });
         }
 
         // Set as active and update backend state
-        AccountManager.setActiveAccountId(response.user_no);
+        AccountManager.setActiveAccountId(userNo);
         await invoke('set_auth_info', {
-          authKey: response.auth_key,
-          userName: response.user_name,
-          userNo: response.user_no,
-          characterCount: response.character_count
+          authKey: authKey,
+          userName: username,
+          userNo: Number(jsonResponse.Return.UserNo),
+          characterCount: characterCount
         });
 
         this.setState({ isAuthenticated: true });
@@ -5373,9 +5378,10 @@ const App = {
         this.updateLaunchButtonState();
         this.closeAddAccountModal();
 
-        window.showUpdateNotification('success', this.t('ACCOUNT_ADDED') || 'Account Added', response.user_name);
+        window.showUpdateNotification('success', this.t('ACCOUNT_ADDED') || 'Account Added', username);
       } else {
-        errorEl.textContent = response?.error || 'Login failed';
+        const errorMessage = jsonResponse ? jsonResponse.Msg || 'Login failed' : 'Login failed';
+        errorEl.textContent = errorMessage;
         errorEl.classList.add('show');
       }
     } catch (e) {
