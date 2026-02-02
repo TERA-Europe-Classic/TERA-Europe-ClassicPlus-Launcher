@@ -5209,8 +5209,8 @@ const App = {
       item.addEventListener('click', async (e) => {
         if (e.target.closest('.account-delete-btn')) return;
         const userNo = item.dataset.userNo;
-        await this.switchAccount(userNo);
         document.getElementById('account-manager').classList.remove('open');
+        await App.switchAccount(userNo);
       });
     });
 
@@ -5220,7 +5220,7 @@ const App = {
         e.stopPropagation();
         const userNo = btn.dataset.userNo;
         const account = AccountManager.getAccount(userNo);
-        this.openDeleteAccountModal(account);
+        App.openDeleteAccountModal(account);
       });
     });
   },
