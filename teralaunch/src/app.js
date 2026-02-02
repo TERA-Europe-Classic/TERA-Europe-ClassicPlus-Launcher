@@ -1087,6 +1087,7 @@ const App = {
       AccountManager.migrateFromLegacyStorage();
       AccountManager.getInstanceId(); // Ensure instance ID exists
 
+      this.initAccountManager();
       this.disableContextMenu();
       const savedTheme = localStorage.getItem("theme");
       if (savedTheme === "light") {
@@ -5108,6 +5109,350 @@ const App = {
     newPage.style.left = "";
     newPage.style.width = "";
     newPage.style.transform = "";
+  },
+
+  // ========== ACCOUNT MANAGER UI ==========
+
+  /**
+   * Initialize account manager UI and event listeners.
+   */
+  initAccountManager() {
+    const accountBtn = document.getElementById('account-btn');
+    const accountManager = document.getElementById('account-manager');
+    const accountAddBtn = document.getElementById('account-add-btn');
+
+    if (!accountBtn || !accountManager) return;
+
+    // Toggle dropdown
+    accountBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      accountManager.classList.toggle('open');
+      if (accountManager.classList.contains('open')) {
+        this.renderAccountDropdown();
+      }
+    });
+
+    // Close on outside click
+    document.addEventListener('click', (e) => {
+      if (!accountManager.contains(e.target)) {
+        accountManager.classList.remove('open');
+      }
+    });
+
+    // Add account button
+    if (accountAddBtn) {
+      accountAddBtn.addEventListener('click', () => {
+        accountManager.classList.remove('open');
+        this.openAddAccountModal();
+      });
+    }
+
+    // Setup modals
+    this.setupAddAccountModal();
+    this.setupDeleteAccountModal();
+
+    // Initial render
+    this.updateAccountDisplay();
+  },
+
+  /**
+   * Render the account dropdown list (excluding active account).
+   */
+  renderAccountDropdown() {
+    const list = document.getElementById('account-dropdown-list');
+    if (!list) return;
+
+    const accounts = AccountManager.getAccounts();
+    const activeId = AccountManager.getActiveAccountId();
+    const otherAccounts = accounts.filter(a => a.userNo !== activeId);
+
+    if (otherAccounts.length === 0) {
+      list.innerHTML = '<div style="padding: 10px 14px; color: var(--muted-foreground); font-size: 13px;">No other accounts</div>';
+      return;
+    }
+
+    list.innerHTML = otherAccounts.map(account => {
+      const isPlaying = AccountManager.isAccountInGame(account.userNo);
+      return `
+        <div class="account-dropdown-item" data-user-no="${account.userNo}">
+          <span class="account-item-name">${account.userName}</span>
+          ${isPlaying ? '<span class="account-item-badge">Playing</span>' : ''}
+          <button class="account-delete-btn" data-user-no="${account.userNo}" title="Remove account">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
+            </svg>
+          </button>
+        </div>
+      `;
+    }).join('');
+
+    // Add click handlers for switching
+    list.querySelectorAll('.account-dropdown-item').forEach(item => {
+      item.addEventListener('click', async (e) => {
+        if (e.target.closest('.account-delete-btn')) return;
+        const userNo = item.dataset.userNo;
+        await this.switchAccount(userNo);
+        document.getElementById('account-manager').classList.remove('open');
+      });
+    });
+
+    // Add click handlers for delete
+    list.querySelectorAll('.account-delete-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const userNo = btn.dataset.userNo;
+        const account = AccountManager.getAccount(userNo);
+        this.openDeleteAccountModal(account);
+      });
+    });
+  },
+
+  /**
+   * Update the account button display with current account info.
+   */
+  updateAccountDisplay() {
+    const btnName = document.getElementById('account-btn-name');
+    const statusDot = document.getElementById('account-status-dot');
+
+    if (!btnName) return;
+
+    const activeAccount = AccountManager.getActiveAccount();
+
+    if (activeAccount) {
+      btnName.textContent = activeAccount.userName;
+      const isPlaying = AccountManager.isAccountInGame(activeAccount.userNo);
+      statusDot.classList.toggle('playing', isPlaying);
+    } else {
+      btnName.textContent = 'Not logged in';
+      statusDot.classList.remove('playing');
+    }
+  },
+
+  /**
+   * Switch to a different account.
+   */
+  async switchAccount(userNo) {
+    const account = AccountManager.getAccount(userNo);
+    if (!account) return;
+
+    AccountManager.setActiveAccountId(userNo);
+
+    // Do silent auth refresh
+    try {
+      const cred = JSON.parse(atob(account.credentials));
+      const success = await this.silentAuthRefresh(cred.u, cred.p);
+      if (!success) {
+        this.openAddAccountModal(account.userName); // Pre-fill username for re-auth
+        window.showUpdateNotification('error', this.t('LOGIN_FAILED') || 'Login Failed', this.t('PLEASE_REENTER_PASSWORD') || 'Please re-enter your password');
+        return;
+      }
+    } catch (e) {
+      console.error('Failed to switch account:', e);
+      window.showUpdateNotification('error', this.t('ERROR') || 'Error', 'Failed to switch account');
+      return;
+    }
+
+    this.updateAccountDisplay();
+    this.updateLaunchButtonState();
+  },
+
+  /**
+   * Update launch button based on whether active account has running game.
+   */
+  updateLaunchButtonState() {
+    const launchBtn = document.getElementById('launch-game-btn');
+    if (!launchBtn) return;
+
+    const activeAccount = AccountManager.getActiveAccount();
+    if (!activeAccount) {
+      launchBtn.disabled = true;
+      return;
+    }
+
+    const isPlaying = AccountManager.isAccountInGame(activeAccount.userNo);
+    if (isPlaying) {
+      launchBtn.disabled = true;
+      launchBtn.textContent = this.t('IN_GAME') || 'In Game';
+    } else {
+      // Let existing logic handle enabled/disabled based on update status
+      this.updateLaunchGameButton();
+    }
+  },
+
+  // ========== ADD ACCOUNT MODAL ==========
+
+  setupAddAccountModal() {
+    const modal = document.getElementById('add-account-modal');
+    const cancelBtn = document.getElementById('add-account-cancel');
+    const submitBtn = document.getElementById('add-account-submit');
+    const passwordInput = document.getElementById('add-account-password');
+
+    if (!modal) return;
+
+    cancelBtn.addEventListener('click', () => this.closeAddAccountModal());
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) this.closeAddAccountModal();
+    });
+
+    submitBtn.addEventListener('click', () => this.handleAddAccount());
+
+    // Enter key to submit
+    if (passwordInput) {
+      passwordInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') this.handleAddAccount();
+      });
+    }
+  },
+
+  openAddAccountModal(prefillUsername = '') {
+    const modal = document.getElementById('add-account-modal');
+    const usernameInput = document.getElementById('add-account-username');
+    const passwordInput = document.getElementById('add-account-password');
+    const errorEl = document.getElementById('add-account-error');
+
+    if (!modal) return;
+
+    usernameInput.value = prefillUsername;
+    passwordInput.value = '';
+    errorEl.textContent = '';
+    errorEl.classList.remove('show');
+
+    modal.classList.add('show');
+
+    if (prefillUsername) {
+      passwordInput.focus();
+    } else {
+      usernameInput.focus();
+    }
+  },
+
+  closeAddAccountModal() {
+    const modal = document.getElementById('add-account-modal');
+    if (modal) modal.classList.remove('show');
+  },
+
+  async handleAddAccount() {
+    const usernameInput = document.getElementById('add-account-username');
+    const passwordInput = document.getElementById('add-account-password');
+    const errorEl = document.getElementById('add-account-error');
+    const submitBtn = document.getElementById('add-account-submit');
+
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value;
+
+    if (!username || !password) {
+      errorEl.textContent = 'Please enter username and password';
+      errorEl.classList.add('show');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    errorEl.classList.remove('show');
+
+    try {
+      const response = await invoke('login', { username, password });
+
+      if (response && response.success) {
+        // Check if account already exists
+        const existingAccounts = AccountManager.getAccounts();
+        const exists = existingAccounts.some(a => a.userNo === response.user_no);
+
+        const credentials = btoa(JSON.stringify({ u: username, p: password }));
+
+        if (exists) {
+          // Update credentials for existing account
+          AccountManager.updateAccountCredentials(response.user_no, credentials);
+        } else {
+          // Add new account
+          AccountManager.addAccount({
+            userNo: response.user_no,
+            userName: response.user_name,
+            credentials: credentials
+          });
+        }
+
+        // Set as active and update backend state
+        AccountManager.setActiveAccountId(response.user_no);
+        await invoke('set_auth_info', {
+          authKey: response.auth_key,
+          userName: response.user_name,
+          userNo: response.user_no,
+          characterCount: response.character_count
+        });
+
+        this.setState({ isAuthenticated: true });
+        this.updateAccountDisplay();
+        this.updateLaunchButtonState();
+        this.closeAddAccountModal();
+
+        window.showUpdateNotification('success', this.t('ACCOUNT_ADDED') || 'Account Added', response.user_name);
+      } else {
+        errorEl.textContent = response?.error || 'Login failed';
+        errorEl.classList.add('show');
+      }
+    } catch (e) {
+      errorEl.textContent = e.toString();
+      errorEl.classList.add('show');
+    } finally {
+      submitBtn.disabled = false;
+    }
+  },
+
+  // ========== DELETE ACCOUNT MODAL ==========
+
+  setupDeleteAccountModal() {
+    const modal = document.getElementById('delete-account-modal');
+    const cancelBtn = document.getElementById('delete-account-cancel');
+    const confirmBtn = document.getElementById('delete-account-confirm');
+
+    if (!modal) return;
+
+    cancelBtn.addEventListener('click', () => this.closeDeleteAccountModal());
+    confirmBtn.addEventListener('click', () => this.confirmDeleteAccount());
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) this.closeDeleteAccountModal();
+    });
+  },
+
+  openDeleteAccountModal(account) {
+    this._accountToDelete = account;
+    const modal = document.getElementById('delete-account-modal');
+    const message = document.getElementById('delete-account-message');
+
+    if (!modal || !account) return;
+
+    message.textContent = `Remove "${account.userName}" from the launcher?`;
+    modal.classList.add('show');
+  },
+
+  closeDeleteAccountModal() {
+    const modal = document.getElementById('delete-account-modal');
+    if (modal) modal.classList.remove('show');
+    this._accountToDelete = null;
+  },
+
+  confirmDeleteAccount() {
+    if (!this._accountToDelete) return;
+
+    const deletedName = this._accountToDelete.userName;
+    AccountManager.removeAccount(this._accountToDelete.userNo);
+    this.closeDeleteAccountModal();
+
+    // If we deleted the active account, switch to another or clear auth
+    if (!AccountManager.getActiveAccount()) {
+      const accounts = AccountManager.getAccounts();
+      if (accounts.length > 0) {
+        this.switchAccount(accounts[0].userNo);
+      } else {
+        this.setState({ isAuthenticated: false });
+        this.updateAccountDisplay();
+      }
+    }
+
+    this.renderAccountDropdown();
+    window.showUpdateNotification('info', this.t('ACCOUNT_REMOVED') || 'Account Removed', deletedName);
   },
 };
 function LoadStartPage() {
