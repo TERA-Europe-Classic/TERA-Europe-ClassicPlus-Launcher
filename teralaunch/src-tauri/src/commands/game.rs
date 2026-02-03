@@ -8,7 +8,6 @@
 #![allow(dead_code)]
 
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use log::{error, info};
 use tauri::Manager;
@@ -144,8 +143,9 @@ pub async fn handle_launch_game(
         )
     };
 
-    let mut is_launching = state.is_launching.lock().await;
-    game_service::validate_launch_preconditions(*is_launching, is_running, &auth_key)?;
+    // Multi-client support: Per-account tracking is handled by frontend.
+    // Game running state is tracked by teralib via PID-based credentials map.
+    game_service::validate_launch_preconditions(false, is_running, &auth_key)?;
     if user_no == 0 {
         return Err("User not authenticated (user_no is 0)".to_string());
     }
@@ -153,36 +153,20 @@ pub async fn handle_launch_game(
     // Note: Auth key refresh is handled by the frontend which performs a fresh login
     // before every game launch. The ticket stored in auth state is already fresh.
 
-    *is_launching = true;
-    let (game_path, game_lang) = match load_config() {
-        Ok(result) => result,
-        Err(err) => {
-            *is_launching = false;
-            return Err(err);
-        }
-    };
+    let (game_path, game_lang) = load_config()?;
     let executable_path = game_service::get_executable_path(&game_path);
-    let launch_params = match game_service::build_launch_params(
+    let launch_params = game_service::build_launch_params(
         &game_path,
         account_name.clone(),
         characters_count.clone(),
         ticket.clone(),
         game_lang.clone(),
-    ) {
-        Ok(params) => params,
-        Err(_e) => {
-            *is_launching = false;
-            return Err(format!(
-                "Game executable not found at: {:?}",
-                executable_path
-            ));
-        }
-    };
+    ).map_err(|_| format!("Game executable not found at: {:?}", executable_path))?;
 
     let full_game_path_str = path_to_string(&launch_params.executable_path)?;
 
     let app_handle_clone = app_handle.clone();
-    let is_launching_clone = Arc::clone(&state.is_launching);
+    let user_no_for_event = user_no; // Capture for game_ended event
 
     tokio::task::spawn(async move {
         // Emit the game_status_changed event at the start of the launch
@@ -217,51 +201,48 @@ pub async fn handle_launch_game(
             }
         }
 
-        info!("Emitting game_ended event");
-        if let Err(e) = app_handle_clone.emit_all("game_ended", ()) {
+        info!("Emitting game_ended event for user_no: {}", user_no_for_event);
+        if let Err(e) = app_handle_clone.emit_all("game_ended", user_no_for_event) {
             error!("Failed to emit game_ended event: {:?}", e);
         }
 
-        let mut is_launching = is_launching_clone.lock().await;
-        *is_launching = false;
-        if let Err(e) = app_handle_clone.emit_all("game_status_changed", false) {
-            error!("Failed to emit game_status_changed event: {:?}", e);
+        // Game status is tracked by teralib via PID map - it sends updates via watch channel
+        // Check if all games have finished
+        if !teralib::is_game_running() {
+            if let Err(e) = app_handle_clone.emit_all("game_status_changed", false) {
+                error!("Failed to emit game_status_changed event: {:?}", e);
+            }
+            info!("All game instances finished");
         }
-
-        reset_global_state();
-
-        info!("Game launch state reset");
     });
 
     Ok("Game launch initiated".to_string())
 }
 
-/// Checks if the game is currently running or launching.
-///
-/// # Arguments
-/// * `state` - The game state containing status information
+/// Checks if any game is currently running.
+/// Uses teralib's PID-based tracking as the source of truth.
 ///
 /// # Returns
-/// `true` if the game is running or launching, `false` otherwise
+/// `true` if any game is running, `false` otherwise
 #[tauri::command]
 #[cfg(not(tarpaulin_include))]
-pub async fn get_game_status(state: tauri::State<'_, GameState>) -> Result<bool, String> {
-    let status = *state.status_receiver.lock().await.borrow();
-    let is_launching = *state.is_launching.lock().await;
-    Ok(status || is_launching)
+pub async fn get_game_status(_state: tauri::State<'_, GameState>) -> Result<bool, String> {
+    Ok(teralib::is_game_running())
 }
 
-/// Resets the game launch state flag.
-///
-/// Used to recover from stuck launch states.
-///
-/// # Arguments
-/// * `state` - The game state containing launch flag
+/// Returns the number of currently running game instances.
 #[tauri::command]
 #[cfg(not(tarpaulin_include))]
-pub async fn reset_launch_state(state: tauri::State<'_, GameState>) -> Result<(), String> {
-    let mut is_launching = state.is_launching.lock().await;
-    *is_launching = false;
+pub async fn get_running_game_count(_state: tauri::State<'_, GameState>) -> Result<usize, String> {
+    Ok(teralib::get_running_game_count())
+}
+
+/// Resets the game state.
+/// Used to recover from stuck states.
+#[tauri::command]
+#[cfg(not(tarpaulin_include))]
+pub async fn reset_launch_state(_state: tauri::State<'_, GameState>) -> Result<(), String> {
+    reset_global_state();
     Ok(())
 }
 

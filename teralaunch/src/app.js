@@ -1266,14 +1266,49 @@ const App = {
     });
     this.gameStatusListeners.push(gameStatusChangedListener);
 
-    const gameEndedListener = await listen("game_ended", async () => {
-      // Force sync with backend state to ensure UI is correct
-      await this.updateGameStatus();
-      // Also call reset_launch_state to ensure backend state is clean
-      try {
-        await invoke("reset_launch_state");
-      } catch (e) {
-        console.warn("Failed to reset launch state:", e);
+    const gameEndedListener = await listen("game_ended", async (event) => {
+      // Event payload contains the user_no of the account whose game ended
+      const userNo = event.payload;
+      console.log(`game_ended event received for user_no: ${userNo} (type: ${typeof userNo})`);
+
+      if (userNo && typeof userNo === 'number') {
+        // We know exactly which account's game ended - unregister it directly
+        // Convert to string for consistent object key handling in AccountManager
+        const userNoStr = String(userNo);
+        const wasRegistered = AccountManager.isAccountInGame(userNoStr);
+        AccountManager.unregisterRunningGame(userNoStr);
+        console.log(`Unregistered game for account ${userNoStr} (was registered: ${wasRegistered})`);
+
+        // Update all UI components
+        this.updateAccountDisplay();
+        this.renderAccountDropdown();
+        this.updateLaunchButtonState();
+
+        // Check backend status - should still be true if other games running
+        const backendRunning = await invoke("get_game_status");
+        const backendCount = await invoke("get_running_game_count");
+        console.log(`After unregister: backend running=${backendRunning}, count=${backendCount}`);
+
+        // Only update UI for game status - don't let it clear remaining games
+        if (backendRunning) {
+          // Other games still running - update status for current account only
+          const activeAccount = AccountManager.getActiveAccount();
+          const activeInGame = activeAccount && AccountManager.isAccountInGame(activeAccount.userNo);
+          if (activeInGame) {
+            if (this.statusEl) this.statusEl.textContent = this.t('IN_GAME') || 'In Game';
+            this.updateLaunchGameButton(true);
+          } else {
+            if (this.statusEl) this.statusEl.textContent = this.t("READY_TO_PLAY");
+            this.updateLaunchGameButton(false);
+          }
+        } else {
+          // No games running - safe to use standard update
+          await this.updateGameStatus();
+        }
+      } else {
+        // Fallback: reconcile if payload is missing (shouldn't happen)
+        console.warn('game_ended event missing user_no, falling back to reconciliation');
+        await this.reconcileGameState();
       }
     });
     this.gameStatusListeners.push(gameEndedListener);
@@ -3153,24 +3188,18 @@ const App = {
     // Check game status every 5 seconds while game is supposed to be running
     this.gameStatusRecoveryInterval = setInterval(async () => {
       try {
-        const isRunning = await invoke("get_game_status");
-        this.updateUIForGameStatus(isRunning);
+        // Use reconciliation to sync frontend with backend count
+        await this.reconcileGameState();
 
-        // If game is no longer running, clear the interval
+        const isRunning = await invoke("get_game_status");
+
+        // If no game is running, clear interval and ensure clean state
         if (!isRunning) {
-          console.log("Game status recovery: game no longer running, clearing interval");
+          console.log("Game status recovery: no games running, clearing interval");
           clearInterval(this.gameStatusRecoveryInterval);
           this.gameStatusRecoveryInterval = null;
 
-          // Unregister running game when it exits
-          const exitedAccount = AccountManager.getActiveAccount();
-          if (exitedAccount) {
-            AccountManager.unregisterRunningGame(exitedAccount.userNo);
-            this.updateAccountDisplay();
-            this.updateLaunchButtonState();
-          }
-
-          // Ensure backend state is clean
+          // Ensure backend state is clean (only when NO games running)
           try {
             await invoke("reset_launch_state");
           } catch (e) {
@@ -3204,23 +3233,85 @@ const App = {
   },
 
   /**
+   * Reconciles frontend AccountManager state with backend game count.
+   * Called when a game_ended event fires to sync the two tracking systems.
+   *
+   * Strategy: Compare backend game count with frontend tracked count.
+   * If backend has fewer games, remove excess accounts from frontend tracking.
+   * We don't know WHICH account's game ended, so we remove the oldest ones first.
+   */
+  async reconcileGameState() {
+    try {
+      const backendCount = await invoke("get_running_game_count");
+      const frontendGames = AccountManager.getRunningGames();
+      const frontendAccounts = Object.keys(frontendGames);
+      const frontendCount = frontendAccounts.length;
+
+      console.log(`Game state reconciliation: backend=${backendCount}, frontend=${frontendCount}`);
+
+      if (backendCount === 0) {
+        // No games running - clear all frontend tracking
+        AccountManager.clearAllRunningGames();
+      } else if (backendCount < frontendCount) {
+        // Some games ended but not all - remove oldest entries to match count
+        // Sort by launchedAt timestamp (oldest first)
+        const sorted = frontendAccounts.sort((a, b) => {
+          return (frontendGames[a].launchedAt || 0) - (frontendGames[b].launchedAt || 0);
+        });
+        // Remove the oldest (frontendCount - backendCount) entries
+        const toRemove = frontendCount - backendCount;
+        for (let i = 0; i < toRemove && i < sorted.length; i++) {
+          AccountManager.unregisterRunningGame(sorted[i]);
+          console.log(`Unregistered game for account ${sorted[i]} (reconciliation)`);
+        }
+      }
+
+      // Update UI
+      this.updateAccountDisplay();
+      this.updateLaunchButtonState();
+      await this.updateGameStatus();
+    } catch (error) {
+      console.error("Error reconciling game state:", error);
+      // Fall back to simple status update
+      await this.updateGameStatus();
+    }
+  },
+
+  /**
    * Updates the game status UI based on the current game status.
    *
-   * The game status element is updated to either "GAME_STATUS_RUNNING" or "GAME_STATUS_NOT_RUNNING".
-   * The launch game button is also updated to be enabled or disabled based on the game status.
-   * The language selector is toggled to be visible or hidden based on the game status.
+   * For multi-account support, we check per-account game status:
+   * - Only disable launch if the ACTIVE account has a running game
+   * - Allow launch for other accounts even if a game is globally running
    *
-   * @param {boolean} isRunning - whether the game is running or not
+   * @param {boolean} isRunning - whether ANY game is running (backend global status)
    * @memberof App
    */
   updateUIForGameStatus(isRunning) {
-    if (this.statusEl) {
-      this.statusEl.textContent = isRunning
-        ? this.t("GAME_STATUS_RUNNING")
-        : this.t("GAME_STATUS_NOT_RUNNING");
+    // Note: We no longer clear all games here - that's handled by reconcileGameState()
+    // when it confirms backend has 0 running games. This prevents race conditions
+    // where this function is called before reconciliation completes.
+
+    const activeAccount = AccountManager.getActiveAccount();
+    // Check per-account status, not just global isRunning
+    const activeAccountInGame = activeAccount && AccountManager.isAccountInGame(activeAccount.userNo);
+
+    // For the active account, check per-account status
+    if (activeAccountInGame) {
+      // This account has a running game
+      if (this.statusEl) {
+        this.statusEl.textContent = this.t('IN_GAME') || 'In Game';
+      }
+      this.updateLaunchGameButton(true); // Disable launch
+      this.toggleLanguageSelector(false);
+    } else {
+      // This account does NOT have a running game - allow launch
+      if (this.statusEl) {
+        this.statusEl.textContent = this.t("READY_TO_PLAY");
+      }
+      this.updateLaunchGameButton(false); // Enable launch
+      this.toggleLanguageSelector(true);
     }
-    this.updateLaunchGameButton(isRunning);
-    this.toggleLanguageSelector(!isRunning);
   },
 
   /**
@@ -3998,7 +4089,7 @@ const App = {
    */
   setupHomePageElements() {
     this.launchGameBtn = document.querySelector("#launch-game-btn");
-    this.statusEl = document.querySelector("#game-status");
+    this.statusEl = document.querySelector("#status-string");
   },
 
   /**
@@ -5233,7 +5324,8 @@ const App = {
     const otherAccounts = accounts.filter(a => a.userNo !== activeId);
 
     if (otherAccounts.length === 0) {
-      list.innerHTML = '<div style="padding: 10px 14px; color: var(--muted-foreground); font-size: 13px;">No other accounts</div>';
+      // Empty state - just leave blank, the "Add Account" button below is self-explanatory
+      list.innerHTML = '';
       return;
     }
 
@@ -5312,7 +5404,7 @@ const App = {
   },
 
   /**
-   * Update launch button based on whether active account has running game.
+   * Update launch button and status based on whether active account has running game.
    */
   updateLaunchButtonState() {
     const launchBtn = document.getElementById('launch-game-btn');
@@ -5321,13 +5413,23 @@ const App = {
     const activeAccount = AccountManager.getActiveAccount();
     if (!activeAccount) {
       launchBtn.disabled = true;
+      launchBtn.classList.add('disabled');
       return;
     }
 
     const isPlaying = AccountManager.isAccountInGame(activeAccount.userNo);
     if (isPlaying) {
+      // Show "In Game" in the status text, keep button disabled
+      if (this.statusEl) {
+        this.statusEl.textContent = this.t('IN_GAME') || 'In Game';
+      }
       launchBtn.disabled = true;
-      launchBtn.textContent = this.t('IN_GAME') || 'In Game';
+      launchBtn.classList.add('disabled');
+      // Update only the text span, NOT the entire button (preserve SVG icons)
+      const btnText = document.getElementById('launch-btn-text');
+      if (btnText) {
+        btnText.textContent = this.t('LAUNCH_GAME') || 'LAUNCH';
+      }
     } else {
       // Let existing logic handle enabled/disabled based on update status
       this.updateLaunchGameButton();

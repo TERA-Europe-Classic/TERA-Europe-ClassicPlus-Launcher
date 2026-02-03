@@ -167,10 +167,12 @@ pub fn is_game_running(running_processes: &[&str]) -> bool {
 /// Validates launch preconditions.
 ///
 /// Checks all requirements before launching the game.
+/// Note: Multi-client is supported - we allow launching while another game is running.
+/// Per-account game tracking is handled by the frontend.
 ///
 /// # Arguments
 /// * `is_already_launching` - Whether a launch is already in progress
-/// * `is_already_running` - Whether the game is already running
+/// * `_is_already_running` - (Unused) Whether the game is already running - multi-client allowed
 /// * `auth_key` - The authentication key (must not be empty)
 ///
 /// # Returns
@@ -178,16 +180,16 @@ pub fn is_game_running(running_processes: &[&str]) -> bool {
 /// * `Err(String)` - Error message describing what's wrong
 pub fn validate_launch_preconditions(
     is_already_launching: bool,
-    is_already_running: bool,
+    _is_already_running: bool,
     auth_key: &str,
 ) -> Result<(), String> {
     if is_already_launching {
         return Err("Game is already launching".to_string());
     }
 
-    if is_already_running {
-        return Err("Game is already running".to_string());
-    }
+    // Multi-client support: We allow launching while another game is running.
+    // Per-account game tracking is handled by the frontend to ensure
+    // one game per account, but multiple accounts can have games running.
 
     if auth_key.is_empty() {
         return Err("Not authenticated. Please log in first.".to_string());
@@ -456,10 +458,10 @@ mod tests {
     }
 
     #[test]
-    fn validate_launch_preconditions_already_running() {
+    fn validate_launch_preconditions_multi_client_allowed() {
+        // Multi-client is supported - launching while another game runs is OK
         let result = validate_launch_preconditions(false, true, "auth_key");
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("already running"));
+        assert!(result.is_ok());
     }
 
     #[test]
@@ -470,8 +472,8 @@ mod tests {
     }
 
     #[test]
-    fn validate_launch_preconditions_priority() {
-        // Already launching takes priority over already running
+    fn validate_launch_preconditions_already_launching_still_blocked() {
+        // Already launching should still be blocked even if game is running
         let result = validate_launch_preconditions(true, true, "auth_key");
         assert!(result.unwrap_err().contains("already launching"));
     }

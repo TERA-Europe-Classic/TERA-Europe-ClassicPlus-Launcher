@@ -9,6 +9,7 @@ pub use game::{
     run_game,
     get_game_status_receiver,
     is_game_running,
+    get_running_game_count,
     reset_global_state,
     setup_logging,
     enable_file_logging,

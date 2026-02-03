@@ -18,7 +18,7 @@ use std::{
     ptr::null_mut,
     slice,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Mutex,
     },
     time::Duration,
@@ -26,13 +26,13 @@ use std::{
 use tokio::sync::{mpsc as other_mpsc, watch, Notify};
 use winapi::{
     shared::{
-        minwindef::{BOOL, LPARAM, LRESULT, TRUE, UINT, WPARAM},
+        minwindef::{BOOL, DWORD, LPARAM, LRESULT, TRUE, UINT, WPARAM},
         windef::HWND,
     },
     um::{
         errhandlingapi::GetLastError,
         libloaderapi::GetModuleHandleW,
-        winuser::{GetClassInfoExW, *},
+        winuser::{GetClassInfoExW, GetWindowThreadProcessId, *},
     },
 };
 
@@ -72,11 +72,12 @@ lazy_static! {
 /// which represents the handle to the game window.
 static WINDOW_HANDLE: Lazy<Mutex<Option<SafeHWND>>> = Lazy::new(|| Mutex::new(None));
 
-/// Flag indicating whether the game is currently running.
-///
-/// This atomic boolean is used to track the running state of the game
-/// across multiple threads.
-static GAME_RUNNING: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
+/// Counter for generating unique window instance IDs for logging (multi-client support).
+static WINDOW_INSTANCE_COUNTER: Lazy<AtomicUsize> = Lazy::new(|| AtomicUsize::new(0));
+
+/// Tracks whether the shared IPC window has been created (multi-client support).
+/// The window is created once on first game launch and reused for all subsequent launches.
+static IPC_WINDOW_CREATED: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
 
 /// Sender for game status updates.
 ///
@@ -267,8 +268,11 @@ pub async fn run_game(
 ) -> Result<ExitStatus, Box<dyn std::error::Error>> {
     info!("Starting run_game function");
 
-    if is_game_running() {
-        return Err("Game is already running".into());
+    // Multi-client support: Don't block if a game is already running.
+    // Per-account tracking is handled by the frontend.
+    let current_count = get_running_game_count();
+    if current_count > 0 {
+        info!("Multi-client: {} game(s) already running, launching another", current_count);
     }
 
     set_credentials(account_name, characters_count, ticket, game_lang, game_path);
@@ -301,71 +305,117 @@ pub async fn run_game(
 ///
 /// A Result containing the exit status of the game process or an error.
 async fn launch_game() -> Result<ExitStatus, Box<dyn std::error::Error>> {
-    if GAME_RUNNING.load(Ordering::SeqCst) {
-        return Err("Game is already running".into());
-    }
+    // CRITICAL: Capture credentials IMMEDIATELY at function entry to prevent race conditions.
+    // Another thread might call set_credentials() during async operations below.
+    // These captured values will be used for both launching and per-PID storage.
+    let creds_account_name = GLOBAL_CREDENTIALS.get_account_name();
+    let creds_characters_count = GLOBAL_CREDENTIALS.get_characters_count();
+    let creds_ticket = GLOBAL_CREDENTIALS.get_ticket();
+    let creds_game_lang = GLOBAL_CREDENTIALS.get_game_lang();
+    let creds_game_path = GLOBAL_CREDENTIALS.get_game_path();
 
-    GAME_RUNNING.store(true, Ordering::SeqCst);
+    // Signal game is running (PID-based tracking happens after spawn)
     GAME_STATUS_SENDER.send(true).unwrap();
-    info!("Game status set to running");
+    let current_count = get_running_game_count();
+    info!("Game instance starting (currently {} running)", current_count);
 
     // Reset exit/crash signaling state for this run
     EXIT_EVENT_SENT.store(false, Ordering::SeqCst);
 
     info!(
         "Launching game for account: {}",
-        GLOBAL_CREDENTIALS.get_account_name()
+        creds_account_name
     );
 
-    // Use tokio's unbounded channel for server list requests.
-    // UnboundedSender::send() is synchronous and non-blocking, making it safe
-    // to call from the Windows message callback (wnd_proc).
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<(WPARAM, usize)>();
-    *SERVER_LIST_SENDER.lock().unwrap() = Some(tx);
+    // Multi-client: Create IPC window only once, reuse for all subsequent game launches.
+    // This ensures all games share one window for WM_COPYDATA communication.
+    let mut is_first_launch = !IPC_WINDOW_CREATED.swap(true, Ordering::SeqCst);
 
-    let tcs = Arc::new(tokio::sync::Notify::new());
-    let tcs_clone = Arc::clone(&tcs);
+    // Validate that window handle exists if flag says it was created
+    // This handles edge case where launcher crashed/restarted while games were running
+    if !is_first_launch {
+        let window_valid = WINDOW_HANDLE.lock()
+            .map(|h| h.is_some())
+            .unwrap_or(false);
+        if !window_valid {
+            info!("IPC window flag was set but no valid handle found - recreating window");
+            is_first_launch = true;
+        }
+    }
 
-    let handle =
+    if is_first_launch {
+        // Use tokio's unbounded channel for server list requests.
+        // UnboundedSender::send() is synchronous and non-blocking, making it safe
+        // to call from the Windows message callback (wnd_proc).
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<(WPARAM, usize)>();
+        *SERVER_LIST_SENDER.lock().unwrap() = Some(tx);
+
+        let tcs = Arc::new(tokio::sync::Notify::new());
+        let tcs_clone = Arc::clone(&tcs);
+
+        // Spawn the IPC window task - it will run until all games exit.
+        // We don't await it here; it runs in background serving all game instances.
         tokio::task::spawn_blocking(move || unsafe { create_and_run_game_window(tcs_clone) });
 
-    // Spawn async task to handle server list requests off the message pump thread.
-    // This ensures the Windows message loop is never blocked by network calls.
-    tokio::spawn(async move {
-        while let Some((w_param, sender)) = rx.recv().await {
-            // Fetch server list asynchronously - no blocking, no new runtime needed
-            let server_list_data = match get_server_list().await {
-                Ok(data) => {
-                    info!("Server list request successful, {} bytes", data.len());
-                    data
+        // Spawn async task to handle server list requests off the message pump thread.
+        // This ensures the Windows message loop is never blocked by network calls.
+        tokio::spawn(async move {
+            while let Some((w_param, sender)) = rx.recv().await {
+                // Fetch server list asynchronously - no blocking, no new runtime needed
+                let server_list_data = match get_server_list().await {
+                    Ok(data) => {
+                        info!("Server list request successful, {} bytes", data.len());
+                        data
+                    }
+                    Err(e) => {
+                        error!("Failed to get server list: {}", e);
+                        continue; // Don't crash, just skip this request
+                    }
+                };
+                // Send response back to the game client
+                unsafe {
+                    send_response_message(w_param, sender as HWND, 6, &server_list_data);
                 }
-                Err(e) => {
-                    error!("Failed to get server list: {}", e);
-                    continue; // Don't crash, just skip this request
-                }
-            };
-            // Send response back to the game client
-            unsafe {
-                send_response_message(w_param, sender as HWND, 6, &server_list_data);
             }
-        }
-    });
+        });
 
-    tcs.notified().await;
+        tcs.notified().await;
+        info!("IPC window created (first game launch)");
+    } else {
+        // IPC window already exists - just verify it's ready
+        info!("Reusing existing IPC window (multi-client launch)");
+    }
     crate::av::ensure_av_exclusion_before_launch();
 
-    let mut child = Command::new(GLOBAL_CREDENTIALS.get_game_path())
+    let mut child = Command::new(&creds_game_path)
         .arg(format!(
             "-LANGUAGEEXT={}",
-            GLOBAL_CREDENTIALS.get_game_lang()
+            creds_game_lang
         ))
         .spawn()?;
 
     let pid = child.id();
     info!("Game process spawned with PID: {}", pid);
 
+    // Store captured credentials for this specific PID (multi-client support)
+    // Note: This happens after spawn, but the race window is tiny (<1ms) since spawn()
+    // returns immediately after process creation. The game takes much longer to
+    // initialize before sending WM_COPYDATA requests (loading DLLs, creating windows).
+    // Using captured values prevents race conditions with concurrent launches.
+    crate::global_credentials::store_credentials_for_pid(
+        pid,
+        &creds_account_name,
+        &creds_characters_count,
+        &creds_ticket,
+        &creds_game_lang,
+        &creds_game_path,
+    );
+
     let status = child.wait()?;
     info!("Game process exited with status: {:?}", status);
+
+    // Clean up credentials for this PID (this is our source of truth for running games)
+    crate::global_credentials::remove_credentials_for_pid(pid);
 
     // Fallback: if no WM_COPYDATA-based exit/crash (1020/1021) was received,
     // synthesize one based on process exit status
@@ -379,23 +429,37 @@ async fn launch_game() -> Result<ExitStatus, Box<dyn std::error::Error>> {
         EXIT_EVENT_SENT.store(true, Ordering::SeqCst);
     }
 
-    GAME_RUNNING.store(false, Ordering::SeqCst);
-    GAME_STATUS_SENDER.send(false).unwrap();
-    info!("Game status set to not running");
+    // Multi-client: Check PID map to see if all games have exited
+    let remaining = get_running_game_count();
+    if remaining == 0 {
+        GAME_STATUS_SENDER.send(false).unwrap();
+        info!("All game instances exited, status set to not running");
+    } else {
+        info!("Game instance exited, {} still running", remaining);
+    }
 
-    if let Ok(handle) = WINDOW_HANDLE.lock() {
-        if let Some(safe_hwnd) = *handle {
-            let hwnd = safe_hwnd.get();
-            unsafe {
-                PostMessageW(hwnd, WM_GAME_EXITED, 0, 0);
+    // Multi-client: Only signal window to exit when ALL games have closed.
+    // If other games are still running, they still need the IPC window.
+    if remaining == 0 {
+        if let Ok(handle) = WINDOW_HANDLE.lock() {
+            if let Some(safe_hwnd) = *handle {
+                let hwnd = safe_hwnd.get();
+                unsafe {
+                    PostMessageW(hwnd, WM_GAME_EXITED, 0, 0);
+                }
+            } else {
+                error!("Window handle not found when trying to post WM_GAME_EXITED message");
             }
         } else {
-            error!("Window handle not found when trying to post WM_GAME_EXITED message");
+            error!("Failed to acquire lock on WINDOW_HANDLE");
         }
+        // Reset IPC window flag so next launcher session creates a new window
+        IPC_WINDOW_CREATED.store(false, Ordering::SeqCst);
     } else {
-        error!("Failed to acquire lock on WINDOW_HANDLE");
+        info!("Skipping WM_GAME_EXITED - {} other game(s) still using IPC window", remaining);
     }
-    handle.await?;
+    // Note: We no longer await the window task here. The IPC window runs in the
+    // background serving all game instances until the last one exits.
 
     Ok(status)
 }
@@ -416,6 +480,16 @@ fn to_wstring(s: &str) -> Vec<u16> {
     OsStr::new(s).encode_wide().chain(Some(0)).collect()
 }
 
+/// Gets the PID of the process that owns a window (for multi-client credential lookup).
+///
+/// # Safety
+/// This function calls Windows API.
+unsafe fn get_pid_from_hwnd(hwnd: HWND) -> u32 {
+    let mut pid: DWORD = 0;
+    GetWindowThreadProcessId(hwnd, &mut pid);
+    pid
+}
+
 /// Returns a receiver for game status updates.
 ///
 /// This function provides a way to subscribe to game status changes.
@@ -427,25 +501,32 @@ pub fn get_game_status_receiver() -> watch::Receiver<bool> {
     GAME_STATUS_SENDER.subscribe()
 }
 
-/// Checks if the game is currently running.
+/// Checks if any game instance is currently running.
+/// Uses the PID-based credential map as the source of truth.
 ///
 /// # Returns
 ///
-/// A boolean indicating whether the game is running (true) or not (false).
+/// A boolean indicating whether any game is running (true) or not (false).
 pub fn is_game_running() -> bool {
-    GAME_RUNNING.load(Ordering::SeqCst)
+    crate::global_credentials::has_running_games()
+}
+
+/// Returns the number of currently running game instances.
+/// Uses the PID-based credential map as the source of truth.
+pub fn get_running_game_count() -> usize {
+    crate::global_credentials::running_game_count()
 }
 
 /// Resets the global state of the application.
 ///
 /// This function performs the following actions:
-/// 1. Sets the game running status to false.
-/// 2. Sends a game status update.
+/// 1. Clears all per-PID game credentials (source of truth for running games).
+/// 2. Sends a game status update (not running).
 /// 3. Clears the stored window handle.
 ///
 /// It's typically called when cleaning up or restarting the application state.
 pub fn reset_global_state() {
-    GAME_RUNNING.store(false, Ordering::SeqCst);
+    crate::global_credentials::clear_all_game_credentials();
     if let Err(e) = GAME_STATUS_SENDER.send(false) {
         error!("Failed to send game status: {:?}", e);
     }
@@ -547,29 +628,42 @@ unsafe extern "system" fn wnd_proc(
 ///
 /// * `tcs` - An `Arc<Notify>` used to signal when the window has been created.
 unsafe fn create_and_run_game_window(tcs: Arc<Notify>) {
+    // Track this instance for multi-client support (for logging only)
+    let instance_id = WINDOW_INSTANCE_COUNTER.fetch_add(1, Ordering::SeqCst);
     let launcher_class_name = "LAUNCHER_CLASS";
     let launcher_window_title = "LAUNCHER_WINDOW";
     let class_name = to_wstring(launcher_class_name);
     let window_name = to_wstring(launcher_window_title);
-    let wnd_class = WNDCLASSEXW {
-        cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
-        style: 0,
-        lpfnWndProc: Some(wnd_proc),
-        cbClsExtra: 0,
-        cbWndExtra: 0,
-        hInstance: GetModuleHandleW(null_mut()),
-        hIcon: null_mut(),
-        hCursor: null_mut(),
-        hbrBackground: null_mut(),
-        lpszMenuName: null_mut(),
-        lpszClassName: class_name.as_ptr(),
-        hIconSm: null_mut(),
-    };
 
-    let atom = RegisterClassExW(&wnd_class);
-    if atom == 0 {
-        error!("Failed to register window class");
-        return;
+    // Check if class is already registered (for multi-client support)
+    let mut existing_class: WNDCLASSEXW = std::mem::zeroed();
+    existing_class.cbSize = std::mem::size_of::<WNDCLASSEXW>() as u32;
+    let class_exists = GetClassInfoExW(GetModuleHandleW(null_mut()), class_name.as_ptr(), &mut existing_class) != 0;
+
+    if !class_exists {
+        let wnd_class = WNDCLASSEXW {
+            cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
+            style: 0,
+            lpfnWndProc: Some(wnd_proc),
+            cbClsExtra: 0,
+            cbWndExtra: 0,
+            hInstance: GetModuleHandleW(null_mut()),
+            hIcon: null_mut(),
+            hCursor: null_mut(),
+            hbrBackground: null_mut(),
+            lpszMenuName: null_mut(),
+            lpszClassName: class_name.as_ptr(),
+            hIconSm: null_mut(),
+        };
+
+        let atom = RegisterClassExW(&wnd_class);
+        if atom == 0 {
+            error!("Failed to register window class");
+            return;
+        }
+        info!("Registered window class LAUNCHER_CLASS");
+    } else {
+        info!("Window class LAUNCHER_CLASS already registered, reusing (instance {})", instance_id);
     }
 
     // WS_EX_NOACTIVATE (0x08000000): Prevents this window from becoming the
@@ -622,25 +716,16 @@ unsafe fn create_and_run_game_window(tcs: Arc<Notify>) {
     info!("Exiting message loop");
 
     DestroyWindow(hwnd);
-    UnregisterClassW(class_name.as_ptr(), GetModuleHandleW(null_mut()));
+    // Don't unregister class - it may be in use by other game instances (multi-client)
+    // UnregisterClassW(class_name.as_ptr(), GetModuleHandleW(null_mut()));
 
-    reset_global_state();
+    // Don't call reset_global_state() here - launch_game() already handles counter decrement.
+    // Calling it here would reset counter to 0 even if other games are still running.
+    info!("Window cleanup complete for this instance");
 
-    let mut wcex: WNDCLASSEXW = std::mem::zeroed();
-    wcex.cbSize = std::mem::size_of::<WNDCLASSEXW>() as u32;
-
-    EnumWindows(Some(enum_window_proc), class_name.as_ptr() as LPARAM);
-
-    if GetClassInfoExW(GetModuleHandleW(null_mut()), class_name.as_ptr(), &mut wcex) != 0 {
-        if UnregisterClassW(class_name.as_ptr(), GetModuleHandleW(null_mut())) == 0 {
-            let error = GetLastError();
-            error!("Failed to unregister class. Error code: {}", error);
-        } else {
-            info!("Tera ClassName Unregistered successfully");
-        }
-    } else {
-        info!("Tera ClassName does not exist or is already unregistered");
-    }
+    // Multi-client: Don't clean up window class or enumerate/destroy windows here.
+    // Other game instances may still be using the shared window class.
+    // The class will be cleaned up when the launcher process exits.
 }
 
 /// Callback function for enumerating windows.
@@ -729,8 +814,18 @@ unsafe fn send_response_message(
 /// * `recipient` - The HWND of the recipient window as a WPARAM.
 /// * `sender` - The sender's window handle as a HWND.
 unsafe fn handle_account_name_request(recipient: WPARAM, sender: HWND) {
-    let account_name = GLOBAL_CREDENTIALS.get_account_name();
-    info!("Account Name Request - Sending: [REDACTED]");
+    // Multi-client support: look up credentials by game PID
+    // IMPORTANT: Do NOT fall back to GLOBAL_CREDENTIALS - it may have wrong account's data
+    // due to concurrent launches or user switching accounts in the launcher UI.
+    let game_pid = get_pid_from_hwnd(recipient as HWND);
+    let account_name = if let Some(creds) = crate::global_credentials::get_credentials_for_pid(game_pid) {
+        info!("Account Name Request from PID {} - found per-PID credentials", game_pid);
+        creds.account_name
+    } else {
+        error!("Account Name Request from PID {} - NO credentials found! This is a bug.", game_pid);
+        // Return empty string rather than potentially wrong GLOBAL_CREDENTIALS data
+        String::new()
+    };
     let account_name_utf16: Vec<u8> = account_name
         .encode_utf16()
         .flat_map(|c| c.to_le_bytes().to_vec())
@@ -751,8 +846,18 @@ unsafe fn handle_account_name_request(recipient: WPARAM, sender: HWND) {
 /// * `recipient` - The HWND of the recipient window as a WPARAM.
 /// * `sender` - The sender's window handle as a HWND.
 unsafe fn handle_session_ticket_request(recipient: WPARAM, sender: HWND) {
-    let session_ticket = GLOBAL_CREDENTIALS.get_ticket();
-    info!("Session Ticket Request - Sending: [REDACTED]");
+    // Multi-client support: look up credentials by game PID
+    // IMPORTANT: Do NOT fall back to GLOBAL_CREDENTIALS - it may have wrong account's data
+    // due to concurrent launches or user switching accounts in the launcher UI.
+    let game_pid = get_pid_from_hwnd(recipient as HWND);
+    let session_ticket = if let Some(creds) = crate::global_credentials::get_credentials_for_pid(game_pid) {
+        info!("Session Ticket Request from PID {} - found per-PID credentials", game_pid);
+        creds.ticket
+    } else {
+        error!("Session Ticket Request from PID {} - NO credentials found! This is a bug.", game_pid);
+        // Return empty string rather than potentially wrong GLOBAL_CREDENTIALS data
+        String::new()
+    };
     send_response_message(recipient, sender, 4, session_ticket.as_bytes());
 }
 

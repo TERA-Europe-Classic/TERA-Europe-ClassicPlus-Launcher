@@ -594,6 +594,11 @@
             margin: 4px 0;
         }
 
+        /* Hide divider when account list is empty */
+        .account-dropdown-list:empty + .account-dropdown-divider {
+            display: none;
+        }
+
         .account-add-btn {
             display: flex;
             align-items: center;

@@ -27,10 +27,10 @@ mod game_state {
     use std::sync::Arc;
     use tokio::sync::{watch, Mutex};
 
-    /// Holds game running state for Tauri managed state
+    /// Holds game running state for Tauri managed state.
+    /// Game running status is tracked by teralib via PID-based credentials map.
     pub struct GameState {
         pub status_receiver: Arc<Mutex<watch::Receiver<bool>>>,
-        pub is_launching: Arc<Mutex<bool>>,
     }
 }
 
@@ -99,7 +99,6 @@ fn main() {
     let game_status_receiver = teralib::get_game_status_receiver();
     let game_state = GameState {
         status_receiver: Arc::new(Mutex::new(game_status_receiver)),
-        is_launching: Arc::new(Mutex::new(false)),
     };
 
     tauri::Builder::default()
@@ -174,6 +173,7 @@ fn main() {
             // Game commands
             commands::game::handle_launch_game,
             commands::game::get_game_status,
+            commands::game::get_running_game_count,
             commands::game::reset_launch_state,
             // Hash commands
             commands::hash::get_files_to_update,

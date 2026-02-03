@@ -175,6 +175,14 @@ export function unregisterRunningGame(userNo) {
 }
 
 /**
+ * Clear all running games for this launcher instance.
+ * Called when backend reports no game processes running.
+ */
+export function clearAllRunningGames() {
+  sessionStorage.setItem(RUNNING_GAMES_KEY, JSON.stringify({}));
+}
+
+/**
  * Check if an account has a running game in this instance.
  * @param {string} userNo - Account ID
  * @returns {boolean}

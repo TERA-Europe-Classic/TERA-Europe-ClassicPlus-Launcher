@@ -242,10 +242,7 @@ pub fn set_auth_info(auth_key: String, user_name: String, user_no: i32, characte
 /// * `state` - The game state containing launch flag
 #[cfg(not(tarpaulin_include))]
 #[tauri::command]
-pub async fn handle_logout(state: tauri::State<'_, GameState>) -> Result<(), String> {
-    let mut is_launching = state.is_launching.lock().await;
-    *is_launching = false;
-
+pub async fn handle_logout(_state: tauri::State<'_, GameState>) -> Result<(), String> {
     // Reset global authentication information
     clear_auth_info();
 

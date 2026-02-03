@@ -6,7 +6,7 @@
   },
   "package": {
     "productName": "TERA-Europe-Launcher",
-    "version": "1.8.7"
+    "version": "1.8.8"
   },
   "tauri": {
     "allowlist": {
