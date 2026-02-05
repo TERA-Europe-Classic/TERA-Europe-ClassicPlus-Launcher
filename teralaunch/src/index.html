@@ -1544,6 +1544,41 @@
             stroke: #ef4444;
         }
 
+        .update-toast-icon.warning {
+            background: rgba(251, 191, 36, 0.2);
+        }
+
+        .update-toast-icon.warning svg {
+            stroke: #fbbf24;
+        }
+
+        .toast-close-btn {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            margin-left: auto;
+            background: transparent;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            color: var(--muted-foreground);
+            transition: background 0.15s, color 0.15s;
+            flex-shrink: 0;
+        }
+
+        .toast-close-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--foreground);
+        }
+
+        .toast-close-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
         .update-toast-text {
             display: flex;
             flex-direction: column;
@@ -1924,6 +1959,7 @@
 
         .status-dot.green { background: var(--emerald-500); }
         .status-dot.amber { background: var(--amber-500); }
+        .status-dot.red { background: #ef4444; }
 
         .status-text {
             font-size: 16px;
@@ -1932,6 +1968,7 @@
 
         .status-text.green { color: var(--emerald-400); }
         .status-text.amber { color: var(--amber-400); }
+        .status-text.red { color: #f87171; }
 
         .status-progress {
             flex-direction: column;
@@ -2330,6 +2367,12 @@
             <span class="update-toast-title" id="toast-title">Checking for updates...</span>
             <span class="update-toast-subtitle" id="toast-subtitle">Please wait</span>
         </div>
+        <button id="toast-close-btn" class="toast-close-btn" style="display: none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
     </div>
 
     <!-- Loading Modal -->

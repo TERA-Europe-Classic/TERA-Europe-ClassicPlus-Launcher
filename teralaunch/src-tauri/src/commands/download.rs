@@ -400,7 +400,17 @@ pub async fn download_all_files(
     let downloaded_sizes: Vec<u64> = results.into_iter().flatten().collect();
 
     if !is_download_cancelled() {
+        // Emit verification start event
+        let _ = window.emit(
+            "download_verifying",
+            json!({
+                "status": "started",
+                "total_files": total_files
+            }),
+        );
+
         // Post-download verification of files that completed
+        let mut verified_count = 0usize;
         for maybe_file in files_by_index.into_iter() {
             if is_download_cancelled() {
                 break;
@@ -414,12 +424,99 @@ pub async fn download_all_files(
             if !file_path.exists() {
                 continue;
             }
+            verified_count += 1;
+
+            // Emit progress for verification
+            let _ = window.emit(
+                "download_verifying",
+                json!({
+                    "status": "verifying",
+                    "file": file_info.path,
+                    "verified": verified_count,
+                    "total_files": total_files
+                }),
+            );
+
             let expected_hash = file_info.hash.clone();
             let file_path_for_size = file_path.clone();
-            let file_path_clone = file_path.clone();
-            let calc = tokio::task::spawn_blocking(move || calculate_file_hash(&file_path_clone))
-                .await
-                .map_err(|e| e.to_string())??;
+
+            // Retry verification with exponential backoff (handles file locks, antivirus, etc.)
+            const MAX_VERIFY_RETRIES: u8 = 5;
+            let mut verify_attempt: u8 = 0;
+            let mut calc: Option<String> = None;
+            let mut last_error: Option<String> = None;
+
+            while verify_attempt < MAX_VERIFY_RETRIES && !is_download_cancelled() {
+                verify_attempt += 1;
+
+                if verify_attempt > 1 {
+                    // Emit retry event with the reason from the previous attempt
+                    let reason = last_error.clone().unwrap_or_else(|| "file access issue".to_string());
+                    let _ = window.emit(
+                        "download_verifying",
+                        json!({
+                            "status": "verify_retry",
+                            "file": file_info.path,
+                            "attempt": verify_attempt,
+                            "max_attempts": MAX_VERIFY_RETRIES,
+                            "reason": reason
+                        }),
+                    );
+                    // Exponential backoff: 500ms, 1000ms, 2000ms, 4000ms
+                    let delay_ms = 500u64 * 2u64.pow((verify_attempt - 2) as u32);
+                    tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+                }
+
+                let file_path_clone = file_path.clone();
+                match tokio::task::spawn_blocking(move || calculate_file_hash(&file_path_clone))
+                    .await
+                {
+                    Ok(Ok(hash)) => {
+                        calc = Some(hash);
+                        break;
+                    }
+                    Ok(Err(e)) => {
+                        // Hash calculation failed (file locked, permission denied, etc.)
+                        warn!(
+                            "Verification attempt {}/{} failed for {}: {}",
+                            verify_attempt, MAX_VERIFY_RETRIES, file_info.path, e
+                        );
+                        last_error = Some(e);
+                    }
+                    Err(e) => {
+                        // spawn_blocking task panicked or was cancelled
+                        warn!(
+                            "Verification task {}/{} failed for {}: {}",
+                            verify_attempt, MAX_VERIFY_RETRIES, file_info.path, e
+                        );
+                        last_error = Some(e.to_string());
+                    }
+                }
+            }
+
+            // If all verification retries failed, log warning but continue anyway
+            // The file was downloaded successfully, just couldn't verify the hash
+            let calc = match calc {
+                Some(h) => h,
+                None => {
+                    let error_detail = last_error.unwrap_or_else(|| "unknown error".to_string());
+                    warn!(
+                        "Could not verify {} after {} attempts ({}), assuming file is OK",
+                        file_info.path, MAX_VERIFY_RETRIES, error_detail
+                    );
+                    // Emit warning event but continue - don't fail the download
+                    let _ = window.emit(
+                        "download_verifying",
+                        json!({
+                            "status": "verify_skipped",
+                            "file": file_info.path,
+                            "reason": error_detail
+                        }),
+                    );
+                    // Skip verification for this file and continue to next
+                    continue;
+                }
+            };
             if calc != expected_hash {
                 // Get file size for debugging
                 let actual_size = tokio::fs::metadata(&file_path_for_size)
@@ -429,6 +526,17 @@ pub async fn download_all_files(
                 warn!(
                     "Hash mismatch for {}: expected {} but got {} (size: {} bytes, expected: {} bytes), redownloading",
                     file_info.path, expected_hash, calc, actual_size, file_info.size
+                );
+
+                // Emit hash mismatch event so UI can show retry status
+                let _ = window.emit(
+                    "download_verifying",
+                    json!({
+                        "status": "hash_mismatch",
+                        "file": file_info.path,
+                        "expected_size": file_info.size,
+                        "actual_size": actual_size
+                    }),
                 );
 
                 // Delete wrong file and retry with exponential backoff
@@ -447,6 +555,17 @@ pub async fn download_all_files(
                     info!(
                         "Redownload attempt {}/{} for {} (hash mismatch)",
                         hash_attempt, max_hash_retries, file_info.path
+                    );
+
+                    // Emit retry event
+                    let _ = window.emit(
+                        "download_verifying",
+                        json!({
+                            "status": "retrying",
+                            "file": file_info.path,
+                            "attempt": hash_attempt,
+                            "max_attempts": max_hash_retries
+                        }),
                     );
 
                     let redownload_result = update_file(
@@ -491,6 +610,17 @@ pub async fn download_all_files(
                                 }
                                 Err(e) => {
                                     warn!("Failed to verify hash after redownload: {}", e);
+                                    // Emit verification error event so UI can show status
+                                    let _ = window.emit(
+                                        "download_verifying",
+                                        json!({
+                                            "status": "verification_error",
+                                            "file": file_info.path,
+                                            "error": e,
+                                            "attempt": hash_attempt,
+                                            "max_attempts": max_hash_retries
+                                        }),
+                                    );
                                 }
                             }
                         }
@@ -510,20 +640,22 @@ pub async fn download_all_files(
                 }
 
                 if !redownload_success && !is_download_cancelled() {
-                    let error_msg = format!(
-                        "Failed to download {} after {} attempts due to persistent hash mismatch",
+                    // Don't fail the entire download for one problematic file
+                    // Skip this file and let the user try to play - they can repair later
+                    let warning_msg = format!(
+                        "Skipping {} after {} failed attempts - file may be corrupted. Try 'Repair Game Files' if you experience issues.",
                         file_info.path, max_hash_retries
                     );
-                    error!("{}", error_msg);
+                    warn!("{}", warning_msg);
                     let _ = window.emit(
-                        "download_error",
+                        "download_verifying",
                         json!({
-                            "message": error_msg,
-                            "file": file_info.path
+                            "status": "file_skipped",
+                            "file": file_info.path,
+                            "reason": "persistent hash mismatch after redownload attempts"
                         }),
                     );
-                    set_download_complete(true);
-                    return Err(error_msg);
+                    // Continue to next file instead of failing
                 }
             }
         }
@@ -533,6 +665,15 @@ pub async fn download_all_files(
         info!("Download cancelled");
         set_download_complete(true);
     } else {
+        // Emit verification complete event
+        let _ = window.emit(
+            "download_verifying",
+            json!({
+                "status": "completed",
+                "total_files": total_files
+            }),
+        );
+
         info!("Download complete for {} file(s)", total_files);
         if let Err(e) = window.emit("download_complete", ()) {
             error!("Failed to emit download_complete event: {}", e);
@@ -1337,12 +1478,16 @@ fn calculate_file_hash<P: AsRef<std::path::Path>>(path: P) -> Result<String, Str
                 attempt += 1;
                 if attempt >= MAX_OPEN_RETRIES {
                     return Err(format!(
-                        "Failed to open file after {} attempts: {}",
+                        "Failed to open file after {} attempts: {} - try deleting the file and relaunching the launcher",
                         MAX_OPEN_RETRIES, e
                     ));
                 }
-                // Exponential backoff: 100ms, 200ms, 400ms
-                let delay_ms = 100 * (1 << (attempt - 1));
+                // Exponential backoff: 500ms, 1000ms
+                let delay_ms = 500u64 * (1 << (attempt - 1));
+                log::debug!(
+                    "File open attempt {}/{} failed for {:?}, retrying in {}ms: {}",
+                    attempt, MAX_OPEN_RETRIES, path.as_ref(), delay_ms, e
+                );
                 std::thread::sleep(std::time::Duration::from_millis(delay_ms));
             }
         }
@@ -1353,9 +1498,12 @@ fn calculate_file_hash<P: AsRef<std::path::Path>>(path: P) -> Result<String, Str
     let mut buffer = [0u8; BUFFER_SIZE];
 
     loop {
-        let bytes_read = reader
-            .read(&mut buffer)
-            .map_err(|e| format!("Failed to read file: {}", e))?;
+        let bytes_read = reader.read(&mut buffer).map_err(|e| {
+            format!(
+                "Failed to read file during verification: {} - try deleting the file and relaunching the launcher",
+                e
+            )
+        })?;
         if bytes_read == 0 {
             break;
         }

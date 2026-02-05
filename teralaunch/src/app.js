@@ -74,6 +74,7 @@ function hideAllStatusStates() {
     s.classList.remove('active');
   });
 }
+window.hideAllStatusStates = hideAllStatusStates;
 
 function showCheckingState(checked, total) {
   hideAllStatusStates();
@@ -292,14 +293,21 @@ function showReadyState() {
   const pauseBtn = document.getElementById('btn-pause-resume');
   if (pauseBtn) pauseBtn.classList.remove('active');
 
-  // Enable launch button only if authenticated
+  // Set launch button icons and text
   const launchBtn = document.getElementById('launch-game-btn');
   const playIcon = document.getElementById('launch-play-icon');
   const spinnerIcon = document.getElementById('launch-spinner-icon');
   const btnText = document.getElementById('launch-btn-text');
 
+  if (playIcon) playIcon.classList.remove('hidden-icon');
+  if (spinnerIcon) spinnerIcon.classList.add('hidden-icon');
+  if (btnText) btnText.textContent = getTranslation('LAUNCH_GAME');
+
+  // Enable launch button based on both authentication AND active account
+  // The multi-account system requires an active account to be selected
   if (launchBtn) {
-    if (isAuthenticated) {
+    const hasActiveAccount = typeof AccountManager !== 'undefined' && AccountManager.getActiveAccount();
+    if (isAuthenticated && hasActiveAccount) {
       launchBtn.classList.remove('disabled');
       launchBtn.disabled = false;
     } else {
@@ -307,11 +315,46 @@ function showReadyState() {
       launchBtn.disabled = true;
     }
   }
+}
+window.showReadyState = showReadyState;
+
+function showErrorState(errorMessage) {
+  hideAllStatusStates();
+
+  // Show the dedicated error state
+  const statusError = document.getElementById('status-error');
+  if (statusError) {
+    statusError.classList.add('active');
+  }
+
+  // Show generic "Error" in the status area (not the specific message)
+  const errorText = document.getElementById('status-error-text');
+  if (errorText) {
+    // Use simple "Error" text - the details are in the toast
+    errorText.textContent = 'Error';
+  }
+
+  // Show specific error details in a PERSISTENT toast (won't auto-hide, has X to dismiss)
+  if (errorMessage && typeof showUpdateNotification === 'function') {
+    showUpdateNotification('error', 'Update Error', errorMessage, true);
+  }
+
+  // Keep launch button disabled
+  const launchBtn = document.getElementById('launch-game-btn');
+  if (launchBtn) {
+    launchBtn.classList.add('disabled');
+    launchBtn.disabled = true;
+  }
+
+  // Ensure spinner is hidden, show play icon on launch button
+  const playIcon = document.getElementById('launch-play-icon');
+  const spinnerIcon = document.getElementById('launch-spinner-icon');
+  const btnText = document.getElementById('launch-btn-text');
   if (playIcon) playIcon.classList.remove('hidden-icon');
   if (spinnerIcon) spinnerIcon.classList.add('hidden-icon');
   if (btnText) btnText.textContent = getTranslation('LAUNCH_GAME');
 }
-window.showReadyState = showReadyState;
+window.showErrorState = showErrorState;
 
 function updateHeaderAuthState(isLoggedIn, username) {
   const statusLoginRequired = document.getElementById('status-login-required');
@@ -426,21 +469,32 @@ window.initBackgroundCarousel = initBackgroundCarousel;
 // Store original path to restore on cancel
 let originalGamePath = '';
 
+// Track toast auto-hide timeout so we can cancel it
+let toastAutoHideTimeout = null;
+
 /**
  * Shows the update notification toast with the given state, title, and subtitle.
- * @param {string} state - The state: 'checking', 'upToDate', 'success', or 'error'
+ * @param {string} state - The state: 'checking', 'upToDate', 'success', 'error', or 'warning'
  * @param {string} title - The main title text
  * @param {string} subtitle - The subtitle text
+ * @param {boolean} persistent - If true, toast won't auto-hide (shows close button)
  */
-function showUpdateNotification(state, title, subtitle) {
+function showUpdateNotification(state, title, subtitle, persistent = false) {
   const toast = document.getElementById('update-toast');
   const icon = document.getElementById('toast-icon');
   const titleEl = document.getElementById('toast-title');
   const subtitleEl = document.getElementById('toast-subtitle');
+  const closeBtn = document.getElementById('toast-close-btn');
 
   if (!toast) {
     console.error('update-toast element not found!');
     return;
+  }
+
+  // Clear any existing auto-hide timeout
+  if (toastAutoHideTimeout) {
+    clearTimeout(toastAutoHideTimeout);
+    toastAutoHideTimeout = null;
   }
 
   // Update text
@@ -457,15 +511,25 @@ function showUpdateNotification(state, title, subtitle) {
       icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>';
     } else if (state === 'error') {
       icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
+    } else if (state === 'warning') {
+      icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>';
     }
   }
+
+  // Show/hide close button based on persistent mode
+  if (closeBtn) {
+    closeBtn.style.display = persistent ? 'flex' : 'none';
+  }
+
+  // Mark toast as persistent or not (for styling)
+  toast.classList.toggle('persistent', persistent);
 
   // Show toast
   toast.classList.add('show');
 
-  // Auto-hide after 4 seconds for non-checking states
-  if (state !== 'checking') {
-    setTimeout(function() {
+  // Auto-hide after 4 seconds for non-checking, non-persistent states
+  if (state !== 'checking' && !persistent) {
+    toastAutoHideTimeout = setTimeout(function() {
       toast.classList.remove('show');
     }, 4000);
   }
@@ -482,6 +546,16 @@ function hideUpdateNotification() {
   }
 }
 window.hideUpdateNotification = hideUpdateNotification;
+
+// Set up toast close button event listener (WebView2 compatible - no inline onclick)
+document.addEventListener('DOMContentLoaded', () => {
+  const toastCloseBtn = document.getElementById('toast-close-btn');
+  if (toastCloseBtn) {
+    toastCloseBtn.addEventListener('click', () => {
+      hideUpdateNotification();
+    });
+  }
+});
 
 /**
  * Handler for Check Launcher Update menu item.
@@ -1077,6 +1151,8 @@ const App = {
           accounts.sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0));
           AccountManager.setActiveAccountId(accounts[0].userNo);
           console.log('Auto-selected account:', accounts[0].userName);
+        } else {
+          console.log('No accounts found to auto-select');
         }
       }
 
@@ -1090,10 +1166,15 @@ const App = {
           const success = await this.silentAuthRefresh(cred.u, cred.p);
           if (success) {
             this.updateAccountDisplay();
+            this.updateLaunchButtonState(); // Ensure button state is updated after auth
           }
         } catch (e) {
           console.warn("Failed to auto-refresh auth for active account:", e);
         }
+      } else if (activeAccount) {
+        // Have account but no credentials - still update display
+        this.updateAccountDisplay();
+        this.updateLaunchButtonState();
       }
 
       this.disableContextMenu();
@@ -1405,24 +1486,132 @@ const App = {
     this.updateListeners.push(fileCheckCompletedListener);
 
     const downloadCompleteListener = await listen("download_complete", () => {
+      console.log(">>> download_complete event received! updateError:", this.state.updateError);
+      // CRITICAL: Do not complete if there was an error
+      if (this.state.updateError) {
+        console.log(">>> download_complete IGNORED because updateError is true");
+        return;
+      }
       // Finalize via unified completion path
       this.handleCompletion();
     });
     this.updateListeners.push(downloadCompleteListener);
 
+    // Listen for verification status events (post-download hash verification)
+    const downloadVerifyingListener = await listen("download_verifying", (event) => {
+      const payload = event?.payload;
+      if (!payload) return;
+
+      const status = payload.status;
+      const dlLabel = document.getElementById('dl-status-label');
+
+      switch (status) {
+        case "started":
+          console.log("Post-download verification started");
+          if (dlLabel) dlLabel.textContent = this.t('VERIFYING_FILES') || 'Verifying files...';
+          break;
+        case "verifying":
+          // Update UI to show which file is being verified
+          if (dlLabel) {
+            dlLabel.textContent = `${this.t('VERIFYING_FILES') || 'Verifying'} (${payload.verified}/${payload.total_files})`;
+          }
+          break;
+        case "hash_mismatch":
+          console.warn(`Hash mismatch for ${payload.file}, size: ${payload.actual_size}/${payload.expected_size}`);
+          if (dlLabel) {
+            const shortFile = this.getFileName(payload.file);
+            dlLabel.textContent = `File corrupted, redownloading: ${shortFile}`;
+          }
+          break;
+        case "retrying":
+          console.log(`Retrying ${payload.file} (${payload.attempt}/${payload.max_attempts})`);
+          if (dlLabel) {
+            const shortFile = this.getFileName(payload.file);
+            dlLabel.textContent = `Redownloading (${payload.attempt}/${payload.max_attempts}): ${shortFile}`;
+          }
+          break;
+        case "verification_error":
+          console.warn(`Verification error for ${payload.file}: ${payload.error}`);
+          if (dlLabel) {
+            const shortFile = this.getFileName(payload.file);
+            const errorDetail = payload.error || 'Unknown error';
+            dlLabel.textContent = `Error verifying ${shortFile}: ${errorDetail}`;
+          }
+          break;
+        case "verify_retry":
+          console.log(`Verifying ${payload.file} (attempt ${payload.attempt}/${payload.max_attempts}): ${payload.reason}`);
+          if (dlLabel) {
+            const shortFile = this.getFileName(payload.file);
+            const reason = payload.reason || 'file may be locked';
+            dlLabel.textContent = `Retrying ${shortFile} (${payload.attempt}/${payload.max_attempts}): ${reason}`;
+          }
+          break;
+        case "verify_skipped":
+          console.warn(`Verification skipped for ${payload.file}: ${payload.reason}`);
+          if (dlLabel) {
+            const shortFile = this.getFileName(payload.file);
+            const reason = payload.reason || 'could not access file';
+            dlLabel.textContent = `Skipped verification for ${shortFile}: ${reason}`;
+          }
+          break;
+        case "file_skipped":
+          console.warn(`File skipped due to persistent issues: ${payload.file}`);
+          if (dlLabel) {
+            const shortFile = this.getFileName(payload.file);
+            dlLabel.textContent = `Skipped ${shortFile} - may need repair`;
+          }
+          // Show a notification so user knows there might be an issue
+          if (typeof window.showUpdateNotification === 'function') {
+            window.showUpdateNotification('warning', 'File Issue', `${this.getFileName(payload.file)} could not be verified. Use 'Repair Game Files' if you have issues.`);
+          }
+          break;
+        case "completed":
+          console.log("Verification completed");
+          break;
+      }
+    });
+    this.updateListeners.push(downloadVerifyingListener);
+
     const downloadErrorListener = await listen("download_error", (event) => {
       const message =
         event?.payload?.message || this.t("UPDATE_ERROR_MESSAGE");
+      const fileName = event?.payload?.file || "";
+      console.error("Download error:", message, fileName ? `(file: ${fileName})` : "");
+
       this.setState({
         updateError: true,
-        currentUpdateMode: "error",
+        currentUpdateMode: "paused", // Set to paused so user can retry
         isUpdateAvailable: true,
         isFileCheckComplete: true,
         isPauseRequested: false,
+        isDownloading: false,
       });
-      this.showErrorMessage(message);
-      this.updateLaunchGameButton(true);
+
+      // Show error state with persistent toast notification
+      // showErrorState shows generic "Error" in status + persistent toast with details
+      if (typeof window.showErrorState === 'function') {
+        window.showErrorState(message);
+      } else {
+        // Fallback: hide downloading but don't show ready (keeps UI in limbo intentionally)
+        if (typeof window.hideAllStatusStates === 'function') {
+          window.hideAllStatusStates();
+        }
+      }
+
+      // Keep LAUNCH disabled since files aren't ready
+      this.updateLaunchGameButton(true); // true = disable
       this.toggleLanguageSelector(true);
+
+      // Show pause/resume button so user can retry
+      const pauseBtn = document.getElementById('btn-pause-resume');
+      if (pauseBtn) {
+        pauseBtn.classList.add('active');
+        // Show play/resume icon
+        const pauseIcon = document.getElementById('pause-icon');
+        const resumeIcon = document.getElementById('resume-icon');
+        if (pauseIcon) pauseIcon.classList.add('hidden-icon');
+        if (resumeIcon) resumeIcon.classList.remove('hidden-icon');
+      }
     });
     this.updateListeners.push(downloadErrorListener);
 
@@ -2410,6 +2599,15 @@ const App = {
    * Also re-enables the game launch button and language selector.
    */
   handleCompletion() {
+    console.log(">>> handleCompletion() called, updateError:", this.state.updateError);
+
+    // CRITICAL: If there was an error, do NOT clear it or complete the download.
+    // The error state should remain visible so users know something went wrong.
+    if (this.state.updateError) {
+      console.log(">>> handleCompletion() aborted: updateError is true, keeping error state visible");
+      return;
+    }
+
     // First, ensure progress bar shows 100% before hiding
     // Set downloadedSize equal to totalSize to show 100% progress
     this.setState({
@@ -2429,6 +2627,12 @@ const App = {
 
     // Brief delay to show 100% progress before transitioning
     setTimeout(() => {
+      // Double-check error state hasn't been set during the timeout
+      if (this.state.updateError) {
+        console.log(">>> handleCompletion() timeout aborted: updateError became true");
+        return;
+      }
+
       this.setState({
         isDownloadComplete: true,
         currentUpdateMode: "complete",
@@ -2440,6 +2644,10 @@ const App = {
       this.updateLaunchGameButton(false);
       this.toggleLanguageSelector(true);
       setTimeout(() => {
+        // Triple-check error state
+        if (this.state.updateError) {
+          return;
+        }
         this.setState({
           isUpdateComplete: true,
           currentUpdateMode: "ready",
@@ -2929,6 +3137,9 @@ const App = {
       // Clear stored credentials for auto re-login
       localStorage.removeItem("_cred");
 
+      // Clear active account in AccountManager (keep accounts list for easy re-login)
+      AccountManager.clearActiveAccount();
+
       // Clean up event listeners to prevent memory leaks
       this.cleanupUpdateListeners();
       this.cleanupGameStatusListeners();
@@ -2939,7 +3150,13 @@ const App = {
         updateCheckPerformed: false,
         updateCheckPerformedOnLogin: false,
         updateCheckPerformedOnRefresh: false,
+        isAuthenticated: false,
       });
+
+      // Update UI to reflect logged out state
+      this.updateAccountDisplay();
+      this.updateLaunchButtonState();
+
       // Stay on current page, just update auth state in header
       this.checkAuthentication();
     } catch (error) {
@@ -3091,13 +3308,33 @@ const App = {
   },
 
   async handleLaunchGame() {
+    // Log all relevant state for debugging
+    console.log("handleLaunchGame called with state:", {
+      isAuthenticated: this.state.isAuthenticated,
+      isUpdateAvailable: this.state.isUpdateAvailable,
+      isDownloadComplete: this.state.isDownloadComplete,
+      currentUpdateMode: this.state.currentUpdateMode,
+      updateError: this.state.updateError,
+      isGameLaunching: this.state.isGameLaunching,
+      isFileCheckComplete: this.state.isFileCheckComplete,
+      activeAccount: AccountManager.getActiveAccount()?.userName || 'none'
+    });
+
     // Early exit if not authenticated
     if (!this.state.isAuthenticated) {
-      console.log("Cannot launch game: not authenticated");
+      console.log("BLOCKED: not authenticated");
+      window.showUpdateNotification?.('error', this.t('LOGIN_REQUIRED') || 'Login Required', this.t('PLEASE_LOGIN_FIRST') || 'Please log in to play');
       return;
     }
-    if (UPDATE_CHECK_ENABLED && this.state.isUpdateAvailable) return;
-    if (this.state.isGameLaunching) return;
+    if (UPDATE_CHECK_ENABLED && this.state.isUpdateAvailable) {
+      console.log("BLOCKED: update still available");
+      window.showUpdateNotification?.('warning', this.t('UPDATE_REQUIRED') || 'Update Required', this.t('PLEASE_WAIT_FOR_UPDATE') || 'Please wait for the update to complete');
+      return;
+    }
+    if (this.state.isGameLaunching) {
+      console.log("BLOCKED: already launching");
+      return;
+    }
 
     // Check if active account already has a running game
     const activeAccount = AccountManager.getActiveAccount();
@@ -3612,6 +3849,32 @@ const App = {
       setTimeout(() => {
         errorContainer.style.display = "none";
       }, 5000);
+    }
+  },
+
+  /**
+   * Shows a persistent error message that doesn't auto-hide.
+   * Used for critical errors like download failures where user action is needed.
+   * @param {string} message the error message to display
+   * @memberof App
+   */
+  showPersistentError(message) {
+    const errorContainer = document.getElementById("error-container");
+    if (errorContainer) {
+      errorContainer.textContent = message;
+      errorContainer.style.display = "block";
+      // Don't auto-hide - user needs to see this
+    }
+  },
+
+  /**
+   * Hides the error container.
+   * @memberof App
+   */
+  hideError() {
+    const errorContainer = document.getElementById("error-container");
+    if (errorContainer) {
+      errorContainer.style.display = "none";
     }
   },
 
