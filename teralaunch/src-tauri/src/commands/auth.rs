@@ -12,7 +12,10 @@ use serde_json::json;
 use crate::domain::{CONNECT_TIMEOUT_SECS, DOWNLOAD_TIMEOUT_SECS};
 use crate::infrastructure::{HttpClient, ReqwestClient};
 use crate::services::auth_service;
-use crate::state::{clear_auth_info, set_auth_info as set_auth_state};
+use crate::state::{
+    clear_auth_client, clear_auth_info, get_auth_client, set_auth_client,
+    set_auth_info as set_auth_state,
+};
 use crate::GameState;
 use teralib::config::get_config_value;
 
@@ -80,7 +83,7 @@ async fn login_with_client<H: HttpClient>(
     let account_info_text = account_info_res.text().map_err(|e| e.to_string())?;
     let (user_no, permission, user_name) =
         auth_service::parse_account_info(&account_info_text).map_err(|e| e.to_string())?;
-    let (privilege, region, banned) =
+    let (privilege, region, banned, leaderboard_consent) =
         auth_service::parse_account_extras(&account_info_text).map_err(|e| e.to_string())?;
 
     let auth_key_res = client.get(auth_key_url).await?;
@@ -102,6 +105,7 @@ async fn login_with_client<H: HttpClient>(
         privilege,
         region,
         banned,
+        leaderboard_consent,
     )
     .map_err(|e| e.to_string())?;
 
@@ -133,7 +137,7 @@ pub async fn login(username: String, password: String) -> Result<String, String>
     let auth_key_url = get_config_value("GET_AUTH_KEY_URL");
     let character_count_url = get_config_value("GET_CHARACTER_COUNT_URL");
 
-    login_with_client(
+    let result = login_with_client(
         &client,
         username,
         password,
@@ -142,7 +146,14 @@ pub async fn login(username: String, password: String) -> Result<String, String>
         &auth_key_url,
         &character_count_url,
     )
-    .await
+    .await;
+
+    // Store the authenticated client for session-based API calls (e.g., consent)
+    if result.is_ok() {
+        set_auth_client(client.inner());
+    }
+
+    result
 }
 
 /// Inner testable registration function that accepts an HttpClient implementation.
@@ -245,8 +256,100 @@ pub fn set_auth_info(auth_key: String, user_name: String, user_no: i32, characte
 pub async fn handle_logout(_state: tauri::State<'_, GameState>) -> Result<(), String> {
     // Reset global authentication information
     clear_auth_info();
+    // Clear the authenticated HTTP client (session cookies)
+    clear_auth_client();
 
     Ok(())
+}
+
+/// Checks if an authenticated session exists.
+///
+/// # Returns
+/// true if there's an active session with cookies, false otherwise
+#[cfg(not(tarpaulin_include))]
+#[tauri::command]
+pub fn has_auth_session() -> bool {
+    get_auth_client().is_some()
+}
+
+/// Gets the leaderboard consent status for the current user.
+///
+/// Uses the authenticated session from login (cookie-based auth).
+///
+/// # Returns
+/// JSON string containing consent status (true, false, or null if not set)
+#[cfg(not(tarpaulin_include))]
+#[tauri::command]
+pub async fn get_leaderboard_consent() -> Result<String, String> {
+    info!("Getting leaderboard consent");
+
+    // Get the authenticated client (has session cookies from login)
+    let client = get_auth_client().ok_or("Not logged in - no authenticated session")?;
+    let consent_url = get_config_value("GET_LEADERBOARD_CONSENT_URL");
+    info!("Requesting: {}", consent_url);
+
+    // Backend expects GET request with session cookie auth
+    let response = client
+        .get(&consent_url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let status = response.status().as_u16();
+    let text = response.text().await.map_err(|e| e.to_string())?;
+
+    info!("Response status: {}, body: {}", status, text);
+
+    if (200..300).contains(&status) {
+        Ok(text)
+    } else {
+        Err(format!("Failed to get consent status: {}", text))
+    }
+}
+
+/// Sets the leaderboard consent for the current user.
+///
+/// Uses the authenticated session from login (cookie-based auth).
+///
+/// # Arguments
+/// * `consent` - Whether the user consents to leaderboard visibility
+///
+/// # Returns
+/// JSON string containing the response from the server
+#[cfg(not(tarpaulin_include))]
+#[tauri::command]
+pub async fn set_leaderboard_consent(consent: bool) -> Result<String, String> {
+    info!("Setting leaderboard consent to: {}", consent);
+
+    // Get the authenticated client (has session cookies from login)
+    let client = get_auth_client().ok_or("Not logged in - no authenticated session")?;
+    let consent_url = get_config_value("SET_LEADERBOARD_CONSENT_URL");
+    info!("Requesting: {}", consent_url);
+
+    // Send JSON with integer value (backend has express.json() middleware)
+    let consent_value: i32 = if consent { 1 } else { 0 };
+    info!("Sending JSON: consent={}", consent_value);
+
+    let response = client
+        .post(&consent_url)
+        .json(&serde_json::json!({ "consent": consent_value }))
+        .send()
+        .await
+        .map_err(|e| {
+            info!("Request error: {}", e);
+            e.to_string()
+        })?;
+
+    let status = response.status().as_u16();
+    let text = response.text().await.map_err(|e| e.to_string())?;
+
+    info!("Response status: {}, body: {}", status, text);
+
+    if (200..300).contains(&status) {
+        Ok(text)
+    } else {
+        Err(format!("Failed to set consent: {}", text))
+    }
 }
 
 #[cfg(test)]

@@ -41,6 +41,12 @@ const URLS = {
     support: "https://helpdesk.crazy-esports.com",
     privacy: "https://forum.crazy-esports.com/index.php?datenschutzerklaerung/",
   },
+
+  // Leaderboard consent API
+  leaderboard: {
+    getConsent: "https://auth.tera-europe.net/launcher/GetLeaderboardConsentAction",
+    setConsent: "https://auth.tera-europe.net/launcher/SetLeaderboardConsentAction",
+  },
 };
 
 const REQUIRED_PRIVILEGE_LEVEL = 3;
@@ -3343,6 +3349,18 @@ const App = {
       return;
     }
 
+    // Check leaderboard consent (skip if we're proceeding after consent modal)
+    if (!this._proceedWithLaunch) {
+      const needsConsent = await this.checkLeaderboardConsent();
+      if (needsConsent) {
+        console.log("Showing leaderboard consent modal");
+        this.openLeaderboardConsentModal();
+        return; // Wait for user to respond to consent modal
+      }
+    }
+    // Reset the flag for next launch
+    this._proceedWithLaunch = false;
+
     this.setState({ isGameLaunching: true });
 
     try {
@@ -5570,6 +5588,7 @@ const App = {
     // Setup modals
     this.setupAddAccountModal();
     this.setupDeleteAccountModal();
+    this.setupConsentModals();
 
     // Initial render
     this.updateAccountDisplay();
@@ -5615,6 +5634,7 @@ const App = {
   updateAccountDisplay() {
     const btnName = document.getElementById('account-btn-name');
     const statusDot = document.getElementById('account-status-dot');
+    const accountOptionsMenu = document.getElementById('menu-account-options');
 
     if (!btnName) return;
 
@@ -5624,9 +5644,17 @@ const App = {
       btnName.textContent = activeAccount.userName;
       const isPlaying = AccountManager.isAccountInGame(activeAccount.userNo);
       statusDot.classList.toggle('playing', isPlaying);
+      // Show Account Options menu item when an account is selected
+      if (accountOptionsMenu) {
+        accountOptionsMenu.style.display = 'flex';
+      }
     } else {
       btnName.textContent = 'Not logged in';
       statusDot.classList.remove('playing');
+      // Hide Account Options menu item when no account is selected
+      if (accountOptionsMenu) {
+        accountOptionsMenu.style.display = 'none';
+      }
     }
   },
 
@@ -5880,10 +5908,334 @@ const App = {
     this.renderAccountDropdown();
     window.showUpdateNotification('info', this.t('ACCOUNT_REMOVED') || 'Account Removed', deletedName);
   },
+
+  // ========== LEADERBOARD CONSENT MODAL ==========
+
+  setupConsentModals() {
+    this.setupLeaderboardConsentModal();
+    this.setupAccountOptionsModal();
+  },
+
+  setupLeaderboardConsentModal() {
+    const modal = document.getElementById('leaderboard-consent-modal');
+    const checkbox = document.getElementById('consent-read-checkbox');
+    const agreeBtn = document.getElementById('consent-agree-btn');
+    const disagreeBtn = document.getElementById('consent-disagree-btn');
+
+    if (!modal) return;
+
+    // Enable/disable buttons based on checkbox
+    checkbox.addEventListener('change', () => {
+      const checked = checkbox.checked;
+      agreeBtn.disabled = !checked;
+      disagreeBtn.disabled = !checked;
+    });
+
+    // Agree button
+    agreeBtn.addEventListener('click', async () => {
+      await this.setLeaderboardConsent(true);
+      this.closeLeaderboardConsentModal();
+      // Continue launching the game
+      this._proceedWithLaunch = true;
+      this.handleLaunchGame();
+    });
+
+    // Disagree button
+    disagreeBtn.addEventListener('click', async () => {
+      await this.setLeaderboardConsent(false);
+      this.closeLeaderboardConsentModal();
+      // Continue launching the game
+      this._proceedWithLaunch = true;
+      this.handleLaunchGame();
+    });
+
+    // Close when clicking outside
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        this.closeLeaderboardConsentModal();
+      }
+    });
+  },
+
+  openLeaderboardConsentModal() {
+    const modal = document.getElementById('leaderboard-consent-modal');
+    const checkbox = document.getElementById('consent-read-checkbox');
+    const agreeBtn = document.getElementById('consent-agree-btn');
+    const disagreeBtn = document.getElementById('consent-disagree-btn');
+
+    if (!modal) return;
+
+    // Reset state
+    checkbox.checked = false;
+    agreeBtn.disabled = true;
+    disagreeBtn.disabled = true;
+
+    modal.classList.add('show');
+  },
+
+  closeLeaderboardConsentModal() {
+    const modal = document.getElementById('leaderboard-consent-modal');
+    if (modal) modal.classList.remove('show');
+  },
+
+  setupAccountOptionsModal() {
+    const modal = document.getElementById('account-options-modal');
+    const closeBtn = document.getElementById('account-options-close');
+    const leaderboardToggle = document.getElementById('leaderboard-toggle');
+    const accountOptionsMenu = document.getElementById('menu-account-options');
+
+    if (!modal) return;
+
+    // Open modal when clicking Account Options menu item
+    if (accountOptionsMenu) {
+      accountOptionsMenu.addEventListener('click', async (e) => {
+        e.preventDefault();
+        // Close settings dropdown
+        const settingsWrapper = document.getElementById("settings-dropdown-wrapper");
+        if (settingsWrapper) settingsWrapper.classList.remove("active");
+        await this.openAccountOptionsModal();
+      });
+    }
+
+    // Close modal
+    closeBtn.addEventListener('click', () => {
+      this.closeAccountOptionsModal();
+    });
+
+    // Toggle change handler
+    leaderboardToggle.addEventListener('change', async (e) => {
+      const agreed = e.target.checked;
+      leaderboardToggle.disabled = true;
+      const success = await this.setLeaderboardConsent(agreed);
+      leaderboardToggle.disabled = false;
+      if (!success) {
+        // Revert on failure
+        e.target.checked = !agreed;
+        window.showUpdateNotification('error', this.t('ERROR') || 'Error', 'Failed to update preference');
+      }
+    });
+
+    // Close when clicking outside
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        this.closeAccountOptionsModal();
+      }
+    });
+  },
+
+  async openAccountOptionsModal() {
+    const modal = document.getElementById('account-options-modal');
+    const leaderboardToggle = document.getElementById('leaderboard-toggle');
+
+    if (!modal) return;
+
+    modal.classList.add('show');
+
+    // Fetch current consent status (will silently re-auth if needed)
+    leaderboardToggle.disabled = true;
+    const result = await this.getLeaderboardConsent();
+
+    if (result.success) {
+      // Successfully fetched - enable toggle (consent can be true/1 or false/0)
+      leaderboardToggle.checked = result.consent === true || result.consent === 1;
+      leaderboardToggle.disabled = false;
+    } else {
+      // Could not fetch consent - keep toggle disabled
+      leaderboardToggle.checked = false;
+      leaderboardToggle.disabled = true;
+      console.warn('[Consent] Could not fetch consent status, toggle disabled');
+    }
+  },
+
+  closeAccountOptionsModal() {
+    const modal = document.getElementById('account-options-modal');
+    if (modal) modal.classList.remove('show');
+  },
+
+  /**
+   * Ensures an authenticated session exists for API calls.
+   * If no session, silently re-authenticates using stored credentials.
+   * If re-auth fails, prompts user to re-login.
+   * @param {boolean} promptOnFailure - If true, open login modal on failure
+   * @returns {Promise<boolean>} true if session is ready, false if failed
+   */
+  async ensureAuthSession(promptOnFailure = false) {
+    try {
+      // Check if session already exists
+      const hasSession = await window.__TAURI__.invoke('has_auth_session');
+      if (hasSession) {
+        console.log('[Auth] Session already exists');
+        return true;
+      }
+
+      console.log('[Auth] No session, attempting silent re-authentication...');
+
+      // Get active account credentials
+      const activeAccount = AccountManager.getActiveAccount();
+      if (!activeAccount || !activeAccount.credentials) {
+        console.warn('[Auth] No credentials available for re-authentication');
+        if (promptOnFailure) {
+          this.openAddAccountModal();
+        }
+        return false;
+      }
+
+      // Decode credentials
+      let cred;
+      try {
+        cred = JSON.parse(atob(activeAccount.credentials));
+      } catch (e) {
+        console.warn('[Auth] Could not decode stored credentials');
+        if (promptOnFailure) {
+          this.openAddAccountModal(activeAccount.userName);
+        }
+        return false;
+      }
+
+      if (!cred.u || !cred.p) {
+        console.warn('[Auth] Invalid stored credentials');
+        if (promptOnFailure) {
+          this.openAddAccountModal(activeAccount.userName);
+        }
+        return false;
+      }
+
+      // Silently re-login to establish session
+      console.log('[Auth] Re-authenticating user:', cred.u);
+      const response = await window.__TAURI__.invoke('login', {
+        username: cred.u,
+        password: cred.p,
+      });
+
+      const jsonResponse = JSON.parse(response);
+      if (jsonResponse.Msg === 'success') {
+        console.log('[Auth] Silent re-authentication successful');
+        return true;
+      } else {
+        console.warn('[Auth] Silent re-authentication failed:', jsonResponse.Msg);
+        // Password changed or account issue - prompt user to re-login
+        if (promptOnFailure) {
+          this.openAddAccountModal(cred.u);
+        }
+        return false;
+      }
+    } catch (error) {
+      console.error('[Auth] Error ensuring session:', error);
+      if (promptOnFailure) {
+        const activeAccount = AccountManager.getActiveAccount();
+        this.openAddAccountModal(activeAccount?.userName || '');
+      }
+      return false;
+    }
+  },
+
+  /**
+   * Get leaderboard consent status from backend.
+   * Uses Tauri invoke to avoid CORS issues in dev mode.
+   * @returns {Promise<boolean|null>} true if agreed, false if disagreed, null if not set
+   */
+  async getLeaderboardConsent() {
+    const activeAccount = AccountManager.getActiveAccount();
+    if (!activeAccount) return { success: false, consent: null };
+
+    try {
+      // Ensure we have an authenticated session (prompt re-login on failure)
+      const sessionReady = await this.ensureAuthSession(true);
+      if (!sessionReady) {
+        console.warn('[Consent] Could not establish session');
+        return { success: false, consent: null };
+      }
+
+      // Use Tauri invoke - session cookies are handled by Rust backend
+      console.log('[Consent] Getting leaderboard consent via Tauri invoke...');
+      const response = await window.__TAURI__.invoke('get_leaderboard_consent');
+      console.log('[Consent] Response:', response);
+
+      const data = JSON.parse(response);
+
+      // Check for error response
+      if (data.Return === false) {
+        console.warn('[Consent] Backend returned error:', data.Msg || 'Unknown error');
+        return { success: false, consent: null };
+      }
+
+      // Backend returns: { LeaderboardConsent: true|false|null }
+      const consent = data.LeaderboardConsent;
+      console.log('[Consent] Parsed consent value:', consent);
+      return { success: true, consent: consent };
+    } catch (error) {
+      console.error('[Consent] Error getting leaderboard consent:', error);
+      return { success: false, consent: null };
+    }
+  },
+
+  /**
+   * Set leaderboard consent on backend.
+   * Uses Tauri invoke to avoid CORS issues in dev mode.
+   * @param {boolean} agreed - true if user agrees, false if disagrees
+   * @returns {Promise<boolean>} true if successful
+   */
+  async setLeaderboardConsent(agreed) {
+    const activeAccount = AccountManager.getActiveAccount();
+    if (!activeAccount) return false;
+
+    try {
+      // Ensure we have an authenticated session (prompt re-login on failure)
+      const sessionReady = await this.ensureAuthSession(true);
+      if (!sessionReady) {
+        console.warn('[Consent] Could not establish session');
+        return false;
+      }
+
+      // Use Tauri invoke - session cookies are handled by Rust backend
+      console.log('[Consent] Setting leaderboard consent to:', agreed);
+      const response = await window.__TAURI__.invoke('set_leaderboard_consent', {
+        consent: agreed,
+      });
+      console.log('[Consent] Set consent response:', response);
+
+      // Parse the response to verify success
+      try {
+        const data = JSON.parse(response);
+        if (data.Return === true || data.Msg === 'success') {
+          console.log('[Consent] Backend confirmed consent saved');
+          return true;
+        } else {
+          console.error('[Consent] Backend rejected consent:', data);
+          return false;
+        }
+      } catch (parseError) {
+        // If response isn't JSON, check if it's a success indicator
+        console.warn('[Consent] Could not parse response as JSON:', response);
+        return true; // Assume success if we got here without error
+      }
+    } catch (error) {
+      console.error('[Consent] Error setting leaderboard consent:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Check if we need to show the leaderboard consent modal.
+   * Returns true if we should show the modal (consent is null), false otherwise.
+   */
+  async checkLeaderboardConsent() {
+    const result = await this.getLeaderboardConsent();
+    // If fetch failed, don't block game launch
+    if (!result.success) {
+      console.warn('[Consent] Could not check consent, allowing game launch');
+      return false;
+    }
+    // Show modal only if consent hasn't been set yet (null)
+    return result.consent === null;
+  },
 };
 function LoadStartPage() {
-  // Load player count from API
+  // Load player count from API (initial load)
   loadPlayerCount();
+
+  // Refresh player count every 60 seconds
+  setInterval(loadPlayerCount, 60000);
 
   // Load news from RSS feed
   loadNewsFeed();

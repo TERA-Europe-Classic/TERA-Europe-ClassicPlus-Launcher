@@ -99,6 +99,13 @@ impl ReqwestClient {
             .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
         Ok(Self { client })
     }
+
+    /// Returns a clone of the inner reqwest::Client.
+    /// Useful for storing the authenticated client for later reuse.
+    #[cfg(not(tarpaulin_include))]
+    pub fn inner(&self) -> reqwest::Client {
+        self.client.clone()
+    }
 }
 
 impl HttpClient for ReqwestClient {

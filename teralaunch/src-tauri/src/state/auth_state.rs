@@ -10,6 +10,27 @@ use crate::domain::GlobalAuthInfo;
 
 lazy_static! {
     static ref GLOBAL_AUTH_INFO: RwLock<GlobalAuthInfo> = RwLock::new(GlobalAuthInfo::default());
+    /// Authenticated HTTP client with session cookies from login.
+    /// Used for API calls that require the same session (e.g., consent).
+    static ref AUTH_CLIENT: RwLock<Option<reqwest::Client>> = RwLock::new(None);
+}
+
+/// Stores the authenticated HTTP client after login.
+/// The client retains session cookies for subsequent API calls.
+pub fn set_auth_client(client: reqwest::Client) {
+    let mut guard = AUTH_CLIENT.write().unwrap_or_else(|e| e.into_inner());
+    *guard = Some(client);
+}
+
+/// Returns a clone of the authenticated HTTP client if available.
+pub fn get_auth_client() -> Option<reqwest::Client> {
+    AUTH_CLIENT.read().ok().and_then(|guard| guard.clone())
+}
+
+/// Clears the authenticated HTTP client (e.g., on logout).
+pub fn clear_auth_client() {
+    let mut guard = AUTH_CLIENT.write().unwrap_or_else(|e| e.into_inner());
+    *guard = None;
 }
 
 /// Returns a clone of the current global authentication info.

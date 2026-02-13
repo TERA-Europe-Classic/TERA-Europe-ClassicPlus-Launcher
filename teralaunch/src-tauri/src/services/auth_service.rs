@@ -16,7 +16,7 @@ const MAX_USERNAME_LENGTH: usize = 100;
 const MAX_PASSWORD_LENGTH: usize = 256;
 
 /// Result of a login attempt.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LoginResult {
     pub auth_key: String,
     pub user_name: String,
@@ -26,6 +26,8 @@ pub struct LoginResult {
     pub privilege: i64,
     pub region: String,
     pub banned: bool,
+    /// Leaderboard consent status: true (agreed), false (disagreed), None (not set)
+    pub leaderboard_consent: Option<bool>,
 }
 
 /// Error types for authentication operations.
@@ -287,8 +289,8 @@ pub fn parse_character_count(response: &str) -> Result<String, AuthError> {
 /// * `response` - The JSON response string from the account info endpoint
 ///
 /// # Returns
-/// * Tuple of (privilege, region, banned)
-pub fn parse_account_extras(response: &str) -> Result<(i64, String, bool), AuthError> {
+/// * Tuple of (privilege, region, banned, leaderboard_consent)
+pub fn parse_account_extras(response: &str) -> Result<(i64, String, bool, Option<bool>), AuthError> {
     let json: Value =
         serde_json::from_str(response).map_err(|e| AuthError::ParseError(e.to_string()))?;
 
@@ -296,7 +298,14 @@ pub fn parse_account_extras(response: &str) -> Result<(i64, String, bool), AuthE
     let region = json["Region"].as_str().unwrap_or("Unknown").to_string();
     let banned = json["Banned"].as_bool().unwrap_or(false);
 
-    Ok((privilege, region, banned))
+    // LeaderboardConsent can be true, false, or null (if not yet set)
+    let leaderboard_consent = if json["LeaderboardConsent"].is_null() {
+        None
+    } else {
+        json["LeaderboardConsent"].as_bool()
+    };
+
+    Ok((privilege, region, banned, leaderboard_consent))
 }
 
 /// Builds the complete login result from all parsed responses.
@@ -311,6 +320,7 @@ pub fn parse_account_extras(response: &str) -> Result<(i64, String, bool), AuthE
 /// * `privilege` - Privilege level from account info
 /// * `region` - Region from account info
 /// * `banned` - Ban status from account info
+/// * `leaderboard_consent` - Leaderboard consent status (true/false/None)
 ///
 /// # Returns
 /// * `Ok(LoginResult)` - If login was successful
@@ -326,6 +336,7 @@ pub fn build_login_result(
     privilege: i64,
     region: String,
     banned: bool,
+    leaderboard_consent: Option<bool>,
 ) -> Result<LoginResult, AuthError> {
     if !is_login_successful(login_status) {
         return Err(AuthError::ServerError(login_status.to_string()));
@@ -340,6 +351,7 @@ pub fn build_login_result(
         privilege,
         region,
         banned,
+        leaderboard_consent,
     })
 }
 
@@ -360,7 +372,8 @@ pub fn serialize_login_result(result: &LoginResult) -> String {
             "Permission": result.permission,
             "Privilege": result.privilege,
             "Region": result.region,
-            "Banned": result.banned
+            "Banned": result.banned,
+            "LeaderboardConsent": result.leaderboard_consent
         },
         "Msg": "success"
     });
@@ -808,12 +821,14 @@ mod tests {
             10,
             "EU".to_string(),
             false,
+            Some(true),
         );
         assert!(result.is_ok());
         let login = result.unwrap();
         assert_eq!(login.user_no, 123);
         assert_eq!(login.user_name, "TestUser");
         assert_eq!(login.auth_key, "authkey123");
+        assert_eq!(login.leaderboard_consent, Some(true));
     }
 
     #[test]
@@ -828,6 +843,7 @@ mod tests {
             0,
             String::new(),
             false,
+            None,
         );
         assert!(matches!(result, Err(AuthError::ServerError(_))));
         assert!(result.unwrap_err().to_string().contains("Invalid password"));
@@ -845,6 +861,7 @@ mod tests {
             0,
             "NA".to_string(),
             false,
+            None,
         );
         assert!(result.is_ok());
     }
@@ -864,6 +881,7 @@ mod tests {
             privilege: 20,
             region: "EU".to_string(),
             banned: false,
+            leaderboard_consent: Some(true),
         };
         let json = serialize_login_result(&result);
 

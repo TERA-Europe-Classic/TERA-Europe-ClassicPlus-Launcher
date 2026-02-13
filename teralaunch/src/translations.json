@@ -108,7 +108,18 @@
         "ACCOUNT_REMOVED": "Compte supprimé",
         "ALREADY_RUNNING": "Déjà en cours",
         "ACCOUNT_ALREADY_RUNNING": "Ce compte a déjà une partie en cours",
-        "ADD_ACCOUNT": "Ajouter un compte"
+        "ADD_ACCOUNT": "Ajouter un compte",
+        "ACCOUNT_OPTIONS": "Options du compte",
+        "LEADERBOARD_CONSENT_TITLE": "Classements DPS",
+        "LEADERBOARD_CONSENT_DESCRIPTION": "Souhaitez-vous que votre nom soit visible sur les classements DPS ?",
+        "LEADERBOARD_CONSENT_DETAIL": "Vos performances DPS sont toujours enregistrées pour nos classements. Si vous acceptez, votre nom de personnage sera affiché. Sinon, seule votre classe sera affichée (ex: \"Lancier\").",
+        "LEADERBOARD_CONSENT_OPTIONAL": "C'est complètement optionnel mais aide la communauté à reconnaître les meilleurs joueurs !",
+        "LEADERBOARD_CONSENT_CHANGE_LATER": "Vous pouvez modifier ce choix à tout moment dans les Options du compte.",
+        "LEADERBOARD_CONSENT_CHECKBOX": "J'ai lu et compris ce qui précède",
+        "AGREE": "Accepter",
+        "DO_NOT_AGREE": "Refuser",
+        "LEADERBOARD_VISIBILITY": "Visibilité du classement",
+        "LEADERBOARD_VISIBILITY_DESC": "Afficher vos statistiques DPS sur les classements publics"
     },
     "EUR": {
         "LOGIN_REQUIRED": "Login required",
@@ -219,7 +230,18 @@
         "ACCOUNT_REMOVED": "Account Removed",
         "ALREADY_RUNNING": "Already Running",
         "ACCOUNT_ALREADY_RUNNING": "This account already has a game running",
-        "ADD_ACCOUNT": "Add Account"
+        "ADD_ACCOUNT": "Add Account",
+        "ACCOUNT_OPTIONS": "Account Options",
+        "LEADERBOARD_CONSENT_TITLE": "DPS Leaderboards",
+        "LEADERBOARD_CONSENT_DESCRIPTION": "Would you like your name to be visible on the DPS leaderboards?",
+        "LEADERBOARD_CONSENT_DETAIL": "Your DPS performance is always recorded for our leaderboards. If you agree, your character name will be displayed. If you decline, only your class will be shown (e.g. \"Lancer\").",
+        "LEADERBOARD_CONSENT_OPTIONAL": "This is completely optional but helps the community recognize top performers!",
+        "LEADERBOARD_CONSENT_CHANGE_LATER": "You can change this choice at any time in Account Options.",
+        "LEADERBOARD_CONSENT_CHECKBOX": "I have read and understood the above",
+        "AGREE": "Agree",
+        "DO_NOT_AGREE": "Do Not Agree",
+        "LEADERBOARD_VISIBILITY": "Leaderboard Visibility",
+        "LEADERBOARD_VISIBILITY_DESC": "Show your DPS stats on public leaderboards"
     },
     "RUS": {
         "LOGIN_REQUIRED": "Требуется вход",
@@ -330,7 +352,18 @@
         "ACCOUNT_REMOVED": "Аккаунт удалён",
         "ALREADY_RUNNING": "Уже запущено",
         "ACCOUNT_ALREADY_RUNNING": "У этого аккаунта уже запущена игра",
-        "ADD_ACCOUNT": "Добавить аккаунт"
+        "ADD_ACCOUNT": "Добавить аккаунт",
+        "ACCOUNT_OPTIONS": "Настройки аккаунта",
+        "LEADERBOARD_CONSENT_TITLE": "Рейтинги DPS",
+        "LEADERBOARD_CONSENT_DESCRIPTION": "Хотите ли вы, чтобы ваше имя было видно в рейтингах DPS?",
+        "LEADERBOARD_CONSENT_DETAIL": "Ваши показатели DPS всегда записываются для наших рейтингов. Если вы согласитесь, будет отображаться имя вашего персонажа. В противном случае будет показан только ваш класс (например, \"Копейщик\").",
+        "LEADERBOARD_CONSENT_OPTIONAL": "Это полностью добровольно, но помогает сообществу узнавать лучших игроков!",
+        "LEADERBOARD_CONSENT_CHANGE_LATER": "Вы можете изменить этот выбор в любое время в Настройках аккаунта.",
+        "LEADERBOARD_CONSENT_CHECKBOX": "Я прочитал(а) и понял(а) вышеизложенное",
+        "AGREE": "Согласен",
+        "DO_NOT_AGREE": "Не согласен",
+        "LEADERBOARD_VISIBILITY": "Видимость в рейтинге",
+        "LEADERBOARD_VISIBILITY_DESC": "Показывать вашу статистику DPS в публичных рейтингах"
     },
     "GER": {
         "LOGIN_REQUIRED": "Anmeldung erforderlich",
@@ -441,6 +474,17 @@
         "ACCOUNT_REMOVED": "Konto entfernt",
         "ALREADY_RUNNING": "Läuft bereits",
         "ACCOUNT_ALREADY_RUNNING": "Dieses Konto hat bereits ein laufendes Spiel",
-        "ADD_ACCOUNT": "Konto hinzufügen"
+        "ADD_ACCOUNT": "Konto hinzufügen",
+        "ACCOUNT_OPTIONS": "Kontooptionen",
+        "LEADERBOARD_CONSENT_TITLE": "DPS-Ranglisten",
+        "LEADERBOARD_CONSENT_DESCRIPTION": "Möchten Sie, dass Ihr Name in den DPS-Ranglisten sichtbar ist?",
+        "LEADERBOARD_CONSENT_DETAIL": "Ihre DPS-Leistungen werden immer für unsere Ranglisten aufgezeichnet. Wenn Sie zustimmen, wird Ihr Charaktername angezeigt. Andernfalls wird nur Ihre Klasse angezeigt (z.B. \"Lanzer\").",
+        "LEADERBOARD_CONSENT_OPTIONAL": "Dies ist völlig optional, hilft aber der Community, Top-Spieler zu erkennen!",
+        "LEADERBOARD_CONSENT_CHANGE_LATER": "Sie können diese Auswahl jederzeit in den Kontooptionen ändern.",
+        "LEADERBOARD_CONSENT_CHECKBOX": "Ich habe das Obige gelesen und verstanden",
+        "AGREE": "Zustimmen",
+        "DO_NOT_AGREE": "Nicht zustimmen",
+        "LEADERBOARD_VISIBILITY": "Ranglisten-Sichtbarkeit",
+        "LEADERBOARD_VISIBILITY_DESC": "Zeige deine DPS-Statistiken in öffentlichen Ranglisten"
     }
 }

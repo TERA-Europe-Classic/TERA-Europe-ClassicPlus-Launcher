@@ -2136,6 +2136,301 @@
             color: var(--muted-foreground);
         }
 
+        /* ============================================
+           LEADERBOARD CONSENT MODAL
+           ============================================ */
+        #leaderboard-consent-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 3002;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+        }
+
+        #leaderboard-consent-modal.show {
+            display: flex;
+        }
+
+        .consent-modal-content {
+            width: 100%;
+            max-width: 420px;
+            padding: 28px;
+            background: var(--background);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+
+        .consent-modal-icon {
+            width: 56px;
+            height: 56px;
+            margin: 0 auto 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(251, 191, 36, 0.15);
+            border-radius: 50%;
+        }
+
+        .consent-modal-icon svg {
+            width: 28px;
+            height: 28px;
+            color: #fbbf24;
+        }
+
+        .consent-modal-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--foreground);
+            margin: 0 0 16px 0;
+        }
+
+        .consent-modal-body {
+            text-align: left;
+        }
+
+        .consent-modal-description {
+            font-size: 14px;
+            color: var(--foreground);
+            margin: 0 0 12px 0;
+            line-height: 1.5;
+        }
+
+        .consent-modal-detail {
+            font-size: 13px;
+            color: var(--muted-foreground);
+            margin: 0 0 12px 0;
+            line-height: 1.5;
+        }
+
+        .consent-modal-optional {
+            font-size: 13px;
+            color: var(--primary);
+            margin: 0 0 12px 0;
+            font-style: italic;
+        }
+
+        .consent-modal-change-later {
+            font-size: 12px;
+            color: var(--muted-foreground);
+            margin: 0 0 20px 0;
+            font-style: italic;
+        }
+
+        .consent-checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            background: rgba(26, 31, 40, 0.5);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+
+        .consent-checkbox-label input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+
+        .consent-checkbox-text {
+            font-size: 13px;
+            color: var(--foreground);
+        }
+
+        .consent-modal-buttons {
+            display: flex;
+            gap: 12px;
+        }
+
+        .consent-btn {
+            flex: 1;
+            height: 42px;
+            padding: 0 20px;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: opacity 0.15s ease, background-color 0.15s ease;
+        }
+
+        .consent-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .consent-btn-secondary {
+            color: var(--foreground);
+            background: rgba(58, 69, 85, 0.5);
+        }
+
+        .consent-btn-secondary:hover:not(:disabled) {
+            background: rgba(58, 69, 85, 0.7);
+        }
+
+        .consent-btn-primary {
+            color: var(--primary-foreground);
+            background: var(--primary);
+        }
+
+        .consent-btn-primary:hover:not(:disabled) {
+            opacity: 0.9;
+        }
+
+        /* ============================================
+           ACCOUNT OPTIONS MODAL
+           ============================================ */
+        #account-options-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 3000;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+        }
+
+        #account-options-modal.show {
+            display: flex;
+        }
+
+        .account-options-content {
+            width: 100%;
+            max-width: 380px;
+            background: var(--background);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+
+        .account-options-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .account-options-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--foreground);
+            margin: 0;
+        }
+
+        .account-options-close {
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            background: transparent;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            color: var(--muted-foreground);
+            transition: background 0.15s, color 0.15s;
+        }
+
+        .account-options-close:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--foreground);
+        }
+
+        .account-options-close svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .account-options-body {
+            padding: 16px 20px;
+        }
+
+        .account-option-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 12px 0;
+        }
+
+        .account-option-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .account-option-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--foreground);
+        }
+
+        .account-option-description {
+            font-size: 12px;
+            color: var(--muted-foreground);
+        }
+
+        /* Toggle Switch */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background-color: rgba(58, 69, 85, 0.5);
+            transition: 0.2s;
+            border-radius: 24px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: var(--foreground);
+            transition: 0.2s;
+            border-radius: 50%;
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background-color: var(--primary);
+        }
+
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(20px);
+        }
+
+        .toggle-switch input:disabled + .toggle-slider {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
         /* Window Dragging for Home Page */
         #home-page,
         #home-bg-container,
@@ -2318,6 +2613,13 @@
                                         </svg>
                                         <span data-translate="SETTINGS_GAME_FOLDER">Game Directory</span>
                                     </a>
+                                    <a href="#" class="menu-item" id="menu-account-options" style="display: none;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                            <circle cx="12" cy="7" r="4"></circle>
+                                        </svg>
+                                        <span data-translate="ACCOUNT_OPTIONS">Account Options</span>
+                                    </a>
                                     <a href="#" class="menu-item" id="logout-link">
                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -2453,6 +2755,68 @@
             <div class="delete-account-buttons">
                 <button class="delete-account-cancel" id="delete-account-cancel">Cancel</button>
                 <button class="delete-account-confirm" id="delete-account-confirm">Remove</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaderboard Consent Modal -->
+    <div id="leaderboard-consent-modal">
+        <div class="consent-modal-content">
+            <div class="consent-modal-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M8.21 13.89L7 23l5-3 5 3-1.21-9.12"></path>
+                    <path d="M12 2L15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2z"></path>
+                </svg>
+            </div>
+            <h3 class="consent-modal-title" data-translate="LEADERBOARD_CONSENT_TITLE">DPS Leaderboards</h3>
+            <div class="consent-modal-body">
+                <p class="consent-modal-description" data-translate="LEADERBOARD_CONSENT_DESCRIPTION">
+                    Would you like your name to be visible on the DPS leaderboards?
+                </p>
+                <p class="consent-modal-detail" data-translate="LEADERBOARD_CONSENT_DETAIL">
+                    Your DPS performance is always recorded for our leaderboards. If you agree, your character name will be displayed. If you decline, only your class will be shown (e.g. "Lancer").
+                </p>
+                <p class="consent-modal-optional" data-translate="LEADERBOARD_CONSENT_OPTIONAL">
+                    This is completely optional but helps the community recognize top performers!
+                </p>
+                <p class="consent-modal-change-later" data-translate="LEADERBOARD_CONSENT_CHANGE_LATER">
+                    You can change this choice at any time in Account Options.
+                </p>
+                <label class="consent-checkbox-label">
+                    <input type="checkbox" id="consent-read-checkbox">
+                    <span class="consent-checkbox-text" data-translate="LEADERBOARD_CONSENT_CHECKBOX">I have read and understood the above</span>
+                </label>
+            </div>
+            <div class="consent-modal-buttons">
+                <button class="consent-btn consent-btn-secondary" id="consent-disagree-btn" disabled data-translate="DO_NOT_AGREE">Do Not Agree</button>
+                <button class="consent-btn consent-btn-primary" id="consent-agree-btn" disabled data-translate="AGREE">Agree</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Account Options Modal -->
+    <div id="account-options-modal">
+        <div class="account-options-content">
+            <div class="account-options-header">
+                <h3 class="account-options-title" data-translate="ACCOUNT_OPTIONS">Account Options</h3>
+                <button class="account-options-close" id="account-options-close">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="account-options-body">
+                <div class="account-option-row">
+                    <div class="account-option-info">
+                        <span class="account-option-label" data-translate="LEADERBOARD_VISIBILITY">Leaderboard Visibility</span>
+                        <span class="account-option-description" data-translate="LEADERBOARD_VISIBILITY_DESC">Show your DPS stats on public leaderboards</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="leaderboard-toggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
             </div>
         </div>
     </div>
