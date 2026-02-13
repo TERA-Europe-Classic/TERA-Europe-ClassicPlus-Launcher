@@ -3342,10 +3342,15 @@ const App = {
       return;
     }
 
+    // Set launching flag immediately to prevent double-clicks/race conditions
+    // This must happen BEFORE any async operations
+    this.setState({ isGameLaunching: true });
+
     // Check if active account already has a running game
     const activeAccount = AccountManager.getActiveAccount();
     if (activeAccount && AccountManager.isAccountInGame(activeAccount.userNo)) {
       window.showUpdateNotification('warning', this.t('ALREADY_RUNNING') || 'Already Running', this.t('ACCOUNT_ALREADY_RUNNING') || 'This account already has a game running');
+      this.setState({ isGameLaunching: false });
       return;
     }
 
@@ -3354,14 +3359,13 @@ const App = {
       const needsConsent = await this.checkLeaderboardConsent();
       if (needsConsent) {
         console.log("Showing leaderboard consent modal");
+        this.setState({ isGameLaunching: false }); // Reset before showing modal
         this.openLeaderboardConsentModal();
         return; // Wait for user to respond to consent modal
       }
     }
     // Reset the flag for next launch
     this._proceedWithLaunch = false;
-
-    this.setState({ isGameLaunching: true });
 
     try {
       this.updateUIForGameStatus(true);
