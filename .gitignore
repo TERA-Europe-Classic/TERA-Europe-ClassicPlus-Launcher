@@ -13,3 +13,7 @@ teralaunch/coverage/
 .worktrees/
 .DS_Store
 .omc
+
+# Game binaries (not needed for launcher build)
+teralaunch/src-tauri/src/TERA/Binaries/
+*.dll

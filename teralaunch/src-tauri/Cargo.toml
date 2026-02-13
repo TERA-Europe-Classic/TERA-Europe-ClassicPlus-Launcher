@@ -86,3 +86,11 @@ custom-menu = []
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ["cfg(tarpaulin_include)"] }
+
+# Release optimizations - balance size and performance
+[profile.release]
+opt-level = 3         # Full optimization for performance
+lto = true            # Link-Time Optimization (reduces size AND improves perf)
+codegen-units = 1     # Better optimization (slightly slower compile)
+panic = "abort"       # Smaller binary, faster panics
+strip = true          # Strip symbols (~1-2MB smaller)
