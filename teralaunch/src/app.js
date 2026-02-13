@@ -5933,6 +5933,9 @@ const App = {
 
     // Agree button
     agreeBtn.addEventListener('click', async () => {
+      // Disable buttons immediately to prevent double-clicks
+      agreeBtn.disabled = true;
+      disagreeBtn.disabled = true;
       await this.setLeaderboardConsent(true);
       this.closeLeaderboardConsentModal();
       // Continue launching the game
@@ -5942,6 +5945,9 @@ const App = {
 
     // Disagree button
     disagreeBtn.addEventListener('click', async () => {
+      // Disable buttons immediately to prevent double-clicks
+      agreeBtn.disabled = true;
+      disagreeBtn.disabled = true;
       await this.setLeaderboardConsent(false);
       this.closeLeaderboardConsentModal();
       // Continue launching the game
@@ -5970,12 +5976,25 @@ const App = {
     agreeBtn.disabled = true;
     disagreeBtn.disabled = true;
 
+    // Disable launch button while consent modal is open to prevent race conditions
+    if (this.launchGameBtn) {
+      this.launchGameBtn.disabled = true;
+      this.launchGameBtn.classList.add('disabled');
+    }
+
     modal.classList.add('show');
   },
 
   closeLeaderboardConsentModal() {
     const modal = document.getElementById('leaderboard-consent-modal');
     if (modal) modal.classList.remove('show');
+
+    // Re-enable launch button if not proceeding with launch
+    // (if proceeding, handleLaunchGame will manage the button state)
+    if (!this._proceedWithLaunch && this.launchGameBtn) {
+      this.launchGameBtn.disabled = false;
+      this.launchGameBtn.classList.remove('disabled');
+    }
   },
 
   setupAccountOptionsModal() {
