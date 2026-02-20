@@ -5013,7 +5013,7 @@ dependencies = [
 
 [[package]]
 name = "tera-europe-launcher"
-version = "1.9.1"
+version = "1.9.2"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",

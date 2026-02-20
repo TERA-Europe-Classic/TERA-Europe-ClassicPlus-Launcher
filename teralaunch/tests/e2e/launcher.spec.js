@@ -32,7 +32,7 @@ async function mockTauriAPIs(page) {
           get_download_progress: { progress: 0, total: 100, speed: 0 },
           launch_game: true,
           check_updates: { hasUpdate: false },
-          get_version: "1.9.1",
+          get_version: "1.9.2",
           get_config: { language: "EUR", gamePath: "C:\\Games\\TERA" },
 1.7.0        };
         return mockResponses[cmd] || null;
