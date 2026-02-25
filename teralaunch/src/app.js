@@ -40,6 +40,7 @@ const URLS = {
     discord: "https://discord.com/invite/crazyesports",
     support: "https://helpdesk.crazy-esports.com",
     privacy: "https://forum.crazy-esports.com/index.php?datenschutzerklaerung/",
+    profile: "https://tera-europe-classic.com/profile",
   },
 
   // Leaderboard consent API
@@ -631,6 +632,75 @@ function handleCheckRepairFiles() {
 window.handleCheckRepairFiles = handleCheckRepairFiles;
 
 /**
+ * Handler for View Profile menu item.
+ * Requests a single-use launcher token from the website API,
+ * then opens the profile page with automatic authentication.
+ * Falls back to the login page if token generation fails.
+ */
+async function handleViewProfile() {
+  // Close dropdown immediately for visual feedback
+  if (typeof window.closeSettingsDropdown === 'function') {
+    window.closeSettingsDropdown();
+  }
+
+  const PROFILE_URL = 'https://tera-europe-classic.com/profile';
+  const TOKEN_API = 'https://tera-europe-classic.com/api/auth/launcher-token';
+
+  try {
+    // Get stored credentials from the active account
+    const activeAccount = window.AccountManager
+      ? window.AccountManager.getActiveAccount()
+      : null;
+
+    if (!activeAccount || !activeAccount.credentials) {
+      // No stored credentials — open login page with redirect to profile
+      if (window.App) {
+        App.openExternal(PROFILE_URL);
+      }
+      return;
+    }
+
+    const cred = JSON.parse(atob(activeAccount.credentials));
+    if (!cred.u || !cred.p) {
+      if (window.App) {
+        App.openExternal(PROFILE_URL);
+      }
+      return;
+    }
+
+    // Request a single-use launcher token
+    const response = await fetch(TOKEN_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: cred.u, password: cred.p }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.token) {
+        // Open profile with auto-auth token
+        if (window.App) {
+          App.openExternal(`${PROFILE_URL}?launcher_token=${data.token}`);
+        }
+        return;
+      }
+    }
+
+    // Token request failed — open profile without auto-auth
+    if (window.App) {
+      App.openExternal(PROFILE_URL);
+    }
+  } catch (error) {
+    console.error('Error opening profile:', error);
+    // Fallback — open profile page directly
+    if (window.App) {
+      App.openExternal(PROFILE_URL);
+    }
+  }
+}
+window.handleViewProfile = handleViewProfile;
+
+/**
  * Handler for Logout menu item.
  */
 function handleLogout() {
@@ -813,13 +883,16 @@ window.fetchData = fetchData;
  */
 function updateIndexHeaderAuthState(isLoggedIn, username) {
   const logoutLink = document.getElementById('logout-link');
+  const viewProfileLink = document.getElementById('menu-view-profile');
 
   if (isLoggedIn) {
-    // Show logout option in settings menu
+    // Show logout and profile options in settings menu
     if (logoutLink) logoutLink.style.display = 'block';
+    if (viewProfileLink) viewProfileLink.style.display = 'block';
   } else {
-    // Hide logout option when logged out
+    // Hide logout and profile options when logged out
     if (logoutLink) logoutLink.style.display = 'none';
+    if (viewProfileLink) viewProfileLink.style.display = 'none';
   }
 
   // Update account manager display (handled by AccountManager module)
@@ -970,6 +1043,14 @@ function initializeHeaderUI() {
     menuGameDirectory.addEventListener('click', function(e) {
       e.preventDefault();
       openGameDirectoryDialog();
+    });
+  }
+
+  const menuViewProfile = document.getElementById('menu-view-profile');
+  if (menuViewProfile) {
+    menuViewProfile.addEventListener('click', function(e) {
+      e.preventDefault();
+      handleViewProfile();
     });
   }
 
