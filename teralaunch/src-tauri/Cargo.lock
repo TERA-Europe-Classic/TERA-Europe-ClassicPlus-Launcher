@@ -5055,6 +5055,7 @@ dependencies = [
  "url",
  "walkdir",
  "winapi",
+ "winreg 0.52.0",
  "zeroize",
 ]
 

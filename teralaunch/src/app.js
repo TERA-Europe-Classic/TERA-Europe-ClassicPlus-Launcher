@@ -35,7 +35,7 @@ const URLS = {
 
   // External links
   external: {
-    register: "https://reg.tera-europe-classic.de/register.php",
+    register: "https://tera-europe-classic.com/register",
     forum: "https://forum.crazy-esports.com/forum/board/42-tera-europe-classic/",
     discord: "https://discord.com/invite/crazyesports",
     support: "https://helpdesk.crazy-esports.com",
@@ -647,13 +647,20 @@ async function handleViewProfile() {
   const TOKEN_API = 'https://tera-europe-classic.com/api/auth/launcher-token';
 
   try {
-    // Get stored credentials from the active account
     const activeAccount = window.AccountManager
       ? window.AccountManager.getActiveAccount()
       : null;
 
+    // OAuth accounts — open profile directly (website session handles auth)
+    if (activeAccount && activeAccount.authMethod === 'oauth') {
+      if (window.App) {
+        App.openExternal(PROFILE_URL);
+      }
+      return;
+    }
+
+    // Password accounts — try to get a launcher token for auto-auth
     if (!activeAccount || !activeAccount.credentials) {
-      // No stored credentials — open login page with redirect to profile
       if (window.App) {
         App.openExternal(PROFILE_URL);
       }
@@ -678,7 +685,6 @@ async function handleViewProfile() {
     if (response.ok) {
       const data = await response.json();
       if (data.token) {
-        // Open profile with auto-auth token
         if (window.App) {
           App.openExternal(`${PROFILE_URL}?launcher_token=${data.token}`);
         }
@@ -692,13 +698,148 @@ async function handleViewProfile() {
     }
   } catch (error) {
     console.error('Error opening profile:', error);
-    // Fallback — open profile page directly
     if (window.App) {
       App.openExternal(PROFILE_URL);
     }
   }
 }
 window.handleViewProfile = handleViewProfile;
+
+// Pending OAuth action — set when an OAuth account needs re-auth before an action
+let _pendingOAuthAction = null; // 'launch' | 'switch' | null
+
+/**
+ * Opens the system browser for OAuth login with the given provider.
+ * The website will redirect back via teraclassic:// deep link with a token.
+ * @param {string} provider - OAuth provider name
+ * @param {string} [pendingAction] - Optional action to execute after OAuth completes
+ */
+function startOAuth(provider, pendingAction = null) {
+  if (pendingAction) {
+    _pendingOAuthAction = pendingAction;
+  }
+  const locale = window.App ? App.getWebsiteLocale() : 'en';
+  const url = `https://tera-europe-classic.com/api/auth/oauth/${encodeURIComponent(provider)}/start?source=launcher&locale=${locale}`;
+  if (window.App) {
+    App.openExternal(url);
+  } else {
+    window.open(url, '_blank');
+  }
+}
+window.startOAuth = startOAuth;
+
+/**
+ * Handle OAuth callback from deep link (teraclassic://auth?token=...).
+ * Exchanges the token for a TERA auth bundle and completes login.
+ */
+async function handleOAuthCallback(token, oauthProvider = null) {
+  if (!token || typeof token !== 'string') return;
+
+  try {
+    // Exchange token via Rust backend (bypasses CSP, uses reqwest)
+    const responseText = await window.__TAURI__.invoke('exchange_oauth_token', { token });
+    const authBundle = JSON.parse(responseText);
+
+    if (!authBundle.authKey) {
+      throw new Error('No auth key received');
+    }
+
+    const jsonResponseFormatted = {
+      AuthKey: authBundle.authKey,
+      UserName: authBundle.userName,
+      UserNo: Number(authBundle.userNo),
+      CharacterCount: authBundle.characterCount || 0,
+      Permission: Number(authBundle.permission || 0),
+      Privilege: Number(authBundle.privilege || 0),
+    };
+
+    // Store auth info (same as regular login)
+    if (window.App) {
+      await App.storeAuthInfo(jsonResponseFormatted, authBundle.userName, null);
+
+      const userNo = String(jsonResponseFormatted.UserNo);
+      const provider = oauthProvider || 'google';
+
+      // Check if this account already exists — update it if so, otherwise add
+      const existingAccount = AccountManager.getAccount(userNo);
+      if (existingAccount) {
+        AccountManager.updateAccountAuthMethod(userNo, 'oauth', provider);
+      } else {
+        AccountManager.addAccount({
+          userNo: userNo,
+          userName: jsonResponseFormatted.UserName,
+          credentials: null,
+          authMethod: 'oauth',
+          provider: provider,
+        });
+      }
+      AccountManager.setActiveAccountId(userNo);
+
+      // Close modal and navigate to home
+      const modal = document.getElementById('add-account-modal');
+      if (modal) modal.classList.remove('show');
+
+      // Check if there was a pending action (e.g., game launch that needed re-auth)
+      const pendingAction = _pendingOAuthAction;
+      _pendingOAuthAction = null;
+
+      if (pendingAction === 'launch') {
+        // Auth is now fresh — proceed with game launch
+        App.updateAccountDisplay();
+        App.updateLaunchButtonState();
+        App.launchGame();
+      } else {
+        await App.initializeAndCheckUpdates(true);
+        await App.Router.navigate('home');
+        if (typeof LoadStartPage === 'function') LoadStartPage();
+      }
+    }
+  } catch (error) {
+    _pendingOAuthAction = null;
+    console.error('OAuth callback error:', error);
+    window.showUpdateNotification(
+      'error',
+      'Login Failed',
+      error.message || 'OAuth login failed. Please try again.'
+    );
+  }
+}
+window.handleOAuthCallback = handleOAuthCallback;
+
+/**
+ * Check for pending deep link on app startup and window focus.
+ * Called by the Tauri backend when a teraclassic:// URL is received.
+ */
+async function checkDeepLink() {
+  try {
+    if (window.__TAURI__?.invoke) {
+      const deepLink = await window.__TAURI__.invoke('get_pending_deep_link');
+      if (deepLink) {
+        const url = new URL(deepLink);
+        if (url.protocol === 'teraclassic:' && url.pathname === '//auth') {
+          const token = url.searchParams.get('token');
+          const provider = url.searchParams.get('provider') || null;
+          if (token) {
+            await handleOAuthCallback(token, provider);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Deep link check error:', error);
+  }
+}
+window.checkDeepLink = checkDeepLink;
+
+// Check for deep link on startup
+document.addEventListener('DOMContentLoaded', () => {
+  checkDeepLink();
+});
+
+// Check for deep link on window focus (launcher re-focused after browser OAuth)
+window.addEventListener('focus', () => {
+  checkDeepLink();
+});
 
 /**
  * Handler for Logout menu item.
@@ -1247,13 +1388,19 @@ const App = {
 
       // If there's an active account, do silent auth refresh to populate localStorage
       const activeAccount = AccountManager.getActiveAccount();
-      if (activeAccount && activeAccount.credentials) {
+      if (activeAccount && activeAccount.authMethod === 'oauth') {
+        // OAuth account — skip silent refresh, just update display
+        console.log('OAuth account active — skipping silent auth refresh');
+        this.setState({ isAuthenticated: true });
+        this.updateAccountDisplay();
+        this.updateLaunchButtonState();
+      } else if (activeAccount && activeAccount.credentials) {
         try {
           const cred = JSON.parse(atob(activeAccount.credentials));
           const success = await this.silentAuthRefresh(cred.u, cred.p);
           if (success) {
             this.updateAccountDisplay();
-            this.updateLaunchButtonState(); // Ensure button state is updated after auth
+            this.updateLaunchButtonState();
           }
         } catch (e) {
           console.warn("Failed to auto-refresh auth for active account:", e);
@@ -1977,9 +2124,16 @@ const App = {
     }
   },
 
+  // Map launcher language codes to website locale codes
+  getWebsiteLocale() {
+    const map = { GER: 'de', EUR: 'en', FRA: 'fr', RUS: 'ru' };
+    return map[this.currentLanguage] || 'en';
+  },
+
   // Open the registration website in the user's default browser
   async openRegisterPopup() {
-    this.openExternal(URLS.external.register);
+    const locale = this.getWebsiteLocale();
+    this.openExternal(`${URLS.external.register}?locale=${locale}`);
   },
 
   // Set up handlers for the header buttons and links
@@ -3454,7 +3608,23 @@ const App = {
 
       // Silently refresh auth before launching to ensure valid session
       const activeAccountForAuth = AccountManager.getActiveAccount();
-      if (activeAccountForAuth && activeAccountForAuth.credentials) {
+
+      if (activeAccountForAuth && activeAccountForAuth.authMethod === 'oauth') {
+        // OAuth account — check if we have stored auth info from last OAuth login
+        const storedAuthKey = localStorage.getItem('authKey');
+        if (storedAuthKey) {
+          console.log("OAuth account — using stored auth key for launch");
+        } else {
+          // No stored auth — need to re-authenticate via OAuth
+          console.log("OAuth account — no stored auth, triggering OAuth re-auth for launch");
+          window.showUpdateNotification('info', 'Re-authentication Required', 'Opening browser to re-authenticate...');
+          const provider = activeAccountForAuth.provider || 'google';
+          startOAuth(provider, 'launch');
+          this.setState({ isGameLaunching: false });
+          this.updateUIForGameStatus(false);
+          return;
+        }
+      } else if (activeAccountForAuth && activeAccountForAuth.credentials) {
         const cred = JSON.parse(atob(activeAccountForAuth.credentials));
         console.log("Refreshing auth before game launch...");
         const refreshed = await this.silentAuthRefresh(cred.u, cred.p);
@@ -5757,14 +5927,23 @@ const App = {
 
     AccountManager.setActiveAccountId(userNo);
 
-    // Do silent auth refresh
+    // OAuth accounts — use stored auth info (no credential-based refresh)
+    if (account.authMethod === 'oauth') {
+      console.log('OAuth account — using stored auth info for:', account.userName);
+      this.setState({ isAuthenticated: true });
+      this.updateAccountDisplay();
+      this.updateLaunchButtonState();
+      return;
+    }
+
+    // Password accounts — do silent auth refresh
     try {
       const cred = JSON.parse(atob(account.credentials));
       console.log('Attempting silent auth refresh for:', cred.u);
       const success = await this.silentAuthRefresh(cred.u, cred.p);
       console.log('Silent auth refresh result:', success);
       if (!success) {
-        this.openAddAccountModal(account.userName); // Pre-fill username for re-auth
+        this.openAddAccountModal(account.userName);
         window.showUpdateNotification('error', this.t('LOGIN_FAILED') || 'Login Failed', this.t('PLEASE_REENTER_PASSWORD') || 'Please re-enter your password');
         return;
       }
@@ -6174,8 +6353,20 @@ const App = {
 
       console.log('[Auth] No session, attempting silent re-authentication...');
 
-      // Get active account credentials
+      // Get active account
       const activeAccount = AccountManager.getActiveAccount();
+
+      // OAuth accounts — can't silently re-auth without browser
+      if (activeAccount && activeAccount.authMethod === 'oauth') {
+        console.warn('[Auth] OAuth account — cannot silently re-authenticate');
+        if (promptOnFailure) {
+          const provider = activeAccount.provider || 'google';
+          window.showUpdateNotification('info', 'Re-authentication Required', 'Opening browser to re-authenticate...');
+          startOAuth(provider);
+        }
+        return false;
+      }
+
       if (!activeAccount || !activeAccount.credentials) {
         console.warn('[Auth] No credentials available for re-authentication');
         if (promptOnFailure) {

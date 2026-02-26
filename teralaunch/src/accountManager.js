@@ -42,7 +42,7 @@ export function saveAccounts(accounts) {
 
 /**
  * Add a new account to the list.
- * @param {Object} account - { userNo, userName, credentials }
+ * @param {Object} account - { userNo, userName, credentials, authMethod?, provider? }
  * @returns {boolean} true if added, false if duplicate
  */
 export function addAccount(account) {
@@ -51,12 +51,15 @@ export function addAccount(account) {
   if (exists) {
     return false;
   }
-  accounts.push({
+  const entry = {
     userNo: account.userNo,
     userName: account.userName,
     credentials: account.credentials,
-    lastUsed: Date.now()
-  });
+    lastUsed: Date.now(),
+  };
+  if (account.authMethod) entry.authMethod = account.authMethod;
+  if (account.provider) entry.provider = account.provider;
+  accounts.push(entry);
   saveAccounts(accounts);
   return true;
 }
@@ -88,6 +91,33 @@ export function updateAccountCredentials(userNo, credentials) {
     account.lastUsed = Date.now();
     saveAccounts(accounts);
   }
+}
+
+/**
+ * Update an account's OAuth info (e.g., after re-auth via different provider).
+ * @param {string} userNo - Account ID
+ * @param {string} authMethod - 'password' or 'oauth'
+ * @param {string|null} provider - OAuth provider name (null for password accounts)
+ */
+export function updateAccountAuthMethod(userNo, authMethod, provider = null) {
+  const accounts = getAccounts();
+  const account = accounts.find(a => a.userNo === userNo);
+  if (account) {
+    account.authMethod = authMethod;
+    account.provider = provider;
+    account.lastUsed = Date.now();
+    saveAccounts(accounts);
+  }
+}
+
+/**
+ * Check if an account uses OAuth (no local credentials).
+ * @param {string} userNo - Account ID
+ * @returns {boolean} true if the account is OAuth-based
+ */
+export function isOAuthAccount(userNo) {
+  const account = getAccount(userNo);
+  return account?.authMethod === 'oauth';
 }
 
 /**

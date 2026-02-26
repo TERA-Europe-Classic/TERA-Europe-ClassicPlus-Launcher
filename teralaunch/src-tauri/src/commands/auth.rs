@@ -14,7 +14,7 @@ use crate::infrastructure::{HttpClient, ReqwestClient};
 use crate::services::auth_service;
 use crate::state::{
     clear_auth_client, clear_auth_info, get_auth_client, set_auth_client,
-    set_auth_info as set_auth_state,
+    set_auth_info as set_auth_state, take_pending_deep_link,
 };
 use crate::GameState;
 use teralib::config::get_config_value;
@@ -350,6 +350,65 @@ pub async fn set_leaderboard_consent(consent: bool) -> Result<String, String> {
     } else {
         Err(format!("Failed to set consent: {}", text))
     }
+}
+
+/// Exchanges an OAuth token with the website for an auth bundle.
+///
+/// POSTs the single-use token to the website's OAuth exchange endpoint.
+/// The website decrypts the stored credential, authenticates with the TERA API,
+/// and returns the auth bundle (authKey, userName, userNo, etc.).
+///
+/// # Arguments
+/// * `token` - The single-use OAuth token (64 hex chars) from the deep link
+///
+/// # Returns
+/// JSON string containing the auth bundle on success
+#[cfg(not(tarpaulin_include))]
+#[tauri::command]
+pub async fn exchange_oauth_token(token: String) -> Result<String, String> {
+    info!("Exchanging OAuth token with website");
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+
+    let exchange_url = "https://tera-europe-classic.com/api/auth/launcher-oauth/exchange";
+
+    let response = client
+        .post(exchange_url)
+        .json(&serde_json::json!({ "token": token }))
+        .send()
+        .await
+        .map_err(|e| format!("OAuth exchange request failed: {}", e))?;
+
+    let status = response.status().as_u16();
+    let text = response.text().await.map_err(|e| e.to_string())?;
+
+    info!("OAuth exchange response status: {}", status);
+
+    if (200..300).contains(&status) {
+        Ok(text)
+    } else {
+        Err(format!("OAuth exchange failed ({}): {}", status, text))
+    }
+}
+
+/// Retrieves and consumes the pending deep link URL.
+///
+/// When the launcher is opened via a `teraclassic://` deep link, the URL is stored
+/// on startup. The frontend calls this command to check for and consume the pending URL.
+///
+/// # Returns
+/// The deep link URL string if one is pending, or null if none
+#[cfg(not(tarpaulin_include))]
+#[tauri::command]
+pub fn get_pending_deep_link() -> Option<String> {
+    let result = take_pending_deep_link();
+    if result.is_some() {
+        info!("Deep link consumed by frontend");
+    }
+    result
 }
 
 #[cfg(test)]

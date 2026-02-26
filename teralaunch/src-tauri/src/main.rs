@@ -12,6 +12,8 @@ use log::{error, info, LevelFilter};
 use tauri::Manager;
 use tokio::sync::Mutex;
 
+use state::set_pending_deep_link;
+
 // Local modules
 mod commands;
 mod domain;
@@ -31,6 +33,54 @@ mod game_state {
     /// Game running status is tracked by teralib via PID-based credentials map.
     pub struct GameState {
         pub status_receiver: Arc<Mutex<watch::Receiver<bool>>>,
+    }
+}
+
+/// Registers the `teraclassic://` custom URL protocol handler on Windows.
+///
+/// Writes registry keys under `HKCU\Software\Classes\teraclassic` so that
+/// when the OS encounters a `teraclassic://` URL, it launches this executable
+/// with the URL as a command-line argument.
+///
+/// This is idempotent — safe to call on every startup.
+#[cfg(target_os = "windows")]
+fn register_deep_link_protocol() {
+    use winreg::enums::*;
+    use winreg::RegKey;
+
+    let exe_path = match std::env::current_exe() {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(e) => {
+            error!("Failed to get current exe path for deep link registration: {}", e);
+            return;
+        }
+    };
+
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+
+    // Create or open HKCU\Software\Classes\teraclassic
+    let (key, _) = match hkcu.create_subkey("Software\\Classes\\teraclassic") {
+        Ok(result) => result,
+        Err(e) => {
+            error!("Failed to create registry key for deep link: {}", e);
+            return;
+        }
+    };
+
+    // Set the default value and URL Protocol marker
+    let _ = key.set_value("", &"URL:TERA Classic Launcher");
+    let _ = key.set_value("URL Protocol", &"");
+
+    // Create shell\open\command subkey with the exe path
+    match key.create_subkey("shell\\open\\command") {
+        Ok((cmd_key, _)) => {
+            let command = format!("\"{}\" \"%1\"", exe_path);
+            let _ = cmd_key.set_value("", &command);
+            info!("Registered teraclassic:// protocol handler");
+        }
+        Err(e) => {
+            error!("Failed to create command registry key: {}", e);
+        }
     }
 }
 
@@ -101,6 +151,21 @@ fn main() {
         status_receiver: Arc::new(Mutex::new(game_status_receiver)),
     };
 
+    // Register teraclassic:// protocol handler on Windows (idempotent).
+    #[cfg(target_os = "windows")]
+    register_deep_link_protocol();
+
+    // Check CLI args for deep link URL (Windows passes deep link as argument).
+    // When the OS opens `teraclassic://auth?token=...`, it launches the exe
+    // with the URL as a command-line argument.
+    for arg in std::env::args().skip(1) {
+        if arg.starts_with("teraclassic://") {
+            info!("Deep link received via CLI arg: teraclassic://...");
+            set_pending_deep_link(arg);
+            break;
+        }
+    }
+
     tauri::Builder::default()
         .manage(game_state)
         .setup(|app| {
@@ -162,6 +227,8 @@ fn main() {
             commands::auth::has_auth_session,
             commands::auth::get_leaderboard_consent,
             commands::auth::set_leaderboard_consent,
+            commands::auth::exchange_oauth_token,
+            commands::auth::get_pending_deep_link,
             // Config commands
             commands::config::select_game_folder,
             commands::config::get_game_path_from_config,
