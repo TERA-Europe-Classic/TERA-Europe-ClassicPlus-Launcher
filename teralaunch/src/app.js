@@ -7,6 +7,7 @@ import {
   getPathChangeResetState,
   shouldDisableLaunch,
 } from "./utils/updateState.js";
+import { localizeForumUrl } from "./utils/forumLinks.js";
 import * as AccountManager from './accountManager.js';
 
 const { invoke } = window.__TAURI__.tauri;
@@ -2113,14 +2114,16 @@ const App = {
 
   // Opens an url in the user's default browser
   openExternal(url) {
+    const localizedUrl = localizeForumUrl(url, this.currentLanguage);
+
     if (
       window.__TAURI__ &&
       window.__TAURI__.shell &&
       window.__TAURI__.shell.open
     ) {
-      window.__TAURI__.shell.open(url);
+      window.__TAURI__.shell.open(localizedUrl);
     } else {
-      window.open(url, "_blank");
+      window.open(localizedUrl, "_blank");
     }
   },
 
@@ -6569,7 +6572,10 @@ function LoadStartPage() {
       document.getElementById("AdTextId1").textContent = jsonNews.Advertisement_left_text || "";
     }
     if (jsonNews.Advertisement_left_img_link_url) {
-      document.getElementById("AdImgId1Href").href = jsonNews.Advertisement_left_img_link_url;
+      document.getElementById("AdImgId1Href").href = localizeForumUrl(
+        jsonNews.Advertisement_left_img_link_url,
+        App.currentLanguage,
+      );
     }
 
     //ADVERTISEMENT MIDDLE
@@ -6579,7 +6585,10 @@ function LoadStartPage() {
       document.getElementById("AdTextId2").textContent = jsonNews.Advertisement_mid_text || "";
     }
     if (jsonNews.Advertisement_mid_img_link_url) {
-      document.getElementById("AdImgId2Href").href = jsonNews.Advertisement_mid_img_link_url;
+      document.getElementById("AdImgId2Href").href = localizeForumUrl(
+        jsonNews.Advertisement_mid_img_link_url,
+        App.currentLanguage,
+      );
     }
 
     //ADVERTISEMENT RIGHT
@@ -6589,7 +6598,10 @@ function LoadStartPage() {
       document.getElementById("AdTextId3").textContent = jsonNews.Advertisement_right_text || "";
     }
     if (jsonNews.Advertisement_right_img_link_url) {
-      document.getElementById("AdImgId3Href").href = jsonNews.Advertisement_right_img_link_url;
+      document.getElementById("AdImgId3Href").href = localizeForumUrl(
+        jsonNews.Advertisement_right_img_link_url,
+        App.currentLanguage,
+      );
     }
   }).catch((error) => {
     console.error("Error loading start page:", error);
@@ -6677,7 +6689,7 @@ async function loadNewsFeed() {
       const link = item.link || "#";
 
       const newsItem = document.createElement("a");
-      newsItem.href = link;
+      newsItem.href = localizeForumUrl(link, App.currentLanguage);
       newsItem.target = "_blank";
       // Inline styles for vertical news list
       // Horizontal news bar style
