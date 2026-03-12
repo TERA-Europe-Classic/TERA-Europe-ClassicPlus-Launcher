@@ -2,6 +2,16 @@ name: PR Validation
 
 on:
   pull_request:
+    paths:
+      - '.github/workflows/pr-validation.yml'
+      - 'builder.ps1'
+      - 'license.txt'
+      - 'teralaunch/**'
+      - 'teralib/**'
+
+concurrency:
+  group: pr-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   windows-validation:
@@ -35,8 +45,9 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: |
-            teralaunch/src-tauri
-            teralib
+            teralaunch/src-tauri -> target
+            teralib -> target
+          shared-key: windows-pr-validation-v1
 
       - name: Install frontend dependencies
         working-directory: teralaunch
