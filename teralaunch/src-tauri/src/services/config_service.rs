@@ -559,8 +559,9 @@ mod tests {
     fn validate_language_code_invalid() {
         let result = validate_language_code("XXX");
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Invalid language code"));
-        assert!(result.clone().unwrap_err().contains("XXX"));
+        let err = result.unwrap_err();
+        assert!(err.contains("Invalid language code"));
+        assert!(err.contains("XXX"));
     }
 
     #[test]
