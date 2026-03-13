@@ -783,7 +783,7 @@ mod tests {
         let response = r#"{"Privilege": 10, "Region": "EU", "Banned": false}"#;
         let result = parse_account_extras(response);
         assert!(result.is_ok());
-        let (privilege, region, banned) = result.unwrap();
+        let (privilege, region, banned, _) = result.unwrap();
         assert_eq!(privilege, 10);
         assert_eq!(region, "EU");
         assert!(!banned);
@@ -794,7 +794,7 @@ mod tests {
         let response = r#"{}"#;
         let result = parse_account_extras(response);
         assert!(result.is_ok());
-        let (privilege, region, banned) = result.unwrap();
+        let (privilege, region, banned, _) = result.unwrap();
         assert_eq!(privilege, 0);
         assert_eq!(region, "Unknown");
         assert!(!banned);
@@ -805,7 +805,7 @@ mod tests {
         let response = r#"{"Banned": true}"#;
         let result = parse_account_extras(response);
         assert!(result.is_ok());
-        let (_, _, banned) = result.unwrap();
+        let (_, _, banned, _) = result.unwrap();
         assert!(banned);
     }
 
@@ -913,6 +913,7 @@ mod tests {
             privilege: 0,
             region: "EU".to_string(),
             banned: true,
+            leaderboard_consent: None,
         };
         let json = serialize_login_result(&result);
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();

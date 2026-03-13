@@ -10,7 +10,7 @@
 use sha2::{Digest, Sha256};
 use std::io::Read;
 
-use crate::domain::HASH_BUFFER_SIZE;
+use crate::domain::{BUFFER_SIZE, HASH_BUFFER_SIZE};
 
 /// Calculates SHA-256 hash from a reader.
 ///

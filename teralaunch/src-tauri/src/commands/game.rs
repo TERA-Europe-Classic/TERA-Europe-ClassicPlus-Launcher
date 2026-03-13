@@ -125,7 +125,7 @@ pub async fn handle_launch_game(
     info!("Total time: {:?}", 3);
     let is_running = *state.status_receiver.lock().await.borrow();
 
-    let (account_name, characters_count, ticket, auth_key, user_no, user_name) = {
+    let (account_name, characters_count, ticket, auth_key, user_no, _user_name) = {
         let auth_info = read_auth_info();
         let account_name = auth_info.user_no.to_string();
         let characters_count = auth_info.character_count.clone();
