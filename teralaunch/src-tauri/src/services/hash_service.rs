@@ -6,11 +6,14 @@
 //! - Batch hash operations
 
 #![allow(dead_code)]
+// BUFFER_SIZE is imported by the base branch and used only in test builds;
+// allow unused_imports to avoid false positives when merging.
+#![allow(unused_imports)]
 
 use sha2::{Digest, Sha256};
 use std::io::Read;
 
-use crate::domain::HASH_BUFFER_SIZE;
+use crate::domain::{BUFFER_SIZE, HASH_BUFFER_SIZE};
 
 /// Calculates SHA-256 hash from a reader.
 ///
@@ -223,7 +226,6 @@ pub fn aggregate_hash_results<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::BUFFER_SIZE;
     use std::io::Cursor;
 
     // Known SHA-256 hashes for test data
