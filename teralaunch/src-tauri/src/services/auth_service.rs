@@ -89,12 +89,14 @@ pub fn validate_credentials(username: &str, password: &str) -> Result<(), AuthEr
     }
     if username.len() > MAX_USERNAME_LENGTH {
         return Err(AuthError::InvalidCredentials(format!(
-            "Username too long (max {} characters)", MAX_USERNAME_LENGTH
+            "Username too long (max {} characters)",
+            MAX_USERNAME_LENGTH
         )));
     }
     if password.len() > MAX_PASSWORD_LENGTH {
         return Err(AuthError::InvalidCredentials(format!(
-            "Password too long (max {} characters)", MAX_PASSWORD_LENGTH
+            "Password too long (max {} characters)",
+            MAX_PASSWORD_LENGTH
         )));
     }
     Ok(())
@@ -290,7 +292,9 @@ pub fn parse_character_count(response: &str) -> Result<String, AuthError> {
 ///
 /// # Returns
 /// * Tuple of (privilege, region, banned, leaderboard_consent)
-pub fn parse_account_extras(response: &str) -> Result<(i64, String, bool, Option<bool>), AuthError> {
+pub fn parse_account_extras(
+    response: &str,
+) -> Result<(i64, String, bool, Option<bool>), AuthError> {
     let json: Value =
         serde_json::from_str(response).map_err(|e| AuthError::ParseError(e.to_string()))?;
 
@@ -598,9 +602,9 @@ mod tests {
     #[test]
     fn validate_email_format_invalid_old_style_cases() {
         // Cases that old validation would incorrectly accept
-        assert!(!validate_email_format("a@b."));       // Old validation would accept
-        assert!(!validate_email_format(".@."));        // Old validation would accept
-        assert!(!validate_email_format("@.com"));      // Old validation would accept
+        assert!(!validate_email_format("a@b.")); // Old validation would accept
+        assert!(!validate_email_format(".@.")); // Old validation would accept
+        assert!(!validate_email_format("@.com")); // Old validation would accept
     }
 
     #[test]

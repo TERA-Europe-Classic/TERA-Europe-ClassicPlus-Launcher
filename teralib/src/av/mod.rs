@@ -1,8 +1,8 @@
-use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
 use crate::global_credentials::GLOBAL_CREDENTIALS;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
+use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Attempts to add the specified directory to Microsoft Defender's exclusion list.
 ///
@@ -51,9 +51,7 @@ try {
 
     // Elevated attempt via Start-Process -Verb RunAs with EncodedCommand to avoid any splitting issues
     // Build the inner command as: & '<script>' -Path '<dir>' and encode it to Base64 (UTF-16LE) within PowerShell
-    let script_ps = script_path
-        .to_string_lossy()
-        .replace("'", "''");
+    let script_ps = script_path.to_string_lossy().replace("'", "''");
     let dir_ps = dir_str.replace("'", "''");
     let elevated_cmd = format!(
         "$cmd = \"& '{}' -Path '{}'\"; $bytes = [Text.Encoding]::Unicode.GetBytes($cmd); $b64 = [Convert]::ToBase64String($bytes); Start-Process PowerShell -Verb RunAs -WindowStyle Hidden -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-EncodedCommand',$b64) -Wait",
@@ -72,7 +70,7 @@ try {
             "-Command",
             &elevated_cmd,
         ])
-        .creation_flags(0x08000000) 
+        .creation_flags(0x08000000)
         .status();
 
     // Best-effort cleanup of the temporary script
@@ -80,11 +78,18 @@ try {
 
     match status2 {
         Ok(s) if s.success() => Ok(()),
-        Ok(s) => Err(format!("Elevated Defender exclusion attempt failed with status: {:?}", s).into()),
-        Err(e) => Err(format!("Failed to invoke elevated PowerShell for Defender exclusion: {}", e).into()),
+        Ok(s) => Err(format!(
+            "Elevated Defender exclusion attempt failed with status: {:?}",
+            s
+        )
+        .into()),
+        Err(e) => Err(format!(
+            "Failed to invoke elevated PowerShell for Defender exclusion: {}",
+            e
+        )
+        .into()),
     }
 }
-
 
 /// Trim whitespace and remove a single pair of surrounding quotes from a path string.
 fn clean_path_str(s: &str) -> String {
@@ -95,7 +100,6 @@ fn clean_path_str(s: &str) -> String {
         t.to_string()
     }
 }
-
 
 /// Public helper to ensure Defender exclusion for the game's directory prior to launching the game.
 pub fn ensure_av_exclusion_before_launch() {

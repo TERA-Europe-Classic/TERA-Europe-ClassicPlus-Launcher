@@ -51,7 +51,10 @@ fn register_deep_link_protocol() {
     let exe_path = match std::env::current_exe() {
         Ok(p) => p.to_string_lossy().to_string(),
         Err(e) => {
-            error!("Failed to get current exe path for deep link registration: {}", e);
+            error!(
+                "Failed to get current exe path for deep link registration: {}",
+                e
+            );
             return;
         }
     };

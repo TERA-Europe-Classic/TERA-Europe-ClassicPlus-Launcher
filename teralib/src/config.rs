@@ -66,7 +66,10 @@ mod tests {
         // Test that get_relay_servers returns a Vec<Value>
         let result = get_relay_servers();
         // We can't make assumptions about the contents, but we can check the type
-        assert!(result.is_empty() || !result.is_empty(), "Should return a Vec");
+        assert!(
+            result.is_empty() || !result.is_empty(),
+            "Should return a Vec"
+        );
     }
 
     #[test]
@@ -84,7 +87,10 @@ mod tests {
         let first = &*CONFIG_JSON;
         let second = &*CONFIG_JSON;
         // In Rust, these should be the same reference due to Lazy initialization
-        assert!(std::ptr::eq(first, second), "CONFIG_JSON should be initialized once");
+        assert!(
+            std::ptr::eq(first, second),
+            "CONFIG_JSON should be initialized once"
+        );
     }
 
     #[test]

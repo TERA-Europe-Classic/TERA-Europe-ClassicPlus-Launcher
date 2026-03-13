@@ -122,7 +122,10 @@ pub async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>,
             let path = match file_info["path"].as_str() {
                 Some(p) if !p.is_empty() => p,
                 _ => {
-                    error!("Hash file entry missing or empty 'path' field: {:?}", file_info);
+                    error!(
+                        "Hash file entry missing or empty 'path' field: {:?}",
+                        file_info
+                    );
                     return None;
                 }
             };
@@ -136,7 +139,10 @@ pub async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>,
             let size = match file_info["size"].as_u64() {
                 Some(s) if s > 0 => s,
                 _ => {
-                    error!("Hash file entry '{}' has invalid or zero 'size' field", path);
+                    error!(
+                        "Hash file entry '{}' has invalid or zero 'size' field",
+                        path
+                    );
                     return None;
                 }
             };
@@ -526,9 +532,14 @@ async fn get_server_hash_file() -> Result<serde_json::Value, String> {
                     if attempt < max_retries {
                         log::warn!(
                             "Hash file fetch attempt {}/{} failed with status {}, retrying...",
-                            attempt, max_retries, status
+                            attempt,
+                            max_retries,
+                            status
                         );
-                        tokio::time::sleep(Duration::from_millis(500 * 2u64.pow(attempt as u32 - 1))).await;
+                        tokio::time::sleep(Duration::from_millis(
+                            500 * 2u64.pow(attempt as u32 - 1),
+                        ))
+                        .await;
                         continue;
                     }
                     return Err(format!("Failed to fetch hash file: HTTP {}", status));
@@ -539,12 +550,18 @@ async fn get_server_hash_file() -> Result<serde_json::Value, String> {
                 if attempt < max_retries {
                     log::warn!(
                         "Hash file fetch attempt {}/{} failed: {}, retrying...",
-                        attempt, max_retries, e
+                        attempt,
+                        max_retries,
+                        e
                     );
-                    tokio::time::sleep(Duration::from_millis(500 * 2u64.pow(attempt as u32 - 1))).await;
+                    tokio::time::sleep(Duration::from_millis(500 * 2u64.pow(attempt as u32 - 1)))
+                        .await;
                     continue;
                 }
-                return Err(format!("Failed to fetch hash file from {}: {}", hash_file_url, e));
+                return Err(format!(
+                    "Failed to fetch hash file from {}: {}",
+                    hash_file_url, e
+                ));
             }
         }
     }

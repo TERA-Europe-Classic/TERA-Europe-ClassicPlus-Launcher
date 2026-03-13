@@ -44,9 +44,10 @@ use crate::services::download_service::{
 use crate::state::{
     add_downloaded_bytes, cancel_download, get_current_file_name, get_download_generation,
     get_downloaded_bytes as state_get_downloaded_bytes, increment_download_generation,
-    is_download_cancelled, is_download_complete, reset_download_state as state_reset_download_state,
-    set_current_file_name, set_download_cancelled, set_download_complete, set_download_in_progress,
-    set_downloaded_bytes, sub_downloaded_bytes, try_start_download,
+    is_download_cancelled, is_download_complete,
+    reset_download_state as state_reset_download_state, set_current_file_name,
+    set_download_cancelled, set_download_complete, set_download_in_progress, set_downloaded_bytes,
+    sub_downloaded_bytes, try_start_download,
 };
 use crate::utils::{
     is_server_unreachable_error, stall_exceeded, validate_download_url, validate_path_within_base,
@@ -115,7 +116,7 @@ pub async fn download_all_files(
     if !try_start_download() {
         return Err("Download already in progress".to_string());
     }
-    let _download_guard = DownloadGuard;  // Will clean up on panic or return
+    let _download_guard = DownloadGuard; // Will clean up on panic or return
 
     // Increment generation to signal old progress tickers to exit
     let session_generation = increment_download_generation();
@@ -451,7 +452,9 @@ pub async fn download_all_files(
 
                 if verify_attempt > 1 {
                     // Emit retry event with the reason from the previous attempt
-                    let reason = last_error.clone().unwrap_or_else(|| "file access issue".to_string());
+                    let reason = last_error
+                        .clone()
+                        .unwrap_or_else(|| "file access issue".to_string());
                     let _ = window.emit(
                         "download_verifying",
                         json!({
@@ -1486,7 +1489,11 @@ fn calculate_file_hash<P: AsRef<std::path::Path>>(path: P) -> Result<String, Str
                 let delay_ms = 500u64 * (1 << (attempt - 1));
                 log::debug!(
                     "File open attempt {}/{} failed for {:?}, retrying in {}ms: {}",
-                    attempt, MAX_OPEN_RETRIES, path.as_ref(), delay_ms, e
+                    attempt,
+                    MAX_OPEN_RETRIES,
+                    path.as_ref(),
+                    delay_ms,
+                    e
                 );
                 std::thread::sleep(std::time::Duration::from_millis(delay_ms));
             }

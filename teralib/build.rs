@@ -1,6 +1,6 @@
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-changed=src/serverlist.proto");
-    
+
     let out_dir = std::env::var("OUT_DIR").unwrap();
     println!("OUT_DIR: {}", out_dir);
 

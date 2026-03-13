@@ -161,7 +161,8 @@ pub async fn handle_launch_game(
         characters_count.clone(),
         ticket.clone(),
         game_lang.clone(),
-    ).map_err(|_| format!("Game executable not found at: {:?}", executable_path))?;
+    )
+    .map_err(|_| format!("Game executable not found at: {:?}", executable_path))?;
 
     let full_game_path_str = path_to_string(&launch_params.executable_path)?;
 
@@ -201,7 +202,10 @@ pub async fn handle_launch_game(
             }
         }
 
-        info!("Emitting game_ended event for user_no: {}", user_no_for_event);
+        info!(
+            "Emitting game_ended event for user_no: {}",
+            user_no_for_event
+        );
         if let Err(e) = app_handle_clone.emit_all("game_ended", user_no_for_event) {
             error!("Failed to emit game_ended event: {:?}", e);
         }

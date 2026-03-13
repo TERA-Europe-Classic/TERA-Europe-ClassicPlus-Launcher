@@ -1,8 +1,8 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-use parking_lot::RwLock;
 use lazy_static::lazy_static;
 use log::{info, warn};
+use parking_lot::RwLock;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 /// ThreadSafeCredentials provides a thread-safe way to store and access
 /// game credentials (account name, ticket, characters_count and game language).
@@ -11,7 +11,7 @@ pub struct ThreadSafeCredentials {
     characters_count: Arc<RwLock<String>>,
     ticket: Arc<RwLock<String>>,
     game_lang: Arc<RwLock<String>>,
-    game_path: Arc<RwLock<String>>
+    game_path: Arc<RwLock<String>>,
 }
 
 impl ThreadSafeCredentials {
@@ -49,7 +49,6 @@ impl ThreadSafeCredentials {
     pub fn set_characters_count(&self, value: &str) {
         *self.characters_count.write() = value.to_string();
     }
-
 
     /// Sets the ticket (GUID).
     ///
@@ -89,7 +88,6 @@ impl ThreadSafeCredentials {
 
     //////////////////////////////////////////////////////////////////////
 
-
     /// Gets the account name.
     ///
     /// This method acquires a read lock on the account_name field,
@@ -113,7 +111,6 @@ impl ThreadSafeCredentials {
     pub fn get_characters_count(&self) -> String {
         self.characters_count.read().clone()
     }
-
 
     /// Gets the ticket (GUID).
     ///
@@ -139,7 +136,6 @@ impl ThreadSafeCredentials {
         self.game_lang.read().clone()
     }
 
-
     /// Gets the game path.
     ///
     /// This method acquires a read lock on the game_path field,
@@ -151,9 +147,7 @@ impl ThreadSafeCredentials {
     pub fn get_game_path(&self) -> String {
         self.game_path.read().clone()
     }
-
 }
-
 
 /// Credentials for a single game instance.
 #[derive(Clone)]
@@ -185,7 +179,13 @@ lazy_static! {
 /// * `account_name` - A string slice that holds the account name to be set.
 /// * `ticket` - A string slice that holds the ticket (GUID) to be set.
 /// * `game_lang` - A string slice that holds the game language to be set.
-pub fn set_credentials(account_name: &str, characters_count: &str, ticket: &str, game_lang: &str, game_path: &str) {
+pub fn set_credentials(
+    account_name: &str,
+    characters_count: &str,
+    ticket: &str,
+    game_lang: &str,
+    game_path: &str,
+) {
     GLOBAL_CREDENTIALS.set_account_name(account_name);
     GLOBAL_CREDENTIALS.set_characters_count(characters_count);
     GLOBAL_CREDENTIALS.set_ticket(ticket);
@@ -194,7 +194,14 @@ pub fn set_credentials(account_name: &str, characters_count: &str, ticket: &str,
 }
 
 /// Stores credentials for a specific game PID (for multi-client support).
-pub fn store_credentials_for_pid(pid: u32, account_name: &str, characters_count: &str, ticket: &str, game_lang: &str, game_path: &str) {
+pub fn store_credentials_for_pid(
+    pid: u32,
+    account_name: &str,
+    characters_count: &str,
+    ticket: &str,
+    game_lang: &str,
+    game_path: &str,
+) {
     let creds = GameCredentials {
         account_name: account_name.to_string(),
         characters_count: characters_count.to_string(),
@@ -203,7 +210,10 @@ pub fn store_credentials_for_pid(pid: u32, account_name: &str, characters_count:
         game_path: game_path.to_string(),
     };
     GAME_CREDENTIALS_BY_PID.write().insert(pid, creds);
-    info!("Stored credentials for PID {} (account: {})", pid, account_name);
+    info!(
+        "Stored credentials for PID {} (account: {})",
+        pid, account_name
+    );
 }
 
 /// Gets credentials for a specific game PID.
@@ -216,8 +226,7 @@ pub fn get_credentials_for_pid(pid: u32) -> Option<GameCredentials> {
         let known_pids: Vec<u32> = map.keys().cloned().collect();
         warn!(
             "Credential lookup failed for PID {}. Known PIDs: {:?}",
-            pid,
-            known_pids
+            pid, known_pids
         );
     }
     result
@@ -229,7 +238,10 @@ pub fn remove_credentials_for_pid(pid: u32) {
     if removed.is_some() {
         info!("Removed credentials for PID {}", pid);
     } else {
-        warn!("Tried to remove credentials for PID {} but none were stored", pid);
+        warn!(
+            "Tried to remove credentials for PID {} but none were stored",
+            pid
+        );
     }
 }
 

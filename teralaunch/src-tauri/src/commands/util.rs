@@ -116,7 +116,9 @@ pub async fn update_launcher(download_url: String) -> Result<(), String> {
         let current_exe_str = current_exe.to_string_lossy();
 
         if is_unsafe_for_shell(&new_path_str) || is_unsafe_for_shell(&current_exe_str) {
-            return Err("Unsafe path detected: paths must not contain shell metacharacters".to_string());
+            return Err(
+                "Unsafe path detected: paths must not contain shell metacharacters".to_string(),
+            );
         }
 
         let cmd = format!(
@@ -413,7 +415,9 @@ mod tests {
 
     #[test]
     fn is_unsafe_for_shell_accepts_normal_windows_path() {
-        assert!(!is_unsafe_for_shell("C:\\Program Files\\Launcher\\launcher.exe"));
+        assert!(!is_unsafe_for_shell(
+            "C:\\Program Files\\Launcher\\launcher.exe"
+        ));
     }
 
     #[test]
@@ -439,7 +443,9 @@ mod tests {
     #[test]
     fn is_unsafe_for_shell_rejects_injection_attempt() {
         // Classic injection: close quote, add command, reopen quote
-        assert!(is_unsafe_for_shell("C:\\path\\file.exe\" && malicious.exe && \""));
+        assert!(is_unsafe_for_shell(
+            "C:\\path\\file.exe\" && malicious.exe && \""
+        ));
     }
 
     // ============================================================================

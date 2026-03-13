@@ -6,11 +6,11 @@ use crate::{
 use lazy_static::lazy_static;
 use log::{error, info, Level, Metadata, Record};
 use once_cell::sync::Lazy;
-use std::fs::{File, OpenOptions};
-use std::io::Write;
 use prost::Message;
 use reqwest;
 use serde_json::Value;
+use std::fs::{File, OpenOptions};
+use std::io::Write;
 use std::{
     ffi::OsStr,
     os::windows::ffi::OsStrExt,
@@ -272,7 +272,10 @@ pub async fn run_game(
     // Per-account tracking is handled by the frontend.
     let current_count = get_running_game_count();
     if current_count > 0 {
-        info!("Multi-client: {} game(s) already running, launching another", current_count);
+        info!(
+            "Multi-client: {} game(s) already running, launching another",
+            current_count
+        );
     }
 
     set_credentials(account_name, characters_count, ticket, game_lang, game_path);
@@ -317,15 +320,15 @@ async fn launch_game() -> Result<ExitStatus, Box<dyn std::error::Error>> {
     // Signal game is running (PID-based tracking happens after spawn)
     GAME_STATUS_SENDER.send(true).unwrap();
     let current_count = get_running_game_count();
-    info!("Game instance starting (currently {} running)", current_count);
+    info!(
+        "Game instance starting (currently {} running)",
+        current_count
+    );
 
     // Reset exit/crash signaling state for this run
     EXIT_EVENT_SENT.store(false, Ordering::SeqCst);
 
-    info!(
-        "Launching game for account: {}",
-        creds_account_name
-    );
+    info!("Launching game for account: {}", creds_account_name);
 
     // Multi-client: Create IPC window only once, reuse for all subsequent game launches.
     // This ensures all games share one window for WM_COPYDATA communication.
@@ -334,9 +337,7 @@ async fn launch_game() -> Result<ExitStatus, Box<dyn std::error::Error>> {
     // Validate that window handle exists if flag says it was created
     // This handles edge case where launcher crashed/restarted while games were running
     if !is_first_launch {
-        let window_valid = WINDOW_HANDLE.lock()
-            .map(|h| h.is_some())
-            .unwrap_or(false);
+        let window_valid = WINDOW_HANDLE.lock().map(|h| h.is_some()).unwrap_or(false);
         if !window_valid {
             info!("IPC window flag was set but no valid handle found - recreating window");
             is_first_launch = true;
@@ -388,10 +389,7 @@ async fn launch_game() -> Result<ExitStatus, Box<dyn std::error::Error>> {
     crate::av::ensure_av_exclusion_before_launch();
 
     let mut child = Command::new(&creds_game_path)
-        .arg(format!(
-            "-LANGUAGEEXT={}",
-            creds_game_lang
-        ))
+        .arg(format!("-LANGUAGEEXT={}", creds_game_lang))
         .spawn()?;
 
     let pid = child.id();
@@ -456,7 +454,10 @@ async fn launch_game() -> Result<ExitStatus, Box<dyn std::error::Error>> {
         // Reset IPC window flag so next launcher session creates a new window
         IPC_WINDOW_CREATED.store(false, Ordering::SeqCst);
     } else {
-        info!("Skipping WM_GAME_EXITED - {} other game(s) still using IPC window", remaining);
+        info!(
+            "Skipping WM_GAME_EXITED - {} other game(s) still using IPC window",
+            remaining
+        );
     }
     // Note: We no longer await the window task here. The IPC window runs in the
     // background serving all game instances until the last one exits.
@@ -594,7 +595,6 @@ unsafe extern "system" fn wnd_proc(
                 7 => handle_enter_lobby_or_world(w_param, h_wnd, payload),
                 // Notify subscribers of raw event 7 with payload as-is
                 // (handlers below will also emit more specific events)
-                
                 1000 => handle_game_start(w_param, h_wnd, payload),
                 1001..=1016 => handle_game_event(w_param, h_wnd, event_id, payload),
                 1020 => handle_game_exit(w_param, h_wnd, payload),
@@ -638,7 +638,11 @@ unsafe fn create_and_run_game_window(tcs: Arc<Notify>) {
     // Check if class is already registered (for multi-client support)
     let mut existing_class: WNDCLASSEXW = std::mem::zeroed();
     existing_class.cbSize = std::mem::size_of::<WNDCLASSEXW>() as u32;
-    let class_exists = GetClassInfoExW(GetModuleHandleW(null_mut()), class_name.as_ptr(), &mut existing_class) != 0;
+    let class_exists = GetClassInfoExW(
+        GetModuleHandleW(null_mut()),
+        class_name.as_ptr(),
+        &mut existing_class,
+    ) != 0;
 
     if !class_exists {
         let wnd_class = WNDCLASSEXW {
@@ -663,7 +667,10 @@ unsafe fn create_and_run_game_window(tcs: Arc<Notify>) {
         }
         info!("Registered window class LAUNCHER_CLASS");
     } else {
-        info!("Window class LAUNCHER_CLASS already registered, reusing (instance {})", instance_id);
+        info!(
+            "Window class LAUNCHER_CLASS already registered, reusing (instance {})",
+            instance_id
+        );
     }
 
     // WS_EX_NOACTIVATE (0x08000000): Prevents this window from becoming the
@@ -818,14 +825,21 @@ unsafe fn handle_account_name_request(recipient: WPARAM, sender: HWND) {
     // IMPORTANT: Do NOT fall back to GLOBAL_CREDENTIALS - it may have wrong account's data
     // due to concurrent launches or user switching accounts in the launcher UI.
     let game_pid = get_pid_from_hwnd(recipient as HWND);
-    let account_name = if let Some(creds) = crate::global_credentials::get_credentials_for_pid(game_pid) {
-        info!("Account Name Request from PID {} - found per-PID credentials", game_pid);
-        creds.account_name
-    } else {
-        error!("Account Name Request from PID {} - NO credentials found! This is a bug.", game_pid);
-        // Return empty string rather than potentially wrong GLOBAL_CREDENTIALS data
-        String::new()
-    };
+    let account_name =
+        if let Some(creds) = crate::global_credentials::get_credentials_for_pid(game_pid) {
+            info!(
+                "Account Name Request from PID {} - found per-PID credentials",
+                game_pid
+            );
+            creds.account_name
+        } else {
+            error!(
+                "Account Name Request from PID {} - NO credentials found! This is a bug.",
+                game_pid
+            );
+            // Return empty string rather than potentially wrong GLOBAL_CREDENTIALS data
+            String::new()
+        };
     let account_name_utf16: Vec<u8> = account_name
         .encode_utf16()
         .flat_map(|c| c.to_le_bytes().to_vec())
@@ -850,14 +864,21 @@ unsafe fn handle_session_ticket_request(recipient: WPARAM, sender: HWND) {
     // IMPORTANT: Do NOT fall back to GLOBAL_CREDENTIALS - it may have wrong account's data
     // due to concurrent launches or user switching accounts in the launcher UI.
     let game_pid = get_pid_from_hwnd(recipient as HWND);
-    let session_ticket = if let Some(creds) = crate::global_credentials::get_credentials_for_pid(game_pid) {
-        info!("Session Ticket Request from PID {} - found per-PID credentials", game_pid);
-        creds.ticket
-    } else {
-        error!("Session Ticket Request from PID {} - NO credentials found! This is a bug.", game_pid);
-        // Return empty string rather than potentially wrong GLOBAL_CREDENTIALS data
-        String::new()
-    };
+    let session_ticket =
+        if let Some(creds) = crate::global_credentials::get_credentials_for_pid(game_pid) {
+            info!(
+                "Session Ticket Request from PID {} - found per-PID credentials",
+                game_pid
+            );
+            creds.ticket
+        } else {
+            error!(
+                "Session Ticket Request from PID {} - NO credentials found! This is a bug.",
+                game_pid
+            );
+            // Return empty string rather than potentially wrong GLOBAL_CREDENTIALS data
+            String::new()
+        };
     send_response_message(recipient, sender, 4, session_ticket.as_bytes());
 }
 
@@ -1005,7 +1026,10 @@ async fn get_server_list() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let json: Value = response.json().await?;
     info!("Server list JSON received, parsing...");
     let server_list = parse_server_list_json(&json)?;
-    info!("Server list parsed successfully, {} servers total", server_list.servers.len());
+    info!(
+        "Server list parsed successfully, {} servers total",
+        server_list.servers.len()
+    );
 
     let mut buf = Vec::new();
     server_list.encode(&mut buf)?;
@@ -1083,9 +1107,7 @@ fn parse_server_list_json(json: &Value) -> Result<ServerList, Box<dyn std::error
 
         info!(
             "Processing server: id={}, name={}, is_available={}",
-            server_id,
-            server["name"],
-            is_available
+            server_id, server["name"], is_available
         );
 
         let name = match server["name"].as_str() {
@@ -1104,12 +1126,18 @@ fn parse_server_list_json(json: &Value) -> Result<ServerList, Box<dyn std::error
         let address_str = match server["address"].as_str() {
             Some(addr) => addr,
             None => {
-                error!("Missing or invalid 'address' field for server {}", server_id);
+                error!(
+                    "Missing or invalid 'address' field for server {}",
+                    server_id
+                );
                 continue; // Skip invalid server
             }
         };
         if address_str.parse::<std::net::Ipv4Addr>().is_err() {
-            error!("Invalid server address format: {} for server {}", address_str, server_id);
+            error!(
+                "Invalid server address format: {} for server {}",
+                address_str, server_id
+            );
             continue; // Skip invalid server
         }
         let address = ipv4_to_u32(address_str);
@@ -1133,7 +1161,7 @@ fn parse_server_list_json(json: &Value) -> Result<ServerList, Box<dyn std::error
         // Do not add character count suffix; keep original names exactly as provided
         let formatted_name = name.clone();
         let formatted_title = name.clone();
-        
+
         let server_info = ServerInfo {
             id: server_id,
             name: utf16_to_bytes(&formatted_name),
@@ -1182,7 +1210,7 @@ fn parse_server_list_json(json: &Value) -> Result<ServerList, Box<dyn std::error
         let relay_unavailable_msg = relay["unavailable_message"].as_str().unwrap_or("");
 
         let relay_address = ipv4_to_u32(relay_address_str);
-        
+
         let relay_server = ServerInfo {
             id: relay_id,
             name: utf16_to_bytes(relay_name),
@@ -1196,9 +1224,12 @@ fn parse_server_list_json(json: &Value) -> Result<ServerList, Box<dyn std::error
             unavailable_message: utf16_to_bytes(relay_unavailable_msg),
             host: Vec::new(),
         };
-        
+
         server_list.servers.push(relay_server);
-        info!("Added relay server: {} ({}:{})", relay_name, relay_address_str, relay_port);
+        info!(
+            "Added relay server: {} ({}:{})",
+            relay_name, relay_address_str, relay_port
+        );
     }
 
     // Keep original last_server_id from JSON for proper display
@@ -1247,21 +1278,24 @@ mod tests {
     #[test]
     fn test_to_wstring_empty() {
         let result = to_wstring("");
-        assert_eq!(result, vec![0u16], "Empty string should produce only null terminator");
+        assert_eq!(
+            result,
+            vec![0u16],
+            "Empty string should produce only null terminator"
+        );
     }
 
     #[test]
     fn test_to_wstring_ascii() {
         let result = to_wstring("Hello");
         let expected: Vec<u16> = vec![
-            'H' as u16,
-            'e' as u16,
-            'l' as u16,
-            'l' as u16,
-            'o' as u16,
+            'H' as u16, 'e' as u16, 'l' as u16, 'l' as u16, 'o' as u16,
             0u16, // null terminator
         ];
-        assert_eq!(result, expected, "ASCII string should be correctly converted to wide string");
+        assert_eq!(
+            result, expected,
+            "ASCII string should be correctly converted to wide string"
+        );
     }
 
     #[test]
@@ -1269,16 +1303,14 @@ mod tests {
         let result = to_wstring("Hello世界");
         // '世' = U+4E16 and '界' = U+754C
         let expected: Vec<u16> = vec![
-            'H' as u16,
-            'e' as u16,
-            'l' as u16,
-            'l' as u16,
-            'o' as u16,
-            0x4E16, // 世
+            'H' as u16, 'e' as u16, 'l' as u16, 'l' as u16, 'o' as u16, 0x4E16, // 世
             0x754C, // 界
             0u16,   // null terminator
         ];
-        assert_eq!(result, expected, "Unicode string should be correctly converted to wide string");
+        assert_eq!(
+            result, expected,
+            "Unicode string should be correctly converted to wide string"
+        );
     }
 
     #[test]
@@ -1294,13 +1326,19 @@ mod tests {
             '\r' as u16,
             0u16, // null terminator
         ];
-        assert_eq!(result, expected, "Special characters should be correctly converted");
+        assert_eq!(
+            result, expected,
+            "Special characters should be correctly converted"
+        );
     }
 
     #[test]
     fn test_utf16_to_bytes_empty() {
         let result = utf16_to_bytes("");
-        assert!(result.is_empty(), "Empty string should produce empty byte vector");
+        assert!(
+            result.is_empty(),
+            "Empty string should produce empty byte vector"
+        );
     }
 
     #[test]
@@ -1308,7 +1346,10 @@ mod tests {
         let result = utf16_to_bytes("Hi");
         // 'H' = 0x0048, 'i' = 0x0069 in little-endian
         let expected: Vec<u8> = vec![0x48, 0x00, 0x69, 0x00];
-        assert_eq!(result, expected, "ASCII string should be correctly converted to UTF-16 LE bytes");
+        assert_eq!(
+            result, expected,
+            "ASCII string should be correctly converted to UTF-16 LE bytes"
+        );
     }
 
     #[test]
@@ -1316,7 +1357,10 @@ mod tests {
         let result = utf16_to_bytes("世界");
         // '世' = U+4E16, '界' = U+754C in little-endian
         let expected: Vec<u8> = vec![0x16, 0x4E, 0x4C, 0x75];
-        assert_eq!(result, expected, "Unicode string should be correctly converted to UTF-16 LE bytes");
+        assert_eq!(
+            result, expected,
+            "Unicode string should be correctly converted to UTF-16 LE bytes"
+        );
     }
 
     #[test]
@@ -1324,7 +1368,10 @@ mod tests {
         let result = utf16_to_bytes("A世");
         // 'A' = 0x0041, '世' = U+4E16 in little-endian
         let expected: Vec<u8> = vec![0x41, 0x00, 0x16, 0x4E];
-        assert_eq!(result, expected, "Mixed ASCII and Unicode should be correctly converted");
+        assert_eq!(
+            result, expected,
+            "Mixed ASCII and Unicode should be correctly converted"
+        );
     }
 
     #[test]
@@ -1338,7 +1385,10 @@ mod tests {
     fn test_ipv4_to_u32_localhost() {
         // 127.0.0.1 = 0x7F000001 in network byte order
         let result = ipv4_to_u32("127.0.0.1");
-        assert_eq!(result, 0x7F000001, "Localhost IP should be correctly converted");
+        assert_eq!(
+            result, 0x7F000001,
+            "Localhost IP should be correctly converted"
+        );
     }
 
     #[test]
@@ -1408,7 +1458,11 @@ mod tests {
 
         for (ip, expected) in test_cases {
             let result = ipv4_to_u32(ip);
-            assert_eq!(result, expected, "IP {} should convert to 0x{:08X}", ip, expected);
+            assert_eq!(
+                result, expected,
+                "IP {} should convert to 0x{:08X}",
+                ip, expected
+            );
         }
     }
 }
