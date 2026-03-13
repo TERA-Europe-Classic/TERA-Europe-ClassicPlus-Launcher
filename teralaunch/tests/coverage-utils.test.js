@@ -849,36 +849,36 @@ describe('updateState.js - getStatusKey', () => {
     });
 
     describe('isDownloadComplete true (line 108)', () => {
-        it('returns DOWNLOAD_COMPLETE when isDownloadComplete is true', () => {
+        it('returns READY_TO_PLAY when isDownloadComplete is true', () => {
             expect(getStatusKey({
                 updateError: false,
                 isDownloadComplete: true,
-            })).toBe('DOWNLOAD_COMPLETE');
+            })).toBe('READY_TO_PLAY');
         });
 
-        it('returns DOWNLOAD_COMPLETE even with isUpdateAvailable true', () => {
+        it('returns READY_TO_PLAY even with isUpdateAvailable true', () => {
             expect(getStatusKey({
                 updateError: false,
                 isDownloadComplete: true,
                 isUpdateAvailable: true,
-            })).toBe('DOWNLOAD_COMPLETE');
+            })).toBe('READY_TO_PLAY');
         });
     });
 
     describe('isUpdateAvailable false (line 109)', () => {
-        it('returns NO_UPDATE_REQUIRED when isUpdateAvailable is false', () => {
+        it('returns READY_TO_PLAY when isUpdateAvailable is false', () => {
             expect(getStatusKey({
                 updateError: false,
                 isDownloadComplete: false,
                 isUpdateAvailable: false,
-            })).toBe('NO_UPDATE_REQUIRED');
+            })).toBe('READY_TO_PLAY');
         });
 
-        it('returns NO_UPDATE_REQUIRED when isUpdateAvailable is undefined', () => {
+        it('returns READY_TO_PLAY when isUpdateAvailable is undefined', () => {
             expect(getStatusKey({
                 updateError: false,
                 isDownloadComplete: false,
-            })).toBe('NO_UPDATE_REQUIRED');
+            })).toBe('READY_TO_PLAY');
         });
     });
 
