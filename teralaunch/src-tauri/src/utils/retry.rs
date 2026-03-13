@@ -516,7 +516,8 @@ mod tests {
         assert!(is_server_unreachable_error("connection refused"));
         assert!(is_server_unreachable_error("Connection Refused"));
         assert!(is_server_unreachable_error("connect timeout"));
-        assert!(is_server_unreachable_error("connection timeout"));
+        // "connection timeout" = timeout during an active connection = Transient, not ServerUnreachable
+        assert!(!is_server_unreachable_error("connection timeout"));
     }
 
     #[test]
