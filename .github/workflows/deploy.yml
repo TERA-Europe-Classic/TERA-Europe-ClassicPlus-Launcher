@@ -1,0 +1,246 @@
+name: Deploy Launcher Update
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump type"
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
+
+jobs:
+  deploy:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+      TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Read current version
+        id: current
+        run: |
+          $json = Get-Content 'teralaunch/src-tauri/tauri.conf.json' -Raw | ConvertFrom-Json
+          $v = $json.package.version
+          echo "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Bump version
+        id: bump
+        env:
+          BUMP_TYPE: ${{ inputs.bump }}
+          CURRENT_VERSION: ${{ steps.current.outputs.version }}
+        run: |
+          $parts = $env:CURRENT_VERSION.Split('.')
+          $major = [int]$parts[0]
+          $minor = [int]$parts[1]
+          $patch = [int]$parts[2]
+
+          switch ($env:BUMP_TYPE) {
+            "major" { $major++; $minor = 0; $patch = 0 }
+            "minor" { $minor++; $patch = 0 }
+            "patch" { $patch++ }
+          }
+
+          $new = "$major.$minor.$patch"
+          echo "version=$new" >> $env:GITHUB_OUTPUT
+          echo "New version: $new"
+
+      - name: Update version in all files
+        env:
+          OLD_VERSION: ${{ steps.current.outputs.version }}
+          NEW_VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          # tauri.conf.json
+          $tauri = Get-Content 'teralaunch/src-tauri/tauri.conf.json' -Raw
+          $tauri = $tauri -replace [regex]::Escape("`"version`": `"$env:OLD_VERSION`""), "`"version`": `"$env:NEW_VERSION`""
+          Set-Content 'teralaunch/src-tauri/tauri.conf.json' $tauri -NoNewline
+
+          # Cargo.toml
+          $cargo = Get-Content 'teralaunch/src-tauri/Cargo.toml' -Raw
+          $cargo = $cargo -replace [regex]::Escape("version = `"$env:OLD_VERSION`""), "version = `"$env:NEW_VERSION`""
+          Set-Content 'teralaunch/src-tauri/Cargo.toml' $cargo -NoNewline
+
+          # package.json
+          $pkg = Get-Content 'teralaunch/package.json' -Raw
+          $pkg = $pkg -replace [regex]::Escape("`"version`": `"$env:OLD_VERSION`""), "`"version`": `"$env:NEW_VERSION`""
+          Set-Content 'teralaunch/package.json' $pkg -NoNewline
+
+      - name: Commit and push version bump
+        env:
+          NEW_VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          git add teralaunch/src-tauri/tauri.conf.json teralaunch/src-tauri/Cargo.toml teralaunch/package.json
+          git commit -m "release: bump version to v$env:NEW_VERSION"
+          git push origin HEAD
+          git tag "v$env:NEW_VERSION"
+          git push origin "v$env:NEW_VERSION"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Find the previous tag (excluding current)
+          $currentTag = "v${{ steps.bump.outputs.version }}"
+          $prevTag = git tag --sort=-v:refname | Where-Object { $_ -ne $currentTag } | Select-Object -First 1
+
+          if ($prevTag) {
+            $log = git log "$prevTag..HEAD" --pretty=format:"- %s" --no-merges |
+              Where-Object { $_ -notmatch "release: bump" }
+          } else {
+            $log = git log --pretty=format:"- %s" --no-merges -20
+          }
+
+          $changelogText = ($log | Out-String).Trim()
+          if (-not $changelogText) { $changelogText = "- Maintenance update" }
+
+          Set-Content 'changelog.txt' $changelogText -NoNewline
+
+      - name: Install NSIS
+        run: choco install nsis -y
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: teralaunch/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            teralaunch/src-tauri
+            teralib
+
+      - name: Build launcher
+        run: |
+          Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+          ./builder.ps1
+
+      - name: Locate build artifacts
+        id: files
+        run: |
+          $nsisDir = "teralaunch/src-tauri/target/release/bundle/nsis"
+          $setupExe = Get-ChildItem "$nsisDir/*setup*.exe" | Select-Object -First 1
+          $updaterZip = Get-ChildItem "$nsisDir/*.nsis.zip" | Where-Object { $_.Name -notmatch '\.sig$' } | Select-Object -First 1
+          $updaterSig = Get-ChildItem "$nsisDir/*.nsis.zip.sig" | Select-Object -First 1
+
+          if (-not $setupExe -or -not $updaterZip -or -not $updaterSig) {
+            Write-Error "Build artifacts not found in $nsisDir"
+            exit 1
+          }
+
+          echo "setup=$($setupExe.FullName)" >> $env:GITHUB_OUTPUT
+          echo "zip=$($updaterZip.FullName)" >> $env:GITHUB_OUTPUT
+          echo "sig=$($updaterSig.FullName)" >> $env:GITHUB_OUTPUT
+          echo "zip_name=$($updaterZip.Name)" >> $env:GITHUB_OUTPUT
+
+      - name: Generate latest.json
+        env:
+          NEW_VERSION: ${{ steps.bump.outputs.version }}
+          ZIP_NAME: ${{ steps.files.outputs.zip_name }}
+        run: |
+          $sig = Get-Content "${{ steps.files.outputs.sig }}" -Raw
+          $changelog = Get-Content 'changelog.txt' -Raw
+          $date = Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ"
+
+          $latest = @{
+            version = $env:NEW_VERSION
+            notes = $changelog
+            pub_date = $date
+            platforms = @{
+              "windows-x86_64" = @{
+                signature = $sig.Trim()
+                url = "https://web.tera-germany.de/classic/$env:ZIP_NAME"
+              }
+            }
+          } | ConvertTo-Json -Depth 5
+
+          Set-Content 'latest.json' $latest -NoNewline
+
+      - name: Upload to SFTP
+        env:
+          SFTP_HOST: ${{ secrets.SFTP_HOST }}
+          SFTP_USER: ${{ secrets.SFTP_USER }}
+          SFTP_PASS: ${{ secrets.SFTP_PASS }}
+        run: |
+          choco install winscp -y
+          Add-Type -Path "${env:ProgramFiles(x86)}\WinSCP\WinSCPnet.dll"
+
+          $sessionOptions = New-Object WinSCP.SessionOptions -Property @{
+            Protocol = [WinSCP.Protocol]::Ftp
+            FtpSecure = [WinSCP.FtpSecure]::Explicit
+            HostName = $env:SFTP_HOST
+            UserName = $env:SFTP_USER
+            Password = $env:SFTP_PASS
+            GiveUpSecurityAndAcceptAnyTlsHostCertificate = $true
+          }
+
+          $session = New-Object WinSCP.Session
+          try {
+            $session.Open($sessionOptions)
+
+            Write-Host "Uploading setup installer..."
+            $session.PutFiles("${{ steps.files.outputs.setup }}", "/").Check()
+
+            Write-Host "Uploading updater zip..."
+            $session.PutFiles("${{ steps.files.outputs.zip }}", "/").Check()
+
+            Write-Host "Uploading updater signature..."
+            $session.PutFiles("${{ steps.files.outputs.sig }}", "/").Check()
+
+            Write-Host "Uploading latest.json..."
+            $session.PutFiles("latest.json", "/").Check()
+
+            Write-Host "All files uploaded successfully."
+          } finally {
+            $session.Dispose()
+          }
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: launcher-release-v${{ steps.bump.outputs.version }}
+          path: |
+            ${{ steps.files.outputs.setup }}
+            ${{ steps.files.outputs.zip }}
+            ${{ steps.files.outputs.sig }}
+            latest.json
+          retention-days: 7
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.bump.outputs.version }}
+          name: v${{ steps.bump.outputs.version }}
+          body_path: changelog.txt
+          draft: false
+          prerelease: false
+          files: |
+            ${{ steps.files.outputs.setup }}
+            ${{ steps.files.outputs.zip }}
+            ${{ steps.files.outputs.sig }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

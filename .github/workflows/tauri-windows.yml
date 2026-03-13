@@ -60,26 +60,15 @@ jobs:
         run: |
           Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
           ./builder.ps1
-      - name: Upload NSIS installer
+      - name: Upload build artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: nsis-installer
+          name: launcher-build
+          retention-days: 7
           path: |
             teralaunch/src-tauri/target/release/bundle/nsis/*.exe
-      - name: Upload NSIS updater zip
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nsis-updater-zip
-          path: |
             teralaunch/src-tauri/target/release/bundle/nsis/*.nsis.zip
-      - name: Upload NSIS updater signature
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nsis-updater-signature
-          path: |
             teralaunch/src-tauri/target/release/bundle/nsis/*.nsis.zip.sig
       - name: Create GitHub Release on version bump
         if: steps.tagcheck.outputs.exists == 'false' && (github.event_name == 'push' || github.event.inputs.create_release == 'true')
