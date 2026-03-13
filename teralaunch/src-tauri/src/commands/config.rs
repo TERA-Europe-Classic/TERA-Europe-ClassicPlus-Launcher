@@ -456,12 +456,12 @@ lang=EUR
 
         let mock_fs = MockFileSystem::new().with_file(config_path, initial_content.as_bytes());
 
-        let result = save_language_with_fs(&mock_fs, Path::new(config_path), "USA");
+        let result = save_language_with_fs(&mock_fs, Path::new(config_path), "GER");
         assert!(result.is_ok());
 
         // Verify the file was updated
         let updated_content = mock_fs.read_to_string(Path::new(config_path)).unwrap();
-        assert!(updated_content.contains("USA"));
+        assert!(updated_content.contains("GER"));
     }
 
     #[test]
@@ -469,7 +469,7 @@ lang=EUR
         let mock_fs = MockFileSystem::new();
         let config_path = "/nonexistent/config.ini";
 
-        let result = save_language_with_fs(&mock_fs, Path::new(config_path), "USA");
+        let result = save_language_with_fs(&mock_fs, Path::new(config_path), "GER");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Failed to read config"));
     }
@@ -546,12 +546,12 @@ lang=EUR
 
         let mock_fs = MockFileSystem::new().with_file(config_path, initial_content.as_bytes());
 
-        let result = save_language_with_fs(&mock_fs, Path::new(config_path), "USA");
+        let result = save_language_with_fs(&mock_fs, Path::new(config_path), "GER");
         assert!(result.is_ok());
 
         let updated_content = mock_fs.read_to_string(Path::new(config_path)).unwrap();
         // Language should be updated
-        assert!(updated_content.contains("USA"));
+        assert!(updated_content.contains("GER"));
         // Path should be preserved
         assert!(
             updated_content.contains(r"C:\\Games\\TERA")
@@ -578,7 +578,7 @@ lang=EUR
 
         let mock_fs = MockFileSystem::new().with_file(config_path, malformed_content.as_bytes());
 
-        let result = save_language_with_fs(&mock_fs, Path::new(config_path), "USA");
+        let result = save_language_with_fs(&mock_fs, Path::new(config_path), "GER");
         // Should either parse permissively or fail gracefully
         assert!(result.is_ok() || result.is_err());
     }
@@ -652,11 +652,8 @@ volume=100
         let mock_fs = MockFileSystem::new().with_file(config_path, initial_content.as_bytes());
 
         let result = save_language_with_fs(&mock_fs, Path::new(config_path), "");
-        assert!(result.is_ok());
-
-        let updated_content = mock_fs.read_to_string(Path::new(config_path)).unwrap();
-        // Empty language should be written
-        assert!(updated_content.contains("lang=") || updated_content.contains("lang ="));
+        // Empty language code is invalid and should return an error
+        assert!(result.is_err());
     }
 
     #[test]

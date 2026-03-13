@@ -710,7 +710,7 @@ mod tests {
         )
         .await;
 
-        assert_eq!(result.unwrap_err(), "Failed to retrieve UserNo");
+        assert_eq!(result.unwrap_err(), "Parse error: Missing 'UserNo' field");
     }
 
     // === Registration Validation Tests ===

@@ -83,7 +83,10 @@ pub fn stall_exceeded(
 /// assert!(!is_transient_download_error("HTTP 404 not found"));
 /// ```
 pub fn is_transient_download_error(message: &str) -> bool {
-    matches!(classify_error(message), ErrorClassification::Transient)
+    matches!(
+        classify_error(message),
+        ErrorClassification::Transient | ErrorClassification::ServerUnreachable
+    )
 }
 
 /// Calculates retry delay with exponential backoff and optional jitter.
@@ -107,7 +110,9 @@ pub fn is_transient_download_error(message: &str) -> bool {
 /// ```
 pub fn retry_delay_ms(attempt: u8) -> u64 {
     let base = RETRY_DELAY_BASE_MS;
-    let delay = base.saturating_mul(2u64.pow(attempt as u32));
+    // Use checked_pow to avoid overflow for large attempt values (e.g. u8::MAX)
+    let power = 2u64.checked_pow(attempt as u32).unwrap_or(u64::MAX);
+    let delay = base.saturating_mul(power);
     std::cmp::min(delay, MAX_RETRY_DELAY_MS)
 }
 

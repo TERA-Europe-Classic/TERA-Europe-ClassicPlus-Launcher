@@ -400,6 +400,11 @@ pub enum ErrorClassification {
 pub fn classify_error(error_msg: &str) -> ErrorClassification {
     let msg = error_msg.to_lowercase();
 
+    // Empty string has no retry value — treat as permanent
+    if msg.is_empty() {
+        return ErrorClassification::Permanent;
+    }
+
     // Check for cancellation first
     if msg == "cancelled" || msg.contains("cancelled by user") {
         return ErrorClassification::Cancelled;
@@ -416,6 +421,8 @@ pub fn classify_error(error_msg: &str) -> ErrorClassification {
         || msg.contains("route not found")
         || msg.contains("interface not found")
         || msg.contains("address not found")
+        || msg.contains("connect timeout")
+        || msg.contains("connection timeout")
         || (msg.contains("connection refused") && !msg.contains("temporarily"))
     {
         return ErrorClassification::ServerUnreachable;
@@ -439,6 +446,8 @@ pub fn classify_error(error_msg: &str) -> ErrorClassification {
         || msg.contains("unauthorized")
         || msg.contains("403")
         || msg.contains("forbidden")
+        || msg.contains("permission denied")
+        || msg.contains("access denied")
         || msg.contains("invalid url")
         || msg.contains("invalid request")
         || msg.contains("invalid path")

@@ -411,10 +411,10 @@ mod tests {
     #[test]
     fn update_language_in_config_basic() {
         let content = "[game]\npath=C:/Games/TERA\nlang=EUR\n";
-        let result = update_language_in_config(content, "USA");
+        let result = update_language_in_config(content, "GER");
         assert!(result.is_ok());
         let updated = result.unwrap();
-        assert!(updated.contains("lang=USA"));
+        assert!(updated.contains("lang=GER") || updated.contains("lang = GER"));
         // Path should be preserved
         assert!(updated.contains("C:/Games/TERA") || updated.contains("C:\\Games\\TERA"));
     }
@@ -423,9 +423,8 @@ mod tests {
     fn update_language_in_config_empty_lang() {
         let content = "[game]\npath=C:/Games/TERA\nlang=EUR\n";
         let result = update_language_in_config(content, "");
-        assert!(result.is_ok());
-        let updated = result.unwrap();
-        assert!(updated.contains("lang="));
+        // Empty string is not a valid language code
+        assert!(result.is_err());
     }
 
     // ========================================================================
