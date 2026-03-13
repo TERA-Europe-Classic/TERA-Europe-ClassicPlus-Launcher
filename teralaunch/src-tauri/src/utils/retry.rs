@@ -123,11 +123,10 @@ pub fn retry_delay_ms(attempt: u8) -> u64 {
 /// For deterministic tests, this currently returns the base delay.
 /// In production, this would add random jitter to prevent thundering herd.
 pub fn retry_delay_with_jitter_ms(attempt: u8) -> u64 {
-    let base_delay = retry_delay_ms(attempt);
     // Add ±25% jitter to prevent thundering herd
     // For deterministic tests, just return base delay
     // In production, would add random jitter
-    base_delay
+    retry_delay_ms(attempt)
 }
 
 /// Tracks consecutive failures for circuit breaker pattern

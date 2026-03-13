@@ -10,7 +10,7 @@
 use sha2::{Digest, Sha256};
 use std::io::Read;
 
-use crate::domain::{BUFFER_SIZE, HASH_BUFFER_SIZE};
+use crate::domain::HASH_BUFFER_SIZE;
 
 /// Calculates SHA-256 hash from a reader.
 ///
@@ -223,6 +223,7 @@ pub fn aggregate_hash_results<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::BUFFER_SIZE;
     use std::io::Cursor;
 
     // Known SHA-256 hashes for test data
@@ -510,7 +511,7 @@ mod tests {
 
     #[test]
     fn aggregate_hash_results_all_match() {
-        let results = vec![
+        let results = [
             HashCheckResult::Match,
             HashCheckResult::Match,
             HashCheckResult::Match,
@@ -525,7 +526,7 @@ mod tests {
 
     #[test]
     fn aggregate_hash_results_mixed() {
-        let results = vec![
+        let results = [
             HashCheckResult::Match,
             HashCheckResult::Match,
             HashCheckResult::Mismatch {
@@ -548,7 +549,7 @@ mod tests {
 
     #[test]
     fn aggregate_hash_results_only_missing() {
-        let results = vec![HashCheckResult::Missing, HashCheckResult::Missing];
+        let results = [HashCheckResult::Missing, HashCheckResult::Missing];
         let stats = aggregate_hash_results(results.iter());
         assert_eq!(stats.matched, 0);
         assert_eq!(stats.missing, 2);
@@ -601,10 +602,7 @@ mod tests {
     impl std::io::Read for FailingReader {
         fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
             if self.position >= self.fail_after {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "Simulated read failure",
-                ));
+                return Err(std::io::Error::other("Simulated read failure"));
             }
 
             let remaining = self.data.len().saturating_sub(self.position);

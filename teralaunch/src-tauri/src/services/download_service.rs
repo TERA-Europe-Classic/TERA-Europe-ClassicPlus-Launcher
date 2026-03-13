@@ -545,7 +545,7 @@ pub fn estimate_speed(bytes_downloaded: u64, elapsed_secs: f64, default_speed: u
 }
 
 /// Tracks the health of an ongoing download for adaptive behavior.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct DownloadHealth {
     /// Number of successful chunks received
     pub successful_chunks: u64,
@@ -557,18 +557,6 @@ pub struct DownloadHealth {
     pub max_consecutive_errors: u8,
     /// Current consecutive error count
     pub consecutive_errors: u8,
-}
-
-impl Default for DownloadHealth {
-    fn default() -> Self {
-        Self {
-            successful_chunks: 0,
-            retried_chunks: 0,
-            success_streak: 0,
-            max_consecutive_errors: 0,
-            consecutive_errors: 0,
-        }
-    }
 }
 
 impl DownloadHealth {

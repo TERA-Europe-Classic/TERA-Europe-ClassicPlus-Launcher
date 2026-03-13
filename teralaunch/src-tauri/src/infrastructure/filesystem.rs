@@ -321,7 +321,7 @@ mod std_filesystem_tests {
 
     #[test]
     fn std_filesystem_default() {
-        let fs = StdFileSystem::default();
+        let fs = StdFileSystem {};
         // Should be constructable via Default trait
         assert!(fs.exists(Path::new(".")));
     }
@@ -527,7 +527,7 @@ mod std_filesystem_tests {
         let dir = tempdir().unwrap();
         let file_path = dir.path().join("invalid.txt");
         // Write invalid UTF-8 bytes
-        fs::write(&file_path, &[0xFF, 0xFE, 0xFD]).unwrap();
+        fs::write(&file_path, [0xFF, 0xFE, 0xFD]).unwrap();
 
         let fs = StdFileSystem::new();
         let result = fs.read_to_string(&file_path);
