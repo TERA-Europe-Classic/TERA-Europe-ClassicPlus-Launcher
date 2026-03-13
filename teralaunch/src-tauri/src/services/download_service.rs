@@ -422,7 +422,6 @@ pub fn classify_error(error_msg: &str) -> ErrorClassification {
         || msg.contains("interface not found")
         || msg.contains("address not found")
         || msg.contains("connect timeout")
-        || msg.contains("connection timeout")
         || (msg.contains("connection refused") && !msg.contains("temporarily"))
     {
         return ErrorClassification::ServerUnreachable;
@@ -451,6 +450,10 @@ pub fn classify_error(error_msg: &str) -> ErrorClassification {
         || msg.contains("invalid url")
         || msg.contains("invalid request")
         || msg.contains("invalid path")
+        || msg.contains("invalid response")
+        || msg.contains("invalid signature")
+        || msg.contains("invalid cert")
+        || msg.contains("certificate")
     {
         return ErrorClassification::Permanent;
     }
