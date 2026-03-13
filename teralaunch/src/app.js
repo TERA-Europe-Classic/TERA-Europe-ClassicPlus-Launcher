@@ -2029,8 +2029,9 @@ const App = {
       dropdown.classList.toggle("open");
     });
 
-    // Handle option selection
-    dropdown.addEventListener("click", (e) => {
+    // Handle option selection — flagSvgs values are hardcoded static SVG
+    // strings defined in this file, never sourced from user input.
+    dropdown.addEventListener("click", async (e) => {
       const option = e.target.closest(".first-launch-dropdown-option");
       if (!option) return;
 
@@ -2047,6 +2048,19 @@ const App = {
       });
 
       dropdown.classList.remove("open");
+
+      // Apply language change immediately so modal text updates
+      await this.changeLanguage(lang);
+
+      // Update modal text with new language
+      const titleEl = modal.querySelector(".first-launch-title");
+      const subtitleEl = modal.querySelector(".first-launch-subtitle");
+      const labelEl = modal.querySelector(".first-launch-label");
+      const btnEl = document.getElementById("set-game-path-btn");
+      if (titleEl) titleEl.textContent = this.t("WELCOME_TO_LAUNCHER");
+      if (subtitleEl) subtitleEl.textContent = this.t("FIRST_LAUNCH_MESSAGE");
+      if (labelEl) labelEl.textContent = this.t("CHOOSE_DEFAULT_LANGUAGE");
+      if (btnEl) btnEl.textContent = this.t("SET_GAME_PATH");
     });
 
     // Close dropdown when clicking outside

@@ -437,7 +437,7 @@
         "UPDATE_ERROR_MESSAGE": "Bei der Aktualisierung ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut oder kontaktieren Sie den Support.",
         "CHECKING_UPDATES": "Überprüfung der Updates...",
         "VERIFYING_FILES": "Dateien werden überprüft...",
-        "DOWNLOADING_FILES": "Dateien werden heruntergeladen...",
+        "DOWNLOADING_FILES": "Download läuft...",
         "FILE_CHECK_COMPLETE": "Dateiüberprüfung abgeschlossen",
         "FILE_CHECK_COMPLETE_MESSAGE": "Dateiüberprüfung abgeschlossen. Nachricht",
         "GAME_READY_TO_LAUNCH": "Dein Spiel ist bereit, los geht's!",
