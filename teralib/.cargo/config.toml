@@ -8,7 +8,6 @@ rustflags = [
   "--remap-path-prefix", "C:/Users/Lukas/Documents/GitHub/TERA-Germany-Launcher/teralib=src/",
   "--remap-path-prefix", "C:/Users/Lukas/.cargo=.cargo/",
   "--remap-path-prefix", "C:/Users/Lukas/.rustup=.rustup/",
-  "-C", "panic=abort"
 ]
 
 [target.i686-pc-windows-msvc]
@@ -22,5 +21,4 @@ rustflags = [
   "--remap-path-prefix", "C:/Users/Lukas/Documents/GitHub/TERA-Germany-Launcher/teralib=src/",
   "--remap-path-prefix", "C:/Users/Lukas/.cargo=.cargo/",
   "--remap-path-prefix", "C:/Users/Lukas/.rustup=.rustup/",
-  "-C", "panic=abort"
 ]

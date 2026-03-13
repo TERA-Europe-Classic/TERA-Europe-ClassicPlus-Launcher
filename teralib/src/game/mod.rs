@@ -30,7 +30,6 @@ use winapi::{
         windef::HWND,
     },
     um::{
-        errhandlingapi::GetLastError,
         libloaderapi::GetModuleHandleW,
         winuser::{GetClassInfoExW, GetWindowThreadProcessId, *},
     },
@@ -754,6 +753,7 @@ unsafe fn create_and_run_game_window(tcs: Arc<Notify>) {
 /// # Returns
 ///
 /// Returns TRUE to continue enumeration, FALSE to stop.
+#[allow(dead_code)]
 unsafe extern "system" fn enum_window_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
     let mut class_name: [u16; 256] = [0; 256];
     let len = GetClassNameW(hwnd, class_name.as_mut_ptr(), 256) as usize;

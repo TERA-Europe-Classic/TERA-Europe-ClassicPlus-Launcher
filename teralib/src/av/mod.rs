@@ -60,7 +60,7 @@ try {
     );
 
     let status2 = Command::new("powershell.exe")
-        .args(&[
+        .args([
             "-NoProfile",
             "-NonInteractive",
             "-WindowStyle",
