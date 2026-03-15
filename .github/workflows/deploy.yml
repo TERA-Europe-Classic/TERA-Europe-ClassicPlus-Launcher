@@ -186,7 +186,7 @@ jobs:
           SFTP_USER: ${{ secrets.SFTP_USER }}
           SFTP_PASS: ${{ secrets.SFTP_PASS }}
         run: |
-          choco install winscp -y
+          choco install winscp --version=6.3.5 -y
           Add-Type -Path "${env:ProgramFiles(x86)}\WinSCP\WinSCPnet.dll"
 
           $sessionOptions = New-Object WinSCP.SessionOptions -Property @{
