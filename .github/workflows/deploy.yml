@@ -65,7 +65,7 @@ jobs:
           echo "version=$new" >> $env:GITHUB_OUTPUT
           echo "New version: $new"
 
-      - name: Update version in all files
+      - name: Update version in all files (local only, not pushed yet)
         env:
           OLD_VERSION: ${{ steps.current.outputs.version }}
           NEW_VERSION: ${{ steps.bump.outputs.version }}
@@ -85,22 +85,11 @@ jobs:
           $pkg = $pkg -replace [regex]::Escape("`"version`": `"$env:OLD_VERSION`""), "`"version`": `"$env:NEW_VERSION`""
           Set-Content 'teralaunch/package.json' $pkg -NoNewline
 
-      - name: Commit and push version bump
-        env:
-          NEW_VERSION: ${{ steps.bump.outputs.version }}
-        run: |
-          git add teralaunch/src-tauri/tauri.conf.json teralaunch/src-tauri/Cargo.toml teralaunch/package.json
-          git commit -m "release: bump version to v$env:NEW_VERSION"
-          git push origin HEAD
-          git tag "v$env:NEW_VERSION"
-          git push origin "v$env:NEW_VERSION"
-
       - name: Generate changelog
         id: changelog
         run: |
-          # Find the previous tag (excluding current)
           $currentTag = "v${{ steps.bump.outputs.version }}"
-          $prevTag = git tag --sort=-v:refname | Where-Object { $_ -ne $currentTag } | Select-Object -First 1
+          $prevTag = git tag --sort=-v:refname | Select-Object -First 1
 
           if ($prevTag) {
             $log = git log "$prevTag..HEAD" --pretty=format:"- %s" --no-merges |
@@ -218,6 +207,16 @@ jobs:
           } finally {
             $session.Dispose()
           }
+
+      - name: Commit and push version bump
+        env:
+          NEW_VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          git add teralaunch/src-tauri/tauri.conf.json teralaunch/src-tauri/Cargo.toml teralaunch/package.json
+          git commit -m "release: bump version to v$env:NEW_VERSION"
+          git push origin HEAD
+          git tag "v$env:NEW_VERSION"
+          git push origin "v$env:NEW_VERSION"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
