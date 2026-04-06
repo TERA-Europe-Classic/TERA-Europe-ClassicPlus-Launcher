@@ -199,8 +199,13 @@ pub async fn fetch_player_count() -> Result<String, String> {
         .build()
         .map_err(|e| e.to_string())?;
 
+    let url = get_config_value("API_BASE_URL");
+    if url.trim().is_empty() {
+        return Err("Player count endpoint not configured".to_string());
+    }
+    // Classic+ TODO: Update when player count API is available
     let response = client
-        .get("https://tera-europe-classic.com/api/player-count?server=classic")
+        .get(format!("{}/api/player-count", url))
         .header("Accept", "application/json")
         .send()
         .await
@@ -231,6 +236,10 @@ pub async fn fetch_news_feed() -> Result<String, String> {
         .build()
         .map_err(|e| e.to_string())?;
 
+    // Classic+ TODO: Update when news feed endpoint is available
+    return Err("News feed endpoint not configured for Classic+".to_string());
+
+    #[allow(unreachable_code)]
     let response = client
         .get("https://forum.crazy-esports.com/forum/thread-list-rss-feed/43/")
         .send()
@@ -333,6 +342,12 @@ fn extract_tag_content(line: &str, tag: &str) -> Option<String> {
 #[tauri::command]
 #[cfg(not(tarpaulin_include))]
 pub async fn check_server_connection() -> Result<bool, String> {
+    let file_server_url = get_config_value("FILE_SERVER_URL");
+    if file_server_url.trim().is_empty() {
+        log::warn!("FILE_SERVER_URL is empty, skipping server connection check");
+        return Ok(false);
+    }
+
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(DOWNLOAD_TIMEOUT_SECS))
         .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
@@ -340,7 +355,7 @@ pub async fn check_server_connection() -> Result<bool, String> {
         .build()
         .map_err(|e| e.to_string())?;
 
-    match client.get(get_config_value("FILE_SERVER_URL")).send().await {
+    match client.get(file_server_url).send().await {
         Ok(response) => Ok(response.status().is_success()),
         Err(e) => Err(e.to_string()),
     }
