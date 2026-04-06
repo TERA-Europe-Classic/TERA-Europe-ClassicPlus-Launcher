@@ -1,6 +1,6 @@
 [package]
 name = "tera-europe-classic-launcher"
-version = "1.9.3"
+version = "1.9.4"
 description = "A Tauri App"
 authors = ["TNC97"]
 edition = "2021"
