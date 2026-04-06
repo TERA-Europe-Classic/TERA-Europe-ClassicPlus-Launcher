@@ -1,7 +1,7 @@
-﻿TERA Europe Launcher – Nutzungsbedingungen
+﻿TERA Europe Classic Launcher – Nutzungsbedingungen
 ===========================================
 
-TERA Europe Launcher – Endbenutzer-Lizenzvereinbarung (EULA)
+TERA Europe Classic Launcher – Endbenutzer-Lizenzvereinbarung (EULA)
 Copyright © 2025 Crazy-Esports
 Alle Rechte vorbehalten
 
@@ -42,10 +42,10 @@ Mit dem Klicken auf „Weiter“ bestätigst du, dass du diese Bedingungen geles
 
 ---
 
-TERA Europe Launcher – Terms of Use
+TERA Europe Classic Launcher – Terms of Use
 ====================================
 
-TERA Europe Launcher – End User License Agreement (EULA)
+TERA Europe Classic Launcher – End User License Agreement (EULA)
 Copyright © 2025 Crazy-Esports
 All rights reserved
 

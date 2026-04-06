@@ -1,5 +1,5 @@
 [package]
-name = "tera-europe-launcher"
+name = "tera-europe-classic-launcher"
 version = "1.9.3"
 description = "A Tauri App"
 authors = ["TNC97"]

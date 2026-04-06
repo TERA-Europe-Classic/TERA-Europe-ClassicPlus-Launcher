@@ -5,7 +5,7 @@
     "withGlobalTauri": true
   },
   "package": {
-    "productName": "TERA-Europe-Launcher",
+    "productName": "TERA Europe Classic Launcher",
     "version": "1.9.3"
   },
   "tauri": {
@@ -79,7 +79,7 @@
     },
     "windows": [
       {
-        "title": "TERA-Europe-Launcher",
+        "title": "TERA Europe Classic Launcher",
         "width": 1282,
         "height": 759,
         "resizable": false,
@@ -101,7 +101,7 @@
       "publisher": "Crazy-eSports",
       "icon": ["icons/tera_server.png", "icons/tera_server.ico"],
       "copyright": "Crazy-eSports",
-      "shortDescription": "TERA-Europe-Launcher",
+      "shortDescription": "TERA Europe Classic Launcher",
       "resources": ["./src/TERA/readme.txt"],
       "windows": {
         "nsis": {
