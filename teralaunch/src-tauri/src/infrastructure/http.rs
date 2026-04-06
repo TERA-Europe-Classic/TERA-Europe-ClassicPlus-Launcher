@@ -94,7 +94,7 @@ impl ReqwestClient {
             .connect_timeout(Duration::from_secs(connect_timeout_secs))
             .cookie_store(true)
             .user_agent(DEFAULT_USER_AGENT)
-            .https_only(true)
+            .https_only(false)
             .build()
             .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
         Ok(Self { client })

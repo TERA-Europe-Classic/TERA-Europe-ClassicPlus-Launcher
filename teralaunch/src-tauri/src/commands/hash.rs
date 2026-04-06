@@ -12,33 +12,47 @@
 
 #![allow(dead_code)]
 
-use std::collections::{HashMap, HashSet};
-use std::fs::{self, remove_file, File};
+use std::collections::HashSet;
+use std::fs::{remove_file, File};
 use std::io::{BufReader, Read, Write};
 use std::path::Path;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant, SystemTime};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use indicatif::{ProgressBar, ProgressStyle};
-use log::{error, info};
+use log::{error, info, warn};
 use rayon::iter::{ParallelBridge, ParallelIterator};
-use rayon::prelude::*;
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use tokio::sync::Mutex;
 use walkdir::WalkDir;
 
 use crate::commands::config::{get_cache_file_path, get_game_path};
-use crate::domain::{
-    CachedFileInfo, FileCheckProgress, FileInfo, BUFFER_SIZE, CONNECT_TIMEOUT_SECS,
-    DOWNLOAD_TIMEOUT_SECS, HASH_BUFFER_SIZE, HTTP_POOL_MAX_IDLE_PER_HOST,
-};
+use crate::domain::{FileCheckProgress, FileInfo, BUFFER_SIZE, HASH_BUFFER_SIZE};
 use crate::infrastructure::{EventEmitter, FileSystem};
 use crate::services::hash_service;
 use crate::state::clear_hash_cache;
-use crate::utils::{is_ignored, resume_offset, validate_download_url, validate_path_within_base};
+use crate::utils::is_ignored;
 use teralib::config::get_config_value;
+
+// Imports used only by the full update-check path
+#[cfg(not(feature = "skip-updates"))]
+use std::collections::HashMap;
+#[cfg(not(feature = "skip-updates"))]
+use std::fs;
+#[cfg(not(feature = "skip-updates"))]
+use std::sync::atomic::AtomicUsize;
+#[cfg(not(feature = "skip-updates"))]
+use std::sync::RwLock;
+#[cfg(not(feature = "skip-updates"))]
+use std::time::SystemTime;
+#[cfg(not(feature = "skip-updates"))]
+use rayon::prelude::*;
+#[cfg(not(feature = "skip-updates"))]
+use crate::domain::{CachedFileInfo, CONNECT_TIMEOUT_SECS, DOWNLOAD_TIMEOUT_SECS, HTTP_POOL_MAX_IDLE_PER_HOST};
+#[cfg(not(feature = "skip-updates"))]
+use crate::utils::{resume_offset, validate_download_url, validate_path_within_base};
 
 /// Clears the hash cache to force recalculation.
 ///
@@ -59,10 +73,27 @@ pub async fn clear_cache() -> Result<(), String> {
 
 /// Checks if any files need to be updated.
 ///
-/// This is a quick check that returns true if any files differ from the server.
+/// When the `skip-updates` feature is enabled, always returns `false`
+/// to allow launching without update checks.
 ///
 /// # Arguments
 /// * `window` - The Tauri window for emitting progress events
+#[cfg(feature = "skip-updates")]
+#[tauri::command]
+#[cfg(not(tarpaulin_include))]
+pub async fn check_update_required(_window: tauri::Window) -> Result<bool, String> {
+    warn!("skip-updates feature enabled, skipping update check");
+    Ok(false)
+}
+
+/// Checks if any files need to be updated.
+///
+/// Compares local file hashes against the server hash file.
+/// Returns `false` when the hash file is unavailable (empty URL or fetch failure).
+///
+/// # Arguments
+/// * `window` - The Tauri window for emitting progress events
+#[cfg(not(feature = "skip-updates"))]
 #[tauri::command]
 #[cfg(not(tarpaulin_include))]
 pub async fn check_update_required(window: tauri::Window) -> Result<bool, String> {
@@ -74,18 +105,41 @@ pub async fn check_update_required(window: tauri::Window) -> Result<bool, String
 
 /// Gets the list of files that need to be updated.
 ///
+/// When the `skip-updates` feature is enabled, always returns an empty list
+/// to allow launching without downloading any files.
+///
+/// # Arguments
+/// * `_window` - The Tauri window (unused when updates are skipped)
+#[cfg(feature = "skip-updates")]
+#[tauri::command]
+#[cfg(not(tarpaulin_include))]
+pub async fn get_files_to_update(_window: tauri::Window) -> Result<Vec<FileInfo>, String> {
+    warn!("skip-updates feature enabled, returning empty file list");
+    Ok(vec![])
+}
+
+/// Gets the list of files that need to be updated.
+///
 /// Compares local files against the server hash file and returns
 /// a list of files that are missing, corrupted, or outdated.
+/// Returns an empty list when the hash file is unavailable.
 ///
 /// # Arguments
 /// * `window` - The Tauri window for emitting progress events
+#[cfg(not(feature = "skip-updates"))]
 #[tauri::command]
 #[cfg(not(tarpaulin_include))]
 pub async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, String> {
     info!("Starting get_files_to_update");
 
     let start_time = Instant::now();
-    let server_hash_file = get_server_hash_file().await?;
+    let server_hash_file = match get_server_hash_file().await {
+        Ok(hash_file) => hash_file,
+        Err(reason) => {
+            warn!("Hash file unavailable, skipping update check: {}", reason);
+            return Ok(vec![]);
+        }
+    };
 
     // Get the path to the game folder
     let local_game_path = get_game_path()?;
@@ -496,16 +550,24 @@ pub async fn generate_hash_file(window: tauri::Window) -> Result<String, String>
 // ============================================================================
 
 /// Fetches the hash file from the server with retry logic.
+///
+/// Returns `Err` when the URL is empty or the fetch fails, allowing callers
+/// to fall back gracefully (e.g. skip the update check).
+#[cfg(not(feature = "skip-updates"))]
 #[cfg(not(tarpaulin_include))]
 async fn get_server_hash_file() -> Result<serde_json::Value, String> {
+    let hash_file_url = get_config_value("HASH_FILE_URL");
+
+    if hash_file_url.trim().is_empty() {
+        return Err("HASH_FILE_URL is empty".to_string());
+    }
+
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(DOWNLOAD_TIMEOUT_SECS))
         .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
         .pool_max_idle_per_host(HTTP_POOL_MAX_IDLE_PER_HOST)
         .build()
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
-
-    let hash_file_url = get_config_value("HASH_FILE_URL");
 
     let max_retries: u8 = 3;
     let mut attempt: u8 = 0;
@@ -813,6 +875,7 @@ pub fn emit_hash_file_progress<E: EventEmitter>(
 }
 
 /// Saves the file cache to disk.
+#[cfg(not(feature = "skip-updates"))]
 #[cfg(not(tarpaulin_include))]
 async fn save_cache_to_disk(cache: &HashMap<String, CachedFileInfo>) -> Result<(), String> {
     let cache_path = get_cache_file_path()?;
@@ -824,6 +887,7 @@ async fn save_cache_to_disk(cache: &HashMap<String, CachedFileInfo>) -> Result<(
 }
 
 /// Loads the file cache from disk.
+#[cfg(not(feature = "skip-updates"))]
 #[cfg(not(tarpaulin_include))]
 async fn load_cache_from_disk() -> Result<HashMap<String, CachedFileInfo>, String> {
     let cache_path = get_cache_file_path()?;

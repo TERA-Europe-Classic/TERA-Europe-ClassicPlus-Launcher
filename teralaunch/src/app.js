@@ -21,34 +21,32 @@ const { message, ask } = window.__TAURI__.dialog;
  */
 const URLS = {
   // Launcher update endpoints
+  // Classic+ TODO: Re-enable when launcher update infrastructure is available
   launcher: {
-    download: "https://web.tera-germany.de/gameserver/Tera-Germany_Launcher.exe",
-    versionCheck: "https://web.tera-germany.de/classic/version.json",
-    versionInfo: "https://web.tera-germany.de/gameserver/version.json",
+    download: "",
+    versionCheck: "",
+    versionInfo: "",
   },
 
   // Game content endpoints
+  // Classic+ TODO: Re-enable news/patchNotes when endpoints are available
   content: {
-    news: "https://web.tera-germany.de/classic/Launcher_StartPage_News.json",
-    patchNotes: "https://web.tera-germany.de/classic/patchnotes.json",
-    serverStatus: "https://web.tera-germany.de/classic/serverlist.json?lang=ger&sort=3",
+    news: "",
+    patchNotes: "",
+    serverStatus: "http://88.99.102.67:8090/tera/ServerList?lang=en",
   },
 
   // External links
+  // Classic+ TODO: Re-enable registration, forum, privacy, profile when available
   external: {
-    register: "https://tera-europe-classic.com/register",
-    forum: "https://forum.crazy-esports.com/forum/board/42-tera-europe-classic/",
+    register: "",
+    forum: "",
     discord: "https://discord.com/invite/crazyesports",
     support: "https://helpdesk.crazy-esports.com",
-    privacy: "https://forum.crazy-esports.com/index.php?datenschutzerklaerung/",
-    profile: "https://tera-europe-classic.com/profile",
+    privacy: "",
+    profile: "",
   },
-
-  // Leaderboard consent API
-  leaderboard: {
-    getConsent: "https://auth.tera-europe.net/launcher/GetLeaderboardConsentAction",
-    setConsent: "https://auth.tera-europe.net/launcher/SetLeaderboardConsentAction",
-  },
+  // Classic+ NOTE: Leaderboard consent removed -- no leaderboard API on v100
 };
 
 const REQUIRED_PRIVILEGE_LEVEL = 3;
@@ -634,9 +632,7 @@ window.handleCheckRepairFiles = handleCheckRepairFiles;
 
 /**
  * Handler for View Profile menu item.
- * Requests a single-use launcher token from the website API,
- * then opens the profile page with automatic authentication.
- * Falls back to the login page if token generation fails.
+ * Classic+ TODO: Re-enable when profile page and launcher-token API are available
  */
 async function handleViewProfile() {
   // Close dropdown immediately for visual feedback
@@ -644,56 +640,15 @@ async function handleViewProfile() {
     window.closeSettingsDropdown();
   }
 
-  const PROFILE_URL = 'https://tera-europe-classic.com/profile';
-  const TOKEN_API = 'https://tera-europe-classic.com/api/auth/launcher-token';
+  // Classic+ TODO: Re-enable when profile endpoint is available
+  if (!URLS.external.profile) {
+    console.log("[Classic+] Profile URL not configured");
+    return;
+  }
+
+  const PROFILE_URL = URLS.external.profile;
 
   try {
-    const activeAccount = window.AccountManager
-      ? window.AccountManager.getActiveAccount()
-      : null;
-
-    // OAuth accounts — open profile directly (website session handles auth)
-    if (activeAccount && activeAccount.authMethod === 'oauth') {
-      if (window.App) {
-        App.openExternal(PROFILE_URL);
-      }
-      return;
-    }
-
-    // Password accounts — try to get a launcher token for auto-auth
-    if (!activeAccount || !activeAccount.credentials) {
-      if (window.App) {
-        App.openExternal(PROFILE_URL);
-      }
-      return;
-    }
-
-    const cred = JSON.parse(atob(activeAccount.credentials));
-    if (!cred.u || !cred.p) {
-      if (window.App) {
-        App.openExternal(PROFILE_URL);
-      }
-      return;
-    }
-
-    // Request a single-use launcher token
-    const response = await fetch(TOKEN_API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: cred.u, password: cred.p }),
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      if (data.token) {
-        if (window.App) {
-          App.openExternal(`${PROFILE_URL}?launcher_token=${data.token}`);
-        }
-        return;
-      }
-    }
-
-    // Token request failed — open profile without auto-auth
     if (window.App) {
       App.openExternal(PROFILE_URL);
     }
@@ -712,123 +667,37 @@ let _pendingOAuthAction = null; // 'launch' | 'switch' | null
 /**
  * Opens the system browser for OAuth login with the given provider.
  * The website will redirect back via teraclassic:// deep link with a token.
+ * Classic+ TODO: Re-enable when OAuth infrastructure is available
  * @param {string} provider - OAuth provider name
  * @param {string} [pendingAction] - Optional action to execute after OAuth completes
  */
 function startOAuth(provider, pendingAction = null) {
-  if (pendingAction) {
-    _pendingOAuthAction = pendingAction;
-  }
-  const locale = window.App ? App.getWebsiteLocale() : 'en';
-  const url = `https://tera-europe-classic.com/api/auth/oauth/${encodeURIComponent(provider)}/start?source=launcher&locale=${locale}`;
-  if (window.App) {
-    App.openExternal(url);
-  } else {
-    window.open(url, '_blank');
-  }
+  // Classic+ TODO: Re-enable when OAuth endpoint is available
+  console.log("[Classic+] OAuth not available on Classic+ server");
+  return;
 }
 window.startOAuth = startOAuth;
 
 /**
  * Handle OAuth callback from deep link (teraclassic://auth?token=...).
  * Exchanges the token for a TERA auth bundle and completes login.
+ * Classic+ TODO: Re-enable when OAuth infrastructure is available
  */
 async function handleOAuthCallback(token, oauthProvider = null) {
-  if (!token || typeof token !== 'string') return;
-
-  try {
-    // Exchange token via Rust backend (bypasses CSP, uses reqwest)
-    const responseText = await window.__TAURI__.invoke('exchange_oauth_token', { token });
-    const authBundle = JSON.parse(responseText);
-
-    if (!authBundle.authKey) {
-      throw new Error('No auth key received');
-    }
-
-    const jsonResponseFormatted = {
-      AuthKey: authBundle.authKey,
-      UserName: authBundle.userName,
-      UserNo: Number(authBundle.userNo),
-      CharacterCount: authBundle.characterCount || 0,
-      Permission: Number(authBundle.permission || 0),
-      Privilege: Number(authBundle.privilege || 0),
-    };
-
-    // Store auth info (same as regular login)
-    if (window.App) {
-      await App.storeAuthInfo(jsonResponseFormatted, authBundle.userName, null);
-
-      const userNo = String(jsonResponseFormatted.UserNo);
-      const provider = oauthProvider || 'google';
-
-      // Check if this account already exists — update it if so, otherwise add
-      const existingAccount = AccountManager.getAccount(userNo);
-      if (existingAccount) {
-        AccountManager.updateAccountAuthMethod(userNo, 'oauth', provider);
-      } else {
-        AccountManager.addAccount({
-          userNo: userNo,
-          userName: jsonResponseFormatted.UserName,
-          credentials: null,
-          authMethod: 'oauth',
-          provider: provider,
-        });
-      }
-      AccountManager.setActiveAccountId(userNo);
-
-      // Close modal and navigate to home
-      const modal = document.getElementById('add-account-modal');
-      if (modal) modal.classList.remove('show');
-
-      // Check if there was a pending action (e.g., game launch that needed re-auth)
-      const pendingAction = _pendingOAuthAction;
-      _pendingOAuthAction = null;
-
-      if (pendingAction === 'launch') {
-        // Auth is now fresh — proceed with game launch
-        App.updateAccountDisplay();
-        App.updateLaunchButtonState();
-        App.launchGame();
-      } else {
-        await App.initializeAndCheckUpdates(true);
-        await App.Router.navigate('home');
-        if (typeof LoadStartPage === 'function') LoadStartPage();
-      }
-    }
-  } catch (error) {
-    _pendingOAuthAction = null;
-    console.error('OAuth callback error:', error);
-    window.showUpdateNotification(
-      'error',
-      'Login Failed',
-      error.message || 'OAuth login failed. Please try again.'
-    );
-  }
+  // Classic+ TODO: Re-enable when OAuth endpoint is available
+  console.log("[Classic+] OAuth callback not available on Classic+ server");
+  return;
 }
 window.handleOAuthCallback = handleOAuthCallback;
 
 /**
  * Check for pending deep link on app startup and window focus.
  * Called by the Tauri backend when a teraclassic:// URL is received.
+ * Classic+ TODO: Re-enable when deep link / OAuth infrastructure is available
  */
 async function checkDeepLink() {
-  try {
-    if (window.__TAURI__?.invoke) {
-      const deepLink = await window.__TAURI__.invoke('get_pending_deep_link');
-      if (deepLink) {
-        const url = new URL(deepLink);
-        if (url.protocol === 'teraclassic:' && url.pathname === '//auth') {
-          const token = url.searchParams.get('token');
-          const provider = url.searchParams.get('provider') || null;
-          if (token) {
-            await handleOAuthCallback(token, provider);
-          }
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Deep link check error:', error);
-  }
+  // Classic+ TODO: Re-enable when OAuth deep link is available
+  return;
 }
 window.checkDeepLink = checkDeepLink;
 
@@ -2149,6 +2018,11 @@ const App = {
 
   // Open the registration website in the user's default browser
   async openRegisterPopup() {
+    // Classic+ TODO: Re-enable when registration page is available
+    if (!URLS.external.register) {
+      console.log("[Classic+] Registration URL not configured");
+      return;
+    }
     const locale = this.getWebsiteLocale();
     this.openExternal(`${URLS.external.register}?locale=${locale}`);
   },
@@ -2159,6 +2033,8 @@ const App = {
     if (startBtn) {
       startBtn.addEventListener("click", (e) => {
         e.preventDefault();
+        // Classic+ TODO: Re-enable when forum is available
+        if (!URLS.external.forum) return;
         this.openExternal(URLS.external.forum);
       });
     }
@@ -2221,6 +2097,11 @@ const App = {
     links.forEach((link) => {
       const el = document.getElementById(link.id);
       if (el) {
+        // Hide buttons with empty URLs so they don't confuse users
+        if (!link.url) {
+          el.style.display = "none";
+          return;
+        }
         el.addEventListener("click", (e) => {
           e.preventDefault();
           this.openExternal(link.url);
@@ -3943,7 +3824,14 @@ const App = {
   },
 
   async loadServerStatus() {
+    if (!URLS.content.serverStatus) {
+      console.log("[Classic+] Server status endpoint not configured, skipping");
+      return;
+    }
+
     try {
+      // Classic+ NOTE: Server status endpoint returns XML, not JSON.
+      // Wrap in try/catch to prevent crashes from unexpected response format.
       const data = await fetchData(URLS.content.serverStatus);
       if (data && data.servers && data.servers.length > 0) {
         const statusEl = document.getElementById("game-status") || document.querySelector(".game-status");
@@ -3958,6 +3846,12 @@ const App = {
   },
 
   async loadPatchNotes() {
+    // Classic+ TODO: Re-enable when patch notes endpoint is available
+    if (!URLS.content.patchNotes) {
+      console.log("[Classic+] Patch notes endpoint not configured, skipping");
+      return;
+    }
+
     try {
       const notes = await fetchData(URLS.content.patchNotes);
       if (notes && notes.notes && Array.isArray(notes.notes)) {
@@ -3972,6 +3866,11 @@ const App = {
   },
 
   async checkLauncherUpdate() {
+    // Classic+ TODO: Re-enable when launcher update endpoint is available
+    if (!URLS.launcher.versionCheck) {
+      return;
+    }
+
     try {
       const response = await fetch(URLS.launcher.versionCheck);
       if (!response.ok) {
@@ -4897,7 +4796,7 @@ const App = {
       }
     });
 
-    if (versionInfo) {
+    if (versionInfo && URLS.launcher.versionInfo) {
       fetch(URLS.launcher.versionInfo)
         .then((r) => r.json())
         .then((data) => {
@@ -6359,179 +6258,45 @@ const App = {
    * @param {boolean} promptOnFailure - If true, open login modal on failure
    * @returns {Promise<boolean>} true if session is ready, false if failed
    */
+  /**
+   * Classic+ TODO: Re-enable when auth session API (has_auth_session) is available.
+   * Returns true as a no-op so callers proceed without blocking.
+   */
   async ensureAuthSession(promptOnFailure = false) {
-    try {
-      // Check if session already exists
-      const hasSession = await window.__TAURI__.invoke('has_auth_session');
-      if (hasSession) {
-        console.log('[Auth] Session already exists');
-        return true;
-      }
-
-      console.log('[Auth] No session, attempting silent re-authentication...');
-
-      // Get active account
-      const activeAccount = AccountManager.getActiveAccount();
-
-      // OAuth accounts — can't silently re-auth without browser
-      if (activeAccount && activeAccount.authMethod === 'oauth') {
-        console.warn('[Auth] OAuth account — cannot silently re-authenticate');
-        if (promptOnFailure) {
-          const provider = activeAccount.provider || 'google';
-          window.showUpdateNotification('info', 'Re-authentication Required', 'Opening browser to re-authenticate...');
-          startOAuth(provider);
-        }
-        return false;
-      }
-
-      if (!activeAccount || !activeAccount.credentials) {
-        console.warn('[Auth] No credentials available for re-authentication');
-        if (promptOnFailure) {
-          this.openAddAccountModal();
-        }
-        return false;
-      }
-
-      // Decode credentials
-      let cred;
-      try {
-        cred = JSON.parse(atob(activeAccount.credentials));
-      } catch (e) {
-        console.warn('[Auth] Could not decode stored credentials');
-        if (promptOnFailure) {
-          this.openAddAccountModal(activeAccount.userName);
-        }
-        return false;
-      }
-
-      if (!cred.u || !cred.p) {
-        console.warn('[Auth] Invalid stored credentials');
-        if (promptOnFailure) {
-          this.openAddAccountModal(activeAccount.userName);
-        }
-        return false;
-      }
-
-      // Silently re-login to establish session
-      console.log('[Auth] Re-authenticating user:', cred.u);
-      const response = await window.__TAURI__.invoke('login', {
-        username: cred.u,
-        password: cred.p,
-      });
-
-      const jsonResponse = JSON.parse(response);
-      if (jsonResponse.Msg === 'success') {
-        console.log('[Auth] Silent re-authentication successful');
-        return true;
-      } else {
-        console.warn('[Auth] Silent re-authentication failed:', jsonResponse.Msg);
-        // Password changed or account issue - prompt user to re-login
-        if (promptOnFailure) {
-          this.openAddAccountModal(cred.u);
-        }
-        return false;
-      }
-    } catch (error) {
-      console.error('[Auth] Error ensuring session:', error);
-      if (promptOnFailure) {
-        const activeAccount = AccountManager.getActiveAccount();
-        this.openAddAccountModal(activeAccount?.userName || '');
-      }
-      return false;
-    }
+    return true;
   },
 
   /**
    * Get leaderboard consent status from backend.
-   * Uses Tauri invoke to avoid CORS issues in dev mode.
-   * @returns {Promise<boolean|null>} true if agreed, false if disagreed, null if not set
+   * Classic+ TODO: Re-enable when leaderboard API is available
+   * @returns {Promise<{success: boolean, consent: null}>}
    */
   async getLeaderboardConsent() {
-    const activeAccount = AccountManager.getActiveAccount();
-    if (!activeAccount) return { success: false, consent: null };
-
-    try {
-      // Ensure we have an authenticated session (prompt re-login on failure)
-      const sessionReady = await this.ensureAuthSession(true);
-      if (!sessionReady) {
-        console.warn('[Consent] Could not establish session');
-        return { success: false, consent: null };
-      }
-
-      // Use Tauri invoke - session cookies are handled by Rust backend
-      console.log('[Consent] Getting leaderboard consent via Tauri invoke...');
-      const response = await window.__TAURI__.invoke('get_leaderboard_consent');
-      console.log('[Consent] Response:', response);
-
-      const data = JSON.parse(response);
-
-      // Check for error response
-      if (data.Return === false) {
-        console.warn('[Consent] Backend returned error:', data.Msg || 'Unknown error');
-        return { success: false, consent: null };
-      }
-
-      // Backend returns: { LeaderboardConsent: true|false|null }
-      const consent = data.LeaderboardConsent;
-      console.log('[Consent] Parsed consent value:', consent);
-      return { success: true, consent: consent };
-    } catch (error) {
-      console.error('[Consent] Error getting leaderboard consent:', error);
-      return { success: false, consent: null };
-    }
+    // Classic+ TODO: Re-enable when leaderboard consent endpoint is available
+    return { success: false, consent: null };
   },
 
   /**
    * Set leaderboard consent on backend.
-   * Uses Tauri invoke to avoid CORS issues in dev mode.
-   * @param {boolean} agreed - true if user agrees, false if disagrees
-   * @returns {Promise<boolean>} true if successful
+   * Classic+ TODO: Re-enable when leaderboard API is available
+   * @param {boolean} agreed
+   * @returns {Promise<boolean>}
    */
   async setLeaderboardConsent(agreed) {
-    const activeAccount = AccountManager.getActiveAccount();
-    if (!activeAccount) return false;
-
-    try {
-      // Ensure we have an authenticated session (prompt re-login on failure)
-      const sessionReady = await this.ensureAuthSession(true);
-      if (!sessionReady) {
-        console.warn('[Consent] Could not establish session');
-        return false;
-      }
-
-      // Use Tauri invoke - session cookies are handled by Rust backend
-      console.log('[Consent] Setting leaderboard consent to:', agreed);
-      const response = await window.__TAURI__.invoke('set_leaderboard_consent', {
-        consent: agreed,
-      });
-      console.log('[Consent] Set consent response:', response);
-
-      // Parse the response to verify success
-      try {
-        const data = JSON.parse(response);
-        if (data.Return === true || data.Msg === 'success') {
-          console.log('[Consent] Backend confirmed consent saved');
-          return true;
-        } else {
-          console.error('[Consent] Backend rejected consent:', data);
-          return false;
-        }
-      } catch (parseError) {
-        // If response isn't JSON, check if it's a success indicator
-        console.warn('[Consent] Could not parse response as JSON:', response);
-        return true; // Assume success if we got here without error
-      }
-    } catch (error) {
-      console.error('[Consent] Error setting leaderboard consent:', error);
-      return false;
-    }
+    // Classic+ TODO: Re-enable when leaderboard consent endpoint is available
+    return false;
   },
 
   /**
    * Check if we need to show the leaderboard consent modal.
-   * Returns true if we should show the modal (consent is null), false otherwise.
+   * Classic+ TODO: Re-enable when leaderboard API is available
+   * @returns {Promise<boolean>} Always false on Classic+ (no consent modal)
    */
   async checkLeaderboardConsent() {
+    // Classic+ TODO: Re-enable when leaderboard consent endpoint is available
+    return false;
+
+    // Original logic preserved below for reference:
     const result = await this.getLeaderboardConsent();
     // If fetch failed, don't block game launch
     if (!result.success) {
@@ -6551,6 +6316,12 @@ function LoadStartPage() {
 
   // Load news from RSS feed
   loadNewsFeed();
+
+  // Classic+ TODO: Re-enable when news endpoint is available
+  if (!URLS.content.news) {
+    console.log("[Classic+] News endpoint not configured, skipping news data fetch");
+    return;
+  }
 
   // Load original news data for ads/links
   fetchData(URLS.content.news).then((jsonNews) => {
@@ -6686,6 +6457,12 @@ function animateNumber(element, target, duration = 1000) {
 async function loadNewsFeed() {
   const newsFeedList = document.getElementById("news-feed-list");
   if (!newsFeedList) return;
+
+  // Classic+ TODO: Re-enable when news feed backend is available
+  if (!URLS.content.news) {
+    newsFeedList.innerHTML = `<span class="news-item news-muted">No news available</span>`;
+    return;
+  }
 
   try {
     // Use Tauri backend to avoid CORS issues (returns pre-parsed JSON)

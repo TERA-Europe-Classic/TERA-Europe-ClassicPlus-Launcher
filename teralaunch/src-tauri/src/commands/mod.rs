@@ -30,8 +30,7 @@ pub fn list_commands() -> Vec<&'static str> {
         "register_new_account",
         "set_auth_info",
         "handle_logout",
-        "exchange_oauth_token",
-        "get_pending_deep_link",
+        "has_auth_session",
         // Config
         "select_game_folder",
         "get_game_path_from_config",
@@ -66,8 +65,8 @@ mod tests {
     #[test]
     fn list_commands_returns_expected_count() {
         let commands = list_commands();
-        // 6 auth + 5 config + 3 download + 3 game + 4 hash + 4 util = 25 commands
-        assert_eq!(commands.len(), 25);
+        // 5 auth + 5 config + 3 download + 3 game + 4 hash + 4 util = 24 commands
+        assert_eq!(commands.len(), 24);
     }
 
     #[test]

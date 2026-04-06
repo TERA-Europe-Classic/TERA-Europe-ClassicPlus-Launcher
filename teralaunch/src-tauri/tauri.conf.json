@@ -5,8 +5,8 @@
     "withGlobalTauri": true
   },
   "package": {
-    "productName": "TERA Europe Classic Launcher",
-    "version": "1.9.4"
+    "productName": "TERA Europe Classic+ Launcher",
+    "version": "0.1.0"
   },
   "tauri": {
     "allowlist": {
@@ -64,7 +64,8 @@
           "https://auth.tera-europe.net/*",
           "https://dl.tera-europe.net/*",
           "https://web.tera-germany.de/*",
-          "https://tera-europe-classic.com/*"
+          "https://tera-europe-classic.com/*",
+          "http://88.99.102.67:8090/*"
         ]
       },
       "notification": {
@@ -73,13 +74,13 @@
     },
     "updater": {
       "active": true,
-      "endpoints": ["https://web.tera-germany.de/classic/latest.json"],
+      "endpoints": ["https://web.tera-germany.de/classicplus/latest.json"],
       "dialog": true,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENEOTQyQ0VBMTQyNjQ5MTMKUldRVFNTWVU2aXlVelJvK1Y3N1BkTkVHSDlka3BRMTlJT1F6K2szS2FwSnB2SXJmL0c2bFBYUnoK"
     },
     "windows": [
       {
-        "title": "TERA Europe Classic Launcher",
+        "title": "TERA Europe Classic+ Launcher",
         "width": 1282,
         "height": 759,
         "resizable": false,
@@ -92,7 +93,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https://*.tera-europe.net https://*.tera-germany.de https://*.crazy-esports.com https://web.tera-germany.de https://helpdesk.crazy-esports.com https://tera-europe-classic.com"
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https://*.tera-europe.net https://*.tera-germany.de https://*.crazy-esports.com https://web.tera-germany.de https://helpdesk.crazy-esports.com https://tera-europe-classic.com http://88.99.102.67:8090"
     },
     "bundle": {
       "active": true,
@@ -101,7 +102,7 @@
       "publisher": "Crazy-eSports",
       "icon": ["icons/tera_server.png", "icons/tera_server.ico"],
       "copyright": "Crazy-eSports",
-      "shortDescription": "TERA Europe Classic Launcher",
+      "shortDescription": "TERA Europe Classic+ Launcher",
       "resources": ["./src/TERA/readme.txt"],
       "windows": {
         "nsis": {

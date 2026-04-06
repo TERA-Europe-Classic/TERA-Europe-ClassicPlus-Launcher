@@ -75,7 +75,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.ver.outputs.version }}
-          name: TERA Europe Classic Launcher v${{ steps.ver.outputs.version }}
+          name: TERA Europe Classic+ Launcher v${{ steps.ver.outputs.version }}
           body: |
             Automated release for version ${{ steps.ver.outputs.version }}.
           draft: false

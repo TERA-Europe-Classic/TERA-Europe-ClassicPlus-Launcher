@@ -1,13 +1,10 @@
 {
-        "COOKIE_DOMAIN": "https://auth.tera-europe.net",
-        "LOGIN_ACTION_URL": "https://auth.tera-europe.net/launcher/LoginAction",
-        "GET_ACCOUNT_INFO_URL": "https://auth.tera-europe.net/launcher/GetAccountInfoAction",
-        "GET_CHARACTER_COUNT_URL": "https://auth.tera-europe.net/launcher/GetCharacterCountAction",
-        "GET_AUTH_KEY_URL": "https://auth.tera-europe.net/launcher/GetAuthKeyAction",
-        "REGISTER_ACTION_URL": "https://auth.tera-europe.net/accountApi/RegisterNewAccount",
-        "GET_LEADERBOARD_CONSENT_URL": "https://auth.tera-europe.net/launcher/GetLeaderboardConsentAction",
-        "SET_LEADERBOARD_CONSENT_URL": "https://auth.tera-europe.net/launcher/SetLeaderboardConsentAction",
-        "HASH_FILE_URL": "https://web.tera-germany.de/classic/hash-file.json",
-        "FILE_SERVER_URL": "https://dl.tera-europe.net/TERAClassic/",
-        "SERVER_LIST_URL": "https://web.tera-germany.de/classic/serverlist.json"
+        "API_BASE_URL": "http://88.99.102.67:8090",
+        "LOGIN_ACTION_URL": "http://88.99.102.67:8090/tera/LauncherLoginAction",
+        "GET_ACCOUNT_INFO_URL": "http://88.99.102.67:8090/tera/GetAccountInfoByUserNo",
+        "REGISTER_ACTION_URL": "http://88.99.102.67:8090/tera/LauncherSignupAction",
+        "MAINTENANCE_STATUS_URL": "http://88.99.102.67:8090/tera/LauncherMaintenanceStatus",
+        "SERVER_LIST_URL": "http://88.99.102.67:8090/tera/ServerList",
+        "HASH_FILE_URL": "",
+        "FILE_SERVER_URL": ""
 }

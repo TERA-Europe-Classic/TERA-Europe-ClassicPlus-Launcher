@@ -359,6 +359,70 @@ pub fn build_login_result(
     })
 }
 
+/// Parses a v100 API login response into a LoginResult.
+///
+/// The v100 API returns all fields in a single JSON response:
+/// `{"Return":true,"ReturnCode":0,"Msg":"success","CharacterCount":"0||",
+///   "Permission":0,"Privilege":0,"UserNo":19,"UserName":"user","AuthKey":"uuid"}`
+///
+/// On failure: `{"Return":false,"ReturnCode":50000,"Msg":"account not exist"}`
+///
+/// # Arguments
+/// * `response` - The raw JSON response string from the v100 login endpoint
+///
+/// # Returns
+/// * `Ok(LoginResult)` - Parsed login result with all fields populated
+/// * `Err(AuthError)` - If the response indicates failure or cannot be parsed
+pub fn parse_v100_login_response(response: &str) -> Result<LoginResult, AuthError> {
+    let json: Value =
+        serde_json::from_str(response).map_err(|e| AuthError::ParseError(e.to_string()))?;
+
+    let success = json["Return"]
+        .as_bool()
+        .ok_or_else(|| AuthError::ParseError("Missing 'Return' boolean field".to_string()))?;
+
+    if !success {
+        let msg = json["Msg"]
+            .as_str()
+            .unwrap_or("Unknown error");
+        return Err(AuthError::ServerError(msg.to_string()));
+    }
+
+    let user_no = json["UserNo"]
+        .as_i64()
+        .ok_or_else(|| AuthError::ParseError("Missing 'UserNo' field".to_string()))?;
+
+    let user_name = json["UserName"]
+        .as_str()
+        .ok_or_else(|| AuthError::ParseError("Missing 'UserName' field".to_string()))?
+        .to_string();
+
+    let auth_key = json["AuthKey"]
+        .as_str()
+        .ok_or_else(|| AuthError::ParseError("Missing 'AuthKey' field".to_string()))?
+        .to_string();
+
+    let character_count = json["CharacterCount"]
+        .as_str()
+        .unwrap_or("0")
+        .to_string();
+
+    let permission = json["Permission"].as_i64().unwrap_or(0);
+    let privilege = json["Privilege"].as_i64().unwrap_or(0);
+
+    Ok(LoginResult {
+        auth_key,
+        user_name,
+        user_no,
+        character_count,
+        permission,
+        privilege,
+        region: "EU".to_string(),
+        banned: false,
+        leaderboard_consent: None,
+    })
+}
+
 /// Serializes a login result to JSON string for frontend consumption.
 ///
 /// # Arguments
@@ -918,6 +982,114 @@ mod tests {
         let json = serialize_login_result(&result);
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed["Return"]["Banned"], true);
+    }
+
+    // ========================================================================
+    // Tests for parse_v100_login_response
+    // ========================================================================
+
+    #[test]
+    fn parse_v100_login_response_success() {
+        let response = r#"{"Return":true,"ReturnCode":0,"Msg":"success","CharacterCount":"0||","Permission":0,"Privilege":0,"UserNo":19,"UserName":"testclaude01","AuthKey":"550e8400-e29b-41d4-a716-446655440000"}"#;
+        let result = parse_v100_login_response(response);
+        assert!(result.is_ok());
+        let login = result.unwrap();
+        assert_eq!(login.user_no, 19);
+        assert_eq!(login.user_name, "testclaude01");
+        assert_eq!(login.auth_key, "550e8400-e29b-41d4-a716-446655440000");
+        assert_eq!(login.character_count, "0||");
+        assert_eq!(login.permission, 0);
+        assert_eq!(login.privilege, 0);
+        assert_eq!(login.region, "EU");
+        assert!(!login.banned);
+        assert_eq!(login.leaderboard_consent, None);
+    }
+
+    #[test]
+    fn parse_v100_login_response_failure_account_not_exist() {
+        let response = r#"{"Return":false,"ReturnCode":50000,"Msg":"account not exist"}"#;
+        let result = parse_v100_login_response(response);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, AuthError::ServerError(_)));
+        assert!(err.to_string().contains("account not exist"));
+    }
+
+    #[test]
+    fn parse_v100_login_response_failure_wrong_password() {
+        let response = r#"{"Return":false,"ReturnCode":50001,"Msg":"wrong password"}"#;
+        let result = parse_v100_login_response(response);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("wrong password"));
+    }
+
+    #[test]
+    fn parse_v100_login_response_missing_return_field() {
+        let response = r#"{"ReturnCode":0,"Msg":"success","UserNo":19}"#;
+        let result = parse_v100_login_response(response);
+        assert!(matches!(result, Err(AuthError::ParseError(_))));
+    }
+
+    #[test]
+    fn parse_v100_login_response_missing_user_no() {
+        let response = r#"{"Return":true,"ReturnCode":0,"Msg":"success","UserName":"test","AuthKey":"key"}"#;
+        let result = parse_v100_login_response(response);
+        assert!(matches!(result, Err(AuthError::ParseError(_))));
+    }
+
+    #[test]
+    fn parse_v100_login_response_missing_auth_key() {
+        let response = r#"{"Return":true,"ReturnCode":0,"Msg":"success","UserNo":19,"UserName":"test"}"#;
+        let result = parse_v100_login_response(response);
+        assert!(matches!(result, Err(AuthError::ParseError(_))));
+    }
+
+    #[test]
+    fn parse_v100_login_response_missing_user_name() {
+        let response = r#"{"Return":true,"ReturnCode":0,"Msg":"success","UserNo":19,"AuthKey":"key"}"#;
+        let result = parse_v100_login_response(response);
+        assert!(matches!(result, Err(AuthError::ParseError(_))));
+    }
+
+    #[test]
+    fn parse_v100_login_response_invalid_json() {
+        let response = "not valid json";
+        let result = parse_v100_login_response(response);
+        assert!(matches!(result, Err(AuthError::ParseError(_))));
+    }
+
+    #[test]
+    fn parse_v100_login_response_empty_string() {
+        let response = "";
+        let result = parse_v100_login_response(response);
+        assert!(matches!(result, Err(AuthError::ParseError(_))));
+    }
+
+    #[test]
+    fn parse_v100_login_response_defaults_for_optional_fields() {
+        // CharacterCount, Permission, Privilege missing — should use defaults
+        let response = r#"{"Return":true,"ReturnCode":0,"Msg":"success","UserNo":1,"UserName":"u","AuthKey":"k"}"#;
+        let result = parse_v100_login_response(response).unwrap();
+        assert_eq!(result.character_count, "0");
+        assert_eq!(result.permission, 0);
+        assert_eq!(result.privilege, 0);
+    }
+
+    #[test]
+    fn parse_v100_login_response_with_nonzero_permission() {
+        let response = r#"{"Return":true,"ReturnCode":0,"Msg":"success","CharacterCount":"3||","Permission":5,"Privilege":10,"UserNo":42,"UserName":"admin","AuthKey":"abc-123"}"#;
+        let result = parse_v100_login_response(response).unwrap();
+        assert_eq!(result.permission, 5);
+        assert_eq!(result.privilege, 10);
+        assert_eq!(result.character_count, "3||");
+    }
+
+    #[test]
+    fn parse_v100_login_response_false_without_msg_uses_unknown() {
+        let response = r#"{"Return":false,"ReturnCode":99999}"#;
+        let result = parse_v100_login_response(response);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Unknown error"));
     }
 
     // ========================================================================

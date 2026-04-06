@@ -3,10 +3,10 @@
   <assemblyIdentity
     version="1.0.0.0"
     processorArchitecture="*"
-    name="TERA-Europe-Classic-Launcher"
+    name="TERA-Europe-ClassicPlus-Launcher"
     type="win32"
   />
-  <description>TERA Europe Classic Launcher</description>
+  <description>TERA Europe Classic+ Launcher</description>
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>
       <requestedPrivileges>

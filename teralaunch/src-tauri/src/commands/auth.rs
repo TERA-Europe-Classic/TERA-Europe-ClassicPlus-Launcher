@@ -1,7 +1,7 @@
 //! Authentication-related Tauri commands
 //!
 //! This module contains commands for user authentication including:
-//! - Login
+//! - Login (v100 single-POST flow)
 //! - Registration
 //! - Logout
 //! - Auth info management
@@ -14,27 +14,22 @@ use crate::infrastructure::{HttpClient, ReqwestClient};
 use crate::services::auth_service;
 use crate::state::{
     clear_auth_client, clear_auth_info, get_auth_client, set_auth_client,
-    set_auth_info as set_auth_state, take_pending_deep_link,
+    set_auth_info as set_auth_state,
 };
 use crate::GameState;
 use teralib::config::get_config_value;
 
-/// Inner testable login function that accepts an HttpClient implementation.
+/// Inner testable login function using the v100 single-POST API.
 ///
-/// Performs the full login flow:
-/// 1. Sends credentials to login endpoint
-/// 2. Retrieves account info
-/// 3. Gets auth key for game launch
-/// 4. Gets character count
+/// Sends credentials as JSON to the login endpoint. The v100 API returns all
+/// fields (AuthKey, UserNo, CharacterCount, Permission, Privilege, UserName)
+/// in a single response, replacing the old 4-step cookie chain.
 ///
 /// # Arguments
 /// * `client` - The HTTP client to use for requests
 /// * `username` - The user's account name
 /// * `password` - The user's password
-/// * `login_url` - URL for login endpoint
-/// * `account_info_url` - URL for account info endpoint
-/// * `auth_key_url` - URL for auth key endpoint
-/// * `character_count_url` - URL for character count endpoint
+/// * `login_url` - URL for the v100 login endpoint
 ///
 /// # Returns
 /// JSON string containing auth info on success, or error message on failure
@@ -43,26 +38,19 @@ async fn login_with_client<H: HttpClient>(
     username: String,
     password: String,
     login_url: &str,
-    account_info_url: &str,
-    auth_key_url: &str,
-    character_count_url: &str,
 ) -> Result<String, String> {
     if auth_service::validate_credentials(&username, &password).is_err() {
         return Err("Username and password cannot be empty".to_string());
     }
 
-    // Prepare login payload
-    let form_data = vec![
-        ("login".to_string(), username.clone()),
-        ("password".to_string(), password),
-    ];
+    // Build JSON payload for v100 API
+    let payload = json!({
+        "login": username,
+        "password": password
+    });
 
-    // Send login request
-    let login_res = client.post_form(login_url, &form_data).await?;
-
-    if login_res.status == 401 || login_res.status == 403 {
-        return Err("INVALID_CREDENTIALS".to_string());
-    }
+    // Single POST request to v100 login endpoint
+    let login_res = client.post(login_url, &payload.to_string()).await?;
 
     if !login_res.is_success() {
         return Err(format!(
@@ -71,54 +59,19 @@ async fn login_with_client<H: HttpClient>(
         ));
     }
 
-    let login_text = login_res.text().map_err(|e| e.to_string())?;
-    let login_status =
-        auth_service::parse_login_response(&login_text).map_err(|e| e.to_string())?;
+    let response_text = login_res.text().map_err(|e| e.to_string())?;
 
-    if !auth_service::is_login_successful(&login_status) {
-        return Err(login_status);
-    }
-
-    let account_info_res = client.get(account_info_url).await?;
-    let account_info_text = account_info_res.text().map_err(|e| e.to_string())?;
-    let (user_no, permission, user_name) =
-        auth_service::parse_account_info(&account_info_text).map_err(|e| e.to_string())?;
-    let (privilege, region, banned, leaderboard_consent) =
-        auth_service::parse_account_extras(&account_info_text).map_err(|e| e.to_string())?;
-
-    let auth_key_res = client.get(auth_key_url).await?;
-    let auth_key_text = auth_key_res.text().map_err(|e| e.to_string())?;
-    let auth_key = auth_service::parse_auth_key(&auth_key_text).map_err(|e| e.to_string())?;
-
-    let character_count_res = client.get(character_count_url).await?;
-    let character_count_text = character_count_res.text().map_err(|e| e.to_string())?;
-    let character_count =
-        auth_service::parse_character_count(&character_count_text).map_err(|e| e.to_string())?;
-
-    let result = auth_service::build_login_result(
-        &login_status,
-        user_no,
-        permission,
-        user_name,
-        auth_key,
-        character_count,
-        privilege,
-        region,
-        banned,
-        leaderboard_consent,
-    )
-    .map_err(|e| e.to_string())?;
+    // Parse the v100 response which contains all fields in one payload
+    let result =
+        auth_service::parse_v100_login_response(&response_text).map_err(|e| e.to_string())?;
 
     Ok(auth_service::serialize_login_result(&result))
 }
 
-/// Authenticates a user with the game server.
+/// Authenticates a user with the game server using the v100 API.
 ///
-/// Performs the full login flow:
-/// 1. Sends credentials to login endpoint
-/// 2. Retrieves account info
-/// 3. Gets auth key for game launch
-/// 4. Gets character count
+/// Sends a single JSON POST with credentials and receives all auth fields
+/// in one response.
 ///
 /// # Arguments
 /// * `username` - The user's account name
@@ -131,24 +84,11 @@ async fn login_with_client<H: HttpClient>(
 pub async fn login(username: String, password: String) -> Result<String, String> {
     let client = ReqwestClient::with_defaults(DOWNLOAD_TIMEOUT_SECS, CONNECT_TIMEOUT_SECS)?;
 
-    // Get URLs from configuration
     let login_url = get_config_value("LOGIN_ACTION_URL");
-    let account_info_url = get_config_value("GET_ACCOUNT_INFO_URL");
-    let auth_key_url = get_config_value("GET_AUTH_KEY_URL");
-    let character_count_url = get_config_value("GET_CHARACTER_COUNT_URL");
 
-    let result = login_with_client(
-        &client,
-        username,
-        password,
-        &login_url,
-        &account_info_url,
-        &auth_key_url,
-        &character_count_url,
-    )
-    .await;
+    let result = login_with_client(&client, username, password, &login_url).await;
 
-    // Store the authenticated client for session-based API calls (e.g., consent)
+    // Store the authenticated client for potential future session-based calls
     if result.is_ok() {
         set_auth_client(client.inner());
     }
@@ -237,7 +177,6 @@ pub fn set_auth_info(auth_key: String, user_name: String, user_no: i32, characte
         character_count: character_count.clone(),
     });
 
-    // Log auth info received from frontend
     info!("Auth info set from frontend:");
     info!("User Name: {}", user_name);
     info!("User No: {}", user_no);
@@ -254,9 +193,7 @@ pub fn set_auth_info(auth_key: String, user_name: String, user_no: i32, characte
 #[cfg(not(tarpaulin_include))]
 #[tauri::command]
 pub async fn handle_logout(_state: tauri::State<'_, GameState>) -> Result<(), String> {
-    // Reset global authentication information
     clear_auth_info();
-    // Clear the authenticated HTTP client (session cookies)
     clear_auth_client();
 
     Ok(())
@@ -265,150 +202,11 @@ pub async fn handle_logout(_state: tauri::State<'_, GameState>) -> Result<(), St
 /// Checks if an authenticated session exists.
 ///
 /// # Returns
-/// true if there's an active session with cookies, false otherwise
+/// true if there's an active session, false otherwise
 #[cfg(not(tarpaulin_include))]
 #[tauri::command]
 pub fn has_auth_session() -> bool {
     get_auth_client().is_some()
-}
-
-/// Gets the leaderboard consent status for the current user.
-///
-/// Uses the authenticated session from login (cookie-based auth).
-///
-/// # Returns
-/// JSON string containing consent status (true, false, or null if not set)
-#[cfg(not(tarpaulin_include))]
-#[tauri::command]
-pub async fn get_leaderboard_consent() -> Result<String, String> {
-    info!("Getting leaderboard consent");
-
-    // Get the authenticated client (has session cookies from login)
-    let client = get_auth_client().ok_or("Not logged in - no authenticated session")?;
-    let consent_url = get_config_value("GET_LEADERBOARD_CONSENT_URL");
-    info!("Requesting: {}", consent_url);
-
-    // Backend expects GET request with session cookie auth
-    let response = client
-        .get(&consent_url)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let status = response.status().as_u16();
-    let text = response.text().await.map_err(|e| e.to_string())?;
-
-    info!("Response status: {}, body: {}", status, text);
-
-    if (200..300).contains(&status) {
-        Ok(text)
-    } else {
-        Err(format!("Failed to get consent status: {}", text))
-    }
-}
-
-/// Sets the leaderboard consent for the current user.
-///
-/// Uses the authenticated session from login (cookie-based auth).
-///
-/// # Arguments
-/// * `consent` - Whether the user consents to leaderboard visibility
-///
-/// # Returns
-/// JSON string containing the response from the server
-#[cfg(not(tarpaulin_include))]
-#[tauri::command]
-pub async fn set_leaderboard_consent(consent: bool) -> Result<String, String> {
-    info!("Setting leaderboard consent to: {}", consent);
-
-    // Get the authenticated client (has session cookies from login)
-    let client = get_auth_client().ok_or("Not logged in - no authenticated session")?;
-    let consent_url = get_config_value("SET_LEADERBOARD_CONSENT_URL");
-    info!("Requesting: {}", consent_url);
-
-    // Send JSON with integer value (backend has express.json() middleware)
-    let consent_value: i32 = if consent { 1 } else { 0 };
-    info!("Sending JSON: consent={}", consent_value);
-
-    let response = client
-        .post(&consent_url)
-        .json(&serde_json::json!({ "consent": consent_value }))
-        .send()
-        .await
-        .map_err(|e| {
-            info!("Request error: {}", e);
-            e.to_string()
-        })?;
-
-    let status = response.status().as_u16();
-    let text = response.text().await.map_err(|e| e.to_string())?;
-
-    info!("Response status: {}, body: {}", status, text);
-
-    if (200..300).contains(&status) {
-        Ok(text)
-    } else {
-        Err(format!("Failed to set consent: {}", text))
-    }
-}
-
-/// Exchanges an OAuth token with the website for an auth bundle.
-///
-/// POSTs the single-use token to the website's OAuth exchange endpoint.
-/// The website decrypts the stored credential, authenticates with the TERA API,
-/// and returns the auth bundle (authKey, userName, userNo, etc.).
-///
-/// # Arguments
-/// * `token` - The single-use OAuth token (64 hex chars) from the deep link
-///
-/// # Returns
-/// JSON string containing the auth bundle on success
-#[cfg(not(tarpaulin_include))]
-#[tauri::command]
-pub async fn exchange_oauth_token(token: String) -> Result<String, String> {
-    info!("Exchanging OAuth token with website");
-
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
-        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
-
-    let exchange_url = "https://tera-europe-classic.com/api/auth/launcher-oauth/exchange";
-
-    let response = client
-        .post(exchange_url)
-        .json(&serde_json::json!({ "token": token }))
-        .send()
-        .await
-        .map_err(|e| format!("OAuth exchange request failed: {}", e))?;
-
-    let status = response.status().as_u16();
-    let text = response.text().await.map_err(|e| e.to_string())?;
-
-    info!("OAuth exchange response status: {}", status);
-
-    if (200..300).contains(&status) {
-        Ok(text)
-    } else {
-        Err(format!("OAuth exchange failed ({}): {}", status, text))
-    }
-}
-
-/// Retrieves and consumes the pending deep link URL.
-///
-/// When the launcher is opened via a `teraclassic://` deep link, the URL is stored
-/// on startup. The frontend calls this command to check for and consume the pending URL.
-///
-/// # Returns
-/// The deep link URL string if one is pending, or null if none
-#[cfg(not(tarpaulin_include))]
-#[tauri::command]
-pub fn get_pending_deep_link() -> Option<String> {
-    let result = take_pending_deep_link();
-    if result.is_some() {
-        info!("Deep link consumed by frontend");
-    }
-    result
 }
 
 #[cfg(test)]
@@ -417,11 +215,7 @@ mod tests {
     use crate::infrastructure::{HttpResponse, MockHttpClient};
     use serde_json::Value;
 
-    // Test URL constants for mocking
     const TEST_LOGIN_URL: &str = "http://test.server/login";
-    const TEST_ACCOUNT_INFO_URL: &str = "http://test.server/account";
-    const TEST_AUTH_KEY_URL: &str = "http://test.server/authkey";
-    const TEST_CHARACTER_COUNT_URL: &str = "http://test.server/charcount";
     const TEST_REGISTER_URL: &str = "http://test.server/register";
 
     // === Login Validation Tests ===
@@ -434,9 +228,6 @@ mod tests {
             "".to_string(),
             "pass".to_string(),
             TEST_LOGIN_URL,
-            TEST_ACCOUNT_INFO_URL,
-            TEST_AUTH_KEY_URL,
-            TEST_CHARACTER_COUNT_URL,
         )
         .await;
         assert_eq!(result.unwrap_err(), "Username and password cannot be empty");
@@ -450,9 +241,6 @@ mod tests {
             "user".to_string(),
             "".to_string(),
             TEST_LOGIN_URL,
-            TEST_ACCOUNT_INFO_URL,
-            TEST_AUTH_KEY_URL,
-            TEST_CHARACTER_COUNT_URL,
         )
         .await;
         assert_eq!(result.unwrap_err(), "Username and password cannot be empty");
@@ -466,9 +254,6 @@ mod tests {
             "".to_string(),
             "".to_string(),
             TEST_LOGIN_URL,
-            TEST_ACCOUNT_INFO_URL,
-            TEST_AUTH_KEY_URL,
-            TEST_CHARACTER_COUNT_URL,
         )
         .await;
         assert_eq!(result.unwrap_err(), "Username and password cannot be empty");
@@ -480,45 +265,12 @@ mod tests {
     async fn test_login_success() {
         let mock = MockHttpClient::new();
 
-        // Setup login response
+        // v100 API returns all fields in a single response
         mock.add_response(
             TEST_LOGIN_URL,
             HttpResponse {
                 status: 200,
-                body: br#"{"Msg": "Success"}"#.to_vec(),
-                content_length: None,
-                supports_range: false,
-            },
-        );
-
-        // Setup account info response
-        mock.add_response(
-            TEST_ACCOUNT_INFO_URL,
-            HttpResponse {
-                status: 200,
-                body: br#"{"UserNo": 12345, "Permission": 1, "UserName": "TestUser", "Privilege": 0, "Region": "EU", "Banned": false}"#.to_vec(),
-                content_length: None,
-                supports_range: false,
-            },
-        );
-
-        // Setup auth key response
-        mock.add_response(
-            TEST_AUTH_KEY_URL,
-            HttpResponse {
-                status: 200,
-                body: br#"{"AuthKey": "test-auth-key-123"}"#.to_vec(),
-                content_length: None,
-                supports_range: false,
-            },
-        );
-
-        // Setup character count response
-        mock.add_response(
-            TEST_CHARACTER_COUNT_URL,
-            HttpResponse {
-                status: 200,
-                body: br#"{"CharacterCount": "5"}"#.to_vec(),
+                body: br#"{"Return":true,"ReturnCode":0,"Msg":"success","CharacterCount":"5","Permission":1,"Privilege":0,"UserNo":12345,"UserName":"TestUser","AuthKey":"test-auth-key-123"}"#.to_vec(),
                 content_length: None,
                 supports_range: false,
             },
@@ -529,9 +281,6 @@ mod tests {
             "testuser".to_string(),
             "testpass".to_string(),
             TEST_LOGIN_URL,
-            TEST_ACCOUNT_INFO_URL,
-            TEST_AUTH_KEY_URL,
-            TEST_CHARACTER_COUNT_URL,
         )
         .await;
 
@@ -541,19 +290,52 @@ mod tests {
         assert_eq!(json_result["Return"]["UserNo"], 12345);
         assert_eq!(json_result["Return"]["AuthKey"], "test-auth-key-123");
         assert_eq!(json_result["Return"]["CharacterCount"], "5");
+        assert_eq!(json_result["Return"]["Permission"], 1);
+        assert_eq!(json_result["Return"]["Privilege"], 0);
+        assert_eq!(json_result["Return"]["Region"], "EU");
+        assert_eq!(json_result["Return"]["Banned"], false);
         assert_eq!(json_result["Msg"], "success");
+    }
+
+    #[tokio::test]
+    async fn test_login_success_with_character_count_format() {
+        let mock = MockHttpClient::new();
+
+        // v100 returns CharacterCount in "0||" format
+        mock.add_response(
+            TEST_LOGIN_URL,
+            HttpResponse {
+                status: 200,
+                body: br#"{"Return":true,"ReturnCode":0,"Msg":"success","CharacterCount":"0||","Permission":0,"Privilege":0,"UserNo":19,"UserName":"testclaude01","AuthKey":"550e8400-uuid"}"#.to_vec(),
+                content_length: None,
+                supports_range: false,
+            },
+        );
+
+        let result = login_with_client(
+            &mock,
+            "testclaude01".to_string(),
+            "Pass123!".to_string(),
+            TEST_LOGIN_URL,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let json_result: Value = serde_json::from_str(&result.unwrap()).unwrap();
+        assert_eq!(json_result["Return"]["CharacterCount"], "0||");
+        assert_eq!(json_result["Return"]["UserNo"], 19);
     }
 
     // === Login Error Handling Tests ===
 
     #[tokio::test]
-    async fn test_login_invalid_credentials_401() {
+    async fn test_login_v100_account_not_exist() {
         let mock = MockHttpClient::new();
         mock.add_response(
             TEST_LOGIN_URL,
             HttpResponse {
-                status: 401,
-                body: br#"{"Msg": "Unauthorized"}"#.to_vec(),
+                status: 200,
+                body: br#"{"Return":false,"ReturnCode":50000,"Msg":"account not exist"}"#.to_vec(),
                 content_length: None,
                 supports_range: false,
             },
@@ -564,23 +346,21 @@ mod tests {
             "baduser".to_string(),
             "badpass".to_string(),
             TEST_LOGIN_URL,
-            TEST_ACCOUNT_INFO_URL,
-            TEST_AUTH_KEY_URL,
-            TEST_CHARACTER_COUNT_URL,
         )
         .await;
 
-        assert_eq!(result.unwrap_err(), "INVALID_CREDENTIALS");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("account not exist"));
     }
 
     #[tokio::test]
-    async fn test_login_invalid_credentials_403() {
+    async fn test_login_v100_wrong_password() {
         let mock = MockHttpClient::new();
         mock.add_response(
             TEST_LOGIN_URL,
             HttpResponse {
-                status: 403,
-                body: br#"{"Msg": "Forbidden"}"#.to_vec(),
+                status: 200,
+                body: br#"{"Return":false,"ReturnCode":50001,"Msg":"wrong password"}"#.to_vec(),
                 content_length: None,
                 supports_range: false,
             },
@@ -588,16 +368,14 @@ mod tests {
 
         let result = login_with_client(
             &mock,
-            "baduser".to_string(),
-            "badpass".to_string(),
+            "user".to_string(),
+            "wrongpass".to_string(),
             TEST_LOGIN_URL,
-            TEST_ACCOUNT_INFO_URL,
-            TEST_AUTH_KEY_URL,
-            TEST_CHARACTER_COUNT_URL,
         )
         .await;
 
-        assert_eq!(result.unwrap_err(), "INVALID_CREDENTIALS");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("wrong password"));
     }
 
     #[tokio::test]
@@ -618,9 +396,6 @@ mod tests {
             "user".to_string(),
             "pass".to_string(),
             TEST_LOGIN_URL,
-            TEST_ACCOUNT_INFO_URL,
-            TEST_AUTH_KEY_URL,
-            TEST_CHARACTER_COUNT_URL,
         )
         .await;
 
@@ -638,9 +413,6 @@ mod tests {
             "user".to_string(),
             "pass".to_string(),
             TEST_LOGIN_URL,
-            TEST_ACCOUNT_INFO_URL,
-            TEST_AUTH_KEY_URL,
-            TEST_CHARACTER_COUNT_URL,
         )
         .await;
 
@@ -648,13 +420,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_login_failed_status_message() {
+    async fn test_login_invalid_json_response() {
         let mock = MockHttpClient::new();
         mock.add_response(
             TEST_LOGIN_URL,
             HttpResponse {
                 status: 200,
-                body: br#"{"Msg": "Account suspended"}"#.to_vec(),
+                body: br#"not valid json"#.to_vec(),
                 content_length: None,
                 supports_range: false,
             },
@@ -665,52 +437,10 @@ mod tests {
             "user".to_string(),
             "pass".to_string(),
             TEST_LOGIN_URL,
-            TEST_ACCOUNT_INFO_URL,
-            TEST_AUTH_KEY_URL,
-            TEST_CHARACTER_COUNT_URL,
         )
         .await;
 
-        assert_eq!(result.unwrap_err(), "Account suspended");
-    }
-
-    #[tokio::test]
-    async fn test_login_missing_account_info_field() {
-        let mock = MockHttpClient::new();
-
-        mock.add_response(
-            TEST_LOGIN_URL,
-            HttpResponse {
-                status: 200,
-                body: br#"{"Msg": "Success"}"#.to_vec(),
-                content_length: None,
-                supports_range: false,
-            },
-        );
-
-        // Missing UserNo field
-        mock.add_response(
-            TEST_ACCOUNT_INFO_URL,
-            HttpResponse {
-                status: 200,
-                body: br#"{"Permission": 1, "UserName": "TestUser"}"#.to_vec(),
-                content_length: None,
-                supports_range: false,
-            },
-        );
-
-        let result = login_with_client(
-            &mock,
-            "user".to_string(),
-            "pass".to_string(),
-            TEST_LOGIN_URL,
-            TEST_ACCOUNT_INFO_URL,
-            TEST_AUTH_KEY_URL,
-            TEST_CHARACTER_COUNT_URL,
-        )
-        .await;
-
-        assert_eq!(result.unwrap_err(), "Parse error: Missing 'UserNo' field");
+        assert!(result.is_err());
     }
 
     // === Registration Validation Tests ===
@@ -766,7 +496,7 @@ mod tests {
             TEST_REGISTER_URL,
             HttpResponse {
                 status: 200,
-                body: br#"{"Msg": "Registration successful"}"#.to_vec(),
+                body: br#"{"Return":true,"ReturnCode":0,"Msg":"success","UserNo":19,"AuthKey":"uuid"}"#.to_vec(),
                 content_length: None,
                 supports_range: false,
             },
@@ -782,7 +512,7 @@ mod tests {
         .await;
 
         assert!(result.is_ok());
-        assert!(result.unwrap().contains("Registration successful"));
+        assert!(result.unwrap().contains("success"));
     }
 
     // === Registration Error Handling Tests ===
