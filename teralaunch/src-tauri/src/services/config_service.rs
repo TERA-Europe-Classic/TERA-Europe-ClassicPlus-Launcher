@@ -145,14 +145,14 @@ pub fn update_language_in_config(content: &str, new_lang: &str) -> Result<String
 /// Determines the config file path based on platform conventions.
 ///
 /// Returns the path where the config file should be located:
-/// - Windows: %APPDATA%/Crazy-eSports.com/tera_config.ini
-/// - Linux/Mac: ~/.config/Crazy-eSports.com/tera_config.ini
+/// - Windows: %APPDATA%/Crazy-eSports-ClassicPlus/tera_config.ini
+/// - Linux/Mac: ~/.config/Crazy-eSports-ClassicPlus/tera_config.ini
 ///
 /// # Returns
 /// * `Some(PathBuf)` - The expected config file path
 /// * `None` - If the config directory cannot be determined
 pub fn get_config_file_path() -> Option<PathBuf> {
-    dirs_next::config_dir().map(|d| d.join("Crazy-eSports.com").join("tera_config.ini"))
+    dirs_next::config_dir().map(|d| d.join("Crazy-eSports-ClassicPlus").join("tera_config.ini"))
 }
 
 /// Searches for legacy config file locations.
@@ -436,7 +436,7 @@ mod tests {
         let path = get_config_file_path();
         // Should return Some on most systems
         if let Some(p) = path {
-            assert!(p.to_string_lossy().contains("Crazy-eSports.com"));
+            assert!(p.to_string_lossy().contains("Crazy-eSports-ClassicPlus"));
             assert!(p.to_string_lossy().contains("tera_config.ini"));
         }
     }

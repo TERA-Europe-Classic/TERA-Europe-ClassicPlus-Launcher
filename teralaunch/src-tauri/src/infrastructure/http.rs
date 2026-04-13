@@ -85,9 +85,27 @@ impl ReqwestClient {
         Self { client }
     }
 
-    /// Create a new ReqwestClient with default configuration.
+    /// Create a new ReqwestClient with default configuration (HTTPS only).
     #[cfg(not(tarpaulin_include))]
     pub fn with_defaults(timeout_secs: u64, connect_timeout_secs: u64) -> Result<Self, String> {
+        use std::time::Duration;
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(timeout_secs))
+            .connect_timeout(Duration::from_secs(connect_timeout_secs))
+            .cookie_store(true)
+            .user_agent(DEFAULT_USER_AGENT)
+            .https_only(true)
+            .build()
+            .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+        Ok(Self { client })
+    }
+
+    /// Create a new ReqwestClient that permits plain HTTP connections.
+    ///
+    /// Use only for endpoints that require HTTP (e.g. the v100 API at http://...).
+    /// All other clients should use `with_defaults` which enforces HTTPS.
+    #[cfg(not(tarpaulin_include))]
+    pub fn with_http_allowed(timeout_secs: u64, connect_timeout_secs: u64) -> Result<Self, String> {
         use std::time::Duration;
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(timeout_secs))

@@ -3,6 +3,8 @@ README
 target
 /updater
 .env
+*.key
+*.key.pub
 
 # Node
 node_modules/

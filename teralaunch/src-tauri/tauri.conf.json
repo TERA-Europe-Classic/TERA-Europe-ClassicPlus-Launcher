@@ -6,7 +6,7 @@
   },
   "package": {
     "productName": "TERA Europe Classic+ Launcher",
-    "version": "0.1.0"
+    "version": "0.1.3"
   },
   "tauri": {
     "allowlist": {
@@ -65,7 +65,7 @@
           "https://dl.tera-europe.net/*",
           "https://web.tera-germany.de/*",
           "https://tera-europe-classic.com/*",
-          "http://88.99.102.67:8090/*"
+          "http://192.168.1.128:8090/*"
         ]
       },
       "notification": {
@@ -73,10 +73,10 @@
       }
     },
     "updater": {
-      "active": false,
-      "endpoints": ["https://web.tera-germany.de/classicplus/latest.json"],
+      "active": true,
+      "endpoints": ["https://web.tera-germany.de/classic/classicplus/latest.json"],
       "dialog": true,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENEOTQyQ0VBMTQyNjQ5MTMKUldRVFNTWVU2aXlVelJvK1Y3N1BkTkVHSDlka3BRMTlJT1F6K2szS2FwSnB2SXJmL0c2bFBYUnoK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDFCMzc4QTIwN0ZFRjJGODQKUldTRUwrOS9JSW8zR3czVm4xcFhNbDhwK3lrV3lLc1ovZHpqbVZyczBMbDJ2MXY5ckUweWVkMkwK"
     },
     "windows": [
       {
@@ -93,12 +93,12 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https://*.tera-europe.net https://*.tera-germany.de https://*.crazy-esports.com https://web.tera-germany.de https://helpdesk.crazy-esports.com https://tera-europe-classic.com http://88.99.102.67:8090"
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https://*.tera-europe.net https://*.tera-germany.de https://*.crazy-esports.com https://web.tera-germany.de https://helpdesk.crazy-esports.com https://tera-europe-classic.com http://192.168.1.128:8090"
     },
     "bundle": {
       "active": true,
       "targets": ["nsis", "updater"],
-      "identifier": "crazy-esports",
+      "identifier": "crazy-esports-classicplus",
       "publisher": "Crazy-eSports",
       "icon": ["icons/tera_server.png", "icons/tera_server.ico"],
       "copyright": "Crazy-eSports",

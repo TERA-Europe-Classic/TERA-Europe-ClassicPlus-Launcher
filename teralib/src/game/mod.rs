@@ -1002,8 +1002,7 @@ fn on_world_entered(world_name: &str) {
 
 /// Asynchronously retrieves the server list.
 ///
-/// This function sends a GET request to a local server to retrieve the server list,
-/// then parses the JSON response into a ServerList struct.
+/// Fetches from SERVER_LIST_URL and auto-detects format: XML (v100 API) or JSON (hosted file).
 ///
 /// # Returns
 ///
@@ -1023,9 +1022,18 @@ async fn get_server_list() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         return Err(format!("Unsuccessful HTTP response: {}", response.status()).into());
     }
 
-    let json: Value = response.json().await?;
-    info!("Server list JSON received, parsing...");
-    let server_list = parse_server_list_json(&json)?;
+    let body = response.text().await?;
+    let trimmed = body.trim_start();
+
+    let server_list = if trimmed.starts_with("<?xml") || trimmed.starts_with("<serverlist") {
+        info!("Server list XML received, parsing...");
+        parse_server_list_xml(&body)?
+    } else {
+        info!("Server list JSON received, parsing...");
+        let json: Value = serde_json::from_str(&body)?;
+        parse_server_list_json(&json)?
+    };
+
     info!(
         "Server list parsed successfully, {} servers total",
         server_list.servers.len()
@@ -1034,6 +1042,183 @@ async fn get_server_list() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut buf = Vec::new();
     server_list.encode(&mut buf)?;
     Ok(buf)
+}
+
+/// Strips HTML tags from a string. Used to extract plain text from CDATA like
+/// `<font color="#00ff00">Low</font>` → `"Low"`.
+fn strip_html_tags(s: &str) -> String {
+    let mut result = String::new();
+    let mut in_tag = false;
+    for c in s.chars() {
+        match c {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            _ if !in_tag => result.push(c),
+            _ => {}
+        }
+    }
+    result.trim().to_string()
+}
+
+/// Parses v100 XML server list into a ServerList protobuf struct.
+///
+/// The v100 API (`/tera/ServerList`) returns XML. A server is considered
+/// unavailable when its `server_stat` has bit 31 set (`0x80000000`).
+fn parse_server_list_xml(xml: &str) -> Result<ServerList, Box<dyn std::error::Error>> {
+    let doc = roxmltree::Document::parse(xml)?;
+
+    let mut server_list = ServerList {
+        servers: vec![],
+        last_server_id: 2800,
+        sort_criterion: 2,
+    };
+
+    let credentials = GLOBAL_CREDENTIALS.get_characters_count();
+    info!("Raw credentials string: {}", credentials);
+
+    let parts: Vec<&str> = credentials.split('|').collect();
+    let character_counts: std::collections::HashMap<u32, u32> = if parts.len() > 1 {
+        parts[1]
+            .split(',')
+            .collect::<Vec<&str>>()
+            .chunks(2)
+            .filter_map(|chunk| {
+                if chunk.len() == 2 {
+                    Some((chunk[0].parse::<u32>().ok()?, chunk[1].parse::<u32>().ok()?))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    } else {
+        std::collections::HashMap::new()
+    };
+
+    let root = doc.root_element();
+    for server_node in root.children().filter(|n| n.has_tag_name("server")) {
+        let get_text = |tag: &str| -> String {
+            server_node
+                .children()
+                .find(|n| n.has_tag_name(tag))
+                .and_then(|n| n.text())
+                .unwrap_or("")
+                .trim()
+                .to_string()
+        };
+
+        let id_str = get_text("id");
+        let server_id: u32 = match id_str.parse() {
+            Ok(v) if v != 0 => v,
+            _ => {
+                error!("Missing or invalid <id> for server");
+                continue;
+            }
+        };
+
+        let address_str = get_text("ip");
+        if address_str.parse::<std::net::Ipv4Addr>().is_err() {
+            error!("Invalid <ip> for server {}: {}", server_id, address_str);
+            continue;
+        }
+        let address = ipv4_to_u32(&address_str);
+
+        let port_str = get_text("port");
+        let port: u32 = match port_str.parse::<u64>() {
+            Ok(p) if p > 0 && p <= 65535 => p as u32,
+            _ => {
+                error!("Invalid <port> for server {}: {}", server_id, port_str);
+                continue;
+            }
+        };
+
+        // CDATA inside <name> — roxmltree exposes this as text()
+        let name = get_text("name");
+        if name.is_empty() {
+            error!("Missing <name> for server {}", server_id);
+            continue;
+        }
+
+        let category = get_text("category");
+        let queue = get_text("crowdness");
+
+        // <open> CDATA contains HTML like `<font color="#00ff00">Low</font>`
+        let population_raw = get_text("open");
+        let population = strip_html_tags(&population_raw);
+
+        // <server_stat> is hex: 0x80000000 = offline, anything else = available
+        let server_stat_str = get_text("server_stat");
+        let server_stat_val = u64::from_str_radix(server_stat_str.trim_start_matches("0x"), 16)
+            .unwrap_or(0x80000000);
+        let is_available = (server_stat_val & 0x80000000) == 0;
+
+        let popup = get_text("popup");
+
+        let char_count = character_counts.get(&server_id).copied().unwrap_or(0);
+        let formatted_name = if char_count > 0 {
+            format!("{} ({})", name, char_count)
+        } else {
+            name.clone()
+        };
+
+        info!(
+            "XML server: id={}, name={}, ip={}, port={}, available={}",
+            server_id, name, address_str, port, is_available
+        );
+
+        let server_info = ServerInfo {
+            id: server_id,
+            name: utf16_to_bytes(&formatted_name),
+            category: utf16_to_bytes(&category),
+            title: utf16_to_bytes(&name),
+            queue: utf16_to_bytes(&queue),
+            population: utf16_to_bytes(&population),
+            address,
+            port,
+            available: if is_available { 1 } else { 0 },
+            unavailable_message: utf16_to_bytes(&popup),
+            host: Vec::new(),
+        };
+        server_list.servers.push(server_info);
+    }
+
+    // Add relay servers from config (same as JSON path)
+    let relay_servers = config::get_relay_servers();
+    for relay in relay_servers {
+        let relay_id = relay["id"].as_u64().unwrap_or(9999) as u32;
+        let relay_name = relay["name"].as_str().unwrap_or("Relay Server");
+        let relay_address_str = relay["address"].as_str().unwrap_or("127.0.0.1");
+        if relay_address_str.parse::<std::net::Ipv4Addr>().is_err() {
+            continue;
+        }
+        let relay_port_raw = relay["port"].as_u64().unwrap_or(7801);
+        if relay_port_raw == 0 || relay_port_raw > 65535 {
+            continue;
+        }
+        let relay_port = relay_port_raw as u32;
+        let relay_category = relay["category"].as_str().unwrap_or("Relay");
+        let relay_title = relay["title"].as_str().unwrap_or("Relay Server");
+        let relay_queue = relay["queue"].as_str().unwrap_or("no");
+        let relay_population = relay["population"].as_str().unwrap_or("Online");
+        let relay_available = relay["available"].as_u64().unwrap_or(1) != 0;
+        let relay_address = ipv4_to_u32(relay_address_str);
+        let relay_unavailable_message = relay["unavailable_message"].as_str().unwrap_or("");
+
+        server_list.servers.push(ServerInfo {
+            id: relay_id,
+            name: utf16_to_bytes(relay_name),
+            category: utf16_to_bytes(relay_category),
+            title: utf16_to_bytes(relay_title),
+            queue: utf16_to_bytes(relay_queue),
+            population: utf16_to_bytes(relay_population),
+            address: relay_address,
+            port: relay_port,
+            available: if relay_available { 1 } else { 0 },
+            unavailable_message: utf16_to_bytes(relay_unavailable_message),
+            host: Vec::new(),
+        });
+    }
+
+    Ok(server_list)
 }
 
 /// Parses JSON into ServerList struct.

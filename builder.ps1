@@ -152,9 +152,8 @@ if ($null -ne $PrivateKeyPasswordInline -and -not [string]::IsNullOrWhiteSpace($
 
 if ($resolvedKey -and -not [string]::IsNullOrWhiteSpace($resolvedKey)) {
     $env:TAURI_PRIVATE_KEY = $resolvedKey.Trim()
-    if ($resolvedPwd -and -not [string]::IsNullOrWhiteSpace($resolvedPwd)) {
-        $env:TAURI_KEY_PASSWORD = $resolvedPwd.Trim()
-    }
+    # Always set password (even empty string) — Tauri requires it to decrypt the key
+    $env:TAURI_KEY_PASSWORD = if ($resolvedPwd) { $resolvedPwd.Trim() } else { "" }
     Write-Host "`n[OK] Updater auto-signing aktiviert (TAURI_PRIVATE_KEY gesetzt)" -ForegroundColor $success
 } else {
     Write-Host "`n[!] Kein privater Signierschluessel gefunden - Bundler zeigt ggf. Hinweis, Artefakte werden trotzdem erstellt." -ForegroundColor $warn

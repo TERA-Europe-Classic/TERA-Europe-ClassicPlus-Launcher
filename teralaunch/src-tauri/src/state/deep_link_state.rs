@@ -1,6 +1,6 @@
 //! Deep link state management for OAuth callback handling.
 //!
-//! When the launcher is opened via a `teraclassic://` deep link (e.g., after
+//! When the launcher is opened via a `teraclassicplus://` deep link (e.g., after
 //! OAuth consent in the browser), the URL is passed as a CLI argument by the OS.
 //! This module stores that URL so the frontend can retrieve and process it.
 
@@ -21,6 +21,7 @@ pub fn set_pending_deep_link(url: String) {
 
 /// Retrieves and consumes the pending deep link URL.
 /// Returns `None` if no deep link is pending.
+#[allow(dead_code)]
 pub fn take_pending_deep_link() -> Option<String> {
     let mut guard = PENDING_DEEP_LINK.write().unwrap_or_else(|e| e.into_inner());
     guard.take()
@@ -35,12 +36,12 @@ mod tests {
         // Clear any existing state
         let _ = take_pending_deep_link();
 
-        set_pending_deep_link("teraclassic://auth?token=abc123&provider=google".to_string());
+        set_pending_deep_link("teraclassicplus://auth?token=abc123&provider=google".to_string());
 
         let result = take_pending_deep_link();
         assert_eq!(
             result,
-            Some("teraclassic://auth?token=abc123&provider=google".to_string())
+            Some("teraclassicplus://auth?token=abc123&provider=google".to_string())
         );
 
         // Second take should return None (consumed)

@@ -35,6 +35,7 @@ sha2 = "0.10"
 litcrypt = "0.4"
 cryptify = "3.1.1"
 widestring = "1"
+roxmltree = "0.19"
 
 [features]
 # When enabled, embed terainject32.exe bytes compiled at the given path.

@@ -162,7 +162,7 @@ jobs:
             platforms = @{
               "windows-x86_64" = @{
                 signature = $sig.Trim()
-                url = "https://web.tera-germany.de/classic/$env:ZIP_NAME"
+                url = "https://web.tera-germany.de/classic/classicplus/$env:ZIP_NAME"
               }
             }
           } | ConvertTo-Json -Depth 5
@@ -191,17 +191,20 @@ jobs:
           try {
             $session.Open($sessionOptions)
 
+            Write-Host "Ensuring /classicplus/ directory exists..."
+            try { $session.CreateDirectory("/classicplus/") } catch {}
+
             Write-Host "Uploading setup installer..."
-            $session.PutFiles("${{ steps.files.outputs.setup }}", "/").Check()
+            $session.PutFiles("${{ steps.files.outputs.setup }}", "/classicplus/").Check()
 
             Write-Host "Uploading updater zip..."
-            $session.PutFiles("${{ steps.files.outputs.zip }}", "/").Check()
+            $session.PutFiles("${{ steps.files.outputs.zip }}", "/classicplus/").Check()
 
             Write-Host "Uploading updater signature..."
-            $session.PutFiles("${{ steps.files.outputs.sig }}", "/").Check()
+            $session.PutFiles("${{ steps.files.outputs.sig }}", "/classicplus/").Check()
 
             Write-Host "Uploading latest.json..."
-            $session.PutFiles("latest.json", "/").Check()
+            $session.PutFiles("latest.json", "/classicplus/latest.json").Check()
 
             Write-Host "All files uploaded successfully."
           } finally {

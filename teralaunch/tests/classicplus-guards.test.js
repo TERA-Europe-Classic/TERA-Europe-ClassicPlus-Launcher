@@ -22,7 +22,7 @@ const URLS = {
   content: {
     news: "",
     patchNotes: "",
-    serverStatus: "http://88.99.102.67:8090/tera/ServerList?lang=en",
+    serverStatus: "http://192.168.1.128:8090/tera/ServerList?lang=en",
   },
   external: {
     register: "",
@@ -51,7 +51,7 @@ describe('Classic+ URLS configuration', () => {
   });
 
   it('has active server status URL pointing to v100 API', () => {
-    expect(URLS.content.serverStatus).toContain("88.99.102.67:8090");
+    expect(URLS.content.serverStatus).toContain("192.168.1.128:8090");
     expect(URLS.content.serverStatus).toContain("ServerList");
   });
 

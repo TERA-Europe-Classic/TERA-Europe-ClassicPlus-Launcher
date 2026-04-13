@@ -82,7 +82,8 @@ async fn login_with_client<H: HttpClient>(
 #[cfg(not(tarpaulin_include))]
 #[tauri::command]
 pub async fn login(username: String, password: String) -> Result<String, String> {
-    let client = ReqwestClient::with_defaults(DOWNLOAD_TIMEOUT_SECS, CONNECT_TIMEOUT_SECS)?;
+    // The v100 API runs over plain HTTP — use the http-allowed client here only.
+    let client = ReqwestClient::with_http_allowed(DOWNLOAD_TIMEOUT_SECS, CONNECT_TIMEOUT_SECS)?;
 
     let login_url = get_config_value("LOGIN_ACTION_URL");
 
@@ -152,7 +153,8 @@ pub async fn register_new_account(
     email: String,
     password: String,
 ) -> Result<String, String> {
-    let client = ReqwestClient::with_defaults(DOWNLOAD_TIMEOUT_SECS, CONNECT_TIMEOUT_SECS)?;
+    // Registration hits the same HTTP API endpoint.
+    let client = ReqwestClient::with_http_allowed(DOWNLOAD_TIMEOUT_SECS, CONNECT_TIMEOUT_SECS)?;
     let register_url = get_config_value("REGISTER_ACTION_URL");
 
     register_with_client(&client, login, email, password, &register_url).await

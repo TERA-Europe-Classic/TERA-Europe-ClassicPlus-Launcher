@@ -36,10 +36,10 @@ mod game_state {
     }
 }
 
-/// Registers the `teraclassic://` custom URL protocol handler on Windows.
+/// Registers the `teraclassicplus://` custom URL protocol handler on Windows.
 ///
-/// Writes registry keys under `HKCU\Software\Classes\teraclassic` so that
-/// when the OS encounters a `teraclassic://` URL, it launches this executable
+/// Writes registry keys under `HKCU\Software\Classes\teraclassicplus` so that
+/// when the OS encounters a `teraclassicplus://` URL, it launches this executable
 /// with the URL as a command-line argument.
 ///
 /// This is idempotent — safe to call on every startup.
@@ -61,8 +61,8 @@ fn register_deep_link_protocol() {
 
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
 
-    // Create or open HKCU\Software\Classes\teraclassic
-    let (key, _) = match hkcu.create_subkey("Software\\Classes\\teraclassic") {
+    // Create or open HKCU\Software\Classes\teraclassicplus
+    let (key, _) = match hkcu.create_subkey("Software\\Classes\\teraclassicplus") {
         Ok(result) => result,
         Err(e) => {
             error!("Failed to create registry key for deep link: {}", e);
@@ -71,7 +71,7 @@ fn register_deep_link_protocol() {
     };
 
     // Set the default value and URL Protocol marker
-    let _ = key.set_value("", &"URL:TERA Classic Launcher");
+    let _ = key.set_value("", &"URL:TERA Classic+ Launcher");
     let _ = key.set_value("URL Protocol", &"");
 
     // Create shell\open\command subkey with the exe path
@@ -79,7 +79,7 @@ fn register_deep_link_protocol() {
         Ok((cmd_key, _)) => {
             let command = format!("\"{}\" \"%1\"", exe_path);
             let _ = cmd_key.set_value("", &command);
-            info!("Registered teraclassic:// protocol handler");
+            info!("Registered teraclassicplus:// protocol handler");
         }
         Err(e) => {
             error!("Failed to create command registry key: {}", e);
@@ -154,16 +154,16 @@ fn main() {
         status_receiver: Arc::new(Mutex::new(game_status_receiver)),
     };
 
-    // Register teraclassic:// protocol handler on Windows (idempotent).
+    // Register teraclassicplus:// protocol handler on Windows (idempotent).
     #[cfg(target_os = "windows")]
     register_deep_link_protocol();
 
     // Check CLI args for deep link URL (Windows passes deep link as argument).
-    // When the OS opens `teraclassic://auth?token=...`, it launches the exe
+    // When the OS opens `teraclassicplus://auth?token=...`, it launches the exe
     // with the URL as a command-line argument.
     for arg in std::env::args().skip(1) {
-        if arg.starts_with("teraclassic://") {
-            info!("Deep link received via CLI arg: teraclassic://...");
+        if arg.starts_with("teraclassicplus://") {
+            info!("Deep link received via CLI arg: teraclassicplus://...");
             set_pending_deep_link(arg);
             break;
         }
@@ -177,10 +177,9 @@ fn main() {
                 .expect("Main window not found - check tauri.conf.json");
             info!("Tauri setup started");
 
-            // Ensure window stays hidden until updater check completes (if auto-install is enabled)
+            // Keep window hidden until updater check completes (when auto-install is enabled).
             let _ = window.hide();
 
-            // Only auto-install updates when explicitly enabled via env var.
             let app_handle_for_update = app.handle();
             tauri::async_runtime::spawn(async move {
                 if should_auto_install_updater() {
@@ -207,14 +206,10 @@ fn main() {
                     if should_show_window {
                         if let Some(win) = app_handle_for_update.get_window("main") {
                             let _ = win.show();
-                            // Note: Removed set_focus() - it can cause foreground lock issues
-                            // on Windows with transparent WebView2 windows. show() is sufficient.
                         }
                     }
                 } else if let Some(win) = app_handle_for_update.get_window("main") {
                     let _ = win.show();
-                    // Note: Removed set_focus() - it can cause foreground lock issues
-                    // on Windows with transparent WebView2 windows. show() is sufficient.
                 }
             });
 

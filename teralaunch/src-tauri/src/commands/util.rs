@@ -199,13 +199,8 @@ pub async fn fetch_player_count() -> Result<String, String> {
         .build()
         .map_err(|e| e.to_string())?;
 
-    let url = get_config_value("API_BASE_URL");
-    if url.trim().is_empty() {
-        return Err("Player count endpoint not configured".to_string());
-    }
-    // Classic+ TODO: Update when player count API is available
     let response = client
-        .get(format!("{}/api/player-count", url))
+        .get("https://tera-europe-classic.com/api/player-count?server=classic")
         .header("Accept", "application/json")
         .send()
         .await
@@ -236,10 +231,6 @@ pub async fn fetch_news_feed() -> Result<String, String> {
         .build()
         .map_err(|e| e.to_string())?;
 
-    // Classic+ TODO: Update when news feed endpoint is available
-    return Err("News feed endpoint not configured for Classic+".to_string());
-
-    #[allow(unreachable_code)]
     let response = client
         .get("https://forum.crazy-esports.com/forum/thread-list-rss-feed/43/")
         .send()

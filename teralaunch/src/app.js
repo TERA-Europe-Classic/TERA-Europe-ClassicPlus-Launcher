@@ -33,7 +33,7 @@ const URLS = {
   content: {
     news: "",
     patchNotes: "",
-    serverStatus: "http://88.99.102.67:8090/tera/ServerList?lang=en",
+    serverStatus: "http://192.168.1.128:8090/tera/ServerList?lang=en",
   },
 
   // External links
@@ -666,7 +666,7 @@ let _pendingOAuthAction = null; // 'launch' | 'switch' | null
 
 /**
  * Opens the system browser for OAuth login with the given provider.
- * The website will redirect back via teraclassic:// deep link with a token.
+ * The website will redirect back via teraclassicplus:// deep link with a token.
  * Classic+ TODO: Re-enable when OAuth infrastructure is available
  * @param {string} provider - OAuth provider name
  * @param {string} [pendingAction] - Optional action to execute after OAuth completes
@@ -679,7 +679,7 @@ function startOAuth(provider, pendingAction = null) {
 window.startOAuth = startOAuth;
 
 /**
- * Handle OAuth callback from deep link (teraclassic://auth?token=...).
+ * Handle OAuth callback from deep link (teraclassicplus://auth?token=...).
  * Exchanges the token for a TERA auth bundle and completes login.
  * Classic+ TODO: Re-enable when OAuth infrastructure is available
  */
@@ -692,7 +692,7 @@ window.handleOAuthCallback = handleOAuthCallback;
 
 /**
  * Check for pending deep link on app startup and window focus.
- * Called by the Tauri backend when a teraclassic:// URL is received.
+ * Called by the Tauri backend when a teraclassicplus:// URL is received.
  * Classic+ TODO: Re-enable when deep link / OAuth infrastructure is available
  */
 async function checkDeepLink() {
@@ -3830,15 +3830,43 @@ const App = {
     }
 
     try {
-      // Classic+ NOTE: Server status endpoint returns XML, not JSON.
-      // Wrap in try/catch to prevent crashes from unexpected response format.
-      const data = await fetchData(URLS.content.serverStatus);
-      if (data && data.servers && data.servers.length > 0) {
-        const statusEl = document.getElementById("game-status") || document.querySelector(".game-status");
-        if (statusEl) {
-          statusEl.textContent =
-            data.servers[0].available === 1 ? "Online" : "Offline";
-        }
+      // The v100 ServerList endpoint returns XML, not JSON.
+      // Parse with DOMParser to extract server availability.
+      const response = await fetch(URLS.content.serverStatus);
+      if (!response.ok) return;
+
+      const xmlText = await response.text();
+      const doc = new DOMParser().parseFromString(xmlText, "application/xml");
+
+      // Check for XML parse errors
+      const parseError = doc.querySelector("parsererror");
+      if (parseError) {
+        console.error("[Classic+] Server list XML parse error", parseError.textContent);
+        return;
+      }
+
+      // Accept <server> elements anywhere in the document
+      const servers = doc.querySelectorAll("server");
+      if (servers.length === 0) return;
+
+      const first = servers[0];
+
+      // The v100 API uses child elements, not attributes.
+      // <server_stat> is a hex bitmask where 0 = offline, non-zero = some access status.
+      // <open> contains colored HTML text (green = low population = server is accessible).
+      const serverStatEl = first.querySelector("server_stat");
+      const serverStatVal = serverStatEl
+        ? parseInt(serverStatEl.textContent.trim(), 16)
+        : 0;
+
+      // Server is considered online if server_stat is non-zero (server has an access mode set).
+      const isOnline = !isNaN(serverStatVal) && serverStatVal > 0;
+
+      const statusEl =
+        document.getElementById("game-status") ||
+        document.querySelector(".game-status");
+      if (statusEl) {
+        statusEl.textContent = isOnline ? "Online" : "Offline";
       }
     } catch (e) {
       console.error("Failed to load server status", e);
@@ -6457,12 +6485,6 @@ function animateNumber(element, target, duration = 1000) {
 async function loadNewsFeed() {
   const newsFeedList = document.getElementById("news-feed-list");
   if (!newsFeedList) return;
-
-  // Classic+ TODO: Re-enable when news feed backend is available
-  if (!URLS.content.news) {
-    newsFeedList.innerHTML = `<span class="news-item news-muted">No news available</span>`;
-    return;
-  }
 
   try {
     // Use Tauri backend to avoid CORS issues (returns pre-parsed JSON)
