@@ -118,25 +118,36 @@ async fn install_external_mod(
         serde_json::json!({ "id": entry.id, "progress": 0, "state": "downloading" }),
     );
 
-    // Stream the download and emit live progress. We throttle to ~5% steps so
-    // the frontend doesn't re-render on every 16 KB chunk from reqwest.
+    // Stream the download and emit live progress. We throttle by TIME, not
+    // by percentage steps, so the bar actually moves smoothly instead of
+    // jumping 5% at a time. ~60ms between emits ≈ 16 fps, which is plenty
+    // smooth and still light on the event loop for a 54 MB download.
     let progress_window = window.clone();
     let progress_id = entry.id.clone();
-    let mut last_emitted: u8 = 0;
+    let mut last_emit = std::time::Instant::now()
+        .checked_sub(std::time::Duration::from_secs(1))
+        .unwrap_or_else(std::time::Instant::now);
+    let mut last_received: u64 = 0;
+    let min_interval = std::time::Duration::from_millis(60);
     let extract_result = external_app::download_and_extract(
         &entry.download_url,
         &entry.sha256,
         &dest,
         move |received, total| {
-            // Cap the progress phase at 95% so extraction can occupy 95-100%.
+            // Cap the download phase at 95 so extraction can occupy 95→100.
             let pct: u8 = if total > 0 {
                 ((received * 95) / total).min(95) as u8
             } else {
-                // Unknown total: pulse between 10 and 90 based on received MB.
                 (10 + ((received / (1024 * 1024)) as u8).min(80)).min(90)
             };
-            if pct != last_emitted && pct % 5 == 0 {
-                last_emitted = pct;
+            let now = std::time::Instant::now();
+            // Always emit the first and last ticks; otherwise throttle by
+            // wall-clock so the frontend gets a steady stream of updates
+            // (typically every ~60 ms) regardless of chunk size.
+            let force = received == 0 || received == total;
+            if force || now.duration_since(last_emit) >= min_interval {
+                last_emit = now;
+                last_received = received;
                 let _ = progress_window.emit_all(
                     "mod_download_progress",
                     serde_json::json!({
@@ -148,6 +159,7 @@ async fn install_external_mod(
                     }),
                 );
             }
+            let _ = last_received;
         },
     )
     .await;
@@ -212,21 +224,31 @@ async fn install_gpk_mod(
         serde_json::json!({ "id": entry.id, "progress": 0, "state": "downloading" }),
     );
 
+    // Same time-based throttle as install_external_mod: emit ~every 60ms
+    // so the bar actually moves smoothly instead of jumping 5% at a time.
+    // First and last ticks always go out; everything in between is paced
+    // by wall-clock, not percentage steps.
     let progress_window = window.clone();
     let progress_id = entry.id.clone();
-    let mut last_emitted: u8 = 0;
+    let mut last_emit = std::time::Instant::now()
+        .checked_sub(std::time::Duration::from_secs(1))
+        .unwrap_or_else(std::time::Instant::now);
+    let min_interval = std::time::Duration::from_millis(60);
     let dl_result = external_app::download_file(
         &entry.download_url,
         &entry.sha256,
         &dest,
         move |received, total| {
+            // Cap download at 95 so the deploy step can occupy 95→100.
             let pct: u8 = if total > 0 {
-                ((received * 100) / total).min(100) as u8
+                ((received * 95) / total).min(95) as u8
             } else {
                 (10 + ((received / (1024 * 1024)) as u8).min(80)).min(90)
             };
-            if pct != last_emitted && pct % 5 == 0 {
-                last_emitted = pct;
+            let now = std::time::Instant::now();
+            let force = received == 0 || received == total;
+            if force || now.duration_since(last_emit) >= min_interval {
+                last_emit = now;
                 let _ = progress_window.emit_all(
                     "mod_download_progress",
                     serde_json::json!({

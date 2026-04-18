@@ -12,13 +12,11 @@
 use std::fs;
 use std::io::{self, Cursor};
 use std::path::{Path, PathBuf};
+#[cfg(not(windows))]
 use std::process::Command;
 
 use sha2::{Digest, Sha256};
 use sysinfo::System;
-
-#[cfg(windows)]
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// Downloads the zip at `url`, verifies the SHA-256 matches `expected_sha256`
 /// (hex, lowercase), and extracts it into `dest_dir`. Any existing contents

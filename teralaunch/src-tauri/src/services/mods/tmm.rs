@@ -321,7 +321,7 @@ pub fn parse_mod_file(bytes: &[u8]) -> Result<ModFile, String> {
     // Step backwards through the footer reading i32 slots, starting just
     // before the magic.
     let mut pos = end - 4;
-    let mut read_back_i32 = |p: &mut usize| -> Result<i32, String> {
+    let read_back_i32 = |p: &mut usize| -> Result<i32, String> {
         if *p < 4 { return Err("Unexpected EOF while reading mod footer".into()); }
         *p -= 4;
         Ok(read_i32_le(bytes, *p))
