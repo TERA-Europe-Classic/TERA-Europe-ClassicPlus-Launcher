@@ -244,17 +244,19 @@ async fn install_gpk_mod(
 
     match dl_result {
         Ok(_) => {
+            // Attempt the TMM-style deploy: parse the .gpk, back up the
+            // vanilla mapper, patch it to point composites at the mod file.
+            // The mapper patcher lives in services::mods::tmm.rs — it
+            // mirrors VenoMKO/TMM's CompositeMapper.cpp + Mod.cpp.
+            let deploy_note = try_deploy_gpk(&entry.id, &dest);
+
             let final_row = mods_state::mutate(|reg| {
                 let slot = reg.find_mut(&entry.id).ok_or_else(|| {
                     format!("Registry entry for {} disappeared mid-install", entry.id)
                 })?;
                 slot.status = ModStatus::Disabled;
                 slot.progress = None;
-                // Surface a one-liner so users know the file landed but the
-                // launcher isn't patching it into the game yet.
-                slot.last_error = Some(
-                    "Downloaded. Auto-patch into the game ships with the mapper patcher (Phase C). For now: copy this file into S1Game\\CookedPC\\ — see Open mods folder.".to_string(),
-                );
+                slot.last_error = deploy_note;
                 slot.version = entry.version.clone();
                 Ok(slot.clone())
             })?;
@@ -266,6 +268,52 @@ async fn install_gpk_mod(
         }
         Err(err) => finalize_error(&entry.id, err, &window),
     }
+}
+
+/// Tries to deploy a downloaded GPK to the game via tmm.rs. On success
+/// returns None (no message to surface). On any failure returns a
+/// human-readable explanation that the caller stashes in `last_error`
+/// so the user can see why the mod won't apply in-game yet.
+fn try_deploy_gpk(_mod_id: &str, source_gpk: &std::path::Path) -> Option<String> {
+    use crate::services::mods::tmm;
+    let game_root = match resolve_game_root() {
+        Ok(p) => p,
+        Err(e) => {
+            return Some(format!(
+                "Downloaded, but game path isn't set yet — can't deploy. Set the game folder under Settings, then click Retry. ({})",
+                e
+            ));
+        }
+    };
+    match tmm::install_gpk(&game_root, source_gpk) {
+        Ok(_) => None,
+        Err(e) => Some(format!(
+            "Downloaded, but mapper patch failed: {}. Mod file is at {}",
+            e,
+            source_gpk.display()
+        )),
+    }
+}
+
+/// Reads the game root from the launcher's config.ini via the existing
+/// config command helpers. Returned path is the TERA install folder (the
+/// parent of S1Game), matching what tmm.rs expects.
+fn resolve_game_root() -> Result<std::path::PathBuf, String> {
+    // The existing launcher config stores the game-exe path. Strip two
+    // levels up (`Bin/...` → install root) so tmm has the structure it
+    // expects. If we ever track the install root directly we can use
+    // that instead.
+    let (game_path, _lang) = crate::commands::config::load_config()?;
+    // game_path is usually `<root>/Binaries/TERA.exe` or similar.
+    let root = game_path.parent().and_then(|p| p.parent()).map(|p| p.to_path_buf())
+        .ok_or_else(|| "Configured game path has no parent root".to_string())?;
+    if !root.join("S1Game").exists() {
+        return Err(format!(
+            "No S1Game folder under {} — path may be wrong",
+            root.display()
+        ));
+    }
+    Ok(root)
 }
 
 fn finalize_error(
@@ -319,9 +367,31 @@ pub async fn uninstall_mod(id: String, delete_settings: Option<bool>) -> Result<
             }
         }
         ModKind::Gpk => {
-            // Phase-C mapper work (flip composite flag, restore .clean backup,
-            // update ModList.tmm) doesn't run yet. v1 uninstall just deletes
-            // the downloaded .gpk — the user's game files were never touched.
+            // Restore the vanilla mapper entries for this mod and delete
+            // its container .gpk from CookedPC. Best-effort: a missing
+            // backup or a moved game path shouldn't block the registry
+            // removal.
+            if let Ok(game_root) = resolve_game_root() {
+                let gpk_dir = get_gpk_dir()
+                    .ok_or_else(|| "Could not resolve GPK mods dir".to_string())?;
+                let source_gpk = gpk_dir.join(format!("{}.gpk", entry.id.replace('/', "_")));
+                if let Ok(bytes) = std::fs::read(&source_gpk) {
+                    if let Ok(modfile) = crate::services::mods::tmm::parse_mod_file(&bytes) {
+                        let paths: Vec<String> = modfile.packages.iter()
+                            .map(|p| p.object_path.clone())
+                            .filter(|p| !p.is_empty())
+                            .collect();
+                        if !modfile.container.is_empty() && !paths.is_empty() {
+                            let _ = crate::services::mods::tmm::uninstall_gpk(
+                                &game_root,
+                                &modfile.container,
+                                &paths,
+                            );
+                        }
+                    }
+                }
+            }
+            // Also remove the download from the launcher's own gpk folder.
             let gpk_dir = get_gpk_dir()
                 .ok_or_else(|| "Could not resolve GPK mods dir".to_string())?;
             let file = gpk_dir.join(format!("{}.gpk", entry.id.replace('/', "_")));

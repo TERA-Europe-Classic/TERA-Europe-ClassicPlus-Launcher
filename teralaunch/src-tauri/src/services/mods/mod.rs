@@ -13,4 +13,5 @@
 pub mod catalog;
 pub mod external_app;
 pub mod registry;
+pub mod tmm;
 pub mod types;

@@ -192,22 +192,76 @@ pub fn spawn_app(exe_path: &Path, args: &[String]) -> Result<u32, String> {
         ));
     }
 
-    let mut cmd = Command::new(exe_path);
-    cmd.args(args);
-    if let Some(parent) = exe_path.parent() {
-        cmd.current_dir(parent);
-    }
-
+    // On Windows, prefer ShellExecuteW over CreateProcess because some
+    // distributable exes (old ShinraMeter releases, any app with a
+    // requireAdministrator manifest) refuse to start via CreateProcess
+    // with "The requested operation requires elevation. (os error 740)".
+    // ShellExecute with the default verb triggers the UAC prompt if
+    // elevation is needed; otherwise it launches silently like CreateProcess.
     #[cfg(windows)]
     {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(CREATE_NO_WINDOW);
+        return spawn_app_shellexec(exe_path, args);
     }
 
-    let child = cmd
-        .spawn()
-        .map_err(|e| format!("Failed to spawn {}: {}", exe_path.display(), e))?;
-    Ok(child.id())
+    #[cfg(not(windows))]
+    {
+        let mut cmd = Command::new(exe_path);
+        cmd.args(args);
+        if let Some(parent) = exe_path.parent() {
+            cmd.current_dir(parent);
+        }
+        let child = cmd
+            .spawn()
+            .map_err(|e| format!("Failed to spawn {}: {}", exe_path.display(), e))?;
+        Ok(child.id())
+    }
+}
+
+#[cfg(windows)]
+fn spawn_app_shellexec(exe_path: &Path, args: &[String]) -> Result<u32, String> {
+    use std::ffi::OsStr;
+    use std::iter::once;
+    use std::os::windows::ffi::OsStrExt;
+    use std::ptr::null_mut;
+    use winapi::um::shellapi::{ShellExecuteExW, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW};
+    use winapi::um::winuser::SW_SHOWNORMAL;
+
+    let to_wide = |s: &OsStr| -> Vec<u16> { s.encode_wide().chain(once(0)).collect() };
+    let file = to_wide(exe_path.as_os_str());
+    let params_string: String = args.join(" ");
+    let params = to_wide(OsStr::new(&params_string));
+    let dir_owned: Option<Vec<u16>> = exe_path.parent().map(|p| to_wide(p.as_os_str()));
+
+    let mut sei: SHELLEXECUTEINFOW = unsafe { std::mem::zeroed() };
+    sei.cbSize = std::mem::size_of::<SHELLEXECUTEINFOW>() as u32;
+    sei.fMask = SEE_MASK_NOCLOSEPROCESS;
+    sei.hwnd = null_mut();
+    sei.lpVerb = null_mut();          // default verb — handles UAC when needed
+    sei.lpFile = file.as_ptr();
+    sei.lpParameters = if params.len() > 1 { params.as_ptr() } else { null_mut() };
+    sei.lpDirectory = dir_owned.as_ref().map(|v| v.as_ptr()).unwrap_or(null_mut());
+    sei.nShow = SW_SHOWNORMAL;
+
+    let ok = unsafe { ShellExecuteExW(&mut sei) };
+    if ok == 0 {
+        let err = unsafe { winapi::um::errhandlingapi::GetLastError() };
+        return Err(format!(
+            "ShellExecuteEx failed for {}: Win32 error {}",
+            exe_path.display(),
+            err
+        ));
+    }
+
+    // Best-effort PID — derive it from the returned process handle.
+    let pid = if sei.hProcess.is_null() {
+        0
+    } else {
+        unsafe { winapi::um::processthreadsapi::GetProcessId(sei.hProcess) }
+    };
+    if !sei.hProcess.is_null() {
+        unsafe { winapi::um::handleapi::CloseHandle(sei.hProcess) };
+    }
+    Ok(pid)
 }
 
 /// Returns true if any running process matches the given executable name

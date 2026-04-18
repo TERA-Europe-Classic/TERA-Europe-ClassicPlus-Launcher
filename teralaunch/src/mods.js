@@ -223,6 +223,22 @@ const ModsView = {
     async loadInstalled() {
         try {
             this.state.installed = await modsInvoke('list_installed_mods');
+            // Freshen each installed entry with the current catalog entry so
+            // UI fields (icon_url, description, license, credits) always
+            // reflect the latest catalog instead of whatever got persisted
+            // at install time. This is what keeps old broken icon_urls
+            // (from an earlier catalog revision) from lingering in rows.
+            if (Array.isArray(this.state.catalog) && this.state.catalog.length) {
+                const byId = new Map(this.state.catalog.map(c => [c.id, c]));
+                this.state.installed.forEach(m => {
+                    const cat = byId.get(m.id);
+                    if (!cat) return;
+                    m.icon_url = cat.icon_url || null;
+                    m.source_url = cat.source_url || m.source_url;
+                    m.license = cat.license || m.license;
+                    m.credits = cat.credits || m.credits;
+                });
+            }
         } catch (e) {
             console.error('list_installed_mods failed:', e);
             this.state.installed = [];
@@ -342,6 +358,20 @@ const ModsView = {
     render() {
         if (!this.$page) return;
 
+        // Installed count on the tab badge updates on every render so the
+        // number always reflects state even while the user is looking at
+        // the Browse tab. Same story for the per-kind group counts.
+        const installedTotal = this.state.installed.length;
+        if (this.$countInstalled) this.$countInstalled.textContent = installedTotal;
+        const extCount = this.state.installed.filter(m => m.kind === 'external').length;
+        const gpkCount = this.state.installed.filter(m => m.kind === 'gpk').length;
+        if (this.$page) {
+            const extEl = this.$page.querySelector('[data-count="external"]');
+            const gpkEl = this.$page.querySelector('[data-count="gpk"]');
+            if (extEl) extEl.textContent = extCount;
+            if (gpkEl) gpkEl.textContent = gpkCount;
+        }
+
         // Tab-specific rendering.
         if (this.state.tab === 'installed') {
             const external = this.state.installed.filter(m => m.kind === 'external' && this.filterMatches(m));
@@ -350,8 +380,6 @@ const ModsView = {
             this.renderInstalledGroup(this.$installedExt, external, 'external');
             this.renderInstalledGroup(this.$installedGpk, gpk, 'gpk');
 
-            const total = this.state.installed.length;
-            if (this.$countInstalled) this.$countInstalled.textContent = total;
             const anyVisible = external.length + gpk.length > 0;
             if (this.$installedEmpty) this.$installedEmpty.hidden = anyVisible;
         } else {
@@ -701,6 +729,48 @@ const ModsView = {
         this.$detailBackdrop.hidden = true;
     },
 
+    /**
+     * Custom confirmation dialog — returns a Promise that resolves with
+     * true (confirmed) or false (cancelled / dismissed). Replaces
+     * window.confirm, which is unreliable in Tauri's WebView2 and
+     * sometimes short-circuits with 'true' before rendering.
+     */
+    modalConfirm({ title, body = '', confirmLabel = 'Confirm', cancelLabel = 'Cancel', danger = false }) {
+        return new Promise(resolve => {
+            const backdrop = document.createElement('div');
+            backdrop.className = 'mods-confirm-backdrop';
+            backdrop.innerHTML = `
+                <div class="mods-confirm-card">
+                    <h3 class="mods-confirm-title">${escapeHtml(title)}</h3>
+                    ${body ? `<p class="mods-confirm-body">${escapeHtml(body)}</p>` : ''}
+                    <div class="mods-confirm-actions">
+                        <button type="button" class="mods-onboarding-btn secondary" data-confirm-action="cancel">${escapeHtml(cancelLabel)}</button>
+                        <button type="button" class="mods-onboarding-btn ${danger ? 'danger' : 'primary'}" data-confirm-action="ok">${escapeHtml(confirmLabel)}</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(backdrop);
+            const finish = (value) => {
+                backdrop.remove();
+                document.removeEventListener('keydown', keyHandler, true);
+                resolve(value);
+            };
+            const keyHandler = (e) => {
+                if (e.key === 'Escape') { e.stopPropagation(); finish(false); }
+                if (e.key === 'Enter')  { e.stopPropagation(); finish(true); }
+            };
+            backdrop.addEventListener('click', e => {
+                const btn = e.target.closest('[data-confirm-action]');
+                if (btn) finish(btn.dataset.confirmAction === 'ok');
+                else if (e.target === backdrop) finish(false);
+            });
+            document.addEventListener('keydown', keyHandler, true);
+            // Focus the primary button so Enter just works.
+            requestAnimationFrame(() => {
+                backdrop.querySelector('[data-confirm-action="ok"]')?.focus();
+            });
+        });
+    },
+
     async showOverflowMenu(id, anchor) {
         // Small inline popover — click outside / Escape dismisses. Actions
         // depend on whether the mod is installed: installed gets Details /
@@ -767,7 +837,17 @@ const ModsView = {
                     window.open(sourceUrl, '_blank');
                 }
             } else if (action === 'uninstall' && isInstalled) {
-                if (!window.confirm(`Uninstall "${entry.name}"?`)) return;
+                // window.confirm() is unreliable inside the Tauri WebView2
+                // — on some machines it returns true without ever showing a
+                // dialog, which is why the old flow uninstalled instantly.
+                // Use a real in-page confirm that blocks on a promise.
+                const ok = await this.modalConfirm({
+                    title: `Uninstall "${entry.name}"?`,
+                    body: 'The mod files and its entry in the Installed tab will be removed.',
+                    confirmLabel: 'Uninstall',
+                    danger: true,
+                });
+                if (!ok) return;
                 try {
                     await modsInvoke('uninstall_mod', { id, deleteSettings: null });
                     await this.loadInstalled();

@@ -951,6 +951,59 @@
     transform: translateY(-1px);
 }
 
+.mods-onboarding-btn.danger {
+    background: #ef4444;
+    color: #fff;
+}
+
+.mods-onboarding-btn.danger:hover {
+    filter: brightness(1.05);
+    transform: translateY(-1px);
+}
+
+/* Custom confirm dialog — drops native window.confirm, which is
+   unreliable in WebView2. */
+.mods-confirm-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 4200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(6px);
+    animation: modsDetailFade 140ms ease-out;
+}
+
+.mods-confirm-card {
+    width: min(380px, calc(100vw - 48px));
+    padding: 22px 22px 18px;
+    background: #151a22;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    box-shadow: 0 24px 50px rgba(0, 0, 0, 0.6);
+}
+
+.mods-confirm-title {
+    margin: 0 0 8px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.mods-confirm-body {
+    margin: 0 0 18px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.72);
+}
+
+.mods-confirm-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
 /* Row overflow popover — appears on "..." click, floats on top of the modal. */
 .mods-row-popover {
     z-index: 3200;

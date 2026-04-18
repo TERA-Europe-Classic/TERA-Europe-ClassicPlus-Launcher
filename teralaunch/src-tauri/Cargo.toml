@@ -1,6 +1,6 @@
 [package]
 name = "tera-europe-classicplus-launcher"
-version = "0.1.8"
+version = "0.1.9"
 description = "TERA Europe Classic+ Launcher"
 authors = ["TNC97"]
 edition = "2021"
@@ -74,7 +74,7 @@ zip = { version = "2.2", default-features = false, features = ["deflate"] }
 sysinfo = { version = "0.32", default-features = false, features = ["system"] }
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["shellapi", "winuser"] }
+winapi = { version = "0.3", features = ["shellapi", "winuser", "processthreadsapi", "errhandlingapi", "handleapi"] }
 winreg = "0.52"
 
 
