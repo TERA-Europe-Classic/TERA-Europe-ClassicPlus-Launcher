@@ -175,6 +175,11 @@ pub async fn handle_launch_game(
             error!("Failed to emit game_status_changed event: {:?}", e);
         }
 
+        // Spawn any enabled external-app mods (Shinra Meter, TCC) with
+        // auto-launch on. Intentionally fire-and-forget — a failing overlay
+        // must never block the game launch itself.
+        crate::commands::mods::spawn_auto_launch_external_apps();
+
         info!("run_game reached");
 
         match run_game(

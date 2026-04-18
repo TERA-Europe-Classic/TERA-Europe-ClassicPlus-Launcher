@@ -1,0 +1,120 @@
+<link rel="stylesheet" href="./mods.css">
+<main class="content" id="mods-page">
+    <div class="mods-container">
+        <header class="mods-header">
+            <h1 class="mods-title" data-translate="MODS_TITLE">Mods</h1>
+            <div class="mods-actions">
+                <button id="mods-import-btn" class="mods-secondary-btn" data-translate="MODS_IMPORT">Add mod from file…</button>
+                <button id="mods-folder-btn" class="mods-secondary-btn" data-translate="MODS_OPEN_FOLDER">Open mods folder</button>
+            </div>
+        </header>
+
+        <div class="mods-tabs" role="tablist">
+            <button class="mods-tab active" data-tab="installed" role="tab" aria-selected="true">
+                <span data-translate="MODS_TAB_INSTALLED">Installed</span>
+                <span class="mods-tab-count" id="mods-count-installed">0</span>
+            </button>
+            <button class="mods-tab" data-tab="browse" role="tab" aria-selected="false">
+                <span data-translate="MODS_TAB_BROWSE">Browse</span>
+            </button>
+        </div>
+
+        <div class="mods-toolbar">
+            <input type="text" id="mods-search" class="mods-search" placeholder="Search mods" data-translate-placeholder="MODS_SEARCH" />
+            <div class="mods-filter-group" role="group">
+                <button class="mods-filter-chip active" data-filter="all" data-translate="MODS_FILTER_ALL">All</button>
+                <button class="mods-filter-chip" data-filter="external" data-translate="MODS_FILTER_EXTERNAL">External</button>
+                <button class="mods-filter-chip" data-filter="gpk" data-translate="MODS_FILTER_GPK">GPK</button>
+            </div>
+        </div>
+
+        <section class="mods-pane active" data-pane="installed">
+            <div class="mods-group" data-kind="external">
+                <h2 class="mods-group-title">
+                    <span data-translate="MODS_GROUP_EXTERNAL">External apps</span>
+                    <span class="mods-group-count" data-count="external">0</span>
+                </h2>
+                <div class="mods-rows" id="mods-installed-external"></div>
+            </div>
+            <div class="mods-group" data-kind="gpk">
+                <h2 class="mods-group-title">
+                    <span data-translate="MODS_GROUP_GPK">Game mods (GPK)</span>
+                    <span class="mods-group-count" data-count="gpk">0</span>
+                </h2>
+                <div class="mods-rows" id="mods-installed-gpk"></div>
+            </div>
+            <div class="mods-empty" id="mods-installed-empty" hidden>
+                <p data-translate="MODS_INSTALLED_EMPTY">No mods installed. Browse the catalog to install one.</p>
+            </div>
+        </section>
+
+        <section class="mods-pane" data-pane="browse">
+            <div class="mods-rows" id="mods-browse-rows"></div>
+            <div class="mods-empty" id="mods-browse-empty" hidden>
+                <p data-translate="MODS_BROWSE_EMPTY">Catalog unavailable. Try again later.</p>
+            </div>
+        </section>
+
+        <div class="mods-download-tray" id="mods-download-tray" hidden>
+            <div class="mods-download-tray-header">
+                <span data-translate="MODS_DOWNLOADS">Downloads</span>
+                <span class="mods-download-tray-count" id="mods-download-tray-count">0</span>
+            </div>
+            <div class="mods-download-tray-items" id="mods-download-tray-items"></div>
+        </div>
+
+        <!-- Detail panel — opens on row click (outside the action button).
+             Populates from the clicked ModEntry/CatalogEntry. Credits,
+             license, source link, and screenshots are the core attribution
+             surface. -->
+        <div class="mods-detail-backdrop" id="mods-detail-backdrop" hidden>
+            <aside class="mods-detail" id="mods-detail" role="dialog" aria-modal="true" aria-labelledby="mods-detail-name">
+                <header class="mods-detail-header">
+                    <div class="mods-detail-icon" id="mods-detail-icon"></div>
+                    <div class="mods-detail-title-wrap">
+                        <h2 class="mods-detail-name" id="mods-detail-name">—</h2>
+                        <p class="mods-detail-byline">
+                            <span data-translate="MODS_DETAIL_BY">by</span>
+                            <span id="mods-detail-author">—</span>
+                            ·
+                            <span id="mods-detail-version">—</span>
+                        </p>
+                    </div>
+                    <button class="mods-detail-close" id="mods-detail-close" aria-label="Close">×</button>
+                </header>
+                <div class="mods-detail-body">
+                    <section class="mods-detail-section" id="mods-detail-description-section">
+                        <h3 class="mods-detail-section-title" data-translate="MODS_DETAIL_ABOUT">About</h3>
+                        <div class="mods-detail-description" id="mods-detail-description"></div>
+                    </section>
+                    <section class="mods-detail-section" id="mods-detail-screenshots-section" hidden>
+                        <h3 class="mods-detail-section-title" data-translate="MODS_DETAIL_SCREENSHOTS">Screenshots</h3>
+                        <div class="mods-detail-screenshots" id="mods-detail-screenshots"></div>
+                    </section>
+                    <section class="mods-detail-section">
+                        <h3 class="mods-detail-section-title" data-translate="MODS_DETAIL_CREDITS">Credits &amp; source</h3>
+                        <dl class="mods-detail-facts">
+                            <div class="mods-detail-fact">
+                                <dt data-translate="MODS_DETAIL_AUTHOR">Author</dt>
+                                <dd id="mods-detail-fact-author">—</dd>
+                            </div>
+                            <div class="mods-detail-fact" id="mods-detail-fact-license-row" hidden>
+                                <dt data-translate="MODS_DETAIL_LICENSE">License</dt>
+                                <dd id="mods-detail-fact-license">—</dd>
+                            </div>
+                            <div class="mods-detail-fact" id="mods-detail-fact-credits-row" hidden>
+                                <dt data-translate="MODS_DETAIL_ACKS">Acknowledgments</dt>
+                                <dd id="mods-detail-fact-credits">—</dd>
+                            </div>
+                        </dl>
+                        <div class="mods-detail-actions" id="mods-detail-link-row" hidden>
+                            <a class="mods-detail-link" id="mods-detail-source-link" href="#" target="_blank" rel="noopener noreferrer">
+                                <span data-translate="MODS_DETAIL_VIEW_SOURCE">View source</span>
+                            </a>
+                        </div>
+                    </section>
+                </div>
+            </aside>
+        </div>
+    </div>
+</main>

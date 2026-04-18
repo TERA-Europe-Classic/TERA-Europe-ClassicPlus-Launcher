@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use log::info;
 
 use crate::infrastructure::{FileSystem, StdFileSystem};
-use crate::services::config_service;
+use crate::services::{config_service, game_service};
 use crate::state::{cancel_download, clear_hash_cache, set_downloaded_bytes};
 use crate::utils::normalize_path_for_compare;
 
@@ -91,7 +91,12 @@ pub async fn save_game_path_to_config(
     _app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
     let path_buf = PathBuf::from(&path);
-    config_service::validate_game_path(&path_buf)?;
+    let validation = game_service::validate_game_installation(&path_buf);
+    if !validation.is_valid() {
+        return Err(validation
+            .error_message()
+            .unwrap_or_else(|| "Invalid game folder".to_string()));
+    }
 
     // Capture previous path before writing, so we can detect actual changes
     let prev_path_string = get_game_path()
@@ -117,6 +122,60 @@ pub async fn save_game_path_to_config(
     }
 
     Ok(())
+}
+
+/// Reports the state of the configured game folder.
+///
+/// The frontend calls this on startup, after any config change, and before any
+/// game-launch action. The response is the single source of truth for whether
+/// the folder picker must be shown.
+///
+/// # Returns
+/// * `set` - `true` if `[game] path` is non-empty in config
+/// * `valid` - `true` if `set` AND the path passes `validate_game_installation`
+///             (exists, is a directory, contains `Binaries/TERA.exe`)
+/// * `path` - the configured path (may be empty string)
+/// * `error` - `None` if valid; otherwise a human-readable reason
+///             ("Game path does not exist", "TERA.exe not found in Binaries folder", ...)
+#[tauri::command]
+#[cfg(not(tarpaulin_include))]
+pub fn get_game_folder_state() -> GameFolderState {
+    let path_string = match get_game_path_from_config() {
+        Ok(p) => p,
+        Err(_) => {
+            return GameFolderState {
+                set: false,
+                valid: false,
+                path: String::new(),
+                error: None,
+            };
+        }
+    };
+
+    if path_string.trim().is_empty() {
+        return GameFolderState {
+            set: false,
+            valid: false,
+            path: String::new(),
+            error: None,
+        };
+    }
+
+    let validation = game_service::validate_game_installation(Path::new(&path_string));
+    GameFolderState {
+        set: true,
+        valid: validation.is_valid(),
+        path: path_string,
+        error: validation.error_message(),
+    }
+}
+
+#[derive(serde::Serialize, Clone, Debug)]
+pub struct GameFolderState {
+    pub set: bool,
+    pub valid: bool,
+    pub path: String,
+    pub error: Option<String>,
 }
 
 /// Gets the current language setting from the configuration.

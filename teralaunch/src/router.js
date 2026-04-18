@@ -9,6 +9,12 @@ const createRouter = (App) => ({
             public: true,
             init: 'initHome'
         },
+        mods: {
+            title: 'Mods',
+            file: 'mods.html',
+            public: true,
+            init: 'initMods'
+        },
     },
 
     currentRoute: null,
@@ -157,8 +163,18 @@ const createRouter = (App) => ({
      * @param {string} route - The route to initialize.
      */
     async initializeNewRoute(route) {
-        if (this.routes[route].init) {
-            await App[this.routes[route].init]();
+        const initName = this.routes[route].init;
+        if (!initName) return;
+        // Prefer a method on App (existing pattern), fall back to a window
+        // global so route modules can register their init without having to
+        // mutate App.
+        const fn = (typeof App[initName] === 'function') ? App[initName].bind(App)
+                  : (typeof window[initName] === 'function') ? window[initName]
+                  : null;
+        if (fn) {
+            await fn();
+        } else {
+            console.warn('Router: no init function', initName, 'registered for route', route);
         }
     },
 

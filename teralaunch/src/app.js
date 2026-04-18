@@ -723,23 +723,52 @@ window.handleLogout = handleLogout;
 
 /**
  * Opens the game directory dialog.
- * @param {string} [currentPath] - Optional current path to pre-fill
+ * @param {string|Object} [arg] - Legacy: pre-fill path string. New: options object.
+ * @param {string} [arg.currentPath] - Path to pre-fill in the input.
+ * @param {boolean} [arg.required] - If true, cancel/close is disabled until
+ *   a valid folder is saved. Used when the launcher refuses to start without
+ *   a valid game folder (first launch or folder gone invalid).
+ * @param {string} [arg.errorMessage] - Banner shown at the top of the dialog
+ *   (e.g. "TERA.exe not found in Binaries folder"). Rendered inside an
+ *   #game-dir-error-banner node that is injected if missing.
  */
-async function openGameDirectoryDialog(currentPath) {
-  // Close dropdown immediately for visual feedback
+async function openGameDirectoryDialog(arg) {
+  // Normalize legacy string arg to options object.
+  const opts = (typeof arg === 'string') ? { currentPath: arg } : (arg || {});
+  const { currentPath, required = false, errorMessage = '' } = opts;
+
   if (typeof window.closeSettingsDropdown === 'function') {
     window.closeSettingsDropdown();
   }
   try {
     const dialog = document.getElementById('game-directory-dialog');
     const input = document.getElementById('game-directory-input');
+    const cancelBtn = document.getElementById('btn-cancel-game-dir');
 
     if (!dialog) {
       console.error('game-directory-dialog element not found');
       return;
     }
 
-    // Load current path and store it
+    dialog.dataset.required = required ? 'true' : 'false';
+    if (cancelBtn) cancelBtn.style.display = required ? 'none' : '';
+
+    // Inject / update the error banner slot.
+    const content = dialog.querySelector('.game-dir-content');
+    let banner = document.getElementById('game-dir-error-banner');
+    if (errorMessage && content) {
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'game-dir-error-banner';
+        banner.style.cssText = 'margin:0 0 12px;padding:10px 14px;border-radius:8px;background:rgba(220,38,38,0.12);border:1px solid rgba(220,38,38,0.5);color:#fecaca;font-size:13px;';
+        content.insertBefore(banner, content.firstChild);
+      }
+      banner.textContent = errorMessage;
+      banner.style.display = '';
+    } else if (banner) {
+      banner.style.display = 'none';
+    }
+
     if (currentPath) {
       originalGamePath = currentPath;
       if (input) input.value = currentPath;
@@ -764,12 +793,17 @@ window.openGameDirectoryDialog = openGameDirectoryDialog;
 
 /**
  * Closes the game directory dialog and restores original path.
+ * In required mode (set by openGameDirectoryDialog({required:true})),
+ * close is suppressed — the user must pick a valid folder.
  */
 function closeGameDirectoryDialog() {
   const dialog = document.getElementById('game-directory-dialog');
   const input = document.getElementById('game-directory-input');
 
-  // Restore original value on close (cancel behavior)
+  if (dialog && dialog.dataset.required === 'true') {
+    return;
+  }
+
   if (input) input.value = originalGamePath;
 
   if (dialog) {
@@ -802,6 +836,11 @@ window.browseGameDirectory = browseGameDirectory;
 
 /**
  * Saves the game directory from the dialog input.
+ * The backend (save_game_path_to_config) rejects folders that don't contain
+ * Binaries/TERA.exe; on rejection the dialog stays open with the error toast.
+ * When the dialog was opened in required mode (first launch or folder gone
+ * invalid), a successful save clears the required flag and resumes launcher
+ * initialization.
  */
 async function saveGameDirectory() {
   const input = document.getElementById('game-directory-input');
@@ -813,23 +852,41 @@ async function saveGameDirectory() {
     return;
   }
 
-  // Save to config
-  if (window.App && App.saveConfig) {
-    try {
-      await App.saveConfig('gamePath', path);
-      // Update the stored original path since we saved successfully
-      originalGamePath = path;
-      // Close the dialog
-      if (dialog) dialog.classList.remove('show');
-      // Show success notification
-      showUpdateNotification('success', 'Game directory saved', path);
-    } catch (e) {
-      console.error('Failed to save game directory:', e);
-      showUpdateNotification('error', 'Failed to save', e.message || 'Unknown error');
-      // Don't close dialog on error
-    }
-  } else {
+  if (!(window.App && App.saveConfig)) {
     showUpdateNotification('error', 'App not ready', 'Please wait and try again');
+    return;
+  }
+
+  const wasRequired = dialog && dialog.dataset.required === 'true';
+
+  try {
+    await App.saveConfig('gamePath', path);
+  } catch (e) {
+    console.error('Failed to save game directory:', e);
+    showUpdateNotification('error', 'Failed to save', e.message || e.toString() || 'Unknown error');
+    return; // Keep dialog open; user must pick a valid folder.
+  }
+
+  originalGamePath = path;
+  if (dialog) {
+    dialog.dataset.required = 'false';
+    dialog.classList.remove('show');
+  }
+  const cancelBtn = document.getElementById('btn-cancel-game-dir');
+  if (cancelBtn) cancelBtn.style.display = '';
+  const banner = document.getElementById('game-dir-error-banner');
+  if (banner) banner.style.display = 'none';
+
+  showUpdateNotification('success', 'Game directory saved', path);
+
+  // If the dialog was opened because the launcher couldn't start without a
+  // valid folder, resume initialization now that we have one.
+  if (wasRequired && window.App) {
+    if (window.App.state && window.App.state.isFirstLaunch && typeof window.App.completeFirstLaunch === 'function') {
+      window.App.completeFirstLaunch();
+    } else if (typeof window.App.initializeAndCheckUpdates === 'function') {
+      window.App.initializeAndCheckUpdates(false);
+    }
   }
 }
 window.saveGameDirectory = saveGameDirectory;
@@ -1340,10 +1397,12 @@ const App = {
 
         const isConnected = await this.checkServerConnection();
         if (isConnected) {
+          // Single gate for both first-launch and moved/deleted folder recovery.
+          // ensureGameFolderValid blocks with a modal until the folder is valid;
+          // the post-save flow re-enters this init via initializeAndCheckUpdates.
           this.checkFirstLaunch();
-          if (this.state.isFirstLaunch) {
-            await this.handleFirstLaunch();
-          } else {
+          const folderReady = await this.ensureGameFolderValid();
+          if (folderReady) {
             await this.initializeAndCheckUpdates(false);
           }
         } else {
@@ -1409,6 +1468,47 @@ const App = {
   checkFirstLaunch() {
     const isFirstLaunch = localStorage.getItem("isFirstLaunch") !== "false";
     this.setState({ isFirstLaunch });
+  },
+
+  /**
+   * Reads the canonical game-folder state from the backend and forces a
+   * blocking picker if the folder is unset or invalid.
+   *
+   * States from `get_game_folder_state`:
+   *   - { set: false, valid: false }           → never configured. Show first-launch welcome modal.
+   *   - { set: true,  valid: false, error }    → path points somewhere without Binaries/TERA.exe. Force re-pick.
+   *   - { set: true,  valid: true  }           → ready.
+   *
+   * Resolves to `true` once a valid folder is in place, `false` only if
+   * the backend is unreachable (caller should degrade gracefully).
+   */
+  async ensureGameFolderValid() {
+    let state;
+    try {
+      state = await invoke("get_game_folder_state");
+    } catch (e) {
+      console.error("get_game_folder_state failed:", e);
+      return false;
+    }
+
+    if (state && state.valid) return true;
+
+    if (!state || !state.set) {
+      // Never configured → run the first-launch flow (language + folder picker).
+      await this.handleFirstLaunch();
+      return false;
+    }
+
+    // Set but invalid (user moved/deleted the folder, or picked the wrong one).
+    // Non-dismissable dialog with the specific error; saveGameDirectory revalidates
+    // via the backend and keeps the dialog open on failure.
+    const errorMsg = state.error || "The configured game folder is no longer valid.";
+    await openGameDirectoryDialog({
+      currentPath: state.path || "",
+      required: true,
+      errorMessage: errorMsg,
+    });
+    return false;
   },
 
   /**
@@ -2837,9 +2937,8 @@ const App = {
     try {
       await this.initializeHomePage();
       this.checkFirstLaunch();
-      if (this.state.isFirstLaunch) {
-        await this.handleFirstLaunch();
-      } else {
+      const folderReady = await this.ensureGameFolderValid();
+      if (folderReady) {
         await this.checkForUpdates();
       }
 

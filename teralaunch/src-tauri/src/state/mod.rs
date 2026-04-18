@@ -6,6 +6,7 @@
 pub mod auth_state;
 pub mod deep_link_state;
 pub mod download_state;
+pub mod mods_state;
 
 // Re-export commonly used functions for convenience
 pub use auth_state::{

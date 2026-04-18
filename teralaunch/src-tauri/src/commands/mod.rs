@@ -14,6 +14,7 @@ pub mod config;
 pub mod download;
 pub mod game;
 pub mod hash;
+pub mod mods;
 pub mod util;
 
 // Note: Commands are accessed via submodules (e.g., commands::auth::login)
@@ -37,6 +38,17 @@ pub fn list_commands() -> Vec<&'static str> {
         "save_game_path_to_config",
         "get_language_from_config",
         "save_language_to_config",
+        "get_game_folder_state",
+        // Mods
+        "list_installed_mods",
+        "get_mods_catalog",
+        "install_mod",
+        "uninstall_mod",
+        "enable_mod",
+        "disable_mod",
+        "launch_external_app",
+        "stop_external_app",
+        "open_mods_folder",
         // Download
         "download_all_files",
         "cancel_downloads",
@@ -65,8 +77,8 @@ mod tests {
     #[test]
     fn list_commands_returns_expected_count() {
         let commands = list_commands();
-        // 5 auth + 5 config + 3 download + 3 game + 4 hash + 4 util = 24 commands
-        assert_eq!(commands.len(), 24);
+        // 5 auth + 6 config + 3 download + 3 game + 4 hash + 4 util + 9 mods = 34 commands
+        assert_eq!(commands.len(), 34);
     }
 
     #[test]

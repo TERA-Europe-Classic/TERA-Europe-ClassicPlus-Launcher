@@ -229,6 +229,7 @@ fn main() {
             commands::config::save_game_path_to_config,
             commands::config::get_language_from_config,
             commands::config::save_language_to_config,
+            commands::config::get_game_folder_state,
             // Download commands
             commands::download::download_all_files,
             commands::download::cancel_downloads,
@@ -251,6 +252,16 @@ fn main() {
             commands::util::check_server_connection,
             commands::util::fetch_player_count,
             commands::util::fetch_news_feed,
+            // Mods commands
+            commands::mods::list_installed_mods,
+            commands::mods::get_mods_catalog,
+            commands::mods::install_mod,
+            commands::mods::uninstall_mod,
+            commands::mods::enable_mod,
+            commands::mods::disable_mod,
+            commands::mods::launch_external_app,
+            commands::mods::stop_external_app,
+            commands::mods::open_mods_folder,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

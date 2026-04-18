@@ -1069,7 +1069,7 @@ fn parse_server_list_xml(xml: &str) -> Result<ServerList, Box<dyn std::error::Er
 
     let mut server_list = ServerList {
         servers: vec![],
-        last_server_id: 2800,
+        last_server_id: 0,
         sort_criterion: 2,
     };
 
@@ -1247,9 +1247,6 @@ fn parse_server_list_json(json: &Value) -> Result<ServerList, Box<dyn std::error
 
     let parts: Vec<&str> = credentials.split('|').collect();
 
-    let player_last_server = "0";
-    let player_last_server_id = 2800;
-
     // Parse character counts for each server
     let character_counts: std::collections::HashMap<u32, u32> = if parts.len() > 1 {
         parts[1]
@@ -1268,10 +1265,7 @@ fn parse_server_list_json(json: &Value) -> Result<ServerList, Box<dyn std::error
         std::collections::HashMap::new()
     };
 
-    info!(
-        "Parsed values - Last server: {}, Last server ID: {}, Character counts: {:?}",
-        player_last_server, player_last_server_id, character_counts
-    );
+    info!("Parsed character counts: {:?}", character_counts);
 
     let servers = json["servers"]
         .as_array()
@@ -1363,8 +1357,9 @@ fn parse_server_list_json(json: &Value) -> Result<ServerList, Box<dyn std::error
         server_list.servers.push(server_info);
     }
 
-    // Use Enterance's approach: hardcoded last_server_id and format server names with (0) suffix
-    server_list.last_server_id = 2800;
+    // Force last_server_id = 0 so the TERA client shows the server-select
+    // screen instead of auto-joining the previously used server.
+    server_list.last_server_id = 0;
     server_list.sort_criterion = json["sort_criterion"].as_u64().unwrap_or(3) as u32;
     // Add configured relay servers to the server list
     let relay_servers = config::get_relay_servers();
