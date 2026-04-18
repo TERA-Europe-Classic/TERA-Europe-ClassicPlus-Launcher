@@ -432,72 +432,49 @@ pub async fn uninstall_mod(id: String, delete_settings: Option<bool>) -> Result<
     Ok(())
 }
 
-/// Enables a mod. External: marks `auto_launch=true` and spawns the app now
-/// unless it's already running. GPK: Phase C.
+/// Enables a mod. The toggle records intent only — it does NOT start the
+/// external app. Enabled external apps auto-spawn when the user clicks
+/// Launch Game (see `spawn_auto_launch_external_apps`). Enabled GPKs are
+/// applied at game launch by the mapper patcher.
 #[tauri::command]
 #[cfg(not(tarpaulin_include))]
 pub async fn enable_mod(id: String) -> Result<ModEntry, String> {
-    let entry = mods_state::get_mod(&id)?
+    let _entry = mods_state::get_mod(&id)?
         .ok_or_else(|| format!("Mod '{}' is not installed", id))?;
 
-    match entry.kind {
-        ModKind::External => {
-            let updated = launch_external_app_impl(&id, true).await?;
-            Ok(updated)
-        }
-        ModKind::Gpk => {
-            // Flag the GPK as active. Real deployment happens in
-            // spawn_auto_launch_external_apps (to be extended in Phase C)
-            // once the mapper patcher lands. Until then, enable just
-            // records intent so the user's toggle state persists.
-            let updated = mods_state::mutate(|reg| {
-                let slot = reg
-                    .find_mut(&id)
-                    .ok_or_else(|| format!("Mod '{}' is not installed", id))?;
-                slot.enabled = true;
-                slot.auto_launch = true;
-                slot.status = ModStatus::Enabled;
-                Ok(slot.clone())
-            })?;
-            Ok(updated)
-        }
-    }
+    let updated = mods_state::mutate(|reg| {
+        let slot = reg
+            .find_mut(&id)
+            .ok_or_else(|| format!("Mod '{}' is not installed", id))?;
+        slot.enabled = true;
+        slot.auto_launch = true;
+        slot.status = ModStatus::Enabled;
+        slot.last_error = None;
+        Ok(slot.clone())
+    })?;
+    Ok(updated)
 }
 
-/// Disables a mod. External: kills the process and clears `auto_launch`.
+/// Disables a mod — flips the intent flags off. External apps already
+/// running are left alone; close them from their own window if you want
+/// them gone now. (The explicit `stop_external_app` command is still
+/// available for UI controls that need to terminate a live process.)
 #[tauri::command]
 #[cfg(not(tarpaulin_include))]
 pub async fn disable_mod(id: String) -> Result<ModEntry, String> {
-    let entry = mods_state::get_mod(&id)?
+    let _entry = mods_state::get_mod(&id)?
         .ok_or_else(|| format!("Mod '{}' is not installed", id))?;
 
-    match entry.kind {
-        ModKind::External => {
-            if let Some(exe_name) = external_executable_name(&id) {
-                let _ = external_app::stop_process_by_name(&exe_name);
-            }
-            let updated = mods_state::mutate(|reg| {
-                let slot = reg.find_mut(&id).ok_or_else(|| "Mod vanished".to_string())?;
-                slot.enabled = false;
-                slot.auto_launch = false;
-                slot.status = ModStatus::Disabled;
-                Ok(slot.clone())
-            })?;
-            Ok(updated)
-        }
-        ModKind::Gpk => {
-            let updated = mods_state::mutate(|reg| {
-                let slot = reg
-                    .find_mut(&id)
-                    .ok_or_else(|| format!("Mod '{}' is not installed", id))?;
-                slot.enabled = false;
-                slot.auto_launch = false;
-                slot.status = ModStatus::Disabled;
-                Ok(slot.clone())
-            })?;
-            Ok(updated)
-        }
-    }
+    let updated = mods_state::mutate(|reg| {
+        let slot = reg
+            .find_mut(&id)
+            .ok_or_else(|| format!("Mod '{}' is not installed", id))?;
+        slot.enabled = false;
+        slot.auto_launch = false;
+        slot.status = ModStatus::Disabled;
+        Ok(slot.clone())
+    })?;
+    Ok(updated)
 }
 
 /// Ad-hoc launch of an external app without changing its auto-launch setting.
@@ -625,10 +602,18 @@ pub fn spawn_auto_launch_external_apps() {
                 continue;
             }
         };
-        if let Err(e) = external_app::spawn_app(&exe_path, &[]) {
-            log::warn!("Auto-launch: failed to start {}: {}", entry.id, e);
-        } else {
-            log::info!("Auto-launch: started {}", entry.id);
+        match external_app::spawn_app(&exe_path, &[]) {
+            Err(e) => log::warn!("Auto-launch: failed to start {}: {}", entry.id, e),
+            Ok(_) => {
+                log::info!("Auto-launch: started {}", entry.id);
+                let _ = mods_state::mutate(|reg| {
+                    if let Some(slot) = reg.find_mut(&entry.id) {
+                        slot.status = ModStatus::Running;
+                        slot.last_error = None;
+                    }
+                    Ok(())
+                });
+            }
         }
     }
 }
