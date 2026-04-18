@@ -7,6 +7,56 @@
     margin: 0 auto;
 }
 
+/* Styled scrollbar inside the mods modal so the UA-default isn't a
+   jarring grey rectangle against the dark theme. Scoped to #mods-page
+   plus the overflow containers so nothing outside the modal is
+   affected.
+
+   Chromium exposes ::-webkit-scrollbar; Firefox uses scrollbar-color /
+   scrollbar-width. Tauri v1 ships WebView2 (Chromium) on Windows so
+   the Firefox fallback is belt-and-braces. */
+#mods-page,
+#mods-page .mods-pane,
+#mods-page .mods-rows,
+#mods-page .mods-detail-body,
+#mods-page .mods-detail-description,
+#mods-page .mods-category-row {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(34, 211, 238, 0.32) rgba(255, 255, 255, 0.04);
+}
+
+#mods-page ::-webkit-scrollbar,
+#mods-page::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+#mods-page ::-webkit-scrollbar-track,
+#mods-page::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 999px;
+}
+
+#mods-page ::-webkit-scrollbar-thumb,
+#mods-page::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(34, 211, 238, 0.32), rgba(34, 211, 238, 0.18));
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    border-radius: 999px;
+    transition: background 120ms ease;
+}
+
+#mods-page ::-webkit-scrollbar-thumb:hover,
+#mods-page::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(34, 211, 238, 0.55), rgba(34, 211, 238, 0.35));
+    background-clip: padding-box;
+}
+
+#mods-page ::-webkit-scrollbar-corner,
+#mods-page::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
 .mods-container {
     display: flex;
     flex-direction: column;
