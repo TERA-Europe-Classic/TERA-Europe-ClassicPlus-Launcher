@@ -31,16 +31,24 @@
             </button>
             <button class="mods-tab" data-tab="browse" role="tab" aria-selected="false">
                 <span data-translate="MODS_TAB_BROWSE">Browse</span>
+                <span class="mods-tab-count" id="mods-count-browse">0</span>
             </button>
         </div>
 
         <div class="mods-toolbar">
-            <input type="text" id="mods-search" class="mods-search" placeholder="Search mods" data-translate-placeholder="MODS_SEARCH" />
+            <input type="text" id="mods-search" class="mods-search" placeholder="Search by name, author, or category" data-translate-placeholder="MODS_SEARCH" />
             <div class="mods-filter-group" role="group">
                 <button class="mods-filter-chip active" data-filter="all" data-translate="MODS_FILTER_ALL">All</button>
                 <button class="mods-filter-chip" data-filter="external" data-translate="MODS_FILTER_EXTERNAL">External</button>
                 <button class="mods-filter-chip" data-filter="gpk" data-translate="MODS_FILTER_GPK">GPK</button>
             </div>
+        </div>
+
+        <!-- Category chips — populated dynamically from whatever categories
+             the loaded catalog declares. "All" is always first and active
+             by default. -->
+        <div class="mods-category-row" id="mods-category-row" role="group" aria-label="Category filter">
+            <button class="mods-category-chip active" data-category="all" data-translate="MODS_CATEGORY_ALL">All categories</button>
         </div>
 
         <section class="mods-pane active" data-pane="installed">

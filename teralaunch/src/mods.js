@@ -16,6 +16,7 @@ const ModsView = {
     state: {
         tab: 'installed',              // 'installed' | 'browse'
         filter: 'all',                 // 'all' | 'external' | 'gpk'
+        category: 'all',               // 'all' | <catalog category string>
         query: '',
         installed: [],                 // ModEntry[]
         catalog: [],                   // CatalogEntry[]
@@ -120,6 +121,8 @@ const ModsView = {
         this.$trayItems = document.getElementById('mods-download-tray-items');
         this.$trayCount = document.getElementById('mods-download-tray-count');
         this.$countInstalled = document.getElementById('mods-count-installed');
+        this.$countBrowse = document.getElementById('mods-count-browse');
+        this.$categoryRow = document.getElementById('mods-category-row');
         this.$detailBackdrop = document.getElementById('mods-detail-backdrop');
         this.$detailIcon = document.getElementById('mods-detail-icon');
         this.$detailName = document.getElementById('mods-detail-name');
@@ -220,6 +223,54 @@ const ModsView = {
         this.render();
     },
 
+    setCategory(category) {
+        this.state.category = category || 'all';
+        if (this.$categoryRow) {
+            this.$categoryRow.querySelectorAll('.mods-category-chip').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.category === this.state.category);
+            });
+        }
+        this.render();
+    },
+
+    /**
+     * Rebuild the category chip row from whichever categories the current
+     * catalog advertises. Keeps the "All" chip first, always clickable,
+     * and preserves the active selection when possible.
+     */
+    renderCategoryChips() {
+        if (!this.$categoryRow) return;
+        const set = new Set();
+        for (const entry of this.state.catalog) {
+            const cat = (entry.category || '').trim();
+            if (cat) set.add(cat);
+        }
+        const sorted = [...set].sort();
+        const active = this.state.category;
+        const stillValid = active === 'all' || set.has(active);
+        if (!stillValid) this.state.category = 'all';
+
+        const chips = [
+            `<button class="mods-category-chip ${this.state.category === 'all' ? 'active' : ''}" data-category="all" data-translate="MODS_CATEGORY_ALL">All categories</button>`,
+        ];
+        for (const cat of sorted) {
+            const label = this.formatCategoryLabel(cat);
+            const isActive = this.state.category === cat;
+            chips.push(`<button class="mods-category-chip ${isActive ? 'active' : ''}" data-category="${cat}">${label}</button>`);
+        }
+        this.$categoryRow.innerHTML = chips.join('');
+        this.$categoryRow.querySelectorAll('.mods-category-chip').forEach(btn => {
+            btn.addEventListener('click', () => this.setCategory(btn.dataset.category));
+        });
+    },
+
+    /** Capitalise a raw category slug ("ui" → "UI", "fun" → "Fun"). */
+    formatCategoryLabel(cat) {
+        if (!cat) return '';
+        if (cat.length <= 3) return cat.toUpperCase();
+        return cat.charAt(0).toUpperCase() + cat.slice(1);
+    },
+
     async loadInstalled() {
         try {
             this.state.installed = await modsInvoke('list_installed_mods');
@@ -257,6 +308,9 @@ const ModsView = {
             this.state.catalog = [];
             this._catalogError = String(e);
         }
+        // Category chips depend on what's in the catalog, so rebuild them
+        // whenever the catalog reloads.
+        this.renderCategoryChips();
     },
 
     async subscribeToProgress() {
@@ -348,8 +402,16 @@ const ModsView = {
             const kindKey = entry.kind === 'external' ? 'external' : 'gpk';
             if (kindKey !== this.state.filter) return false;
         }
+        if (this.state.category && this.state.category !== 'all') {
+            if ((entry.category || '') !== this.state.category) return false;
+        }
         if (this.state.query) {
-            const hay = `${entry.name} ${entry.author} ${entry.description || entry.short_description || ''}`.toLowerCase();
+            const hay = [
+                entry.name,
+                entry.author,
+                entry.category,
+                entry.description || entry.short_description || '',
+            ].filter(Boolean).join(' ').toLowerCase();
             if (!hay.includes(this.state.query)) return false;
         }
         return true;
@@ -360,9 +422,13 @@ const ModsView = {
 
         // Installed count on the tab badge updates on every render so the
         // number always reflects state even while the user is looking at
-        // the Browse tab. Same story for the per-kind group counts.
+        // the Browse tab. Same story for the per-kind group counts and
+        // the Browse badge (which counts catalog entries minus installed).
         const installedTotal = this.state.installed.length;
         if (this.$countInstalled) this.$countInstalled.textContent = installedTotal;
+        const installedIds = new Set(this.state.installed.map(m => m.id));
+        const browseTotal = this.state.catalog.filter(e => !installedIds.has(e.id)).length;
+        if (this.$countBrowse) this.$countBrowse.textContent = browseTotal;
         const extCount = this.state.installed.filter(m => m.kind === 'external').length;
         const gpkCount = this.state.installed.filter(m => m.kind === 'gpk').length;
         if (this.$page) {
@@ -571,7 +637,13 @@ const ModsView = {
         const id = row.dataset.modId;
         const action = btn.dataset.action;
 
-        event.preventDefault();
+        // Checkbox toggle: let the browser commit the flip natively so the
+        // switch moves immediately even if the IPC call takes a moment.
+        // Everything else (Install/Update/Retry buttons) has no default
+        // action worth keeping, so we block it.
+        if (action !== 'toggle') {
+            event.preventDefault();
+        }
 
         try {
             switch (action) {

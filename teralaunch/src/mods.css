@@ -158,6 +158,40 @@
     color: var(--primary, #22d3ee);
 }
 
+/* Category chip row — secondary filter below the kind chips. Wraps
+   across lines when the catalog has many categories; horizontal scroll
+   on narrow viewports. */
+.mods-category-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 4px 6px;
+    margin-top: -6px;
+}
+
+.mods-category-chip {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.65);
+    padding: 4px 10px;
+    font-size: 11px;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    border-radius: 999px;
+    transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.mods-category-chip:hover {
+    color: var(--text, #fff);
+    border-color: rgba(255, 255, 255, 0.16);
+}
+
+.mods-category-chip.active {
+    background: rgba(34, 211, 238, 0.18);
+    border-color: rgba(34, 211, 238, 0.4);
+    color: var(--primary, #22d3ee);
+}
+
 /* Panes */
 .mods-pane {
     display: none;

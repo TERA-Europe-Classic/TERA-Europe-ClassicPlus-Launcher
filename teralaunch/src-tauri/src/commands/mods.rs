@@ -179,7 +179,12 @@ async fn install_external_mod(
                 let slot = reg.find_mut(&entry.id).ok_or_else(|| {
                     format!("Registry entry for {} disappeared mid-install", entry.id)
                 })?;
-                slot.status = ModStatus::Disabled;
+                // New installs default to enabled so the user gets the mod
+                // they just picked without an extra click. They can untoggle
+                // it from the Installed tab if they change their mind.
+                slot.enabled = true;
+                slot.auto_launch = true;
+                slot.status = ModStatus::Enabled;
                 slot.progress = None;
                 slot.last_error = None;
                 slot.version = entry.version.clone();
@@ -276,7 +281,12 @@ async fn install_gpk_mod(
                 let slot = reg.find_mut(&entry.id).ok_or_else(|| {
                     format!("Registry entry for {} disappeared mid-install", entry.id)
                 })?;
-                slot.status = ModStatus::Disabled;
+                // Match external-app behaviour: fresh installs are enabled
+                // by default. The user untoggles from the Installed tab if
+                // they don't want the mod applied at next game launch.
+                slot.enabled = true;
+                slot.auto_launch = true;
+                slot.status = ModStatus::Enabled;
                 slot.progress = None;
                 slot.last_error = deploy_note;
                 slot.version = entry.version.clone();
@@ -618,13 +628,13 @@ pub fn spawn_auto_launch_external_apps() {
     }
 }
 
-/// Called when the game client closes: terminates every external mod we
-/// launched alongside it, so Shinra/TCC don't linger after the game is
-/// gone. Best-effort — logs failures, never propagates.
+/// Called when the game client closes: terminates every installed
+/// external mod whose process is still alive, so Shinra/TCC don't
+/// linger after the game is gone. Runs regardless of the current
+/// enabled flag — a user who untoggled mid-session still expects the
+/// overlay to exit with the client.
 ///
-/// We don't distinguish "processes we spawned" from "processes the user
-/// started manually"; closing the game nukes any enabled external mod's
-/// process. Disabled mods are left alone.
+/// Best-effort — logs failures, never propagates.
 pub fn stop_auto_launched_external_apps() {
     let entries = match mods_state::list_mods() {
         Ok(v) => v,
@@ -634,7 +644,7 @@ pub fn stop_auto_launched_external_apps() {
         }
     };
     for entry in entries {
-        if !matches!(entry.kind, ModKind::External) || !entry.enabled {
+        if !matches!(entry.kind, ModKind::External) {
             continue;
         }
         let exe_name = match external_executable_name(&entry.id) {
@@ -649,7 +659,13 @@ pub fn stop_auto_launched_external_apps() {
                 log::info!("Auto-stop: terminated {}", entry.id);
                 let _ = mods_state::mutate(|reg| {
                     if let Some(slot) = reg.find_mut(&entry.id) {
-                        slot.status = ModStatus::Enabled;
+                        // Keep the toggle state as-is; just clear the
+                        // "Running" live-status overlay.
+                        slot.status = if slot.enabled {
+                            ModStatus::Enabled
+                        } else {
+                            ModStatus::Disabled
+                        };
                     }
                     Ok(())
                 });
