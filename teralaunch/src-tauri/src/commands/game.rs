@@ -215,6 +215,10 @@ pub async fn handle_launch_game(
             error!("Failed to emit game_ended event: {:?}", e);
         }
 
+        // Tear down any external mods we launched for this game so they
+        // don't linger after the client is gone.
+        crate::commands::mods::stop_auto_launched_external_apps();
+
         // Game status is tracked by teralib via PID map - it sends updates via watch channel
         // Check if all games have finished
         if !teralib::is_game_running() {

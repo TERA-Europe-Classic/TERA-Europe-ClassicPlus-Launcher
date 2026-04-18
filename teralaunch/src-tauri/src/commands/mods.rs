@@ -618,6 +618,47 @@ pub fn spawn_auto_launch_external_apps() {
     }
 }
 
+/// Called when the game client closes: terminates every external mod we
+/// launched alongside it, so Shinra/TCC don't linger after the game is
+/// gone. Best-effort — logs failures, never propagates.
+///
+/// We don't distinguish "processes we spawned" from "processes the user
+/// started manually"; closing the game nukes any enabled external mod's
+/// process. Disabled mods are left alone.
+pub fn stop_auto_launched_external_apps() {
+    let entries = match mods_state::list_mods() {
+        Ok(v) => v,
+        Err(e) => {
+            log::warn!("Auto-stop: could not read mods registry: {}", e);
+            return;
+        }
+    };
+    for entry in entries {
+        if !matches!(entry.kind, ModKind::External) || !entry.enabled {
+            continue;
+        }
+        let exe_name = match external_executable_name(&entry.id) {
+            Some(n) => n,
+            None => continue,
+        };
+        if !external_app::is_process_running(&exe_name) {
+            continue;
+        }
+        match external_app::stop_process_by_name(&exe_name) {
+            Ok(_) => {
+                log::info!("Auto-stop: terminated {}", entry.id);
+                let _ = mods_state::mutate(|reg| {
+                    if let Some(slot) = reg.find_mut(&entry.id) {
+                        slot.status = ModStatus::Enabled;
+                    }
+                    Ok(())
+                });
+            }
+            Err(e) => log::warn!("Auto-stop: failed to stop {}: {}", entry.id, e),
+        }
+    }
+}
+
 /// Maps a mod id to the advertised executable filename. Catalog entries
 /// store this in `executable_relpath`; for installed mods we look it up
 /// from the registry's cached catalog fields. Simpler v1: expect the
