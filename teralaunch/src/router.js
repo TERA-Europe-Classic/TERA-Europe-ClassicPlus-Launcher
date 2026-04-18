@@ -9,12 +9,9 @@ const createRouter = (App) => ({
             public: true,
             init: 'initHome'
         },
-        mods: {
-            title: 'Mods',
-            file: 'mods.html',
-            public: true,
-            init: 'initMods'
-        },
+        // Mods is no longer a route — it lives as a modal overlay opened
+        // from the top-right toolbar, same pattern as the settings popup.
+        // See openModsModal() in app.js.
     },
 
     currentRoute: null,

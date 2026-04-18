@@ -1520,6 +1520,72 @@ const App = {
     this.setupGameStatusListeners();
     this.setupUpdateListeners();
     this.setupErrorListener();
+    this.setupModsToolbar();
+  },
+
+  /**
+   * Wires the top-right Mods icon button (toolbar) and the first-launch
+   * onboarding dialog's buttons. Both lookups are safe if the elements
+   * aren't present yet (older index.html without mods UI) — we just
+   * silently skip.
+   */
+  setupModsToolbar() {
+    const modsButton = document.getElementById("mods-button");
+    if (modsButton && !modsButton.dataset.bound) {
+      modsButton.dataset.bound = "1";
+      modsButton.addEventListener("click", (e) => {
+        e.preventDefault();
+        if (window.ModsView?.open) window.ModsView.open();
+      });
+    }
+
+    const dismiss = document.getElementById("mods-onboarding-dismiss");
+    if (dismiss && !dismiss.dataset.bound) {
+      dismiss.dataset.bound = "1";
+      dismiss.addEventListener("click", () => this.dismissModsOnboarding());
+    }
+
+    const openMods = document.getElementById("mods-onboarding-open");
+    if (openMods && !openMods.dataset.bound) {
+      openMods.dataset.bound = "1";
+      openMods.addEventListener("click", () => {
+        this.dismissModsOnboarding();
+        if (window.ModsView?.open) window.ModsView.open();
+      });
+    }
+  },
+
+  /**
+   * Hides the onboarding dialog and persists the acknowledgment in
+   * localStorage so it never fires again.
+   */
+  dismissModsOnboarding() {
+    const card = document.getElementById("mods-onboarding");
+    if (card) card.hidden = true;
+    try {
+      localStorage.setItem("mods_onboarding_seen", "true");
+    } catch (e) {
+      // localStorage may be disabled in some Tauri configs; onboarding
+      // just shows again next time — no harm.
+      console.warn("mods onboarding: could not persist seen flag", e);
+    }
+  },
+
+  /**
+   * Shows the onboarding dialog if the user has never acknowledged it.
+   * Returns true if the dialog was shown (caller should treat this as
+   * "intercepted the launch click"), false if it was not shown.
+   */
+  maybeShowModsOnboarding() {
+    try {
+      if (localStorage.getItem("mods_onboarding_seen") === "true") return false;
+    } catch (_) {
+      return false;
+    }
+    const card = document.getElementById("mods-onboarding");
+    if (!card) return false;
+    card.hidden = false;
+    return true;
   },
 
   /**
@@ -3574,6 +3640,15 @@ const App = {
       return;
     }
 
+    // First-launch Mods onboarding — show once before the user's first
+    // successful Launch after upgrading to a version with the mod manager.
+    // maybeShowModsOnboarding returns true if it rendered; the user then
+    // dismisses or opens Mods, and re-clicks Launch to proceed.
+    if (this.maybeShowModsOnboarding && this.maybeShowModsOnboarding()) {
+      console.log("BLOCKED: mods onboarding shown");
+      return;
+    }
+
     // Set launching flag immediately to prevent double-clicks/race conditions
     // This must happen BEFORE any async operations
     this.setState({ isGameLaunching: true });
@@ -4550,6 +4625,14 @@ const App = {
     document.querySelectorAll("[data-translate-placeholder]").forEach((el) => {
       const key = el.getAttribute("data-translate-placeholder");
       el.placeholder = this.t(key);
+    });
+
+    // Tooltip (title attribute) localization — used by the Mods toolbar
+    // button so screen readers and hover tooltips follow the selected
+    // language.
+    document.querySelectorAll("[data-translate-title]").forEach((el) => {
+      const key = el.getAttribute("data-translate-title");
+      el.title = this.t(key);
     });
 
     this.updateDynamicTranslations();

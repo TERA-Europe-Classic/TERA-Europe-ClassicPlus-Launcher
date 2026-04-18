@@ -23,16 +23,80 @@ const ModsView = {
     },
     _eventUnlisten: null,
 
-    async mount() {
-        this.cacheDom();
-        this.bindEvents();
-        await Promise.all([
-            this.loadInstalled(),
-            this.loadCatalog(),
-        ]);
-        this.render();
-        this.subscribeToProgress();
+    _mounted: false,
+    _modalBound: false,
+
+    /**
+     * Opens the Mods modal. On first call, fetches mods.html, injects it
+     * into #mods-modal-content, and wires up the internal mount. Subsequent
+     * calls just re-show the modal and refresh state.
+     */
+    async open() {
+        const backdrop = document.getElementById('mods-modal');
+        if (!backdrop) {
+            console.warn('ModsView.open: #mods-modal not in DOM');
+            return;
+        }
+
+        if (!this._mounted) {
+            const container = document.getElementById('mods-modal-content');
+            try {
+                const response = await fetch('./mods.html');
+                const html = await response.text();
+                container.innerHTML = html;
+            } catch (e) {
+                console.error('Failed to load mods.html:', e);
+                container.innerHTML = '<div style="padding:24px;color:#f88">Failed to load mods UI.</div>';
+                return;
+            }
+            this.cacheDom();
+            this.bindEvents();
+            this._mounted = true;
+            await Promise.all([this.loadInstalled(), this.loadCatalog()]);
+            this.render();
+            this.subscribeToProgress();
+            // Translate labels that were in the freshly-loaded fragment.
+            if (window.App?.updateAllTranslations) {
+                await window.App.updateAllTranslations();
+            }
+        } else {
+            // Refresh installed list on re-open so catalog changes land.
+            await this.loadInstalled();
+            this.render();
+        }
+
+        this._bindModalDismissOnce(backdrop);
+        backdrop.hidden = false;
+        backdrop.setAttribute('aria-hidden', 'false');
     },
+
+    close() {
+        const backdrop = document.getElementById('mods-modal');
+        if (!backdrop) return;
+        backdrop.hidden = true;
+        backdrop.setAttribute('aria-hidden', 'true');
+    },
+
+    _bindModalDismissOnce(backdrop) {
+        if (this._modalBound) return;
+        this._modalBound = true;
+        backdrop.addEventListener('click', (e) => {
+            if (e.target === backdrop) this.close();
+        });
+        const closeBtn = document.getElementById('mods-modal-close');
+        if (closeBtn) closeBtn.addEventListener('click', () => this.close());
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !backdrop.hidden) {
+                // Detail panel has its own Escape handler; only close the modal
+                // if the detail backdrop is already hidden.
+                const detail = document.getElementById('mods-detail-backdrop');
+                if (!detail || detail.hidden) this.close();
+            }
+        });
+    },
+
+    /** Legacy alias — the router no longer calls this, but keep for safety. */
+    async mount() { return this.open(); },
 
     async unmount() {
         if (typeof this._eventUnlisten === 'function') {
@@ -550,12 +614,13 @@ function showModsError(title, detail) {
     }
 }
 
-// Integrate with the App router's init dispatch.
+// Expose for the top-right Mods toolbar button. The router no longer has
+// a 'mods' route — see router.js. app.js binds #mods-button to ModsView.open.
 if (typeof window !== 'undefined') {
-    window.initMods = async function () {
-        await ModsView.mount();
-    };
     window.ModsView = ModsView;
+    // initMods retained as a no-op alias in case any legacy code still looks
+    // it up; real open path is window.ModsView.open().
+    window.initMods = async function () { await ModsView.open(); };
 }
 
 export { ModsView };

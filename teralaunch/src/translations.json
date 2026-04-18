@@ -154,7 +154,12 @@
         "MODS_ACTION_UPDATE": "Mettre à jour",
         "MODS_INSTALLED": "Installé",
         "MODS_STATUS_RUNNING": "En cours",
-        "MODS_STATUS_STARTING": "Démarrage…"
+        "MODS_STATUS_STARTING": "Démarrage…",
+        "MODS_BUTTON_TITLE": "Mods",
+        "MODS_ONBOARDING_TITLE": "Nouveau : Mods",
+        "MODS_ONBOARDING_BODY": "Parcourez des outils communautaires comme Shinra Meter et TCC — installez-les, activez-les et lancez-les avec TERA en un clic. Ouvrez la fenêtre Mods à tout moment via l'icône à côté des paramètres.",
+        "MODS_ONBOARDING_DISMISS": "Compris",
+        "MODS_ONBOARDING_OPEN": "Ouvrir Mods…"
     },
     "EUR": {
         "LOGIN_REQUIRED": "Login required",
@@ -311,7 +316,12 @@
         "MODS_ACTION_UPDATE": "Update",
         "MODS_INSTALLED": "Installed",
         "MODS_STATUS_RUNNING": "Running",
-        "MODS_STATUS_STARTING": "Starting…"
+        "MODS_STATUS_STARTING": "Starting…",
+        "MODS_BUTTON_TITLE": "Mods",
+        "MODS_ONBOARDING_TITLE": "New: Mods",
+        "MODS_ONBOARDING_BODY": "Browse community tools like Shinra Meter and TCC — install, enable, and launch them alongside TERA in one click. Open the Mods popup any time from the icon next to Settings.",
+        "MODS_ONBOARDING_DISMISS": "Got it",
+        "MODS_ONBOARDING_OPEN": "Open Mods…"
     },
     "RUS": {
         "LOGIN_REQUIRED": "Требуется вход",
@@ -468,7 +478,12 @@
         "MODS_ACTION_UPDATE": "Обновить",
         "MODS_INSTALLED": "Установлено",
         "MODS_STATUS_RUNNING": "Работает",
-        "MODS_STATUS_STARTING": "Запуск…"
+        "MODS_STATUS_STARTING": "Запуск…",
+        "MODS_BUTTON_TITLE": "Моды",
+        "MODS_ONBOARDING_TITLE": "Новое: Моды",
+        "MODS_ONBOARDING_BODY": "Просматривайте инструменты сообщества, такие как Shinra Meter и TCC — устанавливайте, включайте и запускайте их вместе с TERA одним кликом. Открыть окно модов можно в любое время по иконке рядом с настройками.",
+        "MODS_ONBOARDING_DISMISS": "Понятно",
+        "MODS_ONBOARDING_OPEN": "Открыть моды…"
     },
     "GER": {
         "LOGIN_REQUIRED": "Anmeldung erforderlich",
@@ -625,6 +640,11 @@
         "MODS_ACTION_UPDATE": "Aktualisieren",
         "MODS_INSTALLED": "Installiert",
         "MODS_STATUS_RUNNING": "Läuft",
-        "MODS_STATUS_STARTING": "Startet…"
+        "MODS_STATUS_STARTING": "Startet…",
+        "MODS_BUTTON_TITLE": "Mods",
+        "MODS_ONBOARDING_TITLE": "Neu: Mods",
+        "MODS_ONBOARDING_BODY": "Durchsuchen Sie Community-Tools wie Shinra Meter und TCC — installieren, aktivieren und zusammen mit TERA mit einem Klick starten. Das Mods-Fenster jederzeit über das Symbol neben den Einstellungen öffnen.",
+        "MODS_ONBOARDING_DISMISS": "Verstanden",
+        "MODS_ONBOARDING_OPEN": "Mods öffnen…"
     }
 }
