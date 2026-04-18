@@ -1589,6 +1589,90 @@ const App = {
   },
 
   /**
+   * Scans installed mods against the catalog and, if any are out of date,
+   * shows a persistent banner at bottom-right so the user knows to open
+   * the Mods modal and pull the new versions down. Runs once per launch;
+   * the × dismisses until the next launch (no persistence).
+   *
+   * Silently no-ops if the Tauri bridge isn't ready yet, or if the
+   * catalog / installed list is empty — this is a best-effort hint, not
+   * a guarantee.
+   */
+  async checkModUpdatesOnLaunch() {
+    try {
+      if (this._modUpdatesChecked) return;
+      this._modUpdatesChecked = true;
+
+      const invoke = window.__TAURI__?.tauri?.invoke || window.__TAURI__?.invoke;
+      if (!invoke) return;
+
+      let catalog, installed;
+      try {
+        catalog = await invoke("get_mods_catalog", { forceRefresh: false });
+      } catch (e) {
+        console.warn("mod-update-banner: catalog fetch failed", e);
+        return;
+      }
+      try {
+        installed = await invoke("list_installed_mods");
+      } catch (e) {
+        console.warn("mod-update-banner: installed list failed", e);
+        return;
+      }
+
+      const mods = Array.isArray(catalog?.mods) ? catalog.mods : [];
+      if (!mods.length || !Array.isArray(installed) || !installed.length) return;
+
+      const byId = new Map(mods.map((m) => [m.id, m]));
+      const outdated = [];
+      for (const row of installed) {
+        const cat = byId.get(row.id);
+        if (!cat || !cat.version || !row.version) continue;
+        if (cat.version === row.version) continue;
+        outdated.push({ id: row.id, name: row.name || cat.name, oldV: row.version, newV: cat.version });
+      }
+
+      if (!outdated.length) return;
+
+      const banner = document.getElementById("mods-update-banner");
+      const title = document.getElementById("mods-update-banner-title");
+      const subtitle = document.getElementById("mods-update-banner-subtitle");
+      if (!banner) return;
+
+      const count = outdated.length;
+      if (title) {
+        title.textContent = count === 1
+          ? "1 mod update available"
+          : `${count} mod updates available`;
+      }
+      if (subtitle) {
+        const names = outdated.slice(0, 3).map((o) => o.name).join(", ");
+        const extra = count > 3 ? ` +${count - 3} more` : "";
+        subtitle.textContent = `Open the mod manager to apply: ${names}${extra}`;
+      }
+
+      banner.hidden = false;
+
+      if (!banner.dataset.bound) {
+        banner.dataset.bound = "1";
+        banner.addEventListener("click", (e) => {
+          const action = e.target?.closest?.("[data-action]")?.dataset?.action;
+          if (action === "dismiss") {
+            banner.hidden = true;
+            return;
+          }
+          // "open" (banner body) or any click inside the banner that
+          // isn't the × dismiss button.
+          banner.hidden = true;
+          if (window.ModsView?.open) window.ModsView.open();
+        });
+      }
+    } catch (e) {
+      console.warn("mod-update-banner: unexpected failure", e);
+    }
+  },
+
+  /**
    * Sets up event listeners for game status events from the game server.
    *
    * Listens for the following events:
@@ -4744,6 +4828,18 @@ const App = {
 
     // Re-check authentication to update UI state after home page is loaded
     this.checkAuthentication();
+
+    // One-shot scan: if any installed mods have a newer catalog version,
+    // drop a dismissible banner at bottom-right pointing users at the
+    // mod manager. Runs after a short delay so the home page paint
+    // settles first.
+    setTimeout(() => {
+      if (this.checkModUpdatesOnLaunch) {
+        this.checkModUpdatesOnLaunch().catch((e) =>
+          console.warn("checkModUpdatesOnLaunch failed", e)
+        );
+      }
+    }, 1500);
   },
 
   /**

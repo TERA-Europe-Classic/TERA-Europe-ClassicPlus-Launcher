@@ -288,6 +288,22 @@ const ModsView = {
                     m.source_url = cat.source_url || m.source_url;
                     m.license = cat.license || m.license;
                     m.credits = cat.credits || m.credits;
+
+                    // Update detection: if the catalog advertises a
+                    // version different from what's installed, flip the
+                    // row into update_available so the UI shows an
+                    // "Update" button. Skip if the mod is mid-flow
+                    // (installing/error) or actively running — we don't
+                    // want to stomp a live state. String inequality is
+                    // fine here; versions are opaque strings like
+                    // "2.0.1-classicplus" or "2026-04".
+                    const skipStatuses = new Set(['installing', 'error', 'running', 'starting']);
+                    if (!skipStatuses.has(m.status)
+                        && cat.version
+                        && m.version
+                        && cat.version !== m.version) {
+                        m.status = 'update_available';
+                    }
                 });
             }
         } catch (e) {
@@ -690,6 +706,20 @@ const ModsView = {
                 case 'disable':
                 case 'stop': {
                     await modsInvoke('disable_mod', { id });
+                    await this.loadInstalled();
+                    this.render();
+                    break;
+                }
+                case 'update': {
+                    // Reinstall with the current catalog entry — the
+                    // backend overwrites the dest_dir/file, so this is
+                    // a clean version swap. The version field on the
+                    // registry row gets refreshed on success.
+                    const catalogEntry = this.state.catalog.find(m => m.id === id);
+                    if (!catalogEntry) return;
+                    this.state.downloads.set(id, { progress: 0, state: 'downloading' });
+                    this.render();
+                    await modsInvoke('install_mod', { entry: catalogEntry });
                     await this.loadInstalled();
                     this.render();
                     break;

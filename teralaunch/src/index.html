@@ -1558,6 +1558,106 @@
             animation: toastSlideIn 0.3s ease-out;
         }
 
+        /* Mod-updates banner — bottom-right corner, slides in after the
+           first mod-update scan finds something. Click to open Mods modal;
+           × dismisses until next launch. Matches the update-toast palette
+           so the two feel like a family. */
+        .mods-update-banner {
+            position: fixed;
+            right: 16px;
+            bottom: 16px;
+            z-index: 1500;
+            display: flex;
+            align-items: stretch;
+            min-width: 300px;
+            max-width: 400px;
+            background: rgba(23, 28, 40, 0.95);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            border: 1px solid rgba(34, 211, 238, 0.32);
+            border-radius: 10px;
+            box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(34, 211, 238, 0.08);
+            overflow: hidden;
+            animation: modsUpdateBannerIn 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        .mods-update-banner[hidden] { display: none; }
+
+        @keyframes modsUpdateBannerIn {
+            0%   { transform: translateY(16px); opacity: 0; }
+            100% { transform: translateY(0);    opacity: 1; }
+        }
+
+        .mods-update-banner-body {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            background: none;
+            border: 0;
+            color: inherit;
+            text-align: left;
+            cursor: pointer;
+            transition: background 120ms ease;
+        }
+        .mods-update-banner-body:hover {
+            background: rgba(34, 211, 238, 0.06);
+        }
+
+        .mods-update-banner-icon {
+            width: 32px;
+            height: 32px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            background: rgba(34, 211, 238, 0.14);
+            color: #67e8f9;
+        }
+        .mods-update-banner-icon svg { width: 18px; height: 18px; }
+
+        .mods-update-banner-text {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+        .mods-update-banner-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #fff;
+        }
+        .mods-update-banner-subtitle {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.65);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .mods-update-banner-close {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 0;
+            border-left: 1px solid rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.45);
+            cursor: pointer;
+            transition: background 120ms ease, color 120ms ease;
+        }
+        .mods-update-banner-close:hover {
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.9);
+        }
+        .mods-update-banner-close svg { width: 14px; height: 14px; }
+
+        @media (prefers-reduced-motion: reduce) {
+            .mods-update-banner { animation: none; }
+        }
+
         .update-toast.show {
             display: flex;
         }
@@ -2748,6 +2848,30 @@
         <div class="mods-modal-shell">
             <div class="mods-modal-content" id="mods-modal-content"></div>
         </div>
+    </div>
+
+    <!-- Mod-updates banner: shown once per launch if any installed mod has
+         a newer version in the catalog. Click anywhere on it to open the
+         Mods modal; dismiss with the × to hide until next launch. -->
+    <div id="mods-update-banner" class="mods-update-banner" hidden role="status" aria-live="polite">
+        <button class="mods-update-banner-body" type="button" data-action="open">
+            <span class="mods-update-banner-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="23 4 23 10 17 10"/>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                </svg>
+            </span>
+            <span class="mods-update-banner-text">
+                <span class="mods-update-banner-title" id="mods-update-banner-title">Mod updates available</span>
+                <span class="mods-update-banner-subtitle" id="mods-update-banner-subtitle"></span>
+            </span>
+        </button>
+        <button class="mods-update-banner-close" type="button" data-action="dismiss" aria-label="Dismiss">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+        </button>
     </div>
 
     <!-- First-launch onboarding: shown once before the user presses Launch
