@@ -4,13 +4,25 @@
 <link rel="stylesheet" href="./mods.css">
 <main class="content" id="mods-page">
     <div class="mods-container">
-        <header class="mods-header">
+        <!-- Titlebar: title on the left, close button on the far right like a
+             Windows window. Action buttons live on the next row so they can't
+             clash with the X. -->
+        <header class="mods-titlebar">
             <h1 class="mods-title" data-translate="MODS_TITLE">Mods</h1>
+            <button class="mods-titlebar-close" id="mods-titlebar-close" aria-label="Close" title="Close (Esc)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </header>
+
+        <div class="mods-toolbar-row">
             <div class="mods-actions">
                 <button id="mods-import-btn" class="mods-secondary-btn" data-translate="MODS_IMPORT">Add mod from file…</button>
                 <button id="mods-folder-btn" class="mods-secondary-btn" data-translate="MODS_OPEN_FOLDER">Open mods folder</button>
             </div>
-        </header>
+        </div>
 
         <div class="mods-tabs" role="tablist">
             <button class="mods-tab active" data-tab="installed" role="tab" aria-selected="true">

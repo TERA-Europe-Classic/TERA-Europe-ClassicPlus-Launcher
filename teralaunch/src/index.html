@@ -2740,12 +2740,11 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Swiper/8.4.5/swiper-bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/particles.js/2.0.0/particles.min.js"></script>
-    <!-- Mods modal — populated on first open by ModsView.open() which fetches mods.html.
-         The close button sits outside the shell (on the scrim, top-right) so it
-         never overlaps the mods page's own "Add mod from file…" / "Open mods
-         folder" buttons. -->
+    <!-- Mods modal — populated on first open by ModsView.open() which fetches
+         mods.html. The close (×) lives inside the modal titlebar rendered by
+         mods.html, mirroring how every other modal in the launcher handles
+         closing — backdrop-click and Escape still work too. -->
     <div id="mods-modal" class="mods-modal" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="mods-modal-title">
-        <button class="mods-modal-close" id="mods-modal-close" aria-label="Close mods" title="Close (Esc)">×</button>
         <div class="mods-modal-shell">
             <div class="mods-modal-content" id="mods-modal-content"></div>
         </div>

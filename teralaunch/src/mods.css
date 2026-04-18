@@ -216,6 +216,13 @@
     transition: background 120ms ease, border-color 120ms ease;
 }
 
+/* When the catalog entry doesn't advertise an icon (most community GPK
+   mods don't), drop the 48px column entirely so the row compacts rather
+   than showing a placeholder. */
+.mods-row.no-icon {
+    grid-template-columns: 1fr minmax(160px, auto) 40px;
+}
+
 .mods-row:hover {
     background: rgba(255, 255, 255, 0.05);
     border-color: rgba(255, 255, 255, 0.08);
@@ -765,29 +772,55 @@
     to { transform: translateY(0) scale(1); opacity: 1; }
 }
 
-.mods-modal-close {
-    position: fixed;
-    top: 20px;
-    right: 24px;
-    z-index: 10;
-    width: 40px;
-    height: 40px;
-    padding: 0;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 999px;
-    background: rgba(20, 24, 32, 0.88);
-    backdrop-filter: blur(6px);
-    color: rgba(255, 255, 255, 0.85);
-    font-size: 20px;
-    line-height: 1;
-    cursor: pointer;
-    transition: background 120ms ease, color 120ms ease, transform 120ms ease;
+/* Titlebar — sits at the very top of the mods content, Windows-style:
+   title on the left, × on the right. Styled to match the main launcher's
+   window controls so the modal feels like a native sub-window. */
+.mods-titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 10px 14px 28px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(12, 16, 22, 0.6);
 }
 
-.mods-modal-close:hover {
-    background: rgba(40, 46, 56, 0.95);
+.mods-titlebar .mods-title {
+    font-size: 17px;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: 0.2px;
+}
+
+.mods-titlebar-close {
+    width: 44px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.75);
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+}
+
+.mods-titlebar-close svg {
+    width: 16px;
+    height: 16px;
+}
+
+.mods-titlebar-close:hover {
+    background: #e81123;
     color: #fff;
-    transform: scale(1.04);
+}
+
+/* Second row under the titlebar, containing the Add/Open buttons. */
+.mods-toolbar-row {
+    display: flex;
+    justify-content: flex-end;
+    padding: 14px 28px 0;
 }
 
 .mods-modal-content {
@@ -797,10 +830,25 @@
 }
 
 /* Inside the modal, the mods page cap-width is already capped by the
-   shell; relax the mods-page's own left/right padding so it breathes. */
+   shell; the titlebar owns its own spacing so drop the top padding. */
 .mods-modal #mods-page {
-    padding: 28px 32px 64px;
+    padding: 0 0 64px;
     max-width: none;
+}
+
+.mods-modal .mods-container {
+    gap: 16px;
+}
+
+/* The old mods-page headers lived at padding 32px — keep the rest of the
+   content at the same inset but no longer top-offset the titlebar. */
+.mods-modal .mods-tabs,
+.mods-modal .mods-toolbar,
+.mods-modal .mods-pane,
+.mods-modal .mods-download-tray,
+.mods-modal .mods-empty {
+    margin-left: 28px;
+    margin-right: 28px;
 }
 
 /* ========================================================================
@@ -940,4 +988,124 @@
 
 .mods-row-popover-item.danger:hover {
     background: rgba(248, 113, 113, 0.12);
+}
+
+/* ---- Row toggle (Enable/Disable) ---- */
+.mods-row-toggle {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+}
+
+.mods-row-toggle input {
+    position: absolute;
+    width: 0; height: 0; opacity: 0;
+    pointer-events: none;
+}
+
+.mods-row-toggle-track {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    transition: background 140ms ease;
+}
+
+.mods-row-toggle-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9);
+    transition: transform 140ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.mods-row-toggle input:checked + .mods-row-toggle-track {
+    background: var(--primary, #22d3ee);
+}
+
+.mods-row-toggle input:checked + .mods-row-toggle-track .mods-row-toggle-thumb {
+    transform: translateX(20px);
+    background: #0b1117;
+}
+
+.mods-row-running-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 8px;
+    padding: 2px 10px;
+    font-size: 11px;
+    color: #22d3ee;
+    background: rgba(34, 211, 238, 0.12);
+    border-radius: 999px;
+}
+
+.mods-row-running-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #22d3ee;
+    box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.5);
+    animation: modsRunPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes modsRunPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.5); }
+    50%      { box-shadow: 0 0 0 4px rgba(34, 211, 238, 0); }
+}
+
+/* ---- Inline progress bar in the status cell ---- */
+.mods-row-progressbar {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 180px;
+}
+
+.mods-row-progressbar-track {
+    height: 6px;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.mods-row-progressbar-fill {
+    height: 100%;
+    background: var(--primary, #22d3ee);
+    border-radius: 999px;
+    /* 300ms matches the Windows copy-dialog feel; anything slower looks
+       laggy at 5% steps, anything faster reads as a flicker. */
+    transition: width 300ms cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+
+.mods-row-progressbar-label {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.75);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Download tray items use the same visual vocabulary as the inline bar. */
+.mods-download-tray-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 12px;
+}
+
+.mods-download-tray-bytes {
+    font-size: 10.5px;
+    color: rgba(255, 255, 255, 0.45);
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+}
+
+.mods-download-tray-bar-fill {
+    transition: width 300ms cubic-bezier(0.3, 0.7, 0.3, 1);
 }

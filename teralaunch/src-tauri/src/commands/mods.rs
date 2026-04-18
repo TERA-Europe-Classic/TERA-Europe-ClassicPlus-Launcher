@@ -353,7 +353,22 @@ pub async fn enable_mod(id: String) -> Result<ModEntry, String> {
             let updated = launch_external_app_impl(&id, true).await?;
             Ok(updated)
         }
-        ModKind::Gpk => Err("GPK enable is not yet implemented (Phase C)".to_string()),
+        ModKind::Gpk => {
+            // Flag the GPK as active. Real deployment happens in
+            // spawn_auto_launch_external_apps (to be extended in Phase C)
+            // once the mapper patcher lands. Until then, enable just
+            // records intent so the user's toggle state persists.
+            let updated = mods_state::mutate(|reg| {
+                let slot = reg
+                    .find_mut(&id)
+                    .ok_or_else(|| format!("Mod '{}' is not installed", id))?;
+                slot.enabled = true;
+                slot.auto_launch = true;
+                slot.status = ModStatus::Enabled;
+                Ok(slot.clone())
+            })?;
+            Ok(updated)
+        }
     }
 }
 
@@ -378,7 +393,18 @@ pub async fn disable_mod(id: String) -> Result<ModEntry, String> {
             })?;
             Ok(updated)
         }
-        ModKind::Gpk => Err("GPK disable is not yet implemented (Phase C)".to_string()),
+        ModKind::Gpk => {
+            let updated = mods_state::mutate(|reg| {
+                let slot = reg
+                    .find_mut(&id)
+                    .ok_or_else(|| format!("Mod '{}' is not installed", id))?;
+                slot.enabled = false;
+                slot.auto_launch = false;
+                slot.status = ModStatus::Disabled;
+                Ok(slot.clone())
+            })?;
+            Ok(updated)
+        }
     }
 }
 

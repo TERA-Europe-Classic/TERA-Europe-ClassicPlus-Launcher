@@ -52,16 +52,18 @@ const ModsView = {
             this.cacheDom();
             this.bindEvents();
             this._mounted = true;
-            await Promise.all([this.loadInstalled(), this.loadCatalog()]);
+            // Force-refresh the catalog on first open so the user always
+            // sees the latest entries after upgrading. Cache still serves
+            // later opens within the same session.
+            await Promise.all([this.loadInstalled(), this.loadCatalog(true)]);
             this.render();
             this.subscribeToProgress();
-            // Translate labels that were in the freshly-loaded fragment.
             if (window.App?.updateAllTranslations) {
                 await window.App.updateAllTranslations();
             }
         } else {
             // Refresh installed list on re-open so catalog changes land.
-            await this.loadInstalled();
+            await Promise.all([this.loadInstalled(), this.loadCatalog(false)]);
             this.render();
         }
 
@@ -83,8 +85,9 @@ const ModsView = {
         backdrop.addEventListener('click', (e) => {
             if (e.target === backdrop) this.close();
         });
-        const closeBtn = document.getElementById('mods-modal-close');
-        if (closeBtn) closeBtn.addEventListener('click', () => this.close());
+        // Titlebar X lives inside mods.html (injected on first open).
+        const titlebarClose = document.getElementById('mods-titlebar-close');
+        if (titlebarClose) titlebarClose.addEventListener('click', () => this.close());
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && !backdrop.hidden) {
                 // Detail panel has its own Escape handler; only close the modal
@@ -226,13 +229,17 @@ const ModsView = {
         }
     },
 
-    async loadCatalog() {
+    async loadCatalog(forceRefresh = false) {
         try {
-            const catalog = await modsInvoke('get_mods_catalog', { forceRefresh: false });
+            const catalog = await modsInvoke('get_mods_catalog', { forceRefresh });
             this.state.catalog = (catalog && Array.isArray(catalog.mods)) ? catalog.mods : [];
+            this._catalogError = null;
         } catch (e) {
+            // Surface the actual Rust error (network, TLS, JSON parse…) in
+            // the console so "catalog unavailable" has a real diagnostic.
             console.warn('get_mods_catalog failed:', e);
             this.state.catalog = [];
+            this._catalogError = String(e);
         }
     },
 
@@ -243,19 +250,81 @@ const ModsView = {
                 if (!payload || !payload.id) return;
                 if (payload.state === 'done' || payload.state === 'error') {
                     this.state.downloads.delete(payload.id);
-                    // Refresh installed list — the entry's status just changed.
+                    // Terminal event — refresh installed list so the row
+                    // flips from progress bar to toggle/error state. This
+                    // re-render happens once per install, not per 5% tick.
                     this.loadInstalled().then(() => this.render());
                 } else {
+                    const pct = payload.progress || 0;
                     this.state.downloads.set(payload.id, {
-                        progress: payload.progress || 0,
+                        progress: pct,
                         state: payload.state || 'downloading',
+                        received_bytes: payload.received_bytes || 0,
+                        total_bytes: payload.total_bytes || 0,
                     });
-                    this.render();
+                    // IMPORTANT: don't re-render the whole pane on every 5%
+                    // tick — that's what caused the "flashes the whole
+                    // screen" feedback. Just patch the progress bars in
+                    // place via updateDownloadProgress.
+                    this.updateDownloadProgress(payload.id, pct, payload.received_bytes || 0, payload.total_bytes || 0);
                 }
             });
         } catch (e) {
             console.warn('Could not listen to mod_download_progress:', e);
         }
+    },
+
+    /**
+     * Surgical DOM update: finds any progress bar belonging to `id` and
+     * updates its width + label text, plus the download tray row's bar.
+     * Never touches any other DOM node, so the rest of the pane doesn't
+     * flash during a download.
+     */
+    updateDownloadProgress(id, pct, received, total) {
+        const rows = document.querySelectorAll(`.mods-row[data-mod-id="${CSS.escape(id)}"]`);
+        rows.forEach(row => {
+            const bar = row.querySelector('[data-progressbar]');
+            if (bar) {
+                const fill = bar.querySelector('.mods-row-progressbar-fill');
+                const label = bar.querySelector('.mods-row-progressbar-label');
+                if (fill) fill.style.width = `${pct}%`;
+                if (label) label.textContent = `${pct}%`;
+            } else {
+                // Row is rendered as browse/Install but we just started
+                // downloading — inject the progress bar inline without
+                // reflowing the rest of the pane.
+                const status = row.querySelector('.mods-row-status');
+                if (status) status.innerHTML = this.buildProgressBar(pct);
+            }
+        });
+        this.updateDownloadTrayItem(id, pct, received, total);
+    },
+
+    /** Update just one row in the download tray, without rebuilding it. */
+    updateDownloadTrayItem(id, pct, received, total) {
+        if (!this.$tray || !this.$trayItems) return;
+        if (this.$tray.hidden) {
+            // Tray wasn't visible yet — render it fresh once.
+            this.renderDownloadTray();
+            return;
+        }
+        const selector = `.mods-download-tray-item[data-dl-id="${CSS.escape(id)}"]`;
+        let item = this.$trayItems.querySelector(selector);
+        if (!item) {
+            // New download appearing mid-session; add the row surgically.
+            this.renderDownloadTray();
+            item = this.$trayItems.querySelector(selector);
+            if (!item) return;
+        }
+        const bar = item.querySelector('.mods-download-tray-bar-fill');
+        const label = item.querySelector('.mods-download-tray-progress');
+        const detail = item.querySelector('.mods-download-tray-bytes');
+        if (bar) bar.style.width = `${pct}%`;
+        if (label) label.textContent = `${pct}%`;
+        if (detail && total > 0) {
+            detail.textContent = `${formatMB(received)} / ${formatMB(total)}`;
+        }
+        if (this.$trayCount) this.$trayCount.textContent = String(this.state.downloads.size);
     },
 
     filterMatches(entry) {
@@ -305,8 +374,12 @@ const ModsView = {
 
     renderBrowse() {
         if (!this.$browseRows) return;
+        // Installed mods never appear in Browse — that's what the Installed
+        // tab is for. Hide them entirely rather than showing a badge.
         const installedIds = new Set(this.state.installed.map(m => m.id));
-        const visible = this.state.catalog.filter(e => this.filterMatches(e));
+        const visible = this.state.catalog.filter(e =>
+            !installedIds.has(e.id) && this.filterMatches(e)
+        );
         this.$browseRows.innerHTML = '';
         for (const entry of visible) {
             const view = {
@@ -317,18 +390,29 @@ const ModsView = {
                 description: entry.short_description || '',
                 version: entry.version,
                 icon_url: entry.icon_url,
-                installed: installedIds.has(entry.id),
                 _catalog: entry,
             };
             this.$browseRows.appendChild(this.buildRow(view, 'browse'));
         }
-        if (this.$browseEmpty) this.$browseEmpty.hidden = visible.length > 0;
+        if (this.$browseEmpty) {
+            this.$browseEmpty.hidden = visible.length > 0;
+            // If we failed to fetch the catalog entirely, surface the actual
+            // error in the empty-state text so "catalog unavailable" isn't
+            // the only thing the user sees.
+            if (visible.length === 0 && this._catalogError) {
+                this.$browseEmpty.innerHTML = `
+                    <p>Catalog unavailable.</p>
+                    <p style="opacity:.55;font-size:12px;margin-top:6px;">${escapeHtml(this._catalogError)}</p>
+                `;
+            }
+        }
     },
 
     renderDownloadTray() {
         if (!this.$tray || !this.$trayItems) return;
         if (this.state.downloads.size === 0) {
             this.$tray.hidden = true;
+            this.$trayItems.innerHTML = '';
             return;
         }
         this.$tray.hidden = false;
@@ -338,14 +422,22 @@ const ModsView = {
             const entry = this.state.installed.find(m => m.id === id)
                 || this.state.catalog.find(m => m.id === id);
             const name = entry ? entry.name : id;
+            const pct = info.progress || 0;
+            const bytesLine = info.total_bytes
+                ? `${formatMB(info.received_bytes || 0)} / ${formatMB(info.total_bytes)}`
+                : '';
             const row = document.createElement('div');
             row.className = 'mods-download-tray-item';
+            row.dataset.dlId = id;
             row.innerHTML = `
-                <span class="mods-download-tray-name">${escapeHtml(name)}</span>
-                <span class="mods-download-tray-progress">${info.progress || 0}%</span>
+                <div class="mods-download-tray-item-header">
+                    <span class="mods-download-tray-name">${escapeHtml(name)}</span>
+                    <span class="mods-download-tray-progress">${pct}%</span>
+                </div>
                 <div class="mods-download-tray-bar">
-                    <div class="mods-download-tray-bar-fill" style="width:${info.progress || 0}%"></div>
-                </div>`;
+                    <div class="mods-download-tray-bar-fill" style="width:${pct}%"></div>
+                </div>
+                <div class="mods-download-tray-bytes">${escapeHtml(bytesLine)}</div>`;
             this.$trayItems.appendChild(row);
         }
     },
@@ -353,22 +445,23 @@ const ModsView = {
     buildRow(entry, context) {
         const row = document.createElement('div');
         row.className = 'mods-row';
+        if (!entry.icon_url) row.classList.add('no-icon');
         row.dataset.modId = entry.id;
         row.dataset.modKind = entry.kind;
         row.dataset.context = context;
 
-        const initials = toInitials(entry.name);
-        // If icon_url 404s (GitHub raw path that moved, catalog URL was never
-        // uploaded, etc.), swap the broken <img> for the initials fallback so
-        // the row doesn't render a visible placeholder glyph.
+        // Only render an icon cell when the catalog entry actually carries
+        // an icon_url. No initials placeholder — the user explicitly asked
+        // for that to go away. If the URL 404s at runtime, onerror drops
+        // the image and collapses the row to no-icon spacing.
         const iconMarkup = entry.icon_url
-            ? `<img class="mods-row-icon-img" src="${escapeHtml(entry.icon_url)}" alt="" onerror="this.outerHTML='<div class=&quot;mods-row-icon-fallback&quot;>${escapeHtml(initials).replace(/"/g, '&quot;')}</div>'" />`
-            : `<div class="mods-row-icon-fallback">${escapeHtml(initials)}</div>`;
+            ? `<div class="mods-row-icon"><img class="mods-row-icon-img" src="${escapeHtml(entry.icon_url)}" alt="" onerror="var r=this.closest('.mods-row'); if(r){r.classList.add('no-icon'); var c=this.closest('.mods-row-icon'); if(c)c.remove();}" /></div>`
+            : '';
 
         const statusCell = this.buildStatusCell(entry, context);
 
         row.innerHTML = `
-            <div class="mods-row-icon">${iconMarkup}</div>
+            ${iconMarkup}
             <div class="mods-row-body">
                 <div class="mods-row-title">
                     <span class="mods-row-name">${escapeHtml(entry.name)}</span>
@@ -387,44 +480,50 @@ const ModsView = {
 
     buildStatusCell(entry, context) {
         if (context === 'browse') {
-            if (entry.installed) {
-                return `<span class="mods-row-badge installed" data-translate="MODS_INSTALLED">Installed</span>`;
-            }
+            // installed rows never appear in browse (renderBrowse filters
+            // them out), so this is always the Install action.
             return `<button class="mods-row-primary install" data-action="install" data-translate="MODS_ACTION_INSTALL">Install</button>`;
         }
 
         const download = this.state.downloads.get(entry.id);
         if (download) {
-            return `<span class="mods-row-progress">${download.progress || 0}%</span>`;
+            return this.buildProgressBar(download.progress || 0);
         }
 
         switch (entry.status) {
-            case 'running':
-                return `
-                    <span class="mods-row-badge running">
-                        <span class="mods-row-running-dot"></span>
-                        <span data-translate="MODS_STATUS_RUNNING">Running</span>
-                    </span>
-                    <button class="mods-row-secondary" data-action="stop" data-translate="MODS_ACTION_STOP">Stop</button>
-                `;
-            case 'starting':
-                return `<span class="mods-row-badge starting" data-translate="MODS_STATUS_STARTING">Starting…</span>`;
-            case 'enabled':
-                return `<button class="mods-row-primary enabled" data-action="disable" data-translate="MODS_ACTION_DISABLE">Disable</button>`;
-            case 'update_available':
-                return `<button class="mods-row-primary update" data-action="update" data-translate="MODS_ACTION_UPDATE">Update</button>`;
             case 'error':
                 return `<button class="mods-row-primary error" data-action="retry" data-translate="MODS_ACTION_RETRY">Retry</button>`;
             case 'installing':
-                return `<span class="mods-row-progress">${entry.progress || 0}%</span>`;
-            case 'disabled':
+                return this.buildProgressBar(entry.progress || 0);
+            case 'update_available':
+                return `<button class="mods-row-primary update" data-action="update" data-translate="MODS_ACTION_UPDATE">Update</button>`;
             default: {
-                const action = entry.kind === 'external' ? 'launch' : 'enable';
-                const label = entry.kind === 'external' ? 'Launch' : 'Enable';
-                const key = entry.kind === 'external' ? 'MODS_ACTION_LAUNCH' : 'MODS_ACTION_ENABLE';
-                return `<button class="mods-row-primary" data-action="${action}" data-translate="${key}">${label}</button>`;
+                // Every other state collapses to "enabled toggle". Enabled
+                // external apps auto-launch with the game; enabled GPKs
+                // auto-deploy on Launch once the mapper patcher ships.
+                const enabled = entry.enabled || entry.status === 'enabled' || entry.status === 'running' || entry.status === 'starting';
+                return `
+                    <label class="mods-row-toggle" title="${enabled ? 'Enabled — runs with the game' : 'Disabled — click to enable'}">
+                        <input type="checkbox" data-action="toggle" ${enabled ? 'checked' : ''} />
+                        <span class="mods-row-toggle-track"><span class="mods-row-toggle-thumb"></span></span>
+                    </label>
+                    ${entry.status === 'running' ? `<span class="mods-row-running-pill"><span class="mods-row-running-dot"></span>Running</span>` : ''}
+                `;
             }
         }
+    },
+
+    /** Renders an inline progress bar for the status cell. */
+    buildProgressBar(pct) {
+        const clamped = Math.max(0, Math.min(100, Math.round(pct)));
+        return `
+            <div class="mods-row-progressbar" data-progressbar>
+                <div class="mods-row-progressbar-track">
+                    <div class="mods-row-progressbar-fill" style="width:${clamped}%"></div>
+                </div>
+                <span class="mods-row-progressbar-label">${clamped}%</span>
+            </div>
+        `;
     },
 
     async handleRowClick(event) {
@@ -454,6 +553,29 @@ const ModsView = {
                     this.state.downloads.set(id, { progress: 0, state: 'downloading' });
                     this.render();
                     await modsInvoke('install_mod', { entry: catalogEntry });
+                    await this.loadInstalled();
+                    this.render();
+                    break;
+                }
+                case 'toggle': {
+                    // Checkbox toggle: the input's checked state *before*
+                    // this handler fires reflects the user's intent. In an
+                    // HTML checkbox the `change` has already flipped `.checked`
+                    // by the time we see it on click — treat .checked as
+                    // the target state.
+                    const checkbox = btn;
+                    const shouldEnable = checkbox.checked;
+                    try {
+                        if (shouldEnable) {
+                            await modsInvoke('enable_mod', { id });
+                        } else {
+                            await modsInvoke('disable_mod', { id });
+                        }
+                    } catch (err) {
+                        // Revert visual state if the command failed.
+                        checkbox.checked = !shouldEnable;
+                        throw err;
+                    }
                     await this.loadInstalled();
                     this.render();
                     break;
@@ -664,6 +786,11 @@ const ModsView = {
         }, 0);
     },
 };
+
+function formatMB(bytes) {
+    if (!bytes) return '0 MB';
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 function toInitials(name) {
     if (!name) return '??';
