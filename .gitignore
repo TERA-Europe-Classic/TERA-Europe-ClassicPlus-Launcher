@@ -19,3 +19,6 @@ teralaunch/coverage/
 # Game binaries (not needed for launcher build)
 teralaunch/src-tauri/src/TERA/Binaries/
 *.dll
+
+# Claude Code per-session scratch state
+.claude/
