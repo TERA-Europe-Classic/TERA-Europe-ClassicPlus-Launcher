@@ -50,6 +50,18 @@
     border-color: rgba(255, 255, 255, 0.2);
 }
 
+.mods-secondary-btn:disabled,
+.mods-secondary-btn.is-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.mods-secondary-btn:disabled:hover,
+.mods-secondary-btn.is-disabled:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
 /* Tabs */
 .mods-tabs {
     display: flex;
@@ -754,26 +766,28 @@
 }
 
 .mods-modal-close {
-    position: absolute;
-    top: 14px;
-    right: 14px;
-    z-index: 2;
-    width: 36px;
-    height: 36px;
+    position: fixed;
+    top: 20px;
+    right: 24px;
+    z-index: 10;
+    width: 40px;
+    height: 40px;
     padding: 0;
-    border: none;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.05);
-    color: rgba(255, 255, 255, 0.75);
-    font-size: 22px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    background: rgba(20, 24, 32, 0.88);
+    backdrop-filter: blur(6px);
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 20px;
     line-height: 1;
     cursor: pointer;
-    transition: background 120ms ease, color 120ms ease;
+    transition: background 120ms ease, color 120ms ease, transform 120ms ease;
 }
 
 .mods-modal-close:hover {
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(40, 46, 56, 0.95);
     color: #fff;
+    transform: scale(1.04);
 }
 
 .mods-modal-content {
@@ -887,4 +901,43 @@
 .mods-onboarding-btn.primary:hover {
     filter: brightness(1.05);
     transform: translateY(-1px);
+}
+
+/* Row overflow popover — appears on "..." click, floats on top of the modal. */
+.mods-row-popover {
+    z-index: 3200;
+    min-width: 180px;
+    padding: 6px;
+    background: #181d26;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    animation: modsDetailFade 140ms ease-out;
+}
+
+.mods-row-popover-item {
+    all: unset;
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.88);
+    cursor: pointer;
+    transition: background 100ms ease;
+}
+
+.mods-row-popover-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.mods-row-popover-item.danger {
+    color: #f87171;
+}
+
+.mods-row-popover-item.danger:hover {
+    background: rgba(248, 113, 113, 0.12);
 }

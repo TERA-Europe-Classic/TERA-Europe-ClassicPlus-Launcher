@@ -24,13 +24,16 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 /// (hex, lowercase), and extracts it into `dest_dir`. Any existing contents
 /// of `dest_dir` are wiped first — this is an install, not a merge.
 ///
+/// `on_progress` is called with (bytes_read, total_or_zero) as the HTTP body
+/// streams in so the UI download tray can render a live progress bar.
 /// Returns the absolute path to the extracted root directory.
 pub async fn download_and_extract(
     url: &str,
     expected_sha256: &str,
     dest_dir: &Path,
+    on_progress: impl FnMut(u64, u64) + Send,
 ) -> Result<PathBuf, String> {
-    let bytes = fetch_bytes(url).await?;
+    let bytes = fetch_bytes_streaming(url, on_progress).await?;
 
     let actual = hex_lower(&Sha256::digest(&bytes));
     if !actual.eq_ignore_ascii_case(expected_sha256) {
@@ -52,7 +55,44 @@ pub async fn download_and_extract(
     Ok(dest_dir.to_path_buf())
 }
 
-async fn fetch_bytes(url: &str) -> Result<Vec<u8>, String> {
+/// Downloads any URL, verifies its SHA-256, and writes it to `dest_file`.
+/// Used by GPK install where we only need the file on disk, no zip
+/// extraction. Same streaming progress contract as `download_and_extract`.
+pub async fn download_file(
+    url: &str,
+    expected_sha256: &str,
+    dest_file: &Path,
+    on_progress: impl FnMut(u64, u64) + Send,
+) -> Result<PathBuf, String> {
+    let bytes = fetch_bytes_streaming(url, on_progress).await?;
+
+    let actual = hex_lower(&Sha256::digest(&bytes));
+    if !actual.eq_ignore_ascii_case(expected_sha256) {
+        return Err(format!(
+            "Download hash mismatch: expected {}, got {}",
+            expected_sha256, actual
+        ));
+    }
+
+    if let Some(parent) = dest_file.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create {}: {}", parent.display(), e))?;
+    }
+    fs::write(dest_file, &bytes)
+        .map_err(|e| format!("Failed to write {}: {}", dest_file.display(), e))?;
+    Ok(dest_file.to_path_buf())
+}
+
+/// Streams the HTTP body into memory, invoking `on_progress(bytes_read, total)`
+/// every time a chunk arrives. `total = 0` means Content-Length was unknown,
+/// in which case the UI should render an indeterminate bar. The final call
+/// fires after the last chunk, so callers can treat that as 100%.
+async fn fetch_bytes_streaming(
+    url: &str,
+    mut on_progress: impl FnMut(u64, u64) + Send,
+) -> Result<Vec<u8>, String> {
+    use futures_util::StreamExt;
+
     let client = reqwest::Client::builder()
         .user_agent("TERA-Europe-ClassicPlus-Launcher")
         .build()
@@ -72,11 +112,20 @@ async fn fetch_bytes(url: &str) -> Result<Vec<u8>, String> {
         ));
     }
 
-    response
-        .bytes()
-        .await
-        .map(|b| b.to_vec())
-        .map_err(|e| format!("Failed to read download body: {}", e))
+    let total = response.content_length().unwrap_or(0);
+    let mut buf: Vec<u8> = Vec::with_capacity(total as usize);
+    let mut stream = response.bytes_stream();
+    let mut received: u64 = 0;
+    on_progress(0, total);
+
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| format!("Download stream failed: {}", e))?;
+        received += chunk.len() as u64;
+        buf.extend_from_slice(&chunk);
+        on_progress(received, total);
+    }
+
+    Ok(buf)
 }
 
 fn hex_lower(bytes: &[u8]) -> String {

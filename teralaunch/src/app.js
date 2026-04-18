@@ -3630,6 +3630,21 @@ const App = {
       window.showUpdateNotification?.('error', this.t('LOGIN_REQUIRED') || 'Login Required', this.t('PLEASE_LOGIN_FIRST') || 'Please log in to play');
       return;
     }
+
+    // First-launch Mods onboarding — show once before the user's first Launch
+    // after upgrading. Kept here (before update/launching gates) so it always
+    // fires on the first authenticated Launch click, regardless of update
+    // state or a stuck isGameLaunching flag. Wrapped in try/catch so a DOM
+    // hiccup can't break the launch path entirely.
+    try {
+      if (this.maybeShowModsOnboarding && this.maybeShowModsOnboarding()) {
+        console.log("BLOCKED: mods onboarding shown (pre-gate)");
+        return;
+      }
+    } catch (e) {
+      console.warn("mods onboarding show failed (non-fatal):", e);
+    }
+
     if (UPDATE_CHECK_ENABLED && this.state.isUpdateAvailable) {
       console.log("BLOCKED: update still available");
       window.showUpdateNotification?.('warning', this.t('UPDATE_REQUIRED') || 'Update Required', this.t('PLEASE_WAIT_FOR_UPDATE') || 'Please wait for the update to complete');
@@ -3637,15 +3652,6 @@ const App = {
     }
     if (this.state.isGameLaunching) {
       console.log("BLOCKED: already launching");
-      return;
-    }
-
-    // First-launch Mods onboarding — show once before the user's first
-    // successful Launch after upgrading to a version with the mod manager.
-    // maybeShowModsOnboarding returns true if it rendered; the user then
-    // dismisses or opens Mods, and re-clicks Launch to proceed.
-    if (this.maybeShowModsOnboarding && this.maybeShowModsOnboarding()) {
-      console.log("BLOCKED: mods onboarding shown");
       return;
     }
 
@@ -4768,6 +4774,15 @@ const App = {
       this.launchGameBtn.addEventListener("click", () =>
         this.handleLaunchGame(),
       );
+    }
+
+    // Safety-net trigger: if the user has never seen the Mods onboarding,
+    // show it once the authenticated home page is in view. The primary
+    // trigger is still the Launch click (handleLaunchGame), but rendering
+    // the dialog here as well guarantees it never gets missed due to timing
+    // or a stuck launch gate. The localStorage flag prevents double-showing.
+    if (this.state?.isAuthenticated && this.maybeShowModsOnboarding) {
+      try { this.maybeShowModsOnboarding(); } catch (_) { /* non-fatal */ }
     }
 
     const repairButton = document.getElementById("check-game-files");

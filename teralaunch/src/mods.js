@@ -161,8 +161,15 @@ const ModsView = {
 
         const importBtn = document.getElementById('mods-import-btn');
         if (importBtn) {
+            // GPK import requires the mapper patcher (Phase C). Until that
+            // ships, disable the button and show a neutral coming-soon toast
+            // instead of the previous red "error" toast.
+            importBtn.disabled = true;
+            importBtn.title = 'Coming soon — local GPK import requires the mapper patcher (Phase C).';
+            importBtn.classList.add('is-disabled');
             importBtn.addEventListener('click', () => {
-                showModsError('Local GPK import', 'Not yet implemented (Phase C)');
+                // Safety: in case the disabled attribute is ever removed by theming.
+                showModsError('Add mod from file', 'Coming soon — GPK import will land with the mapper patcher in a later update.');
             });
         }
 
@@ -351,8 +358,11 @@ const ModsView = {
         row.dataset.context = context;
 
         const initials = toInitials(entry.name);
+        // If icon_url 404s (GitHub raw path that moved, catalog URL was never
+        // uploaded, etc.), swap the broken <img> for the initials fallback so
+        // the row doesn't render a visible placeholder glyph.
         const iconMarkup = entry.icon_url
-            ? `<img class="mods-row-icon-img" src="${escapeHtml(entry.icon_url)}" alt="" />`
+            ? `<img class="mods-row-icon-img" src="${escapeHtml(entry.icon_url)}" alt="" onerror="this.outerHTML='<div class=&quot;mods-row-icon-fallback&quot;>${escapeHtml(initials).replace(/"/g, '&quot;')}</div>'" />`
             : `<div class="mods-row-icon-fallback">${escapeHtml(initials)}</div>`;
 
         const statusCell = this.buildStatusCell(entry, context);
@@ -570,19 +580,88 @@ const ModsView = {
     },
 
     async showOverflowMenu(id, anchor) {
-        // v1 implementation: a confirm() for uninstall. A real popover menu
-        // comes in Phase D polish.
-        const entry = this.state.installed.find(m => m.id === id);
+        // Small inline popover — click outside / Escape dismisses. Actions
+        // depend on whether the mod is installed: installed gets Details /
+        // Open source / Uninstall, browse rows get Details / Open source.
+        const installed = this.state.installed.find(m => m.id === id);
+        const catalog = this.state.catalog.find(m => m.id === id);
+        const entry = installed || catalog;
         if (!entry) return;
-        const ok = window.confirm(`Uninstall "${entry.name}"?`);
-        if (!ok) return;
-        try {
-            await modsInvoke('uninstall_mod', { id, deleteSettings: null });
-            await this.loadInstalled();
-            this.render();
-        } catch (e) {
-            showModsError('Uninstall failed', e);
-        }
+
+        // Dismiss any prior popover so we never stack two.
+        document.querySelectorAll('.mods-row-popover').forEach(el => el.remove());
+
+        const sourceUrl = entry.source_url || (catalog && catalog.source_url) || '';
+        const isInstalled = !!installed;
+
+        const popover = document.createElement('div');
+        popover.className = 'mods-row-popover';
+        popover.innerHTML = `
+            <button class="mods-row-popover-item" data-popover-action="details">
+                <span>Details</span>
+            </button>
+            ${sourceUrl
+                ? `<button class="mods-row-popover-item" data-popover-action="source">
+                      <span>Open source</span>
+                   </button>`
+                : ''}
+            ${isInstalled
+                ? `<button class="mods-row-popover-item danger" data-popover-action="uninstall">
+                      <span>Uninstall</span>
+                   </button>`
+                : ''}
+        `;
+
+        // Position to the left of the anchor so the menu doesn't clip off
+        // the right edge of the modal.
+        const rect = anchor.getBoundingClientRect();
+        popover.style.position = 'fixed';
+        popover.style.top = `${rect.bottom + 6}px`;
+        popover.style.right = `${Math.max(16, window.innerWidth - rect.right)}px`;
+        document.body.appendChild(popover);
+
+        const dismiss = () => {
+            popover.remove();
+            document.removeEventListener('click', outsideClick, true);
+            document.removeEventListener('keydown', escKey, true);
+        };
+        const outsideClick = (e) => {
+            if (!popover.contains(e.target) && e.target !== anchor) dismiss();
+        };
+        const escKey = (e) => { if (e.key === 'Escape') dismiss(); };
+
+        popover.addEventListener('click', async (e) => {
+            const item = e.target.closest('[data-popover-action]');
+            if (!item) return;
+            const action = item.dataset.popoverAction;
+            dismiss();
+            if (action === 'details') {
+                this.openDetail(id, isInstalled ? 'installed' : 'browse');
+            } else if (action === 'source' && sourceUrl) {
+                try {
+                    const { open: openShell } = window.__TAURI__.shell;
+                    await openShell(sourceUrl);
+                } catch (err) {
+                    window.open(sourceUrl, '_blank');
+                }
+            } else if (action === 'uninstall' && isInstalled) {
+                if (!window.confirm(`Uninstall "${entry.name}"?`)) return;
+                try {
+                    await modsInvoke('uninstall_mod', { id, deleteSettings: null });
+                    await this.loadInstalled();
+                    this.render();
+                } catch (err) {
+                    showModsError('Uninstall failed', err);
+                }
+            }
+        });
+
+        // Delay binding so the click that opened this menu doesn't immediately
+        // close it.
+        setTimeout(() => {
+            document.addEventListener('click', outsideClick, true);
+            document.addEventListener('keydown', escKey, true);
+        }, 0);
     },
 };
 

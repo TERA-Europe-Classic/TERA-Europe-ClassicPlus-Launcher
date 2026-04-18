@@ -101,6 +101,17 @@ pub fn get_external_apps_dir() -> Option<PathBuf> {
     })
 }
 
+/// Returns the directory GPK mods are stored in. Until the mapper patcher
+/// ships (Phase C), the launcher just deposits files here; users can copy
+/// them into the game manually in the meantime.
+pub fn get_gpk_dir() -> Option<PathBuf> {
+    dirs_next::config_dir().map(|d| {
+        d.join("Crazy-eSports-ClassicPlus")
+            .join("mods")
+            .join("gpk")
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

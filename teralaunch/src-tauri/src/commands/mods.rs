@@ -17,7 +17,7 @@ use tauri::Manager;
 use crate::services::mods::{
     catalog::{self, CachedCatalog},
     external_app,
-    registry::{get_external_apps_dir, get_registry_path},
+    registry::{get_external_apps_dir, get_gpk_dir, get_registry_path},
     types::{Catalog, CatalogEntry, ModEntry, ModKind, ModStatus},
 };
 use crate::state::mods_state;
@@ -83,9 +83,12 @@ pub async fn get_mods_catalog(force_refresh: Option<bool>) -> Result<Catalog, St
 pub async fn install_mod(entry: CatalogEntry, window: tauri::Window) -> Result<ModEntry, String> {
     match entry.kind {
         ModKind::External => install_external_mod(entry, window).await,
-        ModKind::Gpk => Err(
-            "GPK mod installation is not yet implemented (Phase C)".to_string(),
-        ),
+        // GPK install v1 is "download to mods folder". Patching the
+        // CompositePackageMapper.dat and flipping the composite flag is
+        // Phase C; for now the file lands in <app_data>/mods/gpk/<id>.gpk
+        // and the user sees it in the list with a status note so they can
+        // copy it into the game manually while we build the patcher.
+        ModKind::Gpk => install_gpk_mod(entry, window).await,
     }
 }
 
@@ -115,8 +118,39 @@ async fn install_external_mod(
         serde_json::json!({ "id": entry.id, "progress": 0, "state": "downloading" }),
     );
 
-    let extract_result =
-        external_app::download_and_extract(&entry.download_url, &entry.sha256, &dest).await;
+    // Stream the download and emit live progress. We throttle to ~5% steps so
+    // the frontend doesn't re-render on every 16 KB chunk from reqwest.
+    let progress_window = window.clone();
+    let progress_id = entry.id.clone();
+    let mut last_emitted: u8 = 0;
+    let extract_result = external_app::download_and_extract(
+        &entry.download_url,
+        &entry.sha256,
+        &dest,
+        move |received, total| {
+            // Cap the progress phase at 95% so extraction can occupy 95-100%.
+            let pct: u8 = if total > 0 {
+                ((received * 95) / total).min(95) as u8
+            } else {
+                // Unknown total: pulse between 10 and 90 based on received MB.
+                (10 + ((received / (1024 * 1024)) as u8).min(80)).min(90)
+            };
+            if pct != last_emitted && pct % 5 == 0 {
+                last_emitted = pct;
+                let _ = progress_window.emit_all(
+                    "mod_download_progress",
+                    serde_json::json!({
+                        "id": progress_id,
+                        "progress": pct,
+                        "state": "downloading",
+                        "received_bytes": received,
+                        "total_bytes": total,
+                    }),
+                );
+            }
+        },
+    )
+    .await;
 
     match extract_result {
         Ok(_) => {
@@ -140,6 +174,90 @@ async fn install_external_mod(
                 Ok(slot.clone())
             })?;
 
+            let _ = window.emit_all(
+                "mod_download_progress",
+                serde_json::json!({ "id": entry.id, "progress": 100, "state": "done" }),
+            );
+            Ok(final_row)
+        }
+        Err(err) => finalize_error(&entry.id, err, &window),
+    }
+}
+
+/// GPK install v1: download the .gpk to `<app_data>/mods/gpk/<id>.gpk`.
+/// The mapper-patcher integration (flip the composite flag in
+/// CompositePackageMapper.dat, register in ModList.tmm, etc.) lands in
+/// Phase C; for now the registry entry stays at Disabled with a
+/// last_error-style note pointing users at the file.
+async fn install_gpk_mod(
+    entry: CatalogEntry,
+    window: tauri::Window,
+) -> Result<ModEntry, String> {
+    let gpk_dir = get_gpk_dir()
+        .ok_or_else(|| "Could not resolve GPK mods dir".to_string())?;
+    // Derive the on-disk filename from the id so each entry owns a slot and
+    // reinstalls overwrite cleanly.
+    let file_name = format!("{}.gpk", entry.id.replace('/', "_"));
+    let dest = gpk_dir.join(&file_name);
+
+    let mut row = ModEntry::from_catalog(&entry);
+    row.status = ModStatus::Installing;
+    row.progress = Some(0);
+    mods_state::mutate(|reg| {
+        reg.upsert(row.clone());
+        Ok(())
+    })?;
+    let _ = window.emit_all(
+        "mod_download_progress",
+        serde_json::json!({ "id": entry.id, "progress": 0, "state": "downloading" }),
+    );
+
+    let progress_window = window.clone();
+    let progress_id = entry.id.clone();
+    let mut last_emitted: u8 = 0;
+    let dl_result = external_app::download_file(
+        &entry.download_url,
+        &entry.sha256,
+        &dest,
+        move |received, total| {
+            let pct: u8 = if total > 0 {
+                ((received * 100) / total).min(100) as u8
+            } else {
+                (10 + ((received / (1024 * 1024)) as u8).min(80)).min(90)
+            };
+            if pct != last_emitted && pct % 5 == 0 {
+                last_emitted = pct;
+                let _ = progress_window.emit_all(
+                    "mod_download_progress",
+                    serde_json::json!({
+                        "id": progress_id,
+                        "progress": pct,
+                        "state": "downloading",
+                        "received_bytes": received,
+                        "total_bytes": total,
+                    }),
+                );
+            }
+        },
+    )
+    .await;
+
+    match dl_result {
+        Ok(_) => {
+            let final_row = mods_state::mutate(|reg| {
+                let slot = reg.find_mut(&entry.id).ok_or_else(|| {
+                    format!("Registry entry for {} disappeared mid-install", entry.id)
+                })?;
+                slot.status = ModStatus::Disabled;
+                slot.progress = None;
+                // Surface a one-liner so users know the file landed but the
+                // launcher isn't patching it into the game yet.
+                slot.last_error = Some(
+                    "Downloaded. Auto-patch into the game ships with the mapper patcher (Phase C). For now: copy this file into S1Game\\CookedPC\\ — see Open mods folder.".to_string(),
+                );
+                slot.version = entry.version.clone();
+                Ok(slot.clone())
+            })?;
             let _ = window.emit_all(
                 "mod_download_progress",
                 serde_json::json!({ "id": entry.id, "progress": 100, "state": "done" }),
@@ -201,7 +319,17 @@ pub async fn uninstall_mod(id: String, delete_settings: Option<bool>) -> Result<
             }
         }
         ModKind::Gpk => {
-            return Err("GPK mod uninstall is not yet implemented (Phase C)".to_string());
+            // Phase-C mapper work (flip composite flag, restore .clean backup,
+            // update ModList.tmm) doesn't run yet. v1 uninstall just deletes
+            // the downloaded .gpk — the user's game files were never touched.
+            let gpk_dir = get_gpk_dir()
+                .ok_or_else(|| "Could not resolve GPK mods dir".to_string())?;
+            let file = gpk_dir.join(format!("{}.gpk", entry.id.replace('/', "_")));
+            if file.exists() {
+                std::fs::remove_file(&file)
+                    .map_err(|e| format!("Failed to remove {}: {}", file.display(), e))?;
+            }
+            let _ = delete_settings; // GPK has no per-mod settings folder
         }
     }
 
@@ -397,12 +525,14 @@ pub fn spawn_auto_launch_external_apps() {
 /// needed; this helper exists as a seam to add persistent mapping later
 /// without changing call sites.
 fn external_executable_name(id: &str) -> Option<String> {
-    // Known defaults for the two apps we ship. The catalog may override, but
-    // since those are the only external apps until we expand scope, and the
-    // id is the catalog id, this constant lookup is the pragmatic v1.
+    // Known defaults for the two apps we ship. Catalog ids settled on
+    // `classicplus.<app>` in external-mod-catalog v1; the old
+    // `tera-europe-classic.<app>` strings are left in as fallback for anyone
+    // who had an older catalog cached locally. The TCC fork strips the
+    // upstream loader wrapper, so the executable is TCC.exe, not TCC.Loader.exe.
     match id {
-        "tera-europe-classic.shinra" => Some("ShinraMeter.exe".into()),
-        "tera-europe-classic.tcc" => Some("TCC.Loader.exe".into()),
+        "classicplus.shinra" | "tera-europe-classic.shinra" => Some("ShinraMeter.exe".into()),
+        "classicplus.tcc" | "tera-europe-classic.tcc" => Some("TCC.exe".into()),
         _ => None,
     }
 }
