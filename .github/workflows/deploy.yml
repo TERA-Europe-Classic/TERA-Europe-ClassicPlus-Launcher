@@ -169,47 +169,36 @@ jobs:
 
           Set-Content 'latest.json' $latest -NoNewline
 
-      - name: Upload to SFTP
+      - name: Upload to FTPS
         env:
           SFTP_HOST: ${{ secrets.SFTP_HOST }}
           SFTP_USER: ${{ secrets.SFTP_USER }}
           SFTP_PASS: ${{ secrets.SFTP_PASS }}
+          SETUP_PATH: ${{ steps.files.outputs.setup }}
+          ZIP_PATH: ${{ steps.files.outputs.zip }}
+          SIG_PATH: ${{ steps.files.outputs.sig }}
+        shell: bash
         run: |
-          choco install winscp --version=6.3.5 -y
-          Add-Type -Path "${env:ProgramFiles(x86)}\WinSCP\WinSCPnet.dll"
+          # curl handles explicit FTPS fine and ships with the Windows runner.
+          # WinSCP's .NET DLL errors out against pwsh 7's newer runtime, so we
+          # drive the upload through curl instead.
+          set -euo pipefail
+          BASE="ftp://${SFTP_HOST}/classicplus/"
+          CURL_OPTS=(--ssl --ftp-pasv --ftp-create-dirs -fS --retry 3 --retry-delay 5 -u "${SFTP_USER}:${SFTP_PASS}")
 
-          $sessionOptions = New-Object WinSCP.SessionOptions -Property @{
-            Protocol = [WinSCP.Protocol]::Ftp
-            FtpSecure = [WinSCP.FtpSecure]::Explicit
-            HostName = $env:SFTP_HOST
-            UserName = $env:SFTP_USER
-            Password = $env:SFTP_PASS
-            GiveUpSecurityAndAcceptAnyTlsHostCertificate = $true
-          }
+          echo "Uploading setup installer..."
+          curl "${CURL_OPTS[@]}" -T "${SETUP_PATH}" "${BASE}"
 
-          $session = New-Object WinSCP.Session
-          try {
-            $session.Open($sessionOptions)
+          echo "Uploading updater zip..."
+          curl "${CURL_OPTS[@]}" -T "${ZIP_PATH}" "${BASE}"
 
-            Write-Host "Ensuring /classicplus/ directory exists..."
-            try { $session.CreateDirectory("/classicplus/") } catch {}
+          echo "Uploading updater signature..."
+          curl "${CURL_OPTS[@]}" -T "${SIG_PATH}" "${BASE}"
 
-            Write-Host "Uploading setup installer..."
-            $session.PutFiles("${{ steps.files.outputs.setup }}", "/classicplus/").Check()
+          echo "Uploading latest.json..."
+          curl "${CURL_OPTS[@]}" -T "latest.json" "${BASE}latest.json"
 
-            Write-Host "Uploading updater zip..."
-            $session.PutFiles("${{ steps.files.outputs.zip }}", "/classicplus/").Check()
-
-            Write-Host "Uploading updater signature..."
-            $session.PutFiles("${{ steps.files.outputs.sig }}", "/classicplus/").Check()
-
-            Write-Host "Uploading latest.json..."
-            $session.PutFiles("latest.json", "/classicplus/latest.json").Check()
-
-            Write-Host "All files uploaded successfully."
-          } finally {
-            $session.Dispose()
-          }
+          echo "All files uploaded successfully."
 
       - name: Commit and push version bump
         env:
