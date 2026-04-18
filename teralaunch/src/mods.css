@@ -506,6 +506,25 @@
     animation: modsDetailFade 160ms ease-out;
 }
 
+/* The HTML `hidden` attribute normally sets display:none via the user-agent
+   stylesheet, but the .mods-detail-backdrop class's display:flex wins by
+   specificity. Re-assert display:none when hidden so the panel stays closed
+   until openDetail() clears the attribute. */
+.mods-detail-backdrop[hidden] {
+    display: none;
+}
+
+/* Any mods-view element whose CSS class sets a non-block display
+   (grid/flex) also needs the hidden attribute re-asserted. Covers
+   mods-detail-fact (grid), mods-detail-actions, mods-detail-screenshots
+   (grid), and the two fact rows toggled by openDetail. */
+.mods-detail-fact[hidden],
+.mods-detail-actions[hidden],
+.mods-detail-screenshots[hidden],
+.mods-detail-section[hidden] {
+    display: none;
+}
+
 @keyframes modsDetailFade {
     from { opacity: 0; }
     to { opacity: 1; }
