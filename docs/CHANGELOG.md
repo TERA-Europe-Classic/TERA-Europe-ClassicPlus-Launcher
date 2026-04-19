@@ -1,0 +1,125 @@
+# TERA Europe Classic+ Launcher — Changelog
+
+Player-facing release notes. Each version calls out what changed for you,
+not every commit that landed. For the full developer history, see the
+git log.
+
+The most recent release is at the top.
+
+---
+
+## Unreleased
+
+Nothing yet. Next release will include the improvements currently being
+polished in the main branch.
+
+---
+
+## 0.1.12 — Update detection and launch-time banner
+
+Your mods now know when a new version is out. The launcher compares each
+installed mod against the public catalog on startup; if any mod is behind,
+a banner at the top offers to update them with one click.
+
+- The catalog fetch now also drives an "updates available" indicator so
+  you don't have to browse looking for version numbers.
+
+---
+
+## 0.1.11 — Browse tab polish and reliable deploys
+
+A cleanup round across the Browse tab and the deploy pipeline.
+
+- Browse tab shows a live count of available mods and a category filter.
+- Fresh installs are enabled by default so you don't have to toggle
+  every mod after clicking Install.
+- Toggle switches in the Installed tab are now intent-only — flipping
+  them doesn't try to spawn or kill the mod process, just marks what
+  you want to run next game launch.
+- Scrollbar restyled to match the launcher's visual palette.
+- Deploy pipeline made more robust: intermittent FTPS hang-up errors no
+  longer fail releases when the file is actually uploaded.
+
+---
+
+## 0.1.10 — Smoother progress bars
+
+- Download progress bars now move smoothly instead of jumping in 5%
+  increments. The old throttle is gone; you see every real update.
+- Deploy pipeline now uses `curl` for FTPS uploads instead of the older
+  WinSCP bridge — faster and more reliable on the GitHub Actions runner.
+
+---
+
+## 0.1.9 — Real TMM deployer and elevation fix
+
+GPK mods now deploy for real. The launcher parses TMM-format mod files,
+backs up your vanilla `CompositePackageMapper.dat` as `.clean`, patches
+the mapper to route the right composite packages at the mod's GPK, and
+restores on uninstall.
+
+- Mods installed into a game that lives under `C:\Program Files\` now
+  prompt for elevation cleanly instead of silently failing to write.
+- Uninstall confirmation dialog actually asks before removing files
+  (previously a slip could wipe without a prompt).
+- Icons refresh after install — no more stale placeholder images after
+  a mod lands.
+
+---
+
+## 0.1.8 — Overlay polish and more mods
+
+- Installed-tab rows without icons now render cleanly (empty tile,
+  not a broken image).
+- The Enable / Disable toggle is a proper toggle, not a button that
+  flashes.
+- Download progress no longer flickers during bursty chunks.
+- 8 additional GPK mods in the catalog.
+- Titlebar close button renders correctly on non-default themes.
+
+---
+
+## 0.1.7 — GPK install v1 and row polish
+
+First pass at GPK mod installation lands. Picking a GPK mod from Browse
+downloads it, verifies the hash, and stores it under your mod library.
+(The mapper patch — making the game actually load the mod — arrives in
+0.1.9.)
+
+- Per-row action icons in the Installed tab (launch, stop, settings).
+- Overflow menu for less-common actions (open mod folder, remove).
+- External-app executable names detected correctly so launcher status
+  reflects what's actually running.
+
+---
+
+## 0.1.6 — Mods modal popup and onboarding
+
+Mods moved from a permanent header tab to a top-right popup, keeping the
+main launcher chrome clean. First-time users get a short onboarding flow
+that explains what each type of mod does.
+
+---
+
+## 0.1.5 — Detail panel opens cleanly, i18n fixes
+
+- Clicking a mod now reliably opens the detail panel. Previously the
+  panel could open on page load, stealing focus.
+- Translation keys that weren't being resolved now show the correct
+  localised text instead of the raw key string.
+
+---
+
+## 0.1.4 — Mod Manager v1
+
+First public cut of the integrated mod manager. Browse the catalog,
+install Shinra Meter and TCC directly from the launcher, see credits and
+source links for each mod. Foundation for the full GPK deployer landing
+in 0.1.9.
+
+---
+
+## 0.1.3 and earlier
+
+Classic+ identity work, v100.02 API adaptation, launcher versioning.
+See the git log for development history.
