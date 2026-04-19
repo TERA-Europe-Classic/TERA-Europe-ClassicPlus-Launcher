@@ -7,15 +7,15 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 7
-last_work_iteration: 7
+iteration_counter: 8
+last_work_iteration: 8
 last_research_sweep: never
 last_revalidation: never
 last_revalidation_status: never
 last_retrospective: never
 last_blocked_retry: never
 last_investigation_iteration: 2
-total_items_done: 6
+total_items_done: 7
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
@@ -47,7 +47,6 @@ total_iterations_to_cap: 1000
 
 ### Infrastructure (must exist before most P0 tests can be written)
 
-- [P0] **infra.playwright-split** — Split monolithic `teralaunch/tests/e2e/launcher.spec.js` (866 lines) into feature-scoped files matching §3 criterion layout. Acceptance: one file per `mod-*` feature; `npm run test:e2e` green. Pillar: Reliability.
 
 ### Security (PRD §3.1)
 
@@ -250,6 +249,7 @@ The `verified @ iter N` stamp is updated by each REVALIDATION iteration. Any `[D
 - [DONE] infra.shinra-test-project — Shinra commit f0390eb1, proof: `dotnet test Tera.sln -c Release` → 1/1 passed, exit 0. Scaffold: `ShinraMeter/ShinraMeter.Tests/{ShinraMeter.Tests.csproj, SmokeTests.cs}` (xunit 2.5.3, net8.0, `LangVersion=latest` override to bypass Directory.Build.props LangVersion=8). Also: .gitignore negation pair added (`!ShinraMeter.Tests` + `!ShinraMeter.Tests/**`) because `ShinraMeter*` wildcard captured the test dir. Verified @ iter 5.
 - [DONE] infra.catalog-ci — Catalog commit bade602, proof: negative test (delete mods[0].sha256) → exit 1 with `entry classicplus.shinra: missing or empty "sha256"`; happy path → exit 0 on 101 entries. Files: `.github/workflows/catalog-ci.yml` + `scripts/validate-catalog.mjs`. Enforces top-level shape, per-entry required fields, kind enum, sha256 hex format, size_bytes safe-int positive, https-only URL without embedded creds, unique ids. Schema + reachability + size-sanity gates deferred to P2 items. Verified @ iter 6.
 - [DONE] fix.launcher-spec-syntax — commit ed1db9a, proof: `npx playwright test --list` → 70 tests enumerated, exit 0 (previously unparseable). Removed stray `1.7.0` literal at `teralaunch/tests/e2e/launcher.spec.js:37` injected by version-bump 1d788d3. Unblocks infra.playwright-split. Verified @ iter 7.
+- [DONE] infra.playwright-split — commit b920b10, proof: `npx playwright test --list` → 70 tests across 14 files (preserved from monolith), exit 0. Split `launcher.spec.js` (866 lines, 14 describe blocks) into one `*.spec.js` per describe + shared `helpers.js` (mockTauriAPIs, setAuthenticated, clearAuthentication). Each spec imports only the helpers it uses. Follow-up polish P2: shared `beforeEach` patterns still duplicated across ~13 files (3 shapes of setup: anon, authed-home, unauth'd) — deferrable per Playwright explicit-beforeEach idiom. Verified @ iter 8.
 
 ## META (human review)
 
