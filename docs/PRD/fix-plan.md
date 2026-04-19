@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 124
-last_work_iteration: 124
+iteration_counter: 125
+last_work_iteration: 125
 last_research_sweep: 120
 last_revalidation: 120
 last_revalidation_status: all-gates-green
@@ -16,15 +16,33 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 105
+total_items_done: 106
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 60980c5
+tauri_v2_migration_last_commit: b3660e4
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 125 WORK — pin.i18n-jargon+parity-scanners DONE (worktree).**
+>
+> Worktree commit `b3660e4`. Two Vitest scanners enforce i18n invariants beyond no-hardcoded-english:
+> - `teralaunch/tests/i18n-jargon.test.js` (PRD 3.4.7): blocklist `['composite','mapper','sha','tmm']`.
+> - `teralaunch/tests/i18n-parity.test.js` (PRD 3.7.1): equal key sets across locales.
+>
+> Both shipped pre-iter-124. Nothing structurally pinned their invariants — a refactor could drop a blocklist term, widen an allowlist, or collapse the parity diff helper and the Vitest suite would still go green against a weakened detector.
+>
+> New `tests/i18n_scanner_guard.rs` (10 tests, batched since each surface is small):
+> - Jargon (4 tests): self-identifies as PRD 3.4.7, blocklist `['composite','mapper','sha','tmm']` verbatim, SUBSTRING_ALLOWLIST stays empty (quote-presence check), self-test + 3-hit fixture retained.
+> - Parity (4 tests): self-identifies as PRD 3.7.1, three assertions (at-least-two-locales / keys_equal_across_locales / same key count), diffKeySets returns both `missing` and `extra`, self-test retained.
+> - Shared (1 test): translations.json exists + JSON-object-rooted.
+> - 1 detector self-test on 4 synthetic bad shapes.
+>
+> Direct parallel to iter 124 `i18n_no_hardcoded_guard`: Rust test asserting JS-file structure.
+>
+> Acceptance: 921/921 Rust (was 911, +10), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 124 WORK — pin.i18n-no-hardcoded-scanner DONE (worktree).**
 >
