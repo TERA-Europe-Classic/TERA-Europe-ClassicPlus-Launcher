@@ -7,10 +7,10 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 39
+iteration_counter: 40
 last_work_iteration: 39
-last_research_sweep: 10
-last_revalidation: 20
+last_research_sweep: 40
+last_revalidation: 40
 last_revalidation_status: clean
 last_retrospective: 30
 last_blocked_retry: never
@@ -20,6 +20,23 @@ total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
 
+> **Iter 40 REVALIDATION + RESEARCH SWEEP — CLEAN.**
+> REVALIDATION: 24 DONE items re-proved (all proofs from iter-20 + iter-21-39 additions).
+> • launcher `cargo test --release` → 736 unit + 3 + 3 + 4 + 2 + 2 + 4 = 754 passed, exit 0
+> • launcher `cargo clippy --all-targets --release -D warnings` → clean
+> • TCC `dotnet test TCC.sln -c Release` → 1/1 passed
+> • Shinra `dotnet test Tera.sln -c Release` → 1/1 passed
+> • catalog `validate-catalog.mjs` → 101 entries, exit 0
+> • 4 CI gates all green: troubleshoot-coverage (50/50), mods-crate-docs (6/6), changelog-plain-english (126 lines, 0 leaks), deploy-scope-gate (2 upload URLs clean, 11 self-tests)
+> • Playwright `--list` → 76 tests in 16 files (enumerates cleanly; full run gated on warm Tauri webServer)
+> • Vitest → 417 / 417
+> • `git ls-files | grep '\.vs/'` → 0
+> • `secret-scan.yml` present in 4 repos (launcher, TCC, Shinra, mod-catalog)
+>
+> RESEARCH SWEEP: no `cargo-audit` binary installed in this environment; manual key-dep version check confirms tokio 1.49, zip 2.3, aes-gcm 0.10, sha2 0.10.8, reqwest 0.12.23, tauri 1.0, zeroize 1.7 match the iter-10 findings. Recording as P2 `infra.cargo-audit-install` to run a proper advisory scan on the next CI-runner pass. No new RUSTSEC entries have been surfaced for our pinned versions via spot-checks.
+>
+> Next REVALIDATION at iter 60; next RESEARCH SWEEP at iter 50.
+>
 > **Iter 30 RETROSPECTIVE.** `docs/PRD/lessons-learned.md` initialised with 10 patterns spanning iters 1-29. Two new `[META]` entries added (`meta.bin-crate-test-path-flexibility`, `meta.verify-and-implement-language`) flagging a recurring integration-test-path friction and proposing PRD wording amendments. No code changes this iter per retrospective protocol. Next retrospective at iter 60.
 >
 > **Iter 20 REVALIDATION SWEEP — CLEAN.** All 14 [DONE] items re-proved:
@@ -209,6 +226,7 @@ total_iterations_to_cap: 1000
 
 ### Lint / style / infra
 
+- [P2] **infra.cargo-audit-install** — Install `cargo-audit` in CI so every RESEARCH SWEEP iteration runs `cargo audit --json` and the loop can flag new RUSTSEC advisories automatically. Discovered iter 40: RESEARCH sweep couldn't run `cargo audit` locally. Acceptance: `cargo audit` runs clean on every PR + RESEARCH sweep. Pillar: Security.
 - [P2] **lint.js-lint** — Add ESLint or Biome to `teralaunch/`. Acceptance: zero warnings. Pillar: Reliability.
 - [P2] **lint.rust-clippy-release** — Add `--release` clippy to CI. Acceptance: zero warnings in release mode. Pillar: Reliability.
 - [P2] **lint.csharp-warnaserror** — Enable `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` on TCC + Shinra release configs. Acceptance: zero warnings. Pillar: Reliability.
