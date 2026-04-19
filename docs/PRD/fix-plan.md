@@ -7,24 +7,43 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 109
+iteration_counter: 110
 last_work_iteration: 109
-last_research_sweep: 100
+last_research_sweep: 110
 last_revalidation: 100
 last_revalidation_status: all-gates-green
 last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 90
+total_items_done: 91
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 609d659
+tauri_v2_migration_last_commit: 24af9f6
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 110 RESEARCH SWEEP — two real advisories surfaced.**
+>
+> Worktree commit `24af9f6` (`docs/PRD/audits/research/sweep-iter-110.md`). First sweep with cargo-audit actually installed locally — iter 101 install retry succeeded after 9m18s single-threaded build (AV interference cleared).
+>
+> **Real findings:**
+> 1. **RUSTSEC-2026-0097** — `rand 0.9.2` unsound with a custom logger via `rand::rng()`. Landed 2026-04-09 (POST iter-100 sweep). Pulled in by `tauri-plugin-notification 2.3.3`, `chamox 0.1.4`, and `quinn-proto 0.11.14` via `reqwest 0.12.28`. **Not exploitable in our code** (we don't call `rand::rng()` with a custom logger).
+> 2. **RUSTSEC-2021-0141** — `dotenv 0.15.0` unmaintained since 2021-12-24. `teralib` is the sole consumer. Drop-in replacement: `dotenvy`.
+>
+> **CI impact:** iter-101 `cargo-audit --deny warnings` gate will fail first run post-squash unless these are cleared.
+>
+> **Dep tree delta:** two new upstream-driven triple-version dups — `getrandom 0.3.4` (via rand 0.9.2) and `hashbrown 0.16.1` (via indexmap 2.13.0). Both non-actionable from our side, same pattern as iter-87 reqwest deferral. No upstream unblock of the reqwest 0.12/0.13 chain landed in the iter 100-110 window.
+>
+> **New P-slot candidates queued** (see audit doc):
+> - **P1 `dep.teralib-dotenv-to-dotenvy`** — tight scope: 1 dep line + ~10 import renames. Backward-compatible.
+> - **P2 `dep.rand-advisory-ignore-2026-0097`** — add `--ignore RUSTSEC-2026-0097` with cite comment to `cargo-audit.yml`.
+> - **P3 `infra.cargo-audit-tuning`** — 23 informational warnings from `kuchikiki/selectors/cssparser` chain; decide if `--deny warnings` is right default.
+>
+> Iter 111 (next) picks P1 `dep.teralib-dotenv-to-dotenvy`. Iter 112 picks P2 rand-advisory-ignore. Both land before user squash-merge so the first post-squash cargo-audit CI run is green. Iter 120 is next double-duty (N%10=0 + N%20=0 revalidation).
 
 > **Iter 109 WORK — docs.changelog-guard DONE (worktree).**
 >
