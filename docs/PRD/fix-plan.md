@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 212
-last_work_iteration: 212
+iteration_counter: 213
+last_work_iteration: 213
 last_research_sweep: 210
 last_revalidation: 200
 last_revalidation_status: all-gates-green
@@ -16,15 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 186
+total_items_done: 187
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: aeea582
+tauri_v2_migration_last_commit: b44367e
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 213 WORK — pin.changelog-guard-header+path-constant+banned-prefix-type-coverage+Cargo-toml-version-sync+substantive-body DONE (worktree).**
+>
+> Worktree commit `b44367e`. §3.8.5 CHANGELOG player-facing contract; changelog_guard had 12 tests (iter 109 creation + iter 141 +4 + iter 173 +5); 40 iters untouched. Brings to 17.
+>
+> Five new source-inspection pins (meta-guard + path-constant + prefix-coverage + cross-file version sync + per-release substance):
+> 1. `guard_file_header_cites_prd_3_8_5` — header cites `PRD 3.8.5` + `CHANGELOG`/`player-facing`; meta-guard contract
+> 2. `changelog_path_constant_is_canonical` — `const CHANGELOG: &str = "../../docs/CHANGELOG.md";` verbatim; rename without atomic constant update causes opaque "file not readable" errors
+> 3. `banned_prefixes_covers_all_conventional_types_both_forms` — 11 conv-commit types (feat/fix/chore/docs/refactor/test/build/ci/perf/style/revert) × both `:` and `(` forms = ≥ 22 entries; missing any form lets scoped conv-commits slip past
+> 4. `newest_release_matches_cargo_toml_version` — newest numbered `## X.Y.Z` heading must equal Cargo.toml's package `version = "..."`; classic release-tooling drift prevention
+> 5. `every_numbered_release_has_substantive_body` — each release has EITHER a bullet (`- `/`* `) OR ≥ 2 prose lines; heading-only or one-line releases pass title+HR pins but give players zero signal
+>
+> changelog_guard: 12 → 17 tests. 1293 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 212 WORK — pin.prd-drift-guard-header+criterion-xyz-format+PRD_PATH-constant+cell_for-split+section-3-bound DONE (worktree). Every test file in tests/ now carries ≥ 12 pins.**
 >
