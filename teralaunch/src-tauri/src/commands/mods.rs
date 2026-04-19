@@ -72,6 +72,24 @@ pub async fn get_mods_catalog(force_refresh: Option<bool>) -> Result<Catalog, St
     }
 }
 
+/// Applies the fresh-install defaults to a registry slot: enabled + auto-launch
+/// on, status Enabled, progress cleared, version synced to the catalog entry.
+/// `last_error` carries through any non-fatal deploy note (e.g. the GPK path
+/// where the mapper patch failed soft but the .gpk is on disk).
+///
+/// PRD 3.3.12: new installs default to enabled so the user gets the mod they
+/// just picked without an extra click — they can untoggle from the Installed
+/// tab if they change their mind. Kept as a single helper so both the external
+/// and GPK install paths can't drift on defaults.
+fn finalize_installed_slot(slot: &mut ModEntry, new_version: &str, last_error: Option<String>) {
+    slot.enabled = true;
+    slot.auto_launch = true;
+    slot.status = ModStatus::Enabled;
+    slot.progress = None;
+    slot.last_error = last_error;
+    slot.version = new_version.to_string();
+}
+
 /// Installs a mod from a catalog entry: download, verify, extract, register.
 /// External apps extract to `<app_data>/mods/external/<id>/`. GPK mods are
 /// Phase C — this command returns a not-implemented error for them.
@@ -180,15 +198,7 @@ async fn install_external_mod(
                 let slot = reg.find_mut(&entry.id).ok_or_else(|| {
                     format!("Registry entry for {} disappeared mid-install", entry.id)
                 })?;
-                // New installs default to enabled so the user gets the mod
-                // they just picked without an extra click. They can untoggle
-                // it from the Installed tab if they change their mind.
-                slot.enabled = true;
-                slot.auto_launch = true;
-                slot.status = ModStatus::Enabled;
-                slot.progress = None;
-                slot.last_error = None;
-                slot.version = entry.version.clone();
+                finalize_installed_slot(slot, &entry.version, None);
                 Ok(slot.clone())
             })?;
 
@@ -282,15 +292,7 @@ async fn install_gpk_mod(
                 let slot = reg.find_mut(&entry.id).ok_or_else(|| {
                     format!("Registry entry for {} disappeared mid-install", entry.id)
                 })?;
-                // Match external-app behaviour: fresh installs are enabled
-                // by default. The user untoggles from the Installed tab if
-                // they don't want the mod applied at next game launch.
-                slot.enabled = true;
-                slot.auto_launch = true;
-                slot.status = ModStatus::Enabled;
-                slot.progress = None;
-                slot.last_error = deploy_note;
-                slot.version = entry.version.clone();
+                finalize_installed_slot(slot, &entry.version, deploy_note);
                 Ok(slot.clone())
             })?;
             let _ = window.emit_all(
@@ -774,5 +776,82 @@ fn external_executable_name(id: &str) -> Option<String> {
         "classicplus.shinra" | "tera-europe-classic.shinra" => Some("ShinraMeter.exe".into()),
         "classicplus.tcc" | "tera-europe-classic.tcc" => Some("TCC.exe".into()),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn disabled_slot() -> ModEntry {
+        ModEntry {
+            id: "classicplus.shinra".into(),
+            kind: ModKind::External,
+            name: "Shinra".into(),
+            author: "Foglio1024".into(),
+            description: "DPS meter".into(),
+            version: "0.0.0".into(),
+            status: ModStatus::Installing,
+            source_url: None,
+            icon_url: None,
+            progress: Some(42),
+            last_error: Some("stale error from previous attempt".into()),
+            auto_launch: false,
+            enabled: false,
+            license: None,
+            credits: None,
+            long_description: None,
+            screenshots: Vec::new(),
+        }
+    }
+
+    /// PRD 3.3.12.fresh-install-defaults: finalising a slot after a clean
+    /// install flips it to enabled + auto_launch with Enabled status. Pins
+    /// all six fields — the whole contract lives in one helper, so any drift
+    /// shows up here.
+    #[test]
+    fn fresh_install_defaults_enabled() {
+        let mut slot = disabled_slot();
+        finalize_installed_slot(&mut slot, "1.2.3", None);
+
+        assert!(slot.enabled, "fresh install must be enabled by default");
+        assert!(slot.auto_launch, "fresh install must auto-launch by default");
+        assert!(matches!(slot.status, ModStatus::Enabled));
+        assert_eq!(slot.progress, None, "progress must be cleared on finalize");
+        assert_eq!(slot.last_error, None, "last_error clears when no deploy note");
+        assert_eq!(slot.version, "1.2.3");
+    }
+
+    /// GPK path passes a deploy note through as `last_error` (non-fatal:
+    /// bytes landed but mapper patch was skipped). Finalize must preserve it.
+    #[test]
+    fn fresh_install_preserves_deploy_note() {
+        let mut slot = disabled_slot();
+        let note = Some("mapper not patched: backup missing".to_string());
+        finalize_installed_slot(&mut slot, "2.0.0", note.clone());
+
+        assert!(slot.enabled);
+        assert!(slot.auto_launch);
+        assert!(matches!(slot.status, ModStatus::Enabled));
+        assert_eq!(slot.progress, None);
+        assert_eq!(slot.last_error, note);
+        assert_eq!(slot.version, "2.0.0");
+    }
+
+    /// Re-installing over an existing slot must re-enable it: a user who
+    /// previously untoggled the mod and then clicks Install again expects
+    /// the same fresh-install behaviour, not their old disabled state.
+    #[test]
+    fn reinstall_reenables_previously_disabled_slot() {
+        let mut slot = disabled_slot();
+        slot.status = ModStatus::Disabled;
+        slot.version = "0.9.0".into();
+
+        finalize_installed_slot(&mut slot, "1.0.0", None);
+
+        assert!(slot.enabled);
+        assert!(slot.auto_launch);
+        assert!(matches!(slot.status, ModStatus::Enabled));
+        assert_eq!(slot.version, "1.0.0");
     }
 }

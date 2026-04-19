@@ -7,15 +7,15 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 43
-last_work_iteration: 43
+iteration_counter: 44
+last_work_iteration: 44
 last_research_sweep: 40
 last_revalidation: 40
 last_revalidation_status: clean
 last_retrospective: 30
 last_blocked_retry: never
 last_investigation_iteration: 18
-total_items_done: 37
+total_items_done: 38
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
@@ -123,7 +123,7 @@ total_iterations_to_cap: 1000
 - [P1] **3.3.1.every-catalog-entry-lifecycle** — Author `teralaunch/src-tauri/tests/every_catalog_entry_lifecycle.rs` iterating all 101 catalog ids through install → enable → spawn → cleanup → uninstall → mapper-restored. Acceptance: 101/101 green. Pillar: Functionality.
 - [P1] **3.3.9.tcc-elinu-classes** — Verify TCC renders non-default race/gender/class combos from `elinu` datacenter. Author `docs/PRD/audits/functionality/tcc-elinu-classes.md` with screenshots. Acceptance: audit signed off. Pillar: Functionality.
 - [P1] **3.3.10.shinra-elinu-classes** — Verify Shinra tracks non-default race/gender/class combos. Author `docs/PRD/audits/functionality/shinra-elinu-classes.md`. Acceptance: audit signed off. Pillar: Functionality.
-- [P1] **3.3.12.fresh-install-defaults** — Test `commands/mods.rs::tests::fresh_install_defaults_enabled`. Acceptance: `enabled=true`, `auto_launch=true`, `status=Enabled`. Pillar: Functionality.
+- [DONE] 3.3.12.fresh-install-defaults — proof: both install paths in `commands/mods.rs` (install_external_mod ~L179, install_gpk_mod ~L274) now delegate to a single `fn finalize_installed_slot(slot, new_version, last_error)` helper so the defaults contract can't drift between them. Pins: `enabled=true`, `auto_launch=true`, `status=ModStatus::Enabled`, `progress=None`, `version` synced to catalog, `last_error` forwarded (None for external, deploy-note-or-None for GPK). Tests at `src/commands/mods.rs::tests` (new module): `fresh_install_defaults_enabled` (clean install, 6 assertions), `fresh_install_preserves_deploy_note` (GPK soft-fail path preserves note), `reinstall_reenables_previously_disabled_slot` (previously-untoggled slot re-enables on reinstall). `cargo test --release` → 746 unit + 3 + 3 + 4 + 2 + 2 + 4 passed. Clippy clean. Verified @ iter 44.
 - [P1] **3.3.14.tcc-class-layouts-verified** — Verify all 13 TCC classes on Classic+ (no empty apex tiles, awakening present). Author `docs/PRD/audits/functionality/tcc-class-layouts-verified.md` with 13 screenshots. Acceptance: audit signed off. Pillar: Functionality.
 - [P1] **3.3.15.toggle-intent-only** — Test `commands/mods.rs::tests::toggle_intent_only`: enable toggle is pure intent (no spawn, no kill). Acceptance: test passes; multi-client tests also pass. Pillar: Functionality.
 
