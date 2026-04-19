@@ -7,11 +7,11 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 19
+iteration_counter: 20
 last_work_iteration: 19
 last_research_sweep: 10
-last_revalidation: never
-last_revalidation_status: never
+last_revalidation: 20
+last_revalidation_status: clean
 last_retrospective: never
 last_blocked_retry: never
 last_investigation_iteration: 18
@@ -20,6 +20,17 @@ total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
 
+> **Iter 20 REVALIDATION SWEEP — CLEAN.** All 14 [DONE] items re-proved:
+> • launcher `cargo test --release` → 698 unit + 2 integration passed (1 transient single-test flake on first run, 5-run flake-hunt of the new sha_ tests came back 5/5 clean; suspected pre-existing flake unrelated to iter 19).
+> • clippy `--all-targets --release -- -D warnings` → clean.
+> • TCC `dotnet test TCC.sln -c Release` → 1/1 passed.
+> • Shinra `dotnet test Tera.sln -c Release` → 1/1 passed (ShinraMeter.Tests.dll).
+> • Catalog `node scripts/validate-catalog.mjs` → `catalog-validate: ok (101 entries)`.
+> • Launcher `npx playwright test --list` → 70 tests in 14 files.
+> • `git ls-files | grep '\.vs/'` → 0.
+> • `secret-scan.yml` present in all 4 repos (launcher, TCC, Shinra, mod-catalog).
+> Stamp update on individual entries deferred; first actionable staleness would trigger at iter 60 (stamp + 40 < current_iter). Next REVALIDATION at iter 40.
+>
 > **Iter 18 note:** partial progress on `sec.tauri-v1-eol-plan`. Audit draft committed at `docs/PRD/audits/security/tauri-v2-migration.md`. Recommendation stands (migrate). Remaining acceptance gated on 4 human decision gates — re-attempt at BLOCKED RE-TRY every 50 iters or on sign-off.
 >
 > **Iter 13 note:** partial progress on `3.1.6.secret-leak-scan`. gitleaks ran across all 5 repos (6,665 commits, 366 MB); 33 raw hits triaged to 1 true positive + 4 leaky-but-not-secret + 28 false positives. Audit doc committed at `docs/PRD/audits/security/secret-leak-scan.md` (commit 01064c9). 4 new items queued below (3 fix + 1 infra). No git history rewrite performed (not authorised without human sign-off per §12 safety valves).
