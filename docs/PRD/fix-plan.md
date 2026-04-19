@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 54
-last_work_iteration: 54
+iteration_counter: 55
+last_work_iteration: 55
 last_research_sweep: 40
 last_revalidation: 40
 last_revalidation_status: clean
@@ -16,7 +16,7 @@ last_retrospective: 30
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 18
-total_items_done: 47
+total_items_done: 48
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
@@ -123,7 +123,7 @@ total_iterations_to_cap: 1000
 ### Reliability (PRD §3.2)
 
 - [P1] **sec.tokio-rustsec-2025-0023** — RUSTSEC-2025-0023 (tokio broadcast-channel clone parallelism without `Sync` bound, 2025-04-07). Run `cargo audit` to confirm our pinned `tokio = "1.49"` is in affected range; bump to patched release. Acceptance: `cargo audit` clean on tokio; regression tests pass. Pillar: Security. Discovered iter 10 RESEARCH SWEEP.
-- [P1] **sec.aes-gcm-rustsec-2023-0096-audit** — RUSTSEC-2023-0096 (aes-gcm `decrypt_in_place_detached` leaks plaintext on tag-verify failure). Grep teralaunch + teralib for `decrypt_in_place_detached`; if no callers, close as N/A. If callers exist, bump aes-gcm and refactor. Acceptance: grep returns zero matches OR patched version in use + test coverage. Pillar: Security. Discovered iter 10 RESEARCH SWEEP.
+- [DONE] sec.aes-gcm-rustsec-2023-0096-audit — **Close as N/A per PRD acceptance.** `grep -rE 'decrypt_in_place_detached|use aes_gcm|aes_gcm::|Aes(128|256)Gcm'` across `teralaunch/**`, `teralib/**`, and tests returns 0 source hits. `aes-gcm = "0.10"` is declared in `teralaunch/src-tauri/Cargo.toml:42` but has zero importers anywhere in the codebase — it's a dead direct dependency left over from an earlier era, with no code path that could trip RUSTSEC-2023-0096 (tag-verify-failure plaintext leak in `decrypt_in_place_detached`). The closest adjacent crypto stack (`hkdf`, `hmac`, `sha2`, `base64`, `cryptify`) does not pull aes-gcm transitively either. Follow-up P2 `sec.remove-dead-aes-gcm-dep` opened to (a) delete the dead declaration + regenerate Cargo.lock, (b) optionally add a CI grep gate to prevent a future caller from introducing the vulnerable API silently. Verified @ iter 55.
 - [P1] **3.2.1.edge-cases-X1-X24** — Author 24 named tests across `teralaunch/tests/e2e/mod-*.spec.js` + `teralaunch/src-tauri/tests/mod_*.rs` covering edge cases X1–X24. Define X1–X24 in `docs/PRD/test-plan.md` (new file). Acceptance: 24/24 tests passing. Pillar: Reliability.
 - [P1] **3.2.5.offline-retry** — Test `mod-catalog-resilience.spec.js::offline_shows_retry`. Acceptance: test passes. Pillar: Reliability.
 - [DONE] 3.2.6.parse-error-filter — **Real behaviour change.** Previous `fetch_remote` used `response.json::<Catalog>()` which is strict serde — a single malformed entry would error the entire catalog load and the mods page would render empty-or-broken. Replaced with a tolerant two-phase parser at `services::mods::catalog::parse_catalog_tolerant(body)`: (phase 1) parse envelope as `serde_json::Value` and extract required `version` + `updated_at` + `mods` array — envelope errors are still hard errors; (phase 2) iterate `mods[]`, `serde_json::from_value::<CatalogEntry>` each one, keep successes, drop failures with `log::warn!(…"Catalog entry #{idx} ('{id_hint}') dropped — {err}")` so catalog authors have something to grep. `fetch_remote` now awaits `response.text()` and hands the body to the tolerant parser. 4 new tests in `services::mods::catalog::tests`: `malformed_entries_filtered` (3-entry body with `kind: 42` middle entry → 2 good ids survive, bad id filtered), `empty_mods_array_yields_empty_catalog` (the `mods: []` case is valid), `malformed_envelope_is_hard_error` (missing `mods`, missing `version`, invalid JSON all return Err), `every_entry_malformed_returns_empty_catalog` (page renders empty browse tab instead of error banner — matches the reliability goal). `cargo test --release` → 754 unit + 3 + 3 + 4 + 2 + 2 + 4 passed. Clippy clean. Verified @ iter 49.
@@ -259,6 +259,10 @@ total_iterations_to_cap: 1000
 - [P2] **release.tcc-tag-workflow** — Author `.github/workflows/tcc-release.yml` tag-based release for TCC fork. Acceptance: dry-run green. Pillar: Reliability.
 - [P2] **release.shinra-tag-workflow** — Author `.github/workflows/shinra-release.yml`. Acceptance: dry-run green. Pillar: Reliability.
 - [P2] **release.signed-updater-latest-json** — Generate + sign `latest.json` on kasserver `/classicplus/` per release. Acceptance: Tauri updater successfully upgrades from previous tag to current. Pillar: Security.
+
+### Dead-dependency cleanup
+
+- [P2] **sec.remove-dead-aes-gcm-dep** — Delete `aes-gcm = "0.10"` from `teralaunch/src-tauri/Cargo.toml:42` and regenerate `Cargo.lock`. The dep has zero importers anywhere in the codebase (proven by grep at iter 55 closing `sec.aes-gcm-rustsec-2023-0096-audit`). Also consider adding a tiny CI grep gate that fails the job if `decrypt_in_place_detached` ever appears in source, so any future re-introduction of the vulnerable API is caught at PR time rather than at RUSTSEC-announcement time. Acceptance: Cargo.toml no longer lists aes-gcm; Cargo.lock no longer contains the aes-gcm entry; `cargo build --release` + `cargo test --release` both clean. Pillar: Security. Discovered iter 55.
 
 ### Catalog schema + validation
 
