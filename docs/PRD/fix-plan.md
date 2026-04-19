@@ -7,15 +7,15 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 46
-last_work_iteration: 46
+iteration_counter: 47
+last_work_iteration: 47
 last_research_sweep: 40
 last_revalidation: 40
 last_revalidation_status: clean
 last_retrospective: 30
 last_blocked_retry: never
 last_investigation_iteration: 18
-total_items_done: 40
+total_items_done: 41
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
@@ -159,7 +159,7 @@ total_iterations_to_cap: 1000
 
 ### i18n (PRD §3.7)
 
-- [P1] **3.7.1.key-parity** — Test `i18n-parity.test.js::keys_equal_across_locales`. Acceptance: `keys(EN) == keys(FR) == keys(DE) == keys(RU)`. Pillar: i18n.
+- [DONE] 3.7.1.key-parity — proof: new test at `teralaunch/tests/i18n-parity.test.js` (4 cases) compares key sets across all locales in `src/translations.json` (FRA, EUR, RUS, GER). `keys_equal_across_locales` uses FRA as reference and diffs missing/extra keys for every other locale; current state is 161 keys across all 4, zero drift. Supporting tests: `translations.json has at least two locales` (guards against a single-locale drop that would make parity meaningless), `every locale has the same key count` (catches a case where two locales have the same count but different key composition), `detector flags a seeded missing key` (self-test with `{lang_a: {shared, only_in_a}, lang_b: {shared}}` fixture, asserts both directions of the diff). `npm test` → 8 files / 424 tests passed (420 pre-existing + 4 new). Verified @ iter 47.
 - [P1] **3.7.2.no-raw-key-leaks** — Test `mod-i18n.spec.js::no_raw_key_leaks` (4 locales). Acceptance: no `MODS_*` keys in DOM. Pillar: i18n.
 - [P1] **3.7.3.language-switch-inplace** — Test `mod-language-switch.spec.js`. Acceptance: re-render in-place, no full reload. Pillar: i18n.
 - [P1] **3.7.4.no-hardcoded-english** — Test `i18n-no-hardcoded.test.js` (grep-based). Acceptance: 0 matches in mods.js/html/app.js mod paths. Pillar: i18n.
