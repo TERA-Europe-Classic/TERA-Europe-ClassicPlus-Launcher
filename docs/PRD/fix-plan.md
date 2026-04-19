@@ -7,24 +7,34 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 99
+iteration_counter: 100
 last_work_iteration: 99
-last_research_sweep: 90
-last_revalidation: 72
+last_research_sweep: 100
+last_revalidation: 100
 last_revalidation_status: all-gates-green
 last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 80
+total_items_done: 81
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 3360952
+tauri_v2_migration_last_commit: 5efdf80
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 100 DOUBLE-DUTY — RESEARCH SWEEP + REVALIDATION both DONE (worktree).**
+>
+> Worktree commit `5efdf80` (`docs/PRD/audits/research/sweep-iter-100.md`). N%10=0 research sweep + N%20=0 revalidation, both fired same iter.
+>
+> **Research sweep:** zero new drift since iter 90. rustls-webpki (iter 81) and time (iter 91) deduplications both confirmed. Reqwest/cookie 0.12/0.13 chain remains upstream-gated per iter-87 `dep.dedupe-reqwest-zip` deferral. No new RUSTSEC advisories affecting direct deps. No tauri / reqwest / rustls / zip / tokio / serde major bumps. One new P3 queued: `infra.cargo-audit-ci` (`cargo-audit` not installed locally, so no advisory scan fired during this sweep — CI addition is cheap ongoing coverage).
+>
+> **Revalidation:** 860/860 Rust (+83 vs iter-72 baseline of 777, driven by iters 73-99 pin / adversarial / fix / drift-guard additions), 449/449 JS (+32 vs iter-72 baseline of 417), clippy -D warnings clean, zero REGRESSED items across 40 commits since worktree divergence. Spot-check of 7 key pinned invariants: all present. 22-pin drift-guard continues to enforce. Status: **all-gates-green**.
+>
+> Net iter-100 risk delta: **zero**. Worktree `ready_for_squash_merge: true` status unchanged.
 
 > **Iter 99 WORK — pin.clean-recovery-double-arm DONE (worktree).**
 >
