@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 210
-last_work_iteration: 209
+iteration_counter: 211
+last_work_iteration: 211
 last_research_sweep: 210
 last_revalidation: 200
 last_revalidation_status: all-gates-green
@@ -16,15 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 184
+total_items_done: 185
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: b8d45c2
+tauri_v2_migration_last_commit: 6970a21
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 211 WORK — pin.architecture-doc-guard-header+EXPECTED_SECTIONS-count-floor+registry/external-app/tmm-cross-ties DONE (worktree). First WORK after iter 210 research sweep.**
+>
+> Worktree commit `6970a21`. §3.8.4 ARCHITECTURE.md subsystem coverage; architecture_doc_guard had 11 tests (iter 106 creation + iter 138 +3 + iter 176 +5); 35 iters untouched. Brings to 16.
+>
+> Five new source-inspection pins (meta-guard + count floor + per-section cross-ties to code invariants):
+> 1. `guard_file_header_cites_prd_3_8_4` — header cites `PRD 3.8.4` + `ARCHITECTURE.md`; meta-guard contract
+> 2. `expected_sections_count_meets_floor` — `EXPECTED_SECTIONS.len() ≥ 11`; silent parallel trim of list + doc passes `every_expected_section_heading_exists` vacuously otherwise
+> 3. `registry_section_documents_registry_json_and_installing_recovery` — section 3 names `registry.json` + `Installing` recovery; ties doc to crash-recovery invariant
+> 4. `external_app_section_documents_attach_once_and_overlay_lifecycle` — section 4 names `SpawnDecision`/`decide_spawn` + `decide_overlay_action`/`remaining_clients`; ties doc to multi_client.rs iter-158/207 pins
+> 5. `tmm_section_documents_composite_package_mapper` — section 5 names `CompositePackageMapper` + `.clean`/`ensure_backup`; ties doc to bogus_gpk_footer iter-163/203 + clean_recovery pins
+>
+> architecture_doc_guard: 11 → 16 tests. 1283 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 210 RESEARCH SWEEP — zero new advisories, zero dep drift, zero regressions across 20-iter window (iter 190→210). Doc: `docs/PRD/audits/research/sweep-iter-210.md`.**
 >
