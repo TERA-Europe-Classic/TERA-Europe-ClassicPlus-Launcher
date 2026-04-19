@@ -7,10 +7,10 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 139
+iteration_counter: 140
 last_work_iteration: 139
 last_research_sweep: 130
-last_revalidation: 120
+last_revalidation: 140
 last_revalidation_status: all-gates-green
 last_retrospective: 60
 last_blocked_retry: 50
@@ -22,9 +22,23 @@ total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: a418edb
+tauri_v2_migration_last_commit: f3fa62a
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 140 REVALIDATION — all-gates-green.**
+>
+> Worktree commit `f3fa62a` adds `docs/PRD/audits/research/revalidation-iter-140.md`. Full suite re-run: Rust 975/975 across 37 binaries, clippy `-D warnings` clean, Vitest 449/449 across 13 files. cargo audit on both workspaces passes with documented iter-112 ignores — 19 upstream-locked warnings unchanged from iter 120.
+>
+> Delta 120 → 140: +76 Rust tests (899 → 975), +6 new guard files, +3 docs-guard extensions (claude_md / architecture / lessons_learned), +2 meta-guards (hygiene contract + non-stub). Drift-guard pins: 35 → 46 (38 Rust + 8 JS covering Vitest + Playwright e2e).
+>
+> 20 additive commits since iter 120. Regression-pattern scan (`regress` / `revert` / `broke` / `fix.*bug`): zero matches. Spot-check of 8 sample DONE items from iters 120-139: all pass on re-run.
+>
+> Structural-guard inventory: 13 → 22 active guard files (including meta_hygiene_guard that enforces the contract across all 21 others). Every guard passes its own assertions unmodified.
+>
+> `ready_for_squash_merge: true` unchanged since iter 100; five revalidations (iter 100, 110, 120, 130 sweeps, 140 formal) have reaffirmed. Squash merge remains user-gated.
+>
+> Next formal revalidation: iter 160. Next research sweep: iter 150.
 
 > **Iter 139 WORK — pin.lessons-learned-entry-format DONE (worktree).**
 >
