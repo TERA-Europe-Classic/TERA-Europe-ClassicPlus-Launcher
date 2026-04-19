@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 126
-last_work_iteration: 126
+iteration_counter: 127
+last_work_iteration: 127
 last_research_sweep: 120
 last_revalidation: 120
 last_revalidation_status: all-gates-green
@@ -16,15 +16,32 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 107
+total_items_done: 108
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 2789023
+tauri_v2_migration_last_commit: 5a3b49f
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 127 WORK — pin.search-perf-bench DONE (worktree).**
+>
+> Worktree commit `5a3b49f`. `teralaunch/tests/search-perf.test.js` is the ONLY user-facing perf bound pinned in the JS suite (PRD §3.6.4 search-one-frame: filter 300 catalog entries ≤16 ms). High-value target because perf tests are the easiest class of test to silently weaken — relaxing the threshold, shrinking the fixture, or reducing sample count can all be rationalised as "fixing flakiness" while masking a real regression.
+>
+> New `tests/search_perf_guard.rs` (7 tests):
+> 1. File exists, self-identifies as PRD 3.6.4, cites `search-one-frame`
+> 2. Budget stays `toBeLessThanOrEqual(16)` — one 60fps frame — verbatim, with `16 ms` or `60fps` commentary anchoring the number
+> 3. Fixture stays `makeCatalogEntries(300)` — design-size ceiling, shrinking hides scaling regressions
+> 4. Sampling stays median-of-7 (sort + middle-index; NOT mean) with a warm-up run
+> 5. Both sanity controls retained (`filters actually apply` with kind='gpk' binding check + `query narrows matches`)
+> 6. Both Tauri v1 (`tauri:`) and v2 (`core:`) stubs retained at module-load time (mods.js reads either at import)
+> 7. Detector self-test on 5 synthetic bad shapes
+>
+> Fourth in the iter-124/125/126/127 JS-scanner-pin chain. Different surface than iters 124-126 (those pinned structural-invariant scanners; this pins a perf benchmark's integrity).
+>
+> Acceptance: 935/935 Rust (was 928, +7), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 126 WORK — pin.shell-open-callsite-scanner DONE (worktree).**
 >
