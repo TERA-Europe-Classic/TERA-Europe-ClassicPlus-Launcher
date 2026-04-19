@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 72
-last_work_iteration: 72
+iteration_counter: 73
+last_work_iteration: 73
 last_research_sweep: 70
 last_revalidation: 72
 last_revalidation_status: all-gates-green
@@ -16,15 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 18
-total_items_done: 54
+total_items_done: 55
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: b53fbc7
+tauri_v2_migration_last_commit: 0903b68
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 73 WORK — M6-b teralib CONFIG obfuscation DONE (worktree).**
+>
+> Filler work landed on the ready-for-squash worktree while awaiting user authorisation for the M8 merge. Worktree commit `0903b68`. Closes the string-obfuscation gap flagged in M6's audit doc: `192.168.1.128:8090` no longer ships plaintext in the launcher binary's `.rdata`.
+> - `teralib/build.rs`: compile-time rolling-XOR of `config.json` bytes with a per-build 32-byte key seeded from nanos + file length. Emits `$OUT_DIR/config_obf.rs` with `CONFIG_OBF: &[u8]` + `CONFIG_KEY: [u8; 32]`. `cargo:rerun-if-changed` on config.json keeps the obfuscation fresh on content updates.
+> - `teralib/src/config.rs`: `include_str!(config.json)` → `include!("$OUT_DIR/config_obf.rs")` + `fn decrypt_config()` that XORs the bytes back. `CONFIG_JSON` Lazy now decrypts once on first access; downstream `get_config_value` / `get_relay_servers` unchanged.
+> - Per-build key regeneration frustrates pre-computation attacks across releases.
+>
+> Full plaintext-grep proof against a built `.exe` remains a CI-only artefact (queued to the first post-merge v0.2.0 release, same pattern as M4). M6 now covers both CFG (tier-1 linker flag) and string obfuscation (tier-2 compile-time XOR); the one remaining deferral is full rustc CFG metadata which needs a CI-scoped RUSTFLAGS (local-dev-host OOM under LTO documented in iter 70). Audit doc `docs/PRD/audits/security/anti-reverse.md` stays on the worktree; refresh to reflect M6-b DONE queued with the next audit-doc touch iter.
+>
+> Acceptance: `teralib cargo test --release` 28/28, launcher `cargo test --release` 813/813 (no regressions), clippy clean. `tauri_v2_migration_last_commit: 0903b68`; worktree ready state unchanged — still awaiting user authorisation for the squash merge.
+>
+> Next iter (74) slots further filler work — candidates from `[P1]`: `fix.clean-recovery-wiring`, `fix.conflict-modal-wiring`, `fix.overlay-lifecycle-wiring`, `fix.mods-hardcoded-i18n-strings`. Any of those lands cleanly into the pending squash and doesn't reshape the migration scope.
 
 > **Iter 72 WORK — Tauri v2 M8 validation sweep DONE (worktree). Ready for user-gated squash merge.**
 >
