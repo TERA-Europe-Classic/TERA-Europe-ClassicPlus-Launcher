@@ -105,6 +105,31 @@ impl Registry {
         }
     }
 
+    /// PRD 3.2.7.parallel-install-serialised: try to claim the install slot
+    /// for `entry.id`. If a slot already exists with `ModStatus::Installing`,
+    /// refuses the claim so the second concurrent install can't race the
+    /// first on disk (double write to the same dest, two zip extractions,
+    /// two GPK deploys stepping on each other). Otherwise upserts the entry
+    /// with `Installing` status and takes ownership.
+    ///
+    /// Serialisation is cooperative — enforced at the `mods_state::mutate`
+    /// boundary which already serialises on a single `Mutex<Registry>`. Two
+    /// `install_*` commands fired back-to-back will enter `mutate` one at a
+    /// time; the first claims, the second sees `Installing` and returns Err.
+    pub fn try_claim_installing(&mut self, row: ModEntry) -> Result<(), String> {
+        use super::types::ModStatus;
+        if let Some(slot) = self.find(&row.id) {
+            if matches!(slot.status, ModStatus::Installing) {
+                return Err(format!(
+                    "Install for '{}' is already in progress. Wait for it to finish, or check the Installed tab for errors.",
+                    row.id
+                ));
+            }
+        }
+        self.upsert(row);
+        Ok(())
+    }
+
     pub fn remove(&mut self, id: &str) -> Option<ModEntry> {
         let idx = self.mods.iter().position(|m| m.id == id)?;
         Some(self.mods.remove(idx))
@@ -329,5 +354,88 @@ mod tests {
                 "row {id} must be untouched by recovery"
             );
         }
+    }
+
+    fn installing_entry(id: &str) -> ModEntry {
+        let mut e = sample_entry(id, ModKind::External);
+        e.status = ModStatus::Installing;
+        e.progress = Some(0);
+        e
+    }
+
+    /// PRD 3.2.7.parallel-install-serialised: first claim wins, second
+    /// claim on the same id sees `Installing` and is refused. Prevents
+    /// two concurrent installs from racing on the same dest dir.
+    #[test]
+    fn same_id_serialised_second_claim_refused() {
+        let mut reg = Registry::default();
+
+        reg.try_claim_installing(installing_entry("classicplus.shinra"))
+            .expect("first claim must succeed");
+        assert!(matches!(
+            reg.find("classicplus.shinra").unwrap().status,
+            ModStatus::Installing
+        ));
+
+        let err = reg
+            .try_claim_installing(installing_entry("classicplus.shinra"))
+            .unwrap_err();
+        assert!(
+            err.contains("already in progress"),
+            "expected already-in-progress message, got: {err}"
+        );
+        assert!(err.contains("classicplus.shinra"), "error names the id");
+    }
+
+    /// A claim is only refused when the row is currently Installing. If a
+    /// previous install flipped the row to Error (or any non-Installing
+    /// state), re-claiming must succeed — that's the normal retry path.
+    #[test]
+    fn reclaim_after_error_succeeds() {
+        let mut reg = Registry::default();
+        reg.try_claim_installing(installing_entry("classicplus.shinra"))
+            .unwrap();
+
+        // Simulate: first install failed; row flipped to Error.
+        reg.find_mut("classicplus.shinra").unwrap().status = ModStatus::Error;
+
+        // Retry claim must succeed and re-flip the row to Installing.
+        reg.try_claim_installing(installing_entry("classicplus.shinra"))
+            .expect("retry after error must succeed");
+        assert!(matches!(
+            reg.find("classicplus.shinra").unwrap().status,
+            ModStatus::Installing
+        ));
+    }
+
+    /// Claims on different ids don't interact — two installs of different
+    /// mods can genuinely overlap because they touch disjoint dest dirs.
+    #[test]
+    fn different_ids_do_not_block_each_other() {
+        let mut reg = Registry::default();
+        reg.try_claim_installing(installing_entry("classicplus.shinra"))
+            .expect("shinra claim succeeds");
+        reg.try_claim_installing(installing_entry("classicplus.tcc"))
+            .expect("tcc claim succeeds — different id");
+
+        for id in ["classicplus.shinra", "classicplus.tcc"] {
+            assert!(matches!(
+                reg.find(id).unwrap().status,
+                ModStatus::Installing
+            ));
+        }
+    }
+
+    /// First claim on a fresh id upserts the entry. Verifies the row
+    /// actually lands with the Installing status set by the caller.
+    #[test]
+    fn first_claim_upserts_installing_row() {
+        let mut reg = Registry::default();
+        assert!(reg.find("classicplus.shinra").is_none());
+        reg.try_claim_installing(installing_entry("classicplus.shinra"))
+            .unwrap();
+        let slot = reg.find("classicplus.shinra").unwrap();
+        assert!(matches!(slot.status, ModStatus::Installing));
+        assert_eq!(slot.progress, Some(0));
     }
 }

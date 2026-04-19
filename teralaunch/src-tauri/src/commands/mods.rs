@@ -124,14 +124,15 @@ async fn install_external_mod(
         .ok_or_else(|| "Could not resolve external apps dir".to_string())?;
     let dest = install_root.join(&entry.id);
 
-    // Mark Installing in the registry so the UI can render progress.
+    // Mark Installing in the registry so the UI can render progress. The
+    // claim is atomic with the check — if a parallel install of the same
+    // id is already in progress, mods_state::mutate sees Installing and
+    // refuses this claim (PRD 3.2.7). Without this, two simultaneous
+    // installs would both write to the same dest and corrupt each other.
     let mut row = ModEntry::from_catalog(&entry);
     row.status = ModStatus::Installing;
     row.progress = Some(0);
-    mods_state::mutate(|reg| {
-        reg.upsert(row.clone());
-        Ok(())
-    })?;
+    mods_state::mutate(|reg| reg.try_claim_installing(row.clone()))?;
     let _ = window.emit_all(
         "mod_download_progress",
         serde_json::json!({ "id": entry.id, "progress": 0, "state": "downloading" }),
@@ -231,10 +232,9 @@ async fn install_gpk_mod(
     let mut row = ModEntry::from_catalog(&entry);
     row.status = ModStatus::Installing;
     row.progress = Some(0);
-    mods_state::mutate(|reg| {
-        reg.upsert(row.clone());
-        Ok(())
-    })?;
+    // See install_external_mod — atomic claim refuses concurrent installs
+    // of the same id (PRD 3.2.7).
+    mods_state::mutate(|reg| reg.try_claim_installing(row.clone()))?;
     let _ = window.emit_all(
         "mod_download_progress",
         serde_json::json!({ "id": entry.id, "progress": 0, "state": "downloading" }),
