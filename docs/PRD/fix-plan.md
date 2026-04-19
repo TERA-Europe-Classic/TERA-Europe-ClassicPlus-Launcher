@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 78
-last_work_iteration: 78
+iteration_counter: 79
+last_work_iteration: 79
 last_research_sweep: 70
 last_revalidation: 72
 last_revalidation_status: all-gates-green
@@ -16,15 +16,24 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 18
-total_items_done: 60
+total_items_done: 61
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 17db09a
+tauri_v2_migration_last_commit: 39b09e4
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 79 WORK — adv.bogus-gpk-footer DONE (worktree).**
+>
+> Pre-squash filler work on the ready-for-squash worktree. Worktree commit `39b09e4`. Closes the P1 adversarial corpus gap from iter 0's "already passing, verify survives refactor" note: the existing `parse_mod_file_rejects_non_tmm_gpks` inline test was one-fixture thin (64 bytes of 0x42). Replaced with a 9-fixture adversarial corpus and added structural source-inspection guards — same filler layout as iters 74-78.
+> - `services/mods/tmm.rs::tests::parse_mod_file_rejects_non_tmm_gpks` — 9 fixtures: empty buffer, 3 bytes, 4 zero bytes, 64-byte 0x42 baseline, 1024 bytes 0xff, magic-only 4 bytes, misplaced magic, magic+huge composite_count (EOF overflow guard), 4-byte non-magic. Three invariants pinned: parse_mod_file never panics on arbitrary bytes, non-TMM bytes surface as Err or Ok(empty container), downstream install_gpk rejects empty containers.
+> - `tests/bogus_gpk_footer.rs` (new, 4 guards): test-still-present, magic-check-branch-still-present, install_gpk-empty-container-gate-still-present, detector self-test (positive + negative synthetic fixtures).
+> - Clippy: one `useless_vec` on the 64-byte baseline → `&[0x42u8; 64]` slice literal.
+>
+> Acceptance: 828/828 (was 824, +4 new integration guards), clippy clean, 431/431 JS. Worktree ready state unchanged — `ready_for_squash_merge: true`. Six P1 filler items shipped since M8 validation (iters 74-79: overlay-lifecycle, clean-recovery, conflict-modal, hardcoded-i18n, http-redirect-offlist, bogus-gpk-footer). Next iter (80) is **N%10=0 → RESEARCH SWEEP** per the perfection-loop cadence.
 
 > **Iter 78 WORK — adv.http-redirect-offlist DONE (worktree).**
 >
@@ -386,7 +395,7 @@ tauri_v2_migration_ready_for_squash_merge: true
 - [DONE @ iter 78] **adv.http-redirect-offlist** — Both HTTP client builders (`external_app.rs::fetch_bytes_streaming`, `catalog.rs::fetch_remote`) now set `reqwest::redirect::Policy::none()`. A 3xx from a compromised allowlisted mirror surfaces as an HTTP-302 error at the existing `is_success()` gate, so it can't bounce to an off-list host. Guarded by `tests/http_redirect_offlist.rs` (source-inspection, 3 tests). Worktree commit `17db09a`. Pillar: Security.
 - [P1] **adv.replay-latest-json** — Covered by 3.1.9.
 - [P1] **adv.tampered-exe** — Covered by 3.1.11.
-- [P1] **adv.bogus-gpk-footer** — Already passing (parse_mod_file_rejects_non_tmm_gpks). Verify survives any tmm.rs refactor.
+- [DONE @ iter 79] **adv.bogus-gpk-footer** — Extended `parse_mod_file_rejects_non_tmm_gpks` from 1 fixture to 9 covering empty / too-small / wrong-magic / magic-only / misplaced-magic / huge-composite-count / small-non-magic shapes. Three invariants pinned: never panics, non-TMM surfaces as Err or empty-container Ok, install_gpk gate catches it. Structural guards in `tests/bogus_gpk_footer.rs` (4 tests) pin the test presence + magic-check branch + install_gpk empty-container gate across refactors. Worktree commit `39b09e4`. Pillar: Security.
 - [P1] **adv.composite-object-collision** — Covered by 3.3.3.
 - [P1] **adv.sigkill-mid-download** — Author test: registry row recoverable to Error on boot, partial file removed. Acceptance: test passes. Pillar: Reliability.
 - [P1] **adv.disk-full** — Covered by 3.2.8.
