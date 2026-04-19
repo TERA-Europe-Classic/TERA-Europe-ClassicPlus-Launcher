@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 98
-last_work_iteration: 98
+iteration_counter: 99
+last_work_iteration: 99
 last_research_sweep: 90
 last_revalidation: 72
 last_revalidation_status: all-gates-green
@@ -16,15 +16,29 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 79
+total_items_done: 80
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: bdbdb8e
+tauri_v2_migration_last_commit: 3360952
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 99 WORK — pin.clean-recovery-double-arm DONE (worktree).**
+>
+> Worktree commit `3360952`. Last WORK iter before iter 100 double-duty (N%10=0 RESEARCH SWEEP + N%20=0 REVALIDATION). Fixed a 6th PRD path drift: §3.2.9 cited a singular `clean_recovery_logic` that never existed. The actual tests are 4 distinct fns sharing the prefix (creates_backup_from_vanilla_current, refuses_when_current_is_modded, nop_when_backup_exists, errors_when_mapper_missing).
+>
+> The criterion text "recreates if no GPK currently patched; otherwise refuses with recovery instructions" is a double invariant, so the PRD now cites BOTH load-bearing tests explicitly:
+> - `clean_recovery_logic_creates_backup_from_vanilla_current` — recreate path
+> - `clean_recovery_logic_refuses_when_current_is_modded` — refuse path
+>
+> Drift-guard pin count: 20 → 22 (both halves of 3.2.9 pinned).
+>
+> Acceptance: 860/860 Rust (unchanged — pins extend existing test bodies), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
+>
+> **Iter 100 is DOUBLE-DUTY** (N%10=0 RESEARCH SWEEP + N%20=0 REVALIDATION). Header MUST set `last_research_sweep: 100` AND `last_revalidation: 100` when that iter commits. Scope: run a dep/advisory sweep over the worktree (cargo tree + upstream release notes for tauri/reqwest/zip/rustls/time/etc), then revalidate all 80+ DONE items (full cargo + npm + clippy + quick git log scan to ensure none REGRESSED since last revalidation at iter 72).
 
 > **Iter 98 WORK — docs.prd-drift-guard-extend DONE (worktree).**
 >
