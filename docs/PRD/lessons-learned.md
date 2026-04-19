@@ -180,27 +180,11 @@ in `Cargo.toml` or the derive macros are unresolved.
 grep for `x = struct.field;` patterns. Rewrite as whole-struct assignment
 or explicit `.clone()`. Usually whole-struct is cleaner anyway.
 
-### 2026-04-19 / iter 24 — real-vulnerability-in-audit pattern
-
-**Pattern.** PRD items framed as "verify and implement if missing" (iter 24:
-`3.1.4.gpk-deploy-sandbox`) routinely turn up real vulnerabilities. Here
-`install_gpk` joined attacker-controlled `modfile.container` into a filesystem
-path without sanitisation. The test the PRD asked for became the regression
-test for the fix.
-
-**When to apply.** For every PRD item with "verify (and implement if missing)"
-language: read the actual code *before* starting to write the test. If the
-sanitisation truly exists, the test pins it. If it doesn't, the fix comes
-first. Either way the PRD item closes.
-
-Side-benefit: the test file acts as the audit artefact — a reviewer can
-read the vector list and see what threats we considered. More vectors than
-the PRD asks for is cheap defence in depth (iter 24: 15 vectors vs PRD's
-required 5).
-
-*(Entries from iters 3, 13–16, 20, 22, and the meta loop-cadence note
-archived to `lessons-learned.archive.md` at the iter 60 retrospective
-to stay under the 200-line cap. All still valid as reference.)*
+*(Entries from iters 3, 13–16, 20, 22 archived at iter 60 retrospective;
+iter 24 (real-vulnerability-in-audit pattern) archived at iter 108 to
+restore the 200-line cap after slow growth from iters 28–60. All still
+valid — search `lessons-learned.archive.md` first when mining historical
+patterns.)*
 
 ---
 

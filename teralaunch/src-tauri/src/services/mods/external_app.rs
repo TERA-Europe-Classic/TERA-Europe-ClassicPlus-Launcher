@@ -143,8 +143,15 @@ async fn fetch_bytes_streaming(
 ) -> Result<Vec<u8>, String> {
     use futures_util::StreamExt;
 
+    // adv.http-redirect-offlist: the launcher's HTTP scope is pinned to a
+    // handful of known hosts (capabilities/migrated.json + the
+    // http_allowlist integration test). reqwest's default redirect policy
+    // follows up to 10 redirects, which would let a compromised allowlist
+    // host bounce downloads to an off-list server via 3xx. Policy::none()
+    // surfaces 302s as status codes the `!is_success()` branch rejects.
     let client = reqwest::Client::builder()
         .user_agent("TERA-Europe-ClassicPlus-Launcher")
+        .redirect(reqwest::redirect::Policy::none())
         .build()
         .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
 
@@ -236,10 +243,7 @@ fn to_extract_err(e: io::Error) -> String {
 /// own top-level process so it survives the launcher restarting.
 pub fn spawn_app(exe_path: &Path, args: &[String]) -> Result<u32, String> {
     if !exe_path.exists() {
-        return Err(format!(
-            "Executable not found: {}",
-            exe_path.display()
-        ));
+        return Err(format!("Executable not found: {}", exe_path.display()));
     }
 
     // On Windows, prefer ShellExecuteW over CreateProcess because some
@@ -286,9 +290,13 @@ fn spawn_app_shellexec(exe_path: &Path, args: &[String]) -> Result<u32, String> 
     sei.cbSize = std::mem::size_of::<SHELLEXECUTEINFOW>() as u32;
     sei.fMask = SEE_MASK_NOCLOSEPROCESS;
     sei.hwnd = null_mut();
-    sei.lpVerb = null_mut();          // default verb — handles UAC when needed
+    sei.lpVerb = null_mut(); // default verb — handles UAC when needed
     sei.lpFile = file.as_ptr();
-    sei.lpParameters = if params.len() > 1 { params.as_ptr() } else { null_mut() };
+    sei.lpParameters = if params.len() > 1 {
+        params.as_ptr()
+    } else {
+        null_mut()
+    };
     sei.lpDirectory = dir_owned.as_ref().map(|v| v.as_ptr()).unwrap_or(null_mut());
     sei.nShow = SW_SHOWNORMAL;
 
@@ -412,7 +420,11 @@ pub fn stop_process_by_name(exe_name: &str) -> Result<u32, String> {
 /// is trusted, but cheap to validate).
 pub fn executable_path(install_dir: &Path, executable_relpath: &str) -> Result<PathBuf, String> {
     let rel = Path::new(executable_relpath);
-    if rel.is_absolute() || rel.components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+    if rel.is_absolute()
+        || rel
+            .components()
+            .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
         return Err(format!(
             "Catalog executable_relpath '{}' escapes install dir",
             executable_relpath
@@ -888,8 +900,7 @@ mod tests {
     async fn at_least_10hz() {
         let chunk = vec![0xABu8; 64 * 1024];
         let chunks: Vec<Vec<u8>> = std::iter::repeat_n(chunk, 20).collect();
-        let (port, total_bytes) =
-            serve_chunked(chunks, std::time::Duration::from_millis(20)).await;
+        let (port, total_bytes) = serve_chunked(chunks, std::time::Duration::from_millis(20)).await;
         let url = format!("http://127.0.0.1:{port}/stream.bin");
 
         let body = vec![0xABu8; total_bytes];
@@ -934,8 +945,7 @@ mod tests {
 
         async fn count_for(chunks: Vec<Vec<u8>>) -> usize {
             let total_bytes: usize = chunks.iter().map(|c| c.len()).sum();
-            let (port, _) =
-                serve_chunked(chunks, std::time::Duration::from_millis(10)).await;
+            let (port, _) = serve_chunked(chunks, std::time::Duration::from_millis(10)).await;
             let url = format!("http://127.0.0.1:{port}/s.bin");
             let body = vec![0x5Au8; total_bytes];
             let sha = hex_lower(&Sha256::digest(&body));
@@ -958,5 +968,157 @@ mod tests {
             c15 > c5,
             "expected c15 > c5 to prove per-chunk emission; got c5={c5}, c15={c15}"
         );
+    }
+
+    // --- pin.external.download-extract (iter 94) ----------------------------
+    //
+    // Golden-file pin for the download+extract flow. The existing
+    // `extract_zip_writes_files` test (single file) and
+    // `extract_zip_rejects_zip_slip` (4 adversarial fixtures) cover the
+    // happy path and the security gate. This section pins the
+    // multi-entry output-tree shape byte-for-byte: a zip with 3 files
+    // across 2 directories must produce exactly that file tree with
+    // exactly the expected contents — no renames, no re-ordering, no
+    // silently-collapsed directories, no loss of binary fidelity.
+    //
+    // Matches the pin.* pattern established by iters 89 (parser), 92
+    // (cipher), 93 (merger).
+
+    /// Build a deterministic fixture zip with 3 entries:
+    ///   plugins/hello.txt  ASCII "world"
+    ///   plugins/data.bin   256 bytes 0x00..0xFF (tests binary fidelity)
+    ///   README.md          ASCII "root-level file"
+    ///
+    /// The fixture is stable across runs — `SimpleFileOptions::default()`
+    /// picks a compression method + mtime that depend only on the
+    /// `zip` crate version (pinned to 2.4.2 for now; see
+    /// dep-dedup-investigation.md). A future zip-crate major bump that
+    /// changed the default would surface as a different byte layout but
+    /// still round-trip through `extract_zip` to the same output tree —
+    /// which is what this test pins (the OUTPUT, not the zip bytes).
+    #[cfg(test)]
+    fn build_golden_fixture_zip() -> Vec<u8> {
+        let mut buf = Vec::new();
+        let cursor = Cursor::new(&mut buf);
+        let mut w = zip::ZipWriter::new(cursor);
+        let opts: zip::write::SimpleFileOptions = Default::default();
+
+        use std::io::Write;
+        w.start_file("plugins/hello.txt", opts).unwrap();
+        w.write_all(b"world").unwrap();
+
+        w.start_file("plugins/data.bin", opts).unwrap();
+        let bin: Vec<u8> = (0u8..=255u8).collect();
+        w.write_all(&bin).unwrap();
+
+        w.start_file("README.md", opts).unwrap();
+        w.write_all(b"root-level file").unwrap();
+
+        w.finish().unwrap();
+        buf
+    }
+
+    /// Pin the output tree shape: exactly the 3 expected files, exactly
+    /// at the expected relative paths, with the expected contents.
+    #[test]
+    fn golden_extract_multi_entry_tree() {
+        let tmp = TempDir::new().unwrap();
+        let dest = tmp.path().join("out");
+        fs::create_dir_all(&dest).unwrap();
+
+        let zip_bytes = build_golden_fixture_zip();
+        extract_zip(&zip_bytes, &dest).expect("fixture must extract cleanly");
+
+        // File 1: ASCII inside a subdirectory.
+        let hello = dest.join("plugins").join("hello.txt");
+        assert!(hello.is_file(), "plugins/hello.txt must be a file");
+        assert_eq!(
+            fs::read_to_string(&hello).unwrap(),
+            "world",
+            "plugins/hello.txt content round-trip"
+        );
+
+        // File 2: binary 0..=255 round-trip. This catches any UTF-8
+        // coercion, newline conversion, or line-ending munging in the
+        // extract path — "binary fidelity" is not optional for mod
+        // bundles that ship DLLs / configs.
+        let data_bin = dest.join("plugins").join("data.bin");
+        assert!(data_bin.is_file(), "plugins/data.bin must be a file");
+        let data_bytes = fs::read(&data_bin).unwrap();
+        let expected_bin: Vec<u8> = (0u8..=255u8).collect();
+        assert_eq!(
+            data_bytes, expected_bin,
+            "binary payload must round-trip byte-for-byte (256 bytes 0x00..0xFF)"
+        );
+
+        // File 3: root-level sibling.
+        let readme = dest.join("README.md");
+        assert!(readme.is_file(), "README.md must be a root-level file");
+        assert_eq!(
+            fs::read_to_string(&readme).unwrap(),
+            "root-level file",
+            "README.md content round-trip"
+        );
+    }
+
+    /// No silent extra files: the output tree must contain ONLY the
+    /// three fixture entries. A refactor that silently injected a
+    /// marker file ("extracted_at.stamp" etc.) would fail here.
+    #[test]
+    fn golden_extract_no_surprise_entries() {
+        let tmp = TempDir::new().unwrap();
+        let dest = tmp.path().join("out");
+        fs::create_dir_all(&dest).unwrap();
+        extract_zip(&build_golden_fixture_zip(), &dest).unwrap();
+
+        // Walk the output tree, collect all file paths relative to dest,
+        // sort, assert the set.
+        fn walk(p: &Path, dest: &Path, out: &mut Vec<String>) {
+            for entry in fs::read_dir(p).unwrap().flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    walk(&path, dest, out);
+                } else {
+                    out.push(
+                        path.strip_prefix(dest)
+                            .unwrap()
+                            .to_string_lossy()
+                            .replace('\\', "/"),
+                    );
+                }
+            }
+        }
+        let mut found = Vec::new();
+        walk(&dest, &dest, &mut found);
+        found.sort();
+
+        assert_eq!(
+            found,
+            vec![
+                "README.md".to_string(),
+                "plugins/data.bin".to_string(),
+                "plugins/hello.txt".to_string(),
+            ],
+            "output tree must contain EXACTLY the 3 fixture entries"
+        );
+    }
+
+    /// Re-extracting into the same dest directory overwrites cleanly —
+    /// no leftover files, no error, no half-merged tree. Matches the
+    /// re-install semantic mod-manager uses when a user reinstalls a
+    /// mod whose previous files still sit in the target dir.
+    #[test]
+    fn golden_extract_is_idempotent_on_reinstall() {
+        let tmp = TempDir::new().unwrap();
+        let dest = tmp.path().join("out");
+        fs::create_dir_all(&dest).unwrap();
+        let zip_bytes = build_golden_fixture_zip();
+
+        extract_zip(&zip_bytes, &dest).unwrap();
+        extract_zip(&zip_bytes, &dest).unwrap();
+
+        // Same contents both runs, no duplicate paths.
+        let hello = fs::read_to_string(dest.join("plugins").join("hello.txt")).unwrap();
+        assert_eq!(hello, "world", "second extract preserves file content");
     }
 }

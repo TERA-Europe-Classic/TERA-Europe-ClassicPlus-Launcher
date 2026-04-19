@@ -10,6 +10,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use log::info;
+use tauri::Emitter;
+use tauri_plugin_dialog::DialogExt;
 
 use crate::infrastructure::{FileSystem, StdFileSystem};
 use crate::services::{config_service, game_service};
@@ -22,16 +24,19 @@ use crate::utils::normalize_path_for_compare;
 /// The selected folder path, or an error if cancelled
 #[tauri::command]
 #[cfg(not(tarpaulin_include))]
-pub async fn select_game_folder() -> Result<String, String> {
-    use tauri::api::dialog::blocking::FileDialogBuilder;
-
-    let folder = FileDialogBuilder::new()
+pub async fn select_game_folder(app: tauri::AppHandle) -> Result<String, String> {
+    let folder = app
+        .dialog()
+        .file()
         .set_title("Select Tera Game Folder")
         .set_directory("/")
-        .pick_folder();
+        .blocking_pick_folder();
 
     match folder {
-        Some(path) => Ok(path.to_string_lossy().into_owned()),
+        Some(path) => path
+            .into_path()
+            .map(|p| p.to_string_lossy().into_owned())
+            .map_err(|e| format!("Failed to resolve selected folder: {}", e)),
         None => Err("Folder selection cancelled or failed".into()),
     }
 }

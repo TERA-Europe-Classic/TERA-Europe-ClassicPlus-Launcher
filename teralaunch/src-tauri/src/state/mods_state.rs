@@ -27,7 +27,9 @@ struct MemoryState {
 
 fn ensure_loaded() -> Result<(), String> {
     {
-        let guard = MODS_STATE.read().map_err(|e| format!("Mods state poisoned: {}", e))?;
+        let guard = MODS_STATE
+            .read()
+            .map_err(|e| format!("Mods state poisoned: {}", e))?;
         if guard.is_some() {
             return Ok(());
         }

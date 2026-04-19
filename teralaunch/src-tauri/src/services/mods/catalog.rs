@@ -61,8 +61,12 @@ pub fn save_cache(path: &Path, cached: &CachedCatalog) -> Result<(), String> {
 /// dropped with a WARN log; the rest of the catalog still surfaces so a
 /// single bad entry can't brick the mods page — see `parse_catalog_tolerant`.
 pub async fn fetch_remote(url: &str) -> Result<Catalog, String> {
+    // adv.http-redirect-offlist: same reasoning as download_file —
+    // Policy::none() prevents an allowlisted mirror from bouncing the
+    // catalog fetch to an off-list origin via 3xx.
     let client = reqwest::Client::builder()
         .user_agent("TERA-Europe-ClassicPlus-Launcher")
+        .redirect(reqwest::redirect::Policy::none())
         .build()
         .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
 
@@ -119,16 +123,8 @@ pub fn parse_catalog_tolerant(body: &str) -> Result<Catalog, String> {
         match serde_json::from_value::<CatalogEntry>(raw.clone()) {
             Ok(entry) => mods.push(entry),
             Err(err) => {
-                let id_hint = raw
-                    .get("id")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("<no id>");
-                log::warn!(
-                    "Catalog entry #{} ('{}') dropped — {}",
-                    idx,
-                    id_hint,
-                    err
-                );
+                let id_hint = raw.get("id").and_then(|v| v.as_str()).unwrap_or("<no id>");
+                log::warn!("Catalog entry #{} ('{}') dropped — {}", idx, id_hint, err);
             }
         }
     }

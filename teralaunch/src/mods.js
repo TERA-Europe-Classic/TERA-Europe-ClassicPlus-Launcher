@@ -9,7 +9,7 @@
  * direct `invoke()` calls, and this view matches that style.
  */
 
-const { invoke: modsInvoke } = window.__TAURI__.tauri;
+const { invoke: modsInvoke } = window.__TAURI__.core || window.__TAURI__.tauri;
 const { listen: modsListen } = window.__TAURI__.event;
 
 const ModsView = {
@@ -146,7 +146,11 @@ const ModsView = {
         this.$page.querySelectorAll('.mods-tab').forEach(btn => {
             btn.addEventListener('click', () => this.setTab(btn.dataset.tab));
         });
-        this.$page.querySelectorAll('.mods-filter-chip').forEach(btn => {
+        // fix.mods-categories-ui (iter 85): scope the kind-filter binding
+        // to the .mods-filter-group container. After the filter-strip merge,
+        // .mods-filter-chip is also used by the category row — a global
+        // query would double-bind every category chip to setFilter(undefined).
+        this.$page.querySelectorAll('.mods-filter-group .mods-filter-chip').forEach(btn => {
             btn.addEventListener('click', () => this.setFilter(btn.dataset.filter));
         });
 
@@ -234,7 +238,9 @@ const ModsView = {
     setFilter(filter) {
         if (!['all', 'external', 'gpk'].includes(filter)) return;
         this.state.filter = filter;
-        this.$page.querySelectorAll('.mods-filter-chip').forEach(btn => {
+        // fix.mods-categories-ui (iter 85): scoped to the kind-filter group
+        // so the active-class flip doesn't leak into the category row.
+        this.$page.querySelectorAll('.mods-filter-group .mods-filter-chip').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.filter === filter);
         });
         this.render();
@@ -243,7 +249,12 @@ const ModsView = {
     setCategory(category) {
         this.state.category = category || 'all';
         if (this.$categoryRow) {
-            this.$categoryRow.querySelectorAll('.mods-category-chip').forEach(btn => {
+            // fix.mods-categories-ui (iter 85): category chips now share the
+            // `.mods-filter-chip` class with the kind-filter above — same
+            // pill geometry, same active-state treatment. We still scope
+            // the query to this.$categoryRow so the kind-filter chips above
+            // don't get toggled by the category dispatcher.
+            this.$categoryRow.querySelectorAll('.mods-filter-chip').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.category === this.state.category);
             });
         }
@@ -268,15 +279,15 @@ const ModsView = {
         if (!stillValid) this.state.category = 'all';
 
         const chips = [
-            `<button class="mods-category-chip ${this.state.category === 'all' ? 'active' : ''}" data-category="all" data-translate="MODS_CATEGORY_ALL">All categories</button>`,
+            `<button class="mods-filter-chip ${this.state.category === 'all' ? 'active' : ''}" data-category="all" data-translate="MODS_CATEGORY_ALL">${window.App?.t('MODS_CATEGORY_ALL') ?? 'All categories'}</button>`,
         ];
         for (const cat of sorted) {
             const label = this.formatCategoryLabel(cat);
             const isActive = this.state.category === cat;
-            chips.push(`<button class="mods-category-chip ${isActive ? 'active' : ''}" data-category="${cat}">${label}</button>`);
+            chips.push(`<button class="mods-filter-chip ${isActive ? 'active' : ''}" data-category="${cat}">${label}</button>`);
         }
         this.$categoryRow.innerHTML = chips.join('');
-        this.$categoryRow.querySelectorAll('.mods-category-chip').forEach(btn => {
+        this.$categoryRow.querySelectorAll('.mods-filter-chip').forEach(btn => {
             btn.addEventListener('click', () => this.setCategory(btn.dataset.category));
         });
     },
@@ -579,10 +590,12 @@ const ModsView = {
 
         // Only render an icon cell when the catalog entry actually carries
         // an icon_url. No initials placeholder — the user explicitly asked
-        // for that to go away. If the URL 404s at runtime, onerror drops
-        // the image and collapses the row to no-icon spacing.
+        // for that to go away. If the URL 404s at runtime, the error
+        // listener attached below collapses the row to no-icon spacing.
+        // Attribute-based onerror is CSP-forbidden under script-src without
+        // 'unsafe-inline' (PRD 3.1.12).
         const iconMarkup = entry.icon_url
-            ? `<div class="mods-row-icon"><img class="mods-row-icon-img" src="${escapeHtml(entry.icon_url)}" alt="" onerror="var r=this.closest('.mods-row'); if(r){r.classList.add('no-icon'); var c=this.closest('.mods-row-icon'); if(c)c.remove();}" /></div>`
+            ? `<div class="mods-row-icon"><img class="mods-row-icon-img" src="${escapeHtml(entry.icon_url)}" alt="" /></div>`
             : '';
 
         const statusCell = this.buildStatusCell(entry, context);
@@ -599,9 +612,19 @@ const ModsView = {
             </div>
             <div class="mods-row-status">${statusCell}</div>
             <div class="mods-row-menu">
-                <button class="mods-row-overflow" data-action="overflow" aria-label="More">⋯</button>
+                <button class="mods-row-overflow" data-action="overflow" aria-label="${window.App?.t('MODS_ARIA_MORE') ?? 'More'}">⋯</button>
             </div>
         `;
+
+        const iconImg = row.querySelector('.mods-row-icon-img');
+        if (iconImg) {
+            iconImg.addEventListener('error', () => {
+                row.classList.add('no-icon');
+                const iconCell = row.querySelector('.mods-row-icon');
+                if (iconCell) iconCell.remove();
+            }, { once: true });
+        }
+
         return row;
     },
 
@@ -630,11 +653,11 @@ const ModsView = {
                 // auto-deploy on Launch once the mapper patcher ships.
                 const enabled = entry.enabled || entry.status === 'enabled' || entry.status === 'running' || entry.status === 'starting';
                 return `
-                    <label class="mods-row-toggle" title="${enabled ? 'Enabled — runs with the game' : 'Disabled — click to enable'}">
+                    <label class="mods-row-toggle" title="${enabled ? (window.App?.t('MODS_TITLE_ENABLED_HINT') ?? 'Enabled — runs with the game') : (window.App?.t('MODS_TITLE_DISABLED_HINT') ?? 'Disabled — click to enable')}">
                         <input type="checkbox" data-action="toggle" ${enabled ? 'checked' : ''} />
                         <span class="mods-row-toggle-track"><span class="mods-row-toggle-thumb"></span></span>
                     </label>
-                    ${entry.status === 'running' ? `<span class="mods-row-running-pill"><span class="mods-row-running-dot"></span>Running</span>` : ''}
+                    ${entry.status === 'running' ? `<span class="mods-row-running-pill"><span class="mods-row-running-dot"></span>${window.App?.t('MODS_STATUS_RUNNING') ?? 'Running'}</span>` : ''}
                 `;
             }
         }
@@ -909,16 +932,16 @@ const ModsView = {
         popover.className = 'mods-row-popover';
         popover.innerHTML = `
             <button class="mods-row-popover-item" data-popover-action="details">
-                <span>Details</span>
+                <span data-translate="MODS_MENU_DETAILS">${window.App?.t('MODS_MENU_DETAILS') ?? 'Details'}</span>
             </button>
             ${sourceUrl
                 ? `<button class="mods-row-popover-item" data-popover-action="source">
-                      <span>Open source</span>
+                      <span data-translate="MODS_MENU_OPEN_SOURCE">${window.App?.t('MODS_MENU_OPEN_SOURCE') ?? 'Open source'}</span>
                    </button>`
                 : ''}
             ${isInstalled
                 ? `<button class="mods-row-popover-item danger" data-popover-action="uninstall">
-                      <span>Uninstall</span>
+                      <span data-translate="MODS_MENU_UNINSTALL">${window.App?.t('MODS_MENU_UNINSTALL') ?? 'Uninstall'}</span>
                    </button>`
                 : ''}
         `;

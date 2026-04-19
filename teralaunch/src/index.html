@@ -7,34 +7,7 @@
     <title>TERA Europe Classic+ Launcher</title>
 
     <!-- Scale content to fit viewport when DPI scaling causes overflow -->
-    <script>
-    (function() {
-        const DESIGN_WIDTH = 1282;
-        const DESIGN_HEIGHT = 759;
-
-        function updateZoom() {
-            const vw = window.innerWidth;
-            const vh = window.innerHeight;
-
-            // Calculate scale factors for width and height
-            const scaleX = vw / DESIGN_WIDTH;
-            const scaleY = vh / DESIGN_HEIGHT;
-
-            // Use the smaller scale to ensure everything fits
-            const scale = Math.min(scaleX, scaleY, 1); // Cap at 1 (never zoom in)
-
-            if (scale < 1) {
-                document.documentElement.style.zoom = scale;
-            } else {
-                document.documentElement.style.zoom = '';
-            }
-        }
-
-        // Run immediately and on resize
-        updateZoom();
-        window.addEventListener('resize', updateZoom);
-    })();
-    </script>
+    <script src="./zoom.js"></script>
 
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Swiper/8.4.5/swiper-bundle.min.css">
@@ -79,7 +52,15 @@
         }
 
 
-        /* Prevent FOUC - hide until ready */
+        /* Prevent FOUC - hide until ready.
+         *
+         * The .ready class is added at the very top of App.init() (app.js)
+         * BEFORE any network-touching await. fix.offline-empty-state (iter 84):
+         * previously .ready was added mid-init after silent-auth; if that
+         * await hung or threw on an unreachable portal, the outer catch swallowed
+         * it and the page stayed at opacity 0 — user saw a blank dark screen.
+         * Paint-first, hydrate-after prevents that silent failure mode.
+         */
         .mainpage {
             opacity: 0;
             transition: opacity 0.15s ease-in;
@@ -87,6 +68,66 @@
 
         .mainpage.ready {
             opacity: 1;
+        }
+
+        /* Offline banner — fix.offline-empty-state (iter 84) */
+        .offline-banner {
+            position: fixed;
+            top: 48px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10000;
+            background: #b33a3a;
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            max-width: 560px;
+            width: calc(100% - 40px);
+            font-size: 13px;
+        }
+
+        .offline-banner.hidden {
+            display: none;
+        }
+
+        .offline-banner-inner {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .offline-banner-icon {
+            font-size: 20px;
+            line-height: 1;
+        }
+
+        .offline-banner-content {
+            flex: 1;
+        }
+
+        .offline-banner-title {
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .offline-banner-desc {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .offline-banner-retry {
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font: inherit;
+        }
+
+        .offline-banner-retry:hover {
+            background: rgba(255, 255, 255, 0.25);
         }
 
         /* Hide carousel until initialized */
@@ -2628,6 +2669,18 @@
 </head>
 
 <body>
+    <!-- Offline banner — hidden by default; surfaced by App.showOfflineBanner().
+         fix.offline-empty-state (iter 84). -->
+    <div id="offline-banner" class="offline-banner hidden" role="alert" aria-live="polite">
+        <div class="offline-banner-inner">
+            <span class="offline-banner-icon" aria-hidden="true">&#9888;</span>
+            <div class="offline-banner-content">
+                <div class="offline-banner-title" data-translate="OFFLINE_BANNER_TITLE">Can't reach the portal server</div>
+                <div class="offline-banner-desc" data-translate="OFFLINE_BANNER_DESC">The server may be offline, or your connection is down.</div>
+            </div>
+            <button id="offline-banner-retry" type="button" class="offline-banner-retry" data-translate="OFFLINE_BANNER_RETRY">Retry</button>
+        </div>
+    </div>
     <div class="mainpage">
         <header class="header" data-tauri-drag-region>
             <!-- Left: Logo + Nav -->

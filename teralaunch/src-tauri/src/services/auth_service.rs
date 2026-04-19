@@ -210,9 +210,7 @@ pub fn parse_v100_login_response(response: &str) -> Result<LoginResult, AuthErro
         .ok_or_else(|| AuthError::ParseError("Missing 'Return' boolean field".to_string()))?;
 
     if !success {
-        let msg = json["Msg"]
-            .as_str()
-            .unwrap_or("Unknown error");
+        let msg = json["Msg"].as_str().unwrap_or("Unknown error");
         return Err(AuthError::ServerError(msg.to_string()));
     }
 
@@ -230,10 +228,7 @@ pub fn parse_v100_login_response(response: &str) -> Result<LoginResult, AuthErro
         .ok_or_else(|| AuthError::ParseError("Missing 'AuthKey' field".to_string()))?
         .to_string();
 
-    let character_count = json["CharacterCount"]
-        .as_str()
-        .unwrap_or("0")
-        .to_string();
+    let character_count = json["CharacterCount"].as_str().unwrap_or("0").to_string();
 
     let permission = json["Permission"].as_i64().unwrap_or(0);
     let privilege = json["Privilege"].as_i64().unwrap_or(0);
@@ -610,21 +605,24 @@ mod tests {
 
     #[test]
     fn parse_v100_login_response_missing_user_no() {
-        let response = r#"{"Return":true,"ReturnCode":0,"Msg":"success","UserName":"test","AuthKey":"key"}"#;
+        let response =
+            r#"{"Return":true,"ReturnCode":0,"Msg":"success","UserName":"test","AuthKey":"key"}"#;
         let result = parse_v100_login_response(response);
         assert!(matches!(result, Err(AuthError::ParseError(_))));
     }
 
     #[test]
     fn parse_v100_login_response_missing_auth_key() {
-        let response = r#"{"Return":true,"ReturnCode":0,"Msg":"success","UserNo":19,"UserName":"test"}"#;
+        let response =
+            r#"{"Return":true,"ReturnCode":0,"Msg":"success","UserNo":19,"UserName":"test"}"#;
         let result = parse_v100_login_response(response);
         assert!(matches!(result, Err(AuthError::ParseError(_))));
     }
 
     #[test]
     fn parse_v100_login_response_missing_user_name() {
-        let response = r#"{"Return":true,"ReturnCode":0,"Msg":"success","UserNo":19,"AuthKey":"key"}"#;
+        let response =
+            r#"{"Return":true,"ReturnCode":0,"Msg":"success","UserNo":19,"AuthKey":"key"}"#;
         let result = parse_v100_login_response(response);
         assert!(matches!(result, Err(AuthError::ParseError(_))));
     }

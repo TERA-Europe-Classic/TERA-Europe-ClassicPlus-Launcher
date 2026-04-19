@@ -1,0 +1,43 @@
+# gitleaks configuration — infra.gitleaks-allowlist (iter 88).
+#
+# Keeps the default gitleaks v8 ruleset active and layers on a
+# repo-specific allowlist for the known false positives the iter 13
+# secret-leak-scan audit triaged. Every addition must cite that audit
+# (docs/PRD/audits/security/secret-leak-scan.md) — no speculative
+# entries. If a new false positive appears, add a new row here with a
+# one-line justification comment rather than broadening an existing
+# pattern.
+
+[extend]
+useDefault = true
+
+# Global allowlist — applied across ALL rules.
+[allowlist]
+description = "Known false positives triaged in iter 13 audit."
+
+# Literal test-fixture tokens. These look like api keys to gitleaks'
+# generic-api-key regex because they're the right length and character
+# class, but every occurrence is inside a #[cfg(test)] / #[test]
+# block or a fixture constant for hash comparison, not a credential.
+# Tightest possible allow: the exact literal.
+regexes = [
+    '''\babc123def456\b''',
+    '''\bABC123DEF456\b''',
+]
+
+# Paths where above regexes are expected. Anchoring to specific files
+# prevents this allowlist from suppressing a genuine leak that happens
+# to reuse the same fixture string in a production code path.
+#
+# target/ is excluded unconditionally — Cargo build artefacts can embed
+# arbitrary high-entropy strings from third-party crate metadata
+# (`libmuda-*.rmeta` had a false-positive burst in a local iter-88
+# scan). CI's --log-opts=RANGE scan never walks target/ since it's
+# gitignored, but a local `gitleaks detect --no-git` would, and each
+# such false positive wastes reviewer time.
+paths = [
+    '''teralaunch/src-tauri/src/services/hash_service\.rs''',
+    '''target/''',
+    '''teralaunch/src-tauri/target/''',
+    '''teralib/target/''',
+]

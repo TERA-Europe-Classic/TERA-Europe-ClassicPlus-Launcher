@@ -6,7 +6,11 @@
 use serde::{Deserialize, Serialize};
 
 fn non_empty(s: &str) -> Option<String> {
-    if s.is_empty() { None } else { Some(s.to_string()) }
+    if s.is_empty() {
+        None
+    } else {
+        Some(s.to_string())
+    }
 }
 
 /// Which kind of mod this is. The frontend groups rows by this and renders a
@@ -121,7 +125,10 @@ impl ModEntry {
     ///
     /// Caller is responsible for deploying the GPK and upserting into the
     /// registry; this is just the entry shape.
-    pub fn from_local_gpk(bytes_sha256: &str, modfile: &crate::services::mods::tmm::ModFile) -> Self {
+    pub fn from_local_gpk(
+        bytes_sha256: &str,
+        modfile: &crate::services::mods::tmm::ModFile,
+    ) -> Self {
         let sha12 = bytes_sha256.get(..12).unwrap_or("unknown0000");
         let id = format!("local.{sha12}");
         let name = if modfile.mod_name.trim().is_empty() {

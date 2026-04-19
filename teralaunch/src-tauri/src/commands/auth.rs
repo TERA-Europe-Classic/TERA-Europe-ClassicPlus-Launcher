@@ -233,39 +233,23 @@ mod tests {
     #[tokio::test]
     async fn test_login_with_empty_username() {
         let mock = MockHttpClient::new();
-        let result = login_with_client(
-            &mock,
-            "".to_string(),
-            "pass".to_string(),
-            TEST_LOGIN_URL,
-        )
-        .await;
+        let result =
+            login_with_client(&mock, "".to_string(), "pass".to_string(), TEST_LOGIN_URL).await;
         assert_eq!(result.unwrap_err(), "Username and password cannot be empty");
     }
 
     #[tokio::test]
     async fn test_login_with_empty_password() {
         let mock = MockHttpClient::new();
-        let result = login_with_client(
-            &mock,
-            "user".to_string(),
-            "".to_string(),
-            TEST_LOGIN_URL,
-        )
-        .await;
+        let result =
+            login_with_client(&mock, "user".to_string(), "".to_string(), TEST_LOGIN_URL).await;
         assert_eq!(result.unwrap_err(), "Username and password cannot be empty");
     }
 
     #[tokio::test]
     async fn test_login_with_both_empty() {
         let mock = MockHttpClient::new();
-        let result = login_with_client(
-            &mock,
-            "".to_string(),
-            "".to_string(),
-            TEST_LOGIN_URL,
-        )
-        .await;
+        let result = login_with_client(&mock, "".to_string(), "".to_string(), TEST_LOGIN_URL).await;
         assert_eq!(result.unwrap_err(), "Username and password cannot be empty");
     }
 

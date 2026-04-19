@@ -12,13 +12,13 @@
 use std::path::PathBuf;
 
 use log::info;
-use tauri::Manager;
+use tauri::Emitter;
 
 use crate::services::mods::{
     catalog::{self, CachedCatalog},
     external_app,
     registry::{get_external_apps_dir, get_gpk_dir, get_registry_path},
-    tmm,
+    tmm::{self, ModConflict},
     types::{Catalog, CatalogEntry, ModEntry, ModKind, ModStatus},
 };
 use crate::state::mods_state;
@@ -36,8 +36,8 @@ pub fn list_installed_mods() -> Result<Vec<ModEntry>, String> {
 #[tauri::command]
 #[cfg(not(tarpaulin_include))]
 pub async fn get_mods_catalog(force_refresh: Option<bool>) -> Result<Catalog, String> {
-    let cache_path = catalog::get_cache_path()
-        .ok_or_else(|| "Could not resolve mods cache dir".to_string())?;
+    let cache_path =
+        catalog::get_cache_path().ok_or_else(|| "Could not resolve mods cache dir".to_string())?;
 
     let force = force_refresh.unwrap_or(false);
 
@@ -120,8 +120,8 @@ async fn install_external_mod(
         .clone()
         .ok_or_else(|| format!("Catalog entry '{}' is missing executable_relpath", entry.id))?;
 
-    let install_root = get_external_apps_dir()
-        .ok_or_else(|| "Could not resolve external apps dir".to_string())?;
+    let install_root =
+        get_external_apps_dir().ok_or_else(|| "Could not resolve external apps dir".to_string())?;
     let dest = install_root.join(&entry.id);
 
     // Mark Installing in the registry so the UI can render progress. The
@@ -133,7 +133,7 @@ async fn install_external_mod(
     row.status = ModStatus::Installing;
     row.progress = Some(0);
     mods_state::mutate(|reg| reg.try_claim_installing(row.clone()))?;
-    let _ = window.emit_all(
+    let _ = window.emit(
         "mod_download_progress",
         serde_json::json!({ "id": entry.id, "progress": 0, "state": "downloading" }),
     );
@@ -168,7 +168,7 @@ async fn install_external_mod(
             if force || now.duration_since(last_emit) >= min_interval {
                 last_emit = now;
                 last_received = received;
-                let _ = progress_window.emit_all(
+                let _ = progress_window.emit(
                     "mod_download_progress",
                     serde_json::json!({
                         "id": progress_id,
@@ -189,10 +189,14 @@ async fn install_external_mod(
             // Validate the advertised executable exists post-extract.
             let exe = external_app::executable_path(&dest, &executable_relpath)?;
             if !exe.exists() {
-                return finalize_error(&entry.id, format!(
-                    "Advertised executable '{}' not found in extracted zip",
-                    executable_relpath
-                ), &window);
+                return finalize_error(
+                    &entry.id,
+                    format!(
+                        "Advertised executable '{}' not found in extracted zip",
+                        executable_relpath
+                    ),
+                    &window,
+                );
             }
 
             let final_row = mods_state::mutate(|reg| {
@@ -203,7 +207,7 @@ async fn install_external_mod(
                 Ok(slot.clone())
             })?;
 
-            let _ = window.emit_all(
+            let _ = window.emit(
                 "mod_download_progress",
                 serde_json::json!({ "id": entry.id, "progress": 100, "state": "done" }),
             );
@@ -218,12 +222,8 @@ async fn install_external_mod(
 /// CompositePackageMapper.dat, register in ModList.tmm, etc.) lands in
 /// Phase C; for now the registry entry stays at Disabled with a
 /// last_error-style note pointing users at the file.
-async fn install_gpk_mod(
-    entry: CatalogEntry,
-    window: tauri::Window,
-) -> Result<ModEntry, String> {
-    let gpk_dir = get_gpk_dir()
-        .ok_or_else(|| "Could not resolve GPK mods dir".to_string())?;
+async fn install_gpk_mod(entry: CatalogEntry, window: tauri::Window) -> Result<ModEntry, String> {
+    let gpk_dir = get_gpk_dir().ok_or_else(|| "Could not resolve GPK mods dir".to_string())?;
     // Derive the on-disk filename from the id so each entry owns a slot and
     // reinstalls overwrite cleanly.
     let file_name = format!("{}.gpk", entry.id.replace('/', "_"));
@@ -235,7 +235,7 @@ async fn install_gpk_mod(
     // See install_external_mod — atomic claim refuses concurrent installs
     // of the same id (PRD 3.2.7).
     mods_state::mutate(|reg| reg.try_claim_installing(row.clone()))?;
-    let _ = window.emit_all(
+    let _ = window.emit(
         "mod_download_progress",
         serde_json::json!({ "id": entry.id, "progress": 0, "state": "downloading" }),
     );
@@ -265,7 +265,7 @@ async fn install_gpk_mod(
             let force = received == 0 || received == total;
             if force || now.duration_since(last_emit) >= min_interval {
                 last_emit = now;
-                let _ = progress_window.emit_all(
+                let _ = progress_window.emit(
                     "mod_download_progress",
                     serde_json::json!({
                         "id": progress_id,
@@ -295,7 +295,7 @@ async fn install_gpk_mod(
                 finalize_installed_slot(slot, &entry.version, deploy_note);
                 Ok(slot.clone())
             })?;
-            let _ = window.emit_all(
+            let _ = window.emit(
                 "mod_download_progress",
                 serde_json::json!({ "id": entry.id, "progress": 100, "state": "done" }),
             );
@@ -333,29 +333,34 @@ fn try_deploy_gpk(_mod_id: &str, source_gpk: &std::path::Path) -> Option<String>
 /// Reads the game root from the launcher's config.ini via the existing
 /// config command helpers. Returned path is the TERA install folder (the
 /// parent of S1Game), matching what tmm.rs expects.
+///
+/// `services::config_service::parse_game_config` stores the install root
+/// directly (e.g. `C:/Games/TERA`) — NOT a path to `TERA.exe`. Every
+/// other caller (commands/download.rs, commands/hash.rs) treats
+/// `game_path` that way. A previous version of this function stripped
+/// two `parent()` levels assuming an exe-path shape and mis-resolved
+/// every valid install, failing with "Configured game path has no
+/// parent root" even when the user had set a correct path. See
+/// fix.resolve-game-root-wrong-assumption (iter 83) for the bug history.
 fn resolve_game_root() -> Result<std::path::PathBuf, String> {
-    // The existing launcher config stores the game-exe path. Strip two
-    // levels up (`Bin/...` → install root) so tmm has the structure it
-    // expects. If we ever track the install root directly we can use
-    // that instead.
     let (game_path, _lang) = crate::commands::config::load_config()?;
-    // game_path is usually `<root>/Binaries/TERA.exe` or similar.
-    let root = game_path.parent().and_then(|p| p.parent()).map(|p| p.to_path_buf())
-        .ok_or_else(|| "Configured game path has no parent root".to_string())?;
-    if !root.join("S1Game").exists() {
-        return Err(format!(
-            "No S1Game folder under {} — path may be wrong",
-            root.display()
-        ));
-    }
-    Ok(root)
+    validate_game_root(game_path)
 }
 
-fn finalize_error(
-    id: &str,
-    err: String,
-    window: &tauri::Window,
-) -> Result<ModEntry, String> {
+/// Pure predicate split out for testability. `game_root` is the
+/// configured install path as stored in config.ini. Returns Ok iff the
+/// path has an `S1Game` child directory.
+fn validate_game_root(game_root: std::path::PathBuf) -> Result<std::path::PathBuf, String> {
+    if !game_root.join("S1Game").exists() {
+        return Err(format!(
+            "No S1Game folder under {} — path may be wrong",
+            game_root.display()
+        ));
+    }
+    Ok(game_root)
+}
+
+fn finalize_error(id: &str, err: String, window: &tauri::Window) -> Result<ModEntry, String> {
     let _ = mods_state::mutate(|reg| {
         if let Some(slot) = reg.find_mut(id) {
             slot.status = ModStatus::Error;
@@ -364,7 +369,7 @@ fn finalize_error(
         }
         Ok(())
     });
-    let _ = window.emit_all(
+    let _ = window.emit(
         "mod_download_progress",
         serde_json::json!({ "id": id, "progress": 0, "state": "error", "error": err }),
     );
@@ -384,14 +389,13 @@ pub async fn add_mod_from_file(path: String) -> Result<ModEntry, String> {
     use sha2::{Digest, Sha256};
 
     let src = PathBuf::from(&path);
-    let bytes = std::fs::read(&src)
-        .map_err(|e| format!("Failed to read {}: {e}", src.display()))?;
+    let bytes =
+        std::fs::read(&src).map_err(|e| format!("Failed to read {}: {e}", src.display()))?;
 
     let modfile = tmm::parse_mod_file(&bytes)?;
     if modfile.container.is_empty() {
         return Err(
-            "Imported file isn't a TMM-compatible .gpk (no container name in footer)."
-                .into(),
+            "Imported file isn't a TMM-compatible .gpk (no container name in footer).".into(),
         );
     }
     // Reuse the deploy-sandbox predicate so an imported file with a hostile
@@ -415,8 +419,7 @@ pub async fn add_mod_from_file(path: String) -> Result<ModEntry, String> {
     let mut entry = ModEntry::from_local_gpk(&sha, &modfile);
 
     // Copy into our gpk slot so uninstall can find it.
-    let gpk_dir = get_gpk_dir()
-        .ok_or_else(|| "Could not resolve GPK mods dir".to_string())?;
+    let gpk_dir = get_gpk_dir().ok_or_else(|| "Could not resolve GPK mods dir".to_string())?;
     std::fs::create_dir_all(&gpk_dir)
         .map_err(|e| format!("Failed to create {}: {e}", gpk_dir.display()))?;
     let dest = gpk_dir.join(format!("{}.gpk", entry.id.replace('/', "_")));
@@ -455,8 +458,8 @@ pub async fn add_mod_from_file(path: String) -> Result<ModEntry, String> {
 #[tauri::command]
 #[cfg(not(tarpaulin_include))]
 pub async fn uninstall_mod(id: String, delete_settings: Option<bool>) -> Result<(), String> {
-    let entry = mods_state::get_mod(&id)?
-        .ok_or_else(|| format!("Mod '{}' is not installed", id))?;
+    let entry =
+        mods_state::get_mod(&id)?.ok_or_else(|| format!("Mod '{}' is not installed", id))?;
 
     match entry.kind {
         ModKind::External => {
@@ -485,12 +488,14 @@ pub async fn uninstall_mod(id: String, delete_settings: Option<bool>) -> Result<
             // backup or a moved game path shouldn't block the registry
             // removal.
             if let Ok(game_root) = resolve_game_root() {
-                let gpk_dir = get_gpk_dir()
-                    .ok_or_else(|| "Could not resolve GPK mods dir".to_string())?;
+                let gpk_dir =
+                    get_gpk_dir().ok_or_else(|| "Could not resolve GPK mods dir".to_string())?;
                 let source_gpk = gpk_dir.join(format!("{}.gpk", entry.id.replace('/', "_")));
                 if let Ok(bytes) = std::fs::read(&source_gpk) {
                     if let Ok(modfile) = crate::services::mods::tmm::parse_mod_file(&bytes) {
-                        let paths: Vec<String> = modfile.packages.iter()
+                        let paths: Vec<String> = modfile
+                            .packages
+                            .iter()
                             .map(|p| p.object_path.clone())
                             .filter(|p| !p.is_empty())
                             .collect();
@@ -505,8 +510,8 @@ pub async fn uninstall_mod(id: String, delete_settings: Option<bool>) -> Result<
                 }
             }
             // Also remove the download from the launcher's own gpk folder.
-            let gpk_dir = get_gpk_dir()
-                .ok_or_else(|| "Could not resolve GPK mods dir".to_string())?;
+            let gpk_dir =
+                get_gpk_dir().ok_or_else(|| "Could not resolve GPK mods dir".to_string())?;
             let file = gpk_dir.join(format!("{}.gpk", entry.id.replace('/', "_")));
             if file.exists() {
                 std::fs::remove_file(&file)
@@ -552,8 +557,8 @@ fn apply_disable_intent(slot: &mut ModEntry) {
 #[tauri::command]
 #[cfg(not(tarpaulin_include))]
 pub async fn enable_mod(id: String) -> Result<ModEntry, String> {
-    let _entry = mods_state::get_mod(&id)?
-        .ok_or_else(|| format!("Mod '{}' is not installed", id))?;
+    let _entry =
+        mods_state::get_mod(&id)?.ok_or_else(|| format!("Mod '{}' is not installed", id))?;
 
     let updated = mods_state::mutate(|reg| {
         let slot = reg
@@ -572,8 +577,8 @@ pub async fn enable_mod(id: String) -> Result<ModEntry, String> {
 #[tauri::command]
 #[cfg(not(tarpaulin_include))]
 pub async fn disable_mod(id: String) -> Result<ModEntry, String> {
-    let _entry = mods_state::get_mod(&id)?
-        .ok_or_else(|| format!("Mod '{}' is not installed", id))?;
+    let _entry =
+        mods_state::get_mod(&id)?.ok_or_else(|| format!("Mod '{}' is not installed", id))?;
 
     let updated = mods_state::mutate(|reg| {
         let slot = reg
@@ -594,8 +599,7 @@ pub async fn launch_external_app(id: String) -> Result<ModEntry, String> {
 }
 
 async fn launch_external_app_impl(id: &str, set_auto_launch: bool) -> Result<ModEntry, String> {
-    let entry = mods_state::get_mod(id)?
-        .ok_or_else(|| format!("Mod '{}' is not installed", id))?;
+    let entry = mods_state::get_mod(id)?.ok_or_else(|| format!("Mod '{}' is not installed", id))?;
 
     let exe_name = external_executable_name(id)
         .ok_or_else(|| format!("Cannot resolve executable name for {}", id))?;
@@ -641,6 +645,65 @@ pub async fn stop_external_app(id: String) -> Result<ModEntry, String> {
     })
 }
 
+/// Previews (composite, object)-slot collisions between the incoming mod
+/// and any other GPK mod already patched into `CompositePackageMapper.dat`.
+/// Returns one `ModConflict` per dirty slot; an empty vec means "safe to
+/// install, no last-install-wins overwrite."
+///
+/// The frontend calls this before `install_mod`; on a non-empty result it
+/// renders the last-install-wins disclaimer modal (existing Playwright
+/// spec `mod-conflict-warning.spec.js`).
+///
+/// Scope: only GPK mods can produce conflicts. External-app entries are
+/// out-of-band and return `Ok([])`. If the catalog GPK hasn't been
+/// downloaded yet (no file under `mods/gpk/<id>.gpk`), also returns
+/// `Ok([])` — the real install path will still run `detect_conflicts`
+/// again post-download, so this is a best-effort UX preview, not a
+/// safety gate.
+///
+/// Wiring for fix.conflict-modal-wiring (PRD §3.3.3).
+#[tauri::command]
+#[cfg(not(tarpaulin_include))]
+pub async fn preview_mod_install_conflicts(
+    entry: CatalogEntry,
+) -> Result<Vec<ModConflict>, String> {
+    if !matches!(entry.kind, ModKind::Gpk) {
+        return Ok(Vec::new());
+    }
+
+    let gpk_dir = get_gpk_dir().ok_or_else(|| "Could not resolve GPK mods dir".to_string())?;
+    let file_name = format!("{}.gpk", entry.id.replace('/', "_"));
+    let source_gpk = gpk_dir.join(&file_name);
+    if !source_gpk.exists() {
+        return Ok(Vec::new());
+    }
+
+    let bytes = std::fs::read(&source_gpk)
+        .map_err(|e| format!("Failed to read {}: {e}", source_gpk.display()))?;
+    let game_root = resolve_game_root()?;
+    tmm::preview_conflicts_from_bytes(&game_root, &bytes)
+}
+
+/// User-invoked recovery path for a missing `CompositePackageMapper.clean`
+/// backup. Resolves the configured game root, then defers to
+/// `tmm::recover_missing_clean` which:
+///   - no-ops when `.clean` already exists,
+///   - copies the current (vanilla) mapper to `.clean` when safe,
+///   - refuses with a `verify-game-files` instruction when the current
+///     mapper is already TMM-modded (capturing modded bytes as the
+///     "vanilla" baseline would silently break uninstall forever).
+///
+/// Wiring for fix.clean-recovery-wiring (PRD §3.3 reliability). The
+/// frontend calls this when the user clicks the Settings-panel Recovery
+/// button; the button is typically shown after mapper/backup errors
+/// surfaced in the Troubleshoot entries (§7-8 in TROUBLESHOOT.md).
+#[tauri::command]
+#[cfg(not(tarpaulin_include))]
+pub async fn recover_clean_mapper() -> Result<(), String> {
+    let game_root = resolve_game_root()?;
+    tmm::recover_missing_clean(&game_root)
+}
+
 /// Opens the OS file-explorer at the mods directory. Used by the "Open folder"
 /// overflow-menu action.
 #[tauri::command]
@@ -650,8 +713,7 @@ pub fn open_mods_folder() -> Result<(), String> {
         .and_then(|p| p.parent().map(PathBuf::from))
         .ok_or_else(|| "Could not resolve mods dir".to_string())?;
     if !dir.exists() {
-        std::fs::create_dir_all(&dir)
-            .map_err(|e| format!("Failed to create mods dir: {}", e))?;
+        std::fs::create_dir_all(&dir).map_err(|e| format!("Failed to create mods dir: {}", e))?;
     }
     open_in_explorer(&dir)
 }
@@ -832,10 +894,16 @@ mod tests {
         finalize_installed_slot(&mut slot, "1.2.3", None);
 
         assert!(slot.enabled, "fresh install must be enabled by default");
-        assert!(slot.auto_launch, "fresh install must auto-launch by default");
+        assert!(
+            slot.auto_launch,
+            "fresh install must auto-launch by default"
+        );
         assert!(matches!(slot.status, ModStatus::Enabled));
         assert_eq!(slot.progress, None, "progress must be cleared on finalize");
-        assert_eq!(slot.last_error, None, "last_error clears when no deploy note");
+        assert_eq!(
+            slot.last_error, None,
+            "last_error clears when no deploy note"
+        );
         assert_eq!(slot.version, "1.2.3");
     }
 
@@ -946,7 +1014,9 @@ mod tests {
     fn toggle_command_bodies_do_not_spawn_or_kill() {
         let source = include_str!("mods.rs");
 
-        let enable_start = source.find("pub async fn enable_mod").expect("enable_mod present");
+        let enable_start = source
+            .find("pub async fn enable_mod")
+            .expect("enable_mod present");
         let enable_body = &source[enable_start..];
         let enable_body = &enable_body[..enable_body
             .find("\npub async fn disable_mod")
@@ -974,6 +1044,68 @@ mod tests {
         assert!(
             !disable_body.contains("stop_process_by_name"),
             "disable_mod must not kill — PRD 3.3.15"
+        );
+    }
+
+    /// fix.resolve-game-root-wrong-assumption (iter 83).
+    ///
+    /// `validate_game_root` must treat the stored game path AS the install
+    /// root — not as a path to `TERA.exe`. An earlier version of
+    /// `resolve_game_root()` stripped two `parent()` levels assuming an
+    /// exe-path shape, which turned valid configs like `C:/Games/TERA`
+    /// into `C:/` and then failed the `S1Game` check. That blocked every
+    /// GPK install for users with a normal install layout, surfacing as
+    /// the error "Configured game path has no parent root".
+    #[test]
+    fn validate_game_root_accepts_install_root_with_s1game() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let install = tmp.path().to_path_buf();
+        std::fs::create_dir(install.join("S1Game")).unwrap();
+
+        let out = validate_game_root(install.clone()).expect("valid install");
+        assert_eq!(
+            out, install,
+            "validate_game_root must return the stored path unchanged \
+             (NOT a parent) when S1Game exists underneath"
+        );
+    }
+
+    /// Negative: a path without an S1Game subdirectory is rejected with
+    /// a clear "path may be wrong" message — the only legitimate reason
+    /// `validate_game_root` should error.
+    #[test]
+    fn validate_game_root_rejects_missing_s1game() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let err = validate_game_root(tmp.path().to_path_buf())
+            .expect_err("missing S1Game must err");
+        assert!(
+            err.contains("No S1Game folder under"),
+            "error must name S1Game as the missing folder, got: {err}"
+        );
+    }
+
+    /// Regression guard: `validate_game_root` must not call `.parent()` at
+    /// all. The old bug was a `.parent().and_then(|p| p.parent())` chain
+    /// that silently truncated valid paths. Source-inspection keeps the
+    /// fix honest — if a refactor brings parent-walking back (even in a
+    /// different shape like `strip_prefix` or `components().take(n)`), the
+    /// next person to touch this code has to explicitly justify it.
+    #[test]
+    fn validate_game_root_source_has_no_parent_walk() {
+        let src = std::fs::read_to_string("src/commands/mods.rs")
+            .expect("mods.rs must exist");
+        let fn_pos = src
+            .find("fn validate_game_root")
+            .expect("validate_game_root must exist");
+        let fn_end = src[fn_pos..]
+            .find("\n}")
+            .map(|p| fn_pos + p)
+            .expect("function body must close");
+        let body = &src[fn_pos..fn_end];
+        assert!(
+            !body.contains(".parent()"),
+            "validate_game_root must not call .parent() — see iter-83 bug \
+             history. game_path from config_service IS the install root."
         );
     }
 }

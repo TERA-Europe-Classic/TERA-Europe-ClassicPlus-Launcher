@@ -9,7 +9,7 @@
              clash with the X. -->
         <header class="mods-titlebar">
             <h1 class="mods-title" data-translate="MODS_TITLE">Mods</h1>
-            <button class="mods-titlebar-close" id="mods-titlebar-close" aria-label="Close" title="Close (Esc)">
+            <button class="mods-titlebar-close" id="mods-titlebar-close" aria-label="Close" data-translate-aria-label="MODS_ARIA_CLOSE" title="Close (Esc)" data-translate-title="MODS_TITLE_CLOSE_ESC">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <line x1="18" y1="6" x2="6" y2="18"/>
                     <line x1="6" y1="6" x2="18" y2="18"/>
@@ -37,18 +37,26 @@
 
         <div class="mods-toolbar">
             <input type="text" id="mods-search" class="mods-search" placeholder="Search by name, author, or category" data-translate-placeholder="MODS_SEARCH" />
-            <div class="mods-filter-group" role="group">
+        </div>
+
+        <!-- Unified filter strip — fix.mods-categories-ui (iter 85).
+             Kind chips (All/External/GPK) and category chips share one row
+             with a visual divider between groups. Previous layout split them
+             (kind right of search, categories alone below search) and created
+             an L-shape; it also used two different chip shapes, which read as
+             inconsistent. Both chip groups now use the same `.mods-filter-chip`
+             class and pill geometry — the only visual delta is the `.active`
+             state within each group. -->
+        <div class="mods-filters-row" role="group" aria-label="Filters">
+            <div class="mods-filter-group" role="group" aria-label="Kind filter" data-translate-aria-label="MODS_ARIA_KIND_FILTER">
                 <button class="mods-filter-chip active" data-filter="all" data-translate="MODS_FILTER_ALL">All</button>
                 <button class="mods-filter-chip" data-filter="external" data-translate="MODS_FILTER_EXTERNAL">External</button>
                 <button class="mods-filter-chip" data-filter="gpk" data-translate="MODS_FILTER_GPK">GPK</button>
             </div>
-        </div>
-
-        <!-- Category chips — populated dynamically from whatever categories
-             the loaded catalog declares. "All" is always first and active
-             by default. -->
-        <div class="mods-category-row" id="mods-category-row" role="group" aria-label="Category filter">
-            <button class="mods-category-chip active" data-category="all" data-translate="MODS_CATEGORY_ALL">All categories</button>
+            <span class="mods-filters-divider" aria-hidden="true"></span>
+            <div class="mods-category-row" id="mods-category-row" role="group" aria-label="Category filter" data-translate-aria-label="MODS_ARIA_CATEGORY_FILTER">
+                <button class="mods-filter-chip active" data-category="all" data-translate="MODS_CATEGORY_ALL">All categories</button>
+            </div>
         </div>
 
         <section class="mods-pane active" data-pane="installed">
@@ -103,7 +111,7 @@
                             <span id="mods-detail-version">—</span>
                         </p>
                     </div>
-                    <button class="mods-detail-close" id="mods-detail-close" aria-label="Close">×</button>
+                    <button class="mods-detail-close" id="mods-detail-close" aria-label="Close" data-translate-aria-label="MODS_ARIA_CLOSE">×</button>
                 </header>
                 <div class="mods-detail-body">
                     <section class="mods-detail-section" id="mods-detail-description-section">

@@ -10,9 +10,13 @@ import {
 import { localizeForumUrl } from "./utils/forumLinks.js";
 import * as AccountManager from './accountManager.js';
 
-const { invoke } = window.__TAURI__.tauri;
+const { invoke } = window.__TAURI__.core || window.__TAURI__.tauri;
 const { listen } = window.__TAURI__.event;
-const { appWindow, WebviewWindow } = window.__TAURI__.window;
+// v1 exported `appWindow` as a bound constant; v2 replaces it with
+// `getCurrent()` on the window module. Resolve whichever is present.
+const appWindow = window.__TAURI__.window?.appWindow
+  || window.__TAURI__.window?.getCurrent?.()
+  || window.__TAURI__.webviewWindow?.getCurrentWebviewWindow?.();
 const { message, ask } = window.__TAURI__.dialog;
 
 /**
@@ -1293,6 +1297,15 @@ const App = {
    * update check and server connection.
    */
   async init() {
+    // fix.offline-empty-state (iter 84): flip .ready IMMEDIATELY, before any
+    // await. Previously this lived mid-init after silent-auth; if any pre-
+    // `.ready` await threw or hung on an unreachable portal, the outer catch
+    // swallowed it and the page stayed at opacity 0 — user saw a blank dark
+    // screen. Paint-first, hydrate-after: the UI is visible regardless of
+    // network state, and offline-banner surfaces the real failure.
+    const mainpageEarly = document.querySelector('.mainpage');
+    if (mainpageEarly) mainpageEarly.classList.add('ready');
+
     try {
       // Migrate legacy single-account storage to multi-account
       AccountManager.migrateFromLegacyStorage();
@@ -1401,6 +1414,7 @@ const App = {
           // ensureGameFolderValid blocks with a modal until the folder is valid;
           // the post-save flow re-enters this init via initializeAndCheckUpdates.
           this.checkFirstLaunch();
+          this.hideOfflineBanner();
           const folderReady = await this.ensureGameFolderValid();
           if (folderReady) {
             await this.initializeAndCheckUpdates(false);
@@ -1412,6 +1426,7 @@ const App = {
             window.hideCheckingState();
           }
           this.updateLaunchGameButton(false);
+          this.showOfflineBanner();
         }
       }
     } catch (error) {
@@ -1420,7 +1435,40 @@ const App = {
       if (typeof window.hideCheckingState === 'function') {
         window.hideCheckingState();
       }
+      // fix.offline-empty-state (iter 84): if init throws before reaching the
+      // connection check (e.g. an early fetch rejected on portal unreachable),
+      // the banner is still the right surface — user knows the launcher isn't
+      // broken, it just can't reach the server.
+      this.showOfflineBanner();
     }
+  },
+
+  /**
+   * Show the offline banner (server unreachable) and wire its Retry button.
+   * Idempotent — safe to call multiple times. The click handler re-runs
+   * App.init() to retry the connection check.
+   */
+  showOfflineBanner() {
+    const banner = document.getElementById('offline-banner');
+    if (!banner) return;
+    banner.classList.remove('hidden');
+    const retryBtn = document.getElementById('offline-banner-retry');
+    if (retryBtn && !retryBtn.dataset.wired) {
+      retryBtn.dataset.wired = '1';
+      retryBtn.addEventListener('click', () => {
+        this.hideOfflineBanner();
+        // Re-run init to retry the connection probe + downstream work.
+        this.init();
+      });
+    }
+  },
+
+  /**
+   * Hide the offline banner. Idempotent.
+   */
+  hideOfflineBanner() {
+    const banner = document.getElementById('offline-banner');
+    if (banner) banner.classList.add('hidden');
   },
 
   /**
@@ -4723,6 +4771,14 @@ const App = {
     document.querySelectorAll("[data-translate-title]").forEach((el) => {
       const key = el.getAttribute("data-translate-title");
       el.title = this.t(key);
+    });
+
+    // Aria-label localization — used by mods-window close buttons,
+    // category filter group, etc. so screen readers get the user's
+    // selected language (PRD 3.7.1 parity, fix.mods-hardcoded-i18n-strings).
+    document.querySelectorAll("[data-translate-aria-label]").forEach((el) => {
+      const key = el.getAttribute("data-translate-aria-label");
+      el.setAttribute("aria-label", this.t(key));
     });
 
     this.updateDynamicTranslations();

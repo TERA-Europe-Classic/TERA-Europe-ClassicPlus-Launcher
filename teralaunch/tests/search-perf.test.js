@@ -7,9 +7,11 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 
-// mods.js reads window.__TAURI__.tauri and ...event at module-evaluation
-// time. Stub the surface before import so the module doesn't explode.
+// mods.js reads window.__TAURI__.core (v2) || window.__TAURI__.tauri
+// (v1 legacy fallback) + event at module-evaluation time. Stub both so
+// the module doesn't explode either way.
 global.window.__TAURI__ = {
+    core: { invoke: vi.fn() },
     tauri: { invoke: vi.fn() },
     event: { listen: vi.fn(() => Promise.resolve(() => {})) },
 };

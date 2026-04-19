@@ -8,6 +8,10 @@ on:
       - 'license.txt'
       - 'teralaunch/**'
       - 'teralib/**'
+      # PRD 3.8.3 TROUBLESHOOT.md coverage gate — rerun when either
+      # the user-facing doc OR the coverage script itself changes.
+      - 'docs/mod-manager/TROUBLESHOOT.md'
+      - 'scripts/check-troubleshoot-coverage.mjs'
 
 concurrency:
   group: pr-validation-${{ github.event.pull_request.number || github.ref }}
@@ -80,6 +84,13 @@ jobs:
       - name: Run Rust tests (teralib)
         working-directory: teralib
         run: cargo test --all-targets --all-features
+
+      # PRD 3.8.3 TROUBLESHOOT.md coverage gate — every user-facing
+      # error template in the mods services must have a matching
+      # heading/body in docs/mod-manager/TROUBLESHOOT.md. Exit 0 on
+      # full coverage, non-zero with missing templates listed otherwise.
+      - name: Check TROUBLESHOOT.md coverage
+        run: node scripts/check-troubleshoot-coverage.mjs
 
       - name: Prepare Tauri license file
         run: Copy-Item -Path license.txt -Destination teralaunch/license.txt -Force

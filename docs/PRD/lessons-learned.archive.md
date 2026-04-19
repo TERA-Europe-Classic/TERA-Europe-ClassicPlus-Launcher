@@ -6,6 +6,32 @@ chronological order (newest archive banner at top).
 
 ---
 
+## Archived 2026-04-19 / iter 108 cap-restore
+
+Iter 108 `docs.lessons-learned-cap-restore`: active file had drifted
+to 212 lines. Moved iter 24 entry here to restore the <= 200-line
+cap that §3.8.8 guard enforces going forward.
+
+### 2026-04-19 / iter 24 — real-vulnerability-in-audit pattern
+
+**Pattern.** PRD items framed as "verify and implement if missing" (iter 24:
+`3.1.4.gpk-deploy-sandbox`) routinely turn up real vulnerabilities. Here
+`install_gpk` joined attacker-controlled `modfile.container` into a filesystem
+path without sanitisation. The test the PRD asked for became the regression
+test for the fix.
+
+**When to apply.** For every PRD item with "verify (and implement if missing)"
+language: read the actual code *before* starting to write the test. If the
+sanitisation truly exists, the test pins it. If it doesn't, the fix comes
+first. Either way the PRD item closes.
+
+Side-benefit: the test file acts as the audit artefact — a reviewer can
+read the vector list and see what threats we considered. More vectors than
+the PRD asks for is cheap defence in depth (iter 24: 15 vectors vs PRD's
+required 5).
+
+---
+
 ## Archived 2026-04-19 / iter 60 retrospective
 
 Entries below migrated from `lessons-learned.md` to keep the active

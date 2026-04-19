@@ -25,6 +25,7 @@ use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::io::{BufReader, Read};
+use tauri::Emitter;
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufWriter};
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;

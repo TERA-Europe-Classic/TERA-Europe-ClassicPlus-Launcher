@@ -109,6 +109,20 @@ pub const GEN_MIRROR_PSK: [u8; 32] = {:?};
         windows = windows.app_manifest(include_str!("windows-app-manifest.xml"));
         let attrs = tauri_build::Attributes::new().windows_attributes(windows);
         tauri_build::try_build(attrs).expect("Failed to build with custom Windows manifest");
+
+        // Anti-reverse hardening, PRD 3.1.8 (M6). /guard:cf tells the MSVC
+        // linker to set the CFG bit in the PE header so the OS applies
+        // loader-enforced mitigations (CIG/ACG/dynamic-code-guard) against
+        // hijacked indirect-call flow. We do NOT enable rustc's full CFG
+        // metadata instrumentation (-C control-flow-guard=checks) here —
+        // applying it globally via .cargo/config.toml compiles host build
+        // scripts with CFG too, which OOMs on some dev machines under LTO.
+        // Forwarding the linker flag alone gives header-level CFG without
+        // that cost; full rustc instrumentation is queued for a CI-only
+        // build step in M6-b.
+        if env::var("PROFILE").unwrap_or_default() == "release" {
+            println!("cargo:rustc-link-arg-bin=tera-europe-classicplus-launcher=/guard:cf");
+        }
     }
 
     #[cfg(not(target_os = "windows"))]

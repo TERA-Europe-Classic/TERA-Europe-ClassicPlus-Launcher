@@ -25,6 +25,7 @@ use log::{error, info, warn};
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use serde_json::json;
 use sha2::{Digest, Sha256};
+use tauri::Emitter;
 use tokio::sync::Mutex;
 use walkdir::WalkDir;
 
@@ -38,6 +39,14 @@ use teralib::config::get_config_value;
 
 // Imports used only by the full update-check path
 #[cfg(not(feature = "skip-updates"))]
+use crate::domain::{
+    CachedFileInfo, CONNECT_TIMEOUT_SECS, DOWNLOAD_TIMEOUT_SECS, HTTP_POOL_MAX_IDLE_PER_HOST,
+};
+#[cfg(not(feature = "skip-updates"))]
+use crate::utils::{resume_offset, validate_download_url, validate_path_within_base};
+#[cfg(not(feature = "skip-updates"))]
+use rayon::prelude::*;
+#[cfg(not(feature = "skip-updates"))]
 use std::collections::HashMap;
 #[cfg(not(feature = "skip-updates"))]
 use std::fs;
@@ -47,12 +56,6 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::RwLock;
 #[cfg(not(feature = "skip-updates"))]
 use std::time::SystemTime;
-#[cfg(not(feature = "skip-updates"))]
-use rayon::prelude::*;
-#[cfg(not(feature = "skip-updates"))]
-use crate::domain::{CachedFileInfo, CONNECT_TIMEOUT_SECS, DOWNLOAD_TIMEOUT_SECS, HTTP_POOL_MAX_IDLE_PER_HOST};
-#[cfg(not(feature = "skip-updates"))]
-use crate::utils::{resume_offset, validate_download_url, validate_path_within_base};
 
 /// Clears the hash cache to force recalculation.
 ///

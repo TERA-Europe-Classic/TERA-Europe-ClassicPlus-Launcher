@@ -89,6 +89,37 @@ locked mapper (via the game), so this hasn't surfaced in practice.
 
 ---
 
+## 3a. Mods state (in-memory guard)
+
+**File:** `state/mods_state.rs`
+
+The on-disk `registry.rs` is the persistent source of truth; this module
+wraps it in a process-global `RwLock` so multiple Tauri commands can
+read/mutate it without racing each other. The registry file is loaded
+lazily on first access, then held in memory until launcher shutdown.
+
+**Write-through semantics.** Every `mutate(|reg| ...)` call re-serialises
+and saves before releasing the write-lock. A crash between mutation and
+save is impossible; a crash during save is covered by registry's
+tmp+rename atomic-write (§3, Save path).
+
+**Atomic claim.** `try_claim_installing(row)` is the primitive that
+prevents two parallel installs of the same `id` from corrupting each
+other's dest directory (PRD 3.2.7). It checks the current row's status
+under the write-lock: if already `Installing`, returns an error; otherwise
+upserts the incoming `Installing` row. Callers (`install_external_mod`,
+`install_gpk_mod`) use this as the gate before any download begins.
+
+**Invariants.**
+- Lock poisoning surfaces as a clear `"Mods state poisoned: ..."` error,
+  not a silent panic.
+- `mutate()` always saves — no in-memory mutation can drift from disk.
+- No direct `MODS_STATE.write()` calls outside this module — all access
+  goes through `mutate()` / `read()` helpers so the save-on-mutate
+  invariant can't be bypassed.
+
+---
+
 ## 4. External-app download + extract + spawn
 
 **File:** `services/mods/external_app.rs`

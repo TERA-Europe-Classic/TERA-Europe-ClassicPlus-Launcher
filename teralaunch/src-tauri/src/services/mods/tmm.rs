@@ -142,25 +142,37 @@ pub fn parse_mapper(decrypted: &str) -> HashMap<String, MapperEntry> {
     let mut pos_end = 0usize;
 
     loop {
-        let Some(q) = find_from(bytes, b'?', pos_end) else { break };
+        let Some(q) = find_from(bytes, b'?', pos_end) else {
+            break;
+        };
         let filename = decrypted[pos_end..q].to_string();
-        let Some(bang) = find_from(bytes, b'!', q) else { break };
+        let Some(bang) = find_from(bytes, b'!', q) else {
+            break;
+        };
         let mut pos = q + 1;
         while pos < bang {
             // object_path
-            let Some(c1) = find_from(bytes, b',', pos) else { break };
+            let Some(c1) = find_from(bytes, b',', pos) else {
+                break;
+            };
             let object_path = &decrypted[pos..c1];
             pos = c1 + 1;
             // composite_name
-            let Some(c2) = find_from(bytes, b',', pos) else { break };
+            let Some(c2) = find_from(bytes, b',', pos) else {
+                break;
+            };
             let composite_name = &decrypted[pos..c2];
             pos = c2 + 1;
             // offset
-            let Some(c3) = find_from(bytes, b',', pos) else { break };
+            let Some(c3) = find_from(bytes, b',', pos) else {
+                break;
+            };
             let offset_s = &decrypted[pos..c3];
             pos = c3 + 1;
             // size
-            let Some(c4) = find_from(bytes, b',', pos) else { break };
+            let Some(c4) = find_from(bytes, b',', pos) else {
+                break;
+            };
             let size_s = &decrypted[pos..c4];
             pos = c4 + 1;
 
@@ -175,9 +187,17 @@ pub fn parse_mapper(decrypted: &str) -> HashMap<String, MapperEntry> {
 
             // Next entry (TMM uses `decrypted.find('|', pos) < posEnd - 1` as
             // the loop condition; we simply check for '|' before the bang).
-            if pos >= bang { break; }
-            if bytes[pos] == b'|' { pos += 1; }
-            if pos >= bang || find_from(bytes, b'|', pos).map(|p| p < bang).unwrap_or(false) {
+            if pos >= bang {
+                break;
+            }
+            if bytes[pos] == b'|' {
+                pos += 1;
+            }
+            if pos >= bang
+                || find_from(bytes, b'|', pos)
+                    .map(|p| p < bang)
+                    .unwrap_or(false)
+            {
                 // continue loop — there's another entry before the '!'
             } else {
                 break;
@@ -189,7 +209,10 @@ pub fn parse_mapper(decrypted: &str) -> HashMap<String, MapperEntry> {
 }
 
 fn find_from(hay: &[u8], needle: u8, from: usize) -> Option<usize> {
-    hay.get(from..)?.iter().position(|&b| b == needle).map(|p| p + from)
+    hay.get(from..)?
+        .iter()
+        .position(|&b| b == needle)
+        .map(|p| p + from)
 }
 
 /// Inverse of `parse_mapper`. Groups entries by Filename (as TMM does via
@@ -207,7 +230,9 @@ pub fn serialize_mapper(map: &HashMap<String, MapperEntry>) -> String {
     let mut out = String::new();
     for name in names {
         let entries = grouped.get(name).unwrap();
-        if entries.is_empty() { continue; }
+        if entries.is_empty() {
+            continue;
+        }
         out.push_str(name);
         out.push('?');
         // TMM's inner order is by composite_name because the source map is
@@ -248,7 +273,9 @@ fn split_incomplete(path: &str) -> Option<(&str, &str)> {
 
 pub fn incomplete_paths_equal(a: &str, b: &str) -> bool {
     match (split_incomplete(a), split_incomplete(b)) {
-        (Some((ca, oa)), Some((cb, ob))) => ca.eq_ignore_ascii_case(cb) && oa.eq_ignore_ascii_case(ob),
+        (Some((ca, oa)), Some((cb, ob))) => {
+            ca.eq_ignore_ascii_case(cb) && oa.eq_ignore_ascii_case(ob)
+        }
         _ => false,
     }
 }
@@ -257,14 +284,16 @@ pub fn get_entry_by_object_path<'a>(
     map: &'a HashMap<String, MapperEntry>,
     path: &str,
 ) -> Option<&'a MapperEntry> {
-    map.values().find(|e| e.object_path.eq_ignore_ascii_case(path))
+    map.values()
+        .find(|e| e.object_path.eq_ignore_ascii_case(path))
 }
 
 pub fn get_entry_by_incomplete_object_path<'a>(
     map: &'a HashMap<String, MapperEntry>,
     path: &str,
 ) -> Option<&'a MapperEntry> {
-    map.values().find(|e| incomplete_paths_equal(&e.object_path, path))
+    map.values()
+        .find(|e| incomplete_paths_equal(&e.object_path, path))
 }
 
 // --- Mapper patch application (PRD 3.3.2) ----------------------------------
@@ -317,11 +346,10 @@ pub fn apply_mod_patches(
 /// mod than the one about to install. The user should confirm before
 /// overwriting — last-install-wins is our semantic, but opaque.
 ///
-/// Call-site wiring (tauri command preview_mod_install_conflicts + frontend
-/// modal) is follow-up P1 `fix.conflict-modal-wiring`; predicate stays
-/// `pub` so the command can import it when that work lands.
-#[allow(dead_code)]
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Wired via `commands::mods::preview_mod_install_conflicts`
+/// (fix.conflict-modal-wiring landed iter 76). Serializable so Tauri
+/// can hand it straight to the frontend modal.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ModConflict {
     pub composite_name: String,
     pub object_path: String,
@@ -341,7 +369,6 @@ pub struct ModConflict {
 ///
 /// Matches the lookup semantic `install_gpk` uses (region_lock gates
 /// exact-path vs. incomplete-path equality).
-#[allow(dead_code)]
 pub fn detect_conflicts(
     vanilla_map: &HashMap<String, MapperEntry>,
     current_map: &HashMap<String, MapperEntry>,
@@ -369,9 +396,7 @@ pub fn detect_conflicts(
         let is_vanilla_unchanged = vanilla
             .map(|v| v.filename.eq_ignore_ascii_case(&current.filename))
             .unwrap_or(false);
-        let is_self_reinstall = current
-            .filename
-            .eq_ignore_ascii_case(&incoming.container);
+        let is_self_reinstall = current.filename.eq_ignore_ascii_case(&incoming.container);
 
         if !is_vanilla_unchanged && !is_self_reinstall {
             conflicts.push(ModConflict {
@@ -383,6 +408,45 @@ pub fn detect_conflicts(
     }
 
     conflicts
+}
+
+/// Call-site bundle for `detect_conflicts`. Reads + decrypts + parses the
+/// vanilla `.clean` backup and the current `CompositePackageMapper.dat`,
+/// parses the incoming mod file from its on-disk bytes, and runs
+/// `detect_conflicts`. The Tauri command layer (`commands::mods::
+/// preview_mod_install_conflicts`) is a thin wrapper around this — all
+/// the fs + decrypt + parse error paths live here so the command body
+/// stays one unit under `#[cfg(not(tarpaulin_include))]`.
+///
+/// If `.clean` is missing we return an empty vec rather than erroring —
+/// without a vanilla baseline we can't prove a slot is dirty, and a
+/// silent no-op is the safer default for a preview. Install paths still
+/// refuse outright (see `ensure_backup` + `install_gpk`).
+pub fn preview_conflicts_from_bytes(
+    game_root: &Path,
+    source_gpk_bytes: &[u8],
+) -> Result<Vec<ModConflict>, String> {
+    let backup = backup_path(game_root);
+    if !backup.exists() {
+        return Ok(Vec::new());
+    }
+    let vanilla_bytes = fs::read(&backup).map_err(|e| format!("Failed to read backup: {}", e))?;
+    let vanilla_dec = decrypt_mapper(&vanilla_bytes);
+    let vanilla_map = parse_mapper(&String::from_utf8_lossy(&vanilla_dec));
+
+    let mapper = mapper_path(game_root);
+    if !mapper.exists() {
+        return Err(format!(
+            "CompositePackageMapper.dat not found at {}",
+            mapper.display()
+        ));
+    }
+    let current_bytes = fs::read(&mapper).map_err(|e| format!("Failed to read mapper: {}", e))?;
+    let current_dec = decrypt_mapper(&current_bytes);
+    let current_map = parse_mapper(&String::from_utf8_lossy(&current_dec));
+
+    let modfile = parse_mod_file(source_gpk_bytes)?;
+    Ok(detect_conflicts(&vanilla_map, &current_map, &modfile))
 }
 
 // --- Mod file (.gpk with TMM metadata) reader -------------------------------
@@ -444,7 +508,9 @@ pub fn parse_mod_file(bytes: &[u8]) -> Result<ModFile, String> {
     // before the magic.
     let mut pos = end - 4;
     let read_back_i32 = |p: &mut usize| -> Result<i32, String> {
-        if *p < 4 { return Err("Unexpected EOF while reading mod footer".into()); }
+        if *p < 4 {
+            return Err("Unexpected EOF while reading mod footer".into());
+        }
         *p -= 4;
         Ok(read_i32_le(bytes, *p))
     };
@@ -485,14 +551,14 @@ pub fn parse_mod_file(bytes: &[u8]) -> Result<ModFile, String> {
         offsets.push(read_i32_le(bytes, oo + i * 4) as usize);
     }
 
-    m.packages.resize(composite_count as usize, ModPackage::default());
+    m.packages
+        .resize(composite_count as usize, ModPackage::default());
     for (i, &pkg_off) in offsets.iter().enumerate() {
         let p = parse_composite_package(bytes, pkg_off)?;
         m.packages[i] = p;
         if i > 0 {
             // Size of the PREVIOUS package is (this package's offset) minus its own offset.
-            m.packages[i - 1].size =
-                (pkg_off as i64) - m.packages[i - 1].offset;
+            m.packages[i - 1].size = (pkg_off as i64) - m.packages[i - 1].offset;
         }
     }
     // Last package's size ends at composite_end if set, otherwise the
@@ -601,7 +667,6 @@ fn backup_path(game_root: &Path) -> PathBuf {
 ///     silently breaks uninstall forever. Err message tells the user to
 ///     run Steam / their launcher's "verify game files" to restore
 ///     `CompositePackageMapper.dat` first.
-#[allow(dead_code)]
 pub fn recover_missing_clean(game_root: &Path) -> Result<(), String> {
     let src = mapper_path(game_root);
     let dst = backup_path(game_root);
@@ -616,8 +681,7 @@ pub fn recover_missing_clean(game_root: &Path) -> Result<(), String> {
         ));
     }
 
-    let current_bytes = fs::read(&src)
-        .map_err(|e| format!("Failed to read mapper: {}", e))?;
+    let current_bytes = fs::read(&src).map_err(|e| format!("Failed to read mapper: {}", e))?;
     let decrypted = decrypt_mapper(&current_bytes);
     let decrypted_str = String::from_utf8_lossy(&decrypted).to_string();
     let map = parse_mapper(&decrypted_str);
@@ -631,8 +695,7 @@ pub fn recover_missing_clean(game_root: &Path) -> Result<(), String> {
         );
     }
 
-    fs::copy(&src, &dst)
-        .map_err(|e| format!("Failed to back up mapper: {}", e))?;
+    fs::copy(&src, &dst).map_err(|e| format!("Failed to back up mapper: {}", e))?;
     Ok(())
 }
 
@@ -696,14 +759,10 @@ pub fn install_gpk(game_root: &Path, source_gpk: &Path) -> Result<ModFile, Strin
     // Parse the mod file BEFORE touching any filesystem state (including the
     // backup). This way a rejected install leaves `.clean` untouched (PRD
     // 3.1.4.gpk-deploy-sandbox).
-    let gpk_bytes =
-        fs::read(source_gpk).map_err(|e| format!("Failed to read mod file: {}", e))?;
+    let gpk_bytes = fs::read(source_gpk).map_err(|e| format!("Failed to read mod file: {}", e))?;
     let modfile = parse_mod_file(&gpk_bytes)?;
     if modfile.container.is_empty() {
-        return Err(
-            "Mod file has no TMM container name — this .gpk is not TMM-compatible."
-                .into(),
-        );
+        return Err("Mod file has no TMM container name — this .gpk is not TMM-compatible.".into());
     }
     if !is_safe_gpk_container_filename(&modfile.container) {
         return Err(format!(
@@ -716,8 +775,7 @@ pub fn install_gpk(game_root: &Path, source_gpk: &Path) -> Result<ModFile, Strin
     }
     if modfile.packages.iter().any(|p| p.object_path.is_empty()) {
         return Err(
-            "Mod file has a composite package with no object path — can't be installed."
-                .into(),
+            "Mod file has a composite package with no object path — can't be installed.".into(),
         );
     }
 
@@ -726,17 +784,15 @@ pub fn install_gpk(game_root: &Path, source_gpk: &Path) -> Result<ModFile, Strin
     // Copy the mod file into CookedPC with the exact container filename TMM
     // expects. The game loads whatever the mapper points at, so the filename
     // must match the mapper entries we're about to write.
-    let dest_gpk = game_root
-        .join(COOKED_PC_DIR)
-        .join(&modfile.container);
+    let dest_gpk = game_root.join(COOKED_PC_DIR).join(&modfile.container);
     fs::create_dir_all(dest_gpk.parent().unwrap_or_else(|| Path::new(".")))
         .map_err(|e| format!("Failed to create CookedPC dir: {}", e))?;
     fs::copy(source_gpk, &dest_gpk)
         .map_err(|e| format!("Failed to copy mod into CookedPC: {}", e))?;
 
     // Load and decrypt current mapper.
-    let mapper_bytes = fs::read(mapper_path(game_root))
-        .map_err(|e| format!("Failed to read mapper: {}", e))?;
+    let mapper_bytes =
+        fs::read(mapper_path(game_root)).map_err(|e| format!("Failed to read mapper: {}", e))?;
     let decrypted = decrypt_mapper(&mapper_bytes);
     let decrypted_str = String::from_utf8_lossy(&decrypted).to_string();
     let mut map = parse_mapper(&decrypted_str);
@@ -767,7 +823,11 @@ pub fn install_gpk(game_root: &Path, source_gpk: &Path) -> Result<ModFile, Strin
 ///   2. Reads the current mapper, writes back vanilla entries for each
 ///      of this mod's object paths.
 ///   3. Deletes the `.gpk` from CookedPC.
-pub fn uninstall_gpk(game_root: &Path, container: &str, object_paths: &[String]) -> Result<(), String> {
+pub fn uninstall_gpk(
+    game_root: &Path,
+    container: &str,
+    object_paths: &[String],
+) -> Result<(), String> {
     if !is_safe_gpk_container_filename(container) {
         return Err(format!(
             "Refusing to uninstall: container filename '{}' is unsafe — would escape CookedPC.",
@@ -785,8 +845,8 @@ pub fn uninstall_gpk(game_root: &Path, container: &str, object_paths: &[String])
     let backup_str = String::from_utf8_lossy(&backup_decrypted).to_string();
     let backup_map = parse_mapper(&backup_str);
 
-    let current_bytes = fs::read(mapper_path(game_root))
-        .map_err(|e| format!("Failed to read mapper: {}", e))?;
+    let current_bytes =
+        fs::read(mapper_path(game_root)).map_err(|e| format!("Failed to read mapper: {}", e))?;
     let current_decrypted = decrypt_mapper(&current_bytes);
     let current_str = String::from_utf8_lossy(&current_decrypted).to_string();
     let mut map = parse_mapper(&current_str);
@@ -832,8 +892,7 @@ pub fn uninstall_gpk(game_root: &Path, container: &str, object_paths: &[String])
     // Remove the container .gpk we copied in.
     let dest_gpk = game_root.join(COOKED_PC_DIR).join(container);
     if dest_gpk.exists() {
-        fs::remove_file(&dest_gpk)
-            .map_err(|e| format!("Failed to remove mod gpk: {}", e))?;
+        fs::remove_file(&dest_gpk).map_err(|e| format!("Failed to remove mod gpk: {}", e))?;
     }
     Ok(())
 }
@@ -885,26 +944,94 @@ mod tests {
         ));
 
         // Different pre-_ → no match
-        assert!(!incomplete_paths_equal(
-            "S1UI_Foo.Bar",
-            "Other_Foo.Bar"
-        ));
+        assert!(!incomplete_paths_equal("S1UI_Foo.Bar", "Other_Foo.Bar"));
 
         // Same composite prefix, different post-. → no match
-        assert!(!incomplete_paths_equal(
-            "S1UI_Foo.Bar",
-            "S1UI_Foo.Baz"
-        ));
+        assert!(!incomplete_paths_equal("S1UI_Foo.Bar", "S1UI_Foo.Baz"));
     }
 
+    /// adv.bogus-gpk-footer — PRD §5.3 adversarial corpus.
+    ///
+    /// An attacker-supplied `.gpk` can carry any bytes in the tail region
+    /// where TMM expects its magic footer + size/offset fields. Three
+    /// invariants must hold for every byte pattern:
+    ///
+    ///   (a) `parse_mod_file` never panics (no bounds-check blow-up,
+    ///       no integer overflow, no unchecked indexing).
+    ///   (b) Bytes that clearly cannot be TMM (too small, or missing
+    ///       magic) either return `Err(msg)` or return `Ok(m)` with
+    ///       `m.container.is_empty()` — both shapes are caught downstream
+    ///       by `install_gpk`'s "no TMM container" Err branch.
+    ///   (c) Bytes that have the right magic but a truncated/corrupt
+    ///       footer return `Err(msg)`, never silently deploy a partial
+    ///       ModFile.
+    ///
+    /// The corpus below covers the main bogus-footer shapes a malicious
+    /// catalog entry or man-in-the-middle could plant. The test is the
+    /// behavioural pin; `tests/bogus_gpk_footer.rs` is the wiring guard
+    /// that checks this corpus stays in the source across refactors.
     #[test]
     fn parse_mod_file_rejects_non_tmm_gpks() {
-        // A .gpk with no TMM magic footer should return a default ModFile
-        // with one zero-length package and no container.
-        let bytes = vec![0x42u8; 64];
-        let m = parse_mod_file(&bytes).unwrap();
-        assert!(m.container.is_empty());
+        // (1) The long-standing baseline: 64 bytes of junk. Magic check
+        //     fails → fallback single-package ModFile with empty container.
+        let m = parse_mod_file(&[0x42u8; 64]).unwrap();
+        assert!(m.container.is_empty(), "64 bytes junk: container empty");
         assert_eq!(m.packages.len(), 1);
+
+        // (2) Empty buffer → Err("too small"). Must not panic.
+        assert!(parse_mod_file(&[]).is_err(), "empty buffer must err");
+
+        // (3) 3 bytes — one below the 4-byte magic threshold. Err.
+        assert!(parse_mod_file(&[0, 0, 0]).is_err(), "3 bytes must err");
+
+        // (4) 4 bytes of zeros. Magic check fails → fallback Ok.
+        let m = parse_mod_file(&[0, 0, 0, 0]).unwrap();
+        assert!(m.container.is_empty(), "4 zero bytes: container empty");
+
+        // (5) 1024 bytes of 0xff. Magic check fails → fallback Ok.
+        let m = parse_mod_file(&[0xFFu8; 1024]).unwrap();
+        assert!(m.container.is_empty(), "1024 bytes 0xff: container empty");
+
+        // (6) PACKAGE_MAGIC bytes alone (4 bytes). Magic check passes but
+        //     read_back_i32 has no room for the next slot → Err.
+        let magic_only = [0xC1, 0x83, 0x2A, 0x9E]; // little-endian 0x9E2A83C1
+        assert!(
+            parse_mod_file(&magic_only).is_err(),
+            "magic-only 4 bytes must err (no footer slots)"
+        );
+
+        // (7) Magic at wrong offset — PACKAGE_MAGIC in the middle of a
+        //     long buffer, trailing bytes != magic. Magic check at end-4
+        //     fails → fallback Ok with empty container.
+        let mut buf = vec![0u8; 64];
+        buf[30..34].copy_from_slice(&magic_only);
+        let m = parse_mod_file(&buf).unwrap();
+        assert!(m.container.is_empty(), "misplaced magic: container empty");
+
+        // (8) Magic correct at the tail but footer slots point past EOF
+        //     via a huge composite_count. Must err, not panic.
+        //     Layout (from read_back order starting at end-4): magic,
+        //     meta_size, composite_count (HUGE), offsets_offset, ...
+        let mut trap = vec![0u8; 64];
+        // place PACKAGE_MAGIC at the very end
+        let n = trap.len();
+        trap[n - 4..n].copy_from_slice(&magic_only);
+        // composite_count slot (2nd from the end): huge positive i32
+        // (read_back_i32 reads meta_size first, then composite_count).
+        // So composite_count lives at bytes [n-12..n-8].
+        trap[n - 12..n - 8].copy_from_slice(&i32::MAX.to_le_bytes());
+        assert!(
+            parse_mod_file(&trap).is_err(),
+            "huge composite_count must err, not panic"
+        );
+
+        // (9) Buffer of exactly 4 bytes non-magic. Magic check fails →
+        //     fallback Ok. This is the smallest legal fallback input.
+        let m = parse_mod_file(&[0xDE, 0xAD, 0xBE, 0xEF]).unwrap();
+        assert!(
+            m.container.is_empty(),
+            "4-byte non-magic: container empty → install_gpk rejects"
+        );
     }
 
     /// PRD 3.1.4.gpk-deploy-sandbox. The TMM container filename in a `.gpk`
@@ -924,7 +1051,7 @@ mod tests {
             "../../evil.gpk",
             "..\\evil.gpk",
             "..\\..\\evil.gpk",
-            "foo..bar.gpk",  // embedded .. too (prevents creative normalisation bypasses)
+            "foo..bar.gpk", // embedded .. too (prevents creative normalisation bypasses)
             // Absolute POSIX
             "/etc/passwd",
             // Subdir with forward or back slash
@@ -1015,9 +1142,8 @@ mod tests {
         );
 
         // Sanity: post-install state differs from vanilla.
-        let post_install_sha = Sha256::digest(encrypt_mapper(
-            serialize_mapper(&post_install).as_bytes(),
-        ));
+        let post_install_sha =
+            Sha256::digest(encrypt_mapper(serialize_mapper(&post_install).as_bytes()));
         assert_ne!(
             vanilla_sha, post_install_sha,
             "post-install must differ from vanilla"
@@ -1040,19 +1166,17 @@ mod tests {
             }
             backup_map
                 .get(k)
-                .map(|v| {
-                    v.filename == e.filename
-                        && v.offset == e.offset
-                        && v.size == e.size
-                })
+                .map(|v| v.filename == e.filename && v.offset == e.offset && v.size == e.size)
                 .unwrap_or(false)
         });
-        assert!(all_vanilla, "test scenario must exercise the all-vanilla branch");
+        assert!(
+            all_vanilla,
+            "test scenario must exercise the all-vanilla branch"
+        );
         post_uninstall.remove(TMM_MARKER);
 
-        let post_uninstall_sha = Sha256::digest(encrypt_mapper(
-            serialize_mapper(&post_uninstall).as_bytes(),
-        ));
+        let post_uninstall_sha =
+            Sha256::digest(encrypt_mapper(serialize_mapper(&post_uninstall).as_bytes()));
         assert_eq!(
             vanilla_sha, post_uninstall_sha,
             "install + uninstall-all must leave the mapper bytes identical to vanilla"
@@ -1078,7 +1202,10 @@ mod tests {
         // First ensure_backup: .clean doesn't exist yet -> copies vanilla.
         ensure_backup(tmp.path()).unwrap();
         let backup = cooked.join(BACKUP_FILE);
-        assert!(backup.exists(), ".clean must exist after first ensure_backup");
+        assert!(
+            backup.exists(),
+            ".clean must exist after first ensure_backup"
+        );
         assert_eq!(
             fs::read(&backup).unwrap(),
             vanilla_bytes,
@@ -1292,10 +1419,7 @@ mod tests {
         };
 
         apply_mod_patches(&mut map, &incoming).unwrap();
-        let snapshot: HashMap<_, _> = map
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect();
+        let snapshot: HashMap<_, _> = map.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
 
         apply_mod_patches(&mut map, &incoming).unwrap();
         assert_eq!(map, snapshot, "re-apply must be idempotent");
@@ -1397,8 +1521,8 @@ mod tests {
             ("S1UI_Inv", "S1UI_Inv.Bar", "S1Data.gpk"),
         ]);
         let current = mapper_with(&[
-            ("S1UI_Party", "S1UI_Party.Foo", "S1Data.gpk"),  // vanilla
-            ("S1UI_Inv", "S1UI_Inv.Bar", "othermod.gpk"),    // conflict
+            ("S1UI_Party", "S1UI_Party.Foo", "S1Data.gpk"), // vanilla
+            ("S1UI_Inv", "S1UI_Inv.Bar", "othermod.gpk"),   // conflict
         ]);
         let incoming = modfile_with("mymod.gpk", &["S1UI_Party.Foo", "S1UI_Inv.Bar"]);
 
@@ -1434,6 +1558,455 @@ mod tests {
         assert!(
             entries.is_empty(),
             "uninstall created filesystem state despite rejection: {entries:?}"
+        );
+    }
+
+    // --- pin.tmm.parser (iter 89) -------------------------------------------
+    //
+    // Golden-file pin for `parse_mod_file`. The TMM footer format is an
+    // implicit contract with the upstream `TMM/Model/Mod.cpp` reader. A
+    // silent refactor that reordered fields, changed endian-ness, or
+    // reshuffled the string-prefix reader would break compatibility with
+    // every existing TMM-packaged mod — and the failure mode would be a
+    // cryptic runtime error at install time.
+    //
+    // Build a hand-packed v1 fixture (1 composite package, ASCII strings,
+    // no TFC extras) and assert every field of the resulting ModFile +
+    // first ModPackage byte-for-byte. Companion to the iter 79
+    // adversarial corpus (`parse_mod_file_rejects_non_tmm_gpks`): the
+    // happy path is pinned here, the negative path there. Together
+    // they cover the full parser contract.
+
+    /// Pack a length-prefixed ANSI string at `bytes`. Matches
+    /// `read_prefixed_string`'s positive-length branch: i32 length
+    /// followed by raw bytes.
+    fn pack_ansi(bytes: &mut Vec<u8>, s: &str) {
+        let len = s.len() as i32;
+        bytes.extend_from_slice(&len.to_le_bytes());
+        bytes.extend_from_slice(s.as_bytes());
+    }
+
+    /// Build a minimal v1 TMM fixture. Layout (decimal byte offsets, LE):
+    ///
+    ///   0..16    filler (0xAA) — packages reference real data offsets,
+    ///            and the first package starts at offset 16. Filler
+    ///            keeps the numerology obvious.
+    ///   16..28   package header: 4 unused + u16 file_version (3) +
+    ///            u16 licensee_version (4) + 4 unused
+    ///   28..46   length-prefixed folder "MOD:SomeObject" (14 chars)
+    ///   46..48   padding (0xBB) so author lands at 48
+    ///   48..57   length-prefixed author "Alice" (5 chars)
+    ///   57..64   padding (0xCC) so name lands at 64
+    ///   64..75   length-prefixed name "TestMod" (7 chars)
+    ///   75..80   padding (0xDD) so container lands at 80
+    ///   80..95   length-prefixed container "TestMod.gpk" (11 chars)
+    ///   95..96   padding (0xEE) so offsets-array lands at 96
+    ///   96..100  offsets array: [16 as i32 LE]
+    ///   100..104 footer: version slot = PACKAGE_MAGIC (signals v1 format
+    ///            — no TFC extras; counter-intuitive but matches the
+    ///            upstream reader: a magic value here means legacy)
+    ///   104..108 footer: region_lock = 0
+    ///   108..112 footer: author_offset = 48
+    ///   112..116 footer: name_offset = 64
+    ///   116..120 footer: container_offset = 80
+    ///   120..124 footer: offsets_offset = 96
+    ///   124..128 footer: composite_count = 1
+    ///   128..132 footer: meta_size = 90 (end(136) - package-end(46),
+    ///            so last.size = end - meta_size - offset = 30 via
+    ///            the v1 fallback branch)
+    ///   132..136 PACKAGE_MAGIC = 0x9E2A83C1
+    ///
+    /// Total: 136 bytes.
+    fn v1_fixture() -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(&[0xAAu8; 16]);
+        out.extend_from_slice(&[0x00u8; 4]);
+        out.extend_from_slice(&3u16.to_le_bytes()); // file_version
+        out.extend_from_slice(&4u16.to_le_bytes()); // licensee_version
+        out.extend_from_slice(&[0x00u8; 4]);
+        assert_eq!(out.len(), 28);
+        pack_ansi(&mut out, "MOD:SomeObject");
+        assert_eq!(out.len(), 46);
+        out.extend_from_slice(&[0xBBu8; 2]);
+        assert_eq!(out.len(), 48);
+        pack_ansi(&mut out, "Alice");
+        assert_eq!(out.len(), 57);
+        out.extend_from_slice(&[0xCCu8; 7]);
+        assert_eq!(out.len(), 64);
+        pack_ansi(&mut out, "TestMod");
+        assert_eq!(out.len(), 75);
+        out.extend_from_slice(&[0xDDu8; 5]);
+        assert_eq!(out.len(), 80);
+        pack_ansi(&mut out, "TestMod.gpk");
+        assert_eq!(out.len(), 95);
+        out.extend_from_slice(&[0xEEu8; 1]);
+        assert_eq!(out.len(), 96);
+        out.extend_from_slice(&16i32.to_le_bytes());
+        assert_eq!(out.len(), 100);
+        out.extend_from_slice(&0x9E2A83C1u32.to_le_bytes()); // version slot = MAGIC → v1
+        out.extend_from_slice(&0i32.to_le_bytes()); // region_lock
+        out.extend_from_slice(&48i32.to_le_bytes()); // author_offset
+        out.extend_from_slice(&64i32.to_le_bytes()); // name_offset
+        out.extend_from_slice(&80i32.to_le_bytes()); // container_offset
+        out.extend_from_slice(&96i32.to_le_bytes()); // offsets_offset
+        out.extend_from_slice(&1i32.to_le_bytes()); // composite_count
+        out.extend_from_slice(&90i32.to_le_bytes()); // meta_size
+        out.extend_from_slice(&0x9E2A83C1u32.to_le_bytes());
+        assert_eq!(out.len(), 136);
+        out
+    }
+
+    #[test]
+    fn golden_v1_fixture_parses_to_expected_modfile() {
+        let bytes = v1_fixture();
+        let m = parse_mod_file(&bytes).expect("v1 fixture must parse");
+
+        assert_eq!(m.mod_name, "TestMod", "mod_name round-trip");
+        assert_eq!(m.mod_author, "Alice", "mod_author round-trip");
+        assert_eq!(m.container, "TestMod.gpk", "container round-trip");
+        assert!(!m.region_lock, "region_lock round-trip");
+        assert_eq!(m.mod_file_version, 1, "v1 preserves version=1");
+
+        assert_eq!(m.packages.len(), 1, "one composite package");
+        let p = &m.packages[0];
+        assert_eq!(p.offset, 16, "package offset round-trip");
+        assert_eq!(p.file_version, 3, "file_version round-trip");
+        assert_eq!(p.licensee_version, 4, "licensee_version round-trip");
+        assert_eq!(
+            p.object_path, "SomeObject",
+            "MOD: prefix must be stripped from folder name"
+        );
+        assert_eq!(
+            p.size, 30,
+            "v1 package size = end - meta_size - offset (136-90-16=30)"
+        );
+    }
+
+    /// Regression guard: if `v1_fixture()` itself drifts, this test
+    /// would silently change what we're pinning. Cross-check the
+    /// fixture length + a few interior bytes.
+    #[test]
+    fn golden_fixture_shape_is_stable() {
+        let bytes = v1_fixture();
+        assert_eq!(bytes.len(), 136, "fixture length is fixed");
+        assert_eq!(
+            &bytes[132..136],
+            &[0xC1, 0x83, 0x2A, 0x9E],
+            "last 4 bytes must be PACKAGE_MAGIC (0x9E2A83C1) LE"
+        );
+        assert_eq!(&bytes[0..2], &[0xAA, 0xAA], "filler byte @0 = 0xAA");
+        assert_eq!(&bytes[20..22], &3u16.to_le_bytes(), "file_version @20 = 3");
+        assert_eq!(
+            &bytes[124..128],
+            &1i32.to_le_bytes(),
+            "composite_count slot @124 = 1"
+        );
+    }
+
+    /// Sanity: re-parsing the fixture twice yields identical structs.
+    /// If `parse_mod_file` ever picked up hidden state (global counter,
+    /// RNG-seeded order, thread-local cache), this test would catch it.
+    #[test]
+    fn golden_parse_is_deterministic() {
+        let bytes = v1_fixture();
+        let a = parse_mod_file(&bytes).unwrap();
+        let b = parse_mod_file(&bytes).unwrap();
+        assert_eq!(a.mod_name, b.mod_name);
+        assert_eq!(a.mod_author, b.mod_author);
+        assert_eq!(a.container, b.container);
+        assert_eq!(a.region_lock, b.region_lock);
+        assert_eq!(a.mod_file_version, b.mod_file_version);
+        assert_eq!(a.packages.len(), b.packages.len());
+        assert_eq!(a.packages[0].offset, b.packages[0].offset);
+        assert_eq!(a.packages[0].object_path, b.packages[0].object_path);
+        assert_eq!(a.packages[0].size, b.packages[0].size);
+    }
+
+    // --- pin.tmm.cipher (iter 92) -------------------------------------------
+    //
+    // Golden-file pin for the 3-pass CompositePackageMapper cipher
+    // (`encrypt_mapper` + `decrypt_mapper` at the top of this file). The
+    // upstream algorithm lives in TMM/Model/CompositeMapper.cpp:15 / :49
+    // and is a wire-format contract: any silent drift here would make
+    // our launcher produce mapper files incompatible with TMM's own
+    // reader, silently corrupting installs for users who round-trip
+    // mods between this launcher and the reference TMM tool.
+    //
+    // Three passes in decrypt order: (a) 16-byte block un-shuffle under
+    // KEY1 permutation, (b) middle-outward pair-swap (self-inverse), (c)
+    // XOR against the repeating 21-byte KEY2 = "GeneratePackageMapper".
+    // Encrypt is the exact reverse.
+    //
+    // This section pins: (1) a specific 16-byte input produces a specific
+    // 16-byte output under `encrypt_mapper` (byte-for-byte), (2) the two
+    // functions round-trip both ways on short + long + tail-unaligned
+    // inputs, (3) the KEY1 permutation is a permutation of 0..16 (not a
+    // wrong table), (4) KEY2 is the literal ASCII
+    // "GeneratePackageMapper".
+
+    /// The golden expected output for `encrypt_mapper(&[0; 16])`.
+    ///
+    /// Derivation (hand-traced for the reader; the test asserts the value
+    /// this function actually returns):
+    ///   Step 1 — XOR zeros with KEY2[0..16] = b"GeneratePackageM"
+    ///     → [71,101,110,101,114,97,116,101,80,97,99,107,97,103,101,77]
+    ///   Step 2 — pair-swap (1↔15, 3↔13, 5↔11, 7↔9):
+    ///     → [71,77,110,103,114,107,116,97,80,101,99,97,97,101,101,101]
+    ///   Step 3 — KEY1-forward shuffle (out[KEY1[i]] = tmp[i]):
+    ///     → [97,116,101,114,103,101,77,99,101,110,97,101,71,80,107,97]
+    ///       = ASCII "atergeMcenaeGPka"
+    const GOLDEN_ENCRYPT_OF_ZEROS_16: [u8; 16] = [
+        97, 116, 101, 114, 103, 101, 77, 99, 101, 110, 97, 101, 71, 80, 107, 97,
+    ];
+
+    /// Byte-for-byte pin of `encrypt_mapper` output on a fixed 16-byte
+    /// plaintext. A drift in KEY1, KEY2, the pair-swap loop bounds, or
+    /// the shuffle direction would fail here with a diffable mismatch.
+    #[test]
+    fn golden_cipher_encrypt_zeros_16() {
+        let plaintext = [0u8; 16];
+        let cipher = encrypt_mapper(&plaintext);
+        assert_eq!(
+            cipher.as_slice(),
+            &GOLDEN_ENCRYPT_OF_ZEROS_16,
+            "encrypt_mapper(&[0; 16]) changed — check KEY1 / KEY2 / \
+             pair-swap bounds / shuffle direction against \
+             TMM/Model/CompositeMapper.cpp"
+        );
+    }
+
+    /// Encrypt + decrypt is the identity. Covers the "inverse" contract
+    /// between the two functions; if someone edits one without updating
+    /// the other, this test fires before any user ships a corrupted
+    /// mapper file.
+    #[test]
+    fn golden_cipher_round_trip_identity() {
+        // A variety of inputs: zeros, ones, an ASCII line, a 48-byte
+        // multi-block buffer, and a tail-unaligned buffer (19 bytes;
+        // one full 16-byte block + 3 bytes of tail that the un-shuffle
+        // must copy verbatim).
+        let fixtures: Vec<Vec<u8>> = vec![
+            vec![0u8; 16],
+            vec![0xFFu8; 16],
+            b"compName/objPath.gpk".to_vec(),       // 20 bytes: 16 + 4 tail
+            (0u8..48).collect(),                     // 48 bytes = 3 blocks
+            b"abcdefghijklmnopqrs".to_vec(),         // 19 bytes: 16 + 3 tail
+        ];
+        for (i, plain) in fixtures.iter().enumerate() {
+            let back = decrypt_mapper(&encrypt_mapper(plain));
+            assert_eq!(
+                &back, plain,
+                "encrypt→decrypt must be identity (fixture #{i}, len={})",
+                plain.len()
+            );
+            // And the other direction: decrypt treated as inverse of
+            // encrypt (which also means encrypt treated as inverse of
+            // decrypt — same math).
+            let forward = encrypt_mapper(&decrypt_mapper(plain));
+            assert_eq!(
+                &forward, plain,
+                "decrypt→encrypt must be identity (fixture #{i}, len={})",
+                plain.len()
+            );
+        }
+    }
+
+    /// Structural pin: KEY1 must be a permutation of 0..16, i.e. each
+    /// value from 0 to 15 appears exactly once. A typo that made KEY1
+    /// non-bijective (e.g. two values equal, or a value ≥ 16) would
+    /// either mangle output silently or panic at the `KEY1[idx]` index.
+    /// Catch it directly.
+    #[test]
+    fn golden_cipher_key1_is_permutation() {
+        let mut seen = [false; 16];
+        for &k in KEY1.iter() {
+            assert!(k < 16, "KEY1 value {k} out of range 0..16");
+            assert!(!seen[k], "KEY1 value {k} appears twice");
+            seen[k] = true;
+        }
+        assert!(seen.iter().all(|&x| x), "KEY1 missing some value in 0..16");
+    }
+
+    /// Structural pin: KEY2 is exactly b"GeneratePackageMapper" (21
+    /// bytes). Upstream TMM hard-codes this string; losing any byte or
+    /// typing one wrong would make ciphertext incompatible with every
+    /// existing TMM-packaged mod.
+    #[test]
+    fn golden_cipher_key2_is_exact_constant() {
+        assert_eq!(KEY2, b"GeneratePackageMapper");
+        assert_eq!(KEY2.len(), 21, "KEY2 length is 21");
+    }
+
+    // --- pin.tmm.merger (iter 93) -------------------------------------------
+    //
+    // Completes the pin.tmm trio (parser @ iter 89, cipher @ iter 92).
+    //
+    // The "merger" in our tmm.rs is `apply_mod_patches`: each mod's
+    // packages patch the running `HashMap<composite_name, MapperEntry>`
+    // state. The merge contract has two halves and both matter:
+    //
+    //   1. DISJOINT mods (different slots) commute — apply(A, B) ==
+    //      apply(B, A). Loss of commutativity would mean the install
+    //      order of independent mods changes the final mapper, which
+    //      would confuse users and break TMM-compat golden output for
+    //      every user whose mod list is non-alphabetical.
+    //
+   //   2. OVERLAPPING mods (same slot) are last-install-wins. PRD
+    //      3.3.3 explicitly ships this as the behaviour (with
+    //      detect_conflicts surfacing the overwrite for user
+    //      confirmation). Pinning this stops a refactor from silently
+    //      switching to first-wins or merge-both semantics.
+    //
+    // The following inline tests pin both halves plus identity-on-empty.
+
+    /// Helper: cheap deep-equality on two mapper states. HashMap !=
+    /// preserves nothing about iteration order; we compare by
+    /// sorted (composite_name, MapperEntry) pairs.
+    fn sorted_entries(
+        map: &HashMap<String, MapperEntry>,
+    ) -> Vec<(String, MapperEntry)> {
+        let mut v: Vec<(String, MapperEntry)> =
+            map.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+        v.sort_by(|a, b| a.0.cmp(&b.0));
+        v
+    }
+
+    /// Disjoint-slot commutativity: two mods patching different
+    /// composites must produce identical final maps regardless of
+    /// install order.
+    #[test]
+    fn golden_merger_commutes_on_disjoint_slots() {
+        let base = mapper_with(&[
+            ("S1UI", "S1UI_Party.Foo", "S1Data.gpk"),
+            ("S1UI2", "S1UI_Inv.Bar", "S1Data.gpk"),
+        ]);
+
+        let mod_a = modfile_with("modA.gpk", &["S1UI_Party.Foo"]);
+        let mod_b = modfile_with("modB.gpk", &["S1UI_Inv.Bar"]);
+
+        let mut map_ab = base.clone();
+        apply_mod_patches(&mut map_ab, &mod_a).unwrap();
+        apply_mod_patches(&mut map_ab, &mod_b).unwrap();
+
+        let mut map_ba = base.clone();
+        apply_mod_patches(&mut map_ba, &mod_b).unwrap();
+        apply_mod_patches(&mut map_ba, &mod_a).unwrap();
+
+        assert_eq!(
+            sorted_entries(&map_ab),
+            sorted_entries(&map_ba),
+            "disjoint-slot merges must commute — final map must be \
+             identical regardless of A-then-B vs B-then-A"
+        );
+    }
+
+    /// Three-mod disjoint case: every permutation of install order
+    /// yields the same final map. If commutativity holds for 2 mods
+    /// but not 3, something path-dependent slipped into the merger
+    /// (e.g. a HashMap-iteration-order leak into the final state).
+    #[test]
+    fn golden_merger_three_disjoint_mods_all_orders_agree() {
+        let base = mapper_with(&[
+            ("A", "PkgA.Obj", "S1Data.gpk"),
+            ("B", "PkgB.Obj", "S1Data.gpk"),
+            ("C", "PkgC.Obj", "S1Data.gpk"),
+        ]);
+        let mods = [
+            modfile_with("modA.gpk", &["PkgA.Obj"]),
+            modfile_with("modB.gpk", &["PkgB.Obj"]),
+            modfile_with("modC.gpk", &["PkgC.Obj"]),
+        ];
+
+        // Pin the 3! = 6 permutations to a single reference result.
+        let reference = {
+            let mut m = base.clone();
+            for mf in &mods {
+                apply_mod_patches(&mut m, mf).unwrap();
+            }
+            sorted_entries(&m)
+        };
+
+        let permutations: [[usize; 3]; 6] = [
+            [0, 1, 2],
+            [0, 2, 1],
+            [1, 0, 2],
+            [1, 2, 0],
+            [2, 0, 1],
+            [2, 1, 0],
+        ];
+        for perm in permutations.iter() {
+            let mut m = base.clone();
+            for &i in perm.iter() {
+                apply_mod_patches(&mut m, &mods[i]).unwrap();
+            }
+            assert_eq!(
+                sorted_entries(&m),
+                reference,
+                "permutation {perm:?} diverged from reference order"
+            );
+        }
+    }
+
+    /// Overlapping slot (same composite_name): last install wins.
+    /// The two orders must NOT commute — the final filename is the
+    /// container of whichever mod was applied last. Pinning this
+    /// stops a refactor from silently switching to first-wins or
+    /// merge-both semantics.
+    #[test]
+    fn golden_merger_last_install_wins_on_overlap() {
+        let base = mapper_with(&[("S1UI", "S1UI_Party.Foo", "S1Data.gpk")]);
+        let mod_a = modfile_with("modA.gpk", &["S1UI_Party.Foo"]);
+        let mod_b = modfile_with("modB.gpk", &["S1UI_Party.Foo"]);
+
+        let mut map_ab = base.clone();
+        apply_mod_patches(&mut map_ab, &mod_a).unwrap();
+        apply_mod_patches(&mut map_ab, &mod_b).unwrap();
+        assert_eq!(
+            map_ab.values().next().unwrap().filename,
+            "modB.gpk",
+            "A-then-B order: B must win the slot (last-install-wins)"
+        );
+
+        let mut map_ba = base.clone();
+        apply_mod_patches(&mut map_ba, &mod_b).unwrap();
+        apply_mod_patches(&mut map_ba, &mod_a).unwrap();
+        assert_eq!(
+            map_ba.values().next().unwrap().filename,
+            "modA.gpk",
+            "B-then-A order: A must win (last-install-wins)"
+        );
+
+        // And the two maps must NOT agree — overlap is the case where
+        // order DOES matter (PRD 3.3.3).
+        assert_ne!(
+            sorted_entries(&map_ab),
+            sorted_entries(&map_ba),
+            "overlapping-slot installs must diverge by order — \
+             last-install-wins is the PRD 3.3.3 contract"
+        );
+    }
+
+    /// Identity: applying a ModFile with zero packages must not
+    /// mutate the map. A refactor that accidentally inserted a
+    /// placeholder entry would surface as this test failing.
+    #[test]
+    fn golden_merger_identity_on_empty_modfile() {
+        let base = mapper_with(&[("S1UI", "S1UI_Party.Foo", "S1Data.gpk")]);
+        let before = sorted_entries(&base);
+
+        let mut map = base;
+        let empty_mod = ModFile {
+            container: "empty.gpk".into(),
+            region_lock: true,
+            packages: vec![],
+            ..Default::default()
+        };
+        apply_mod_patches(&mut map, &empty_mod).unwrap();
+
+        let after = sorted_entries(&map);
+        assert_eq!(
+            before, after,
+            "apply_mod_patches on ModFile{{packages: []}} must be a no-op"
         );
     }
 }

@@ -2106,6 +2106,19 @@ tauri_v2_migration_ready_for_squash_merge: true
 
 ## P2 — Polish
 
+### Dep hygiene (from research sweep iter 80)
+
+- [P2] **dep.rustls-webpki-bump** — `cargo update -p rustls-webpki --precise 0.103.12` on worktree. Closes RUSTSEC-2026-0049, -0098, -0099 (all non-exploitable in our GET-on-allowlist pattern, but an open advisory row would fail a future `cargo audit` CI gate). Acceptance: `Cargo.lock` shows `rustls-webpki 0.103.12+`. Pillar: Security.
+- [P2] **sec.shell-scope-hardening** — Pin `"shell": { "open": true }` in `tauri.conf.json` (mailto/http/https only) or migrate to `tauri-plugin-opener` (the `shell.open` endpoint is formally deprecated). Defence-in-depth against a default-scope regression; CVE-2025-31477 is already closed by plugin 2.3.5. Acceptance: explicit scope pin + test at `tests/shell_scope_pinned.rs`. Pillar: Security.
+- [P2] **sec.shell-open-call-sites-pinned** — Author `teralaunch/tests/shell-open-callsite.test.js` grepping `src/` for `shell.open(X)` — every X must be a string literal, localized constant, or `event.target.href`. Prevents a future refactor from passing an arbitrary `fetch()` response value into the open endpoint. Acceptance: test passes; current 3 call sites (app.js:2259, 2261, 5025) pinned. Pillar: Security.
+- [DONE @ iter 87 — upstream-driven deferral] **dep.dedupe-reqwest-zip** — Investigation landed at `docs/PRD/audits/security/dep-dedup-investigation.md`. Root cause: `tauri-plugin-updater 2.10.1` has jumped ahead to reqwest 0.13 + zip 4.x while the rest of the Tauri plugin ecosystem (`tauri-plugin-http 2.5.8`, `reqwest_cookie_store 0.8.2`) stays on 0.12 / 2.x. Bumping our direct pins would fail to resolve (no 0.13-compat release of reqwest_cookie_store or tauri-plugin-http yet). Dup cost is bounded (~250-400 kB binary, ~10-15s cold build). Re-open when any peer crate publishes reqwest-0.13 support. Acceptance met per PRD: "0 duplicates, OR documented blocker citing upstream tauri" — second clause. Pillar: Reliability.
+- [P3] **dep.vitest-bump-post-squash** — Bump `vitest`/`@vitest/coverage-v8` from 2.1.8 to latest stable (4.x) after squash + 1-week stability window. No CVE; currency only. Acceptance: 431/431 JS green post-bump. Pillar: Reliability.
+
+### Dep hygiene (from research sweep iter 90)
+
+- [DONE @ iter 91] **dep.time-bump** — Closed on worktree commit `b17ab33`. `cargo update -p time` picked up 0.3.47, clearing RUSTSEC-2026-0009 / CVE-2026-25727. Lockfile-only (time + num-conv + time-core + time-macros). 837/837 Rust unchanged, 449/449 JS unchanged, clippy clean. Pillar: Security.
+- [P3] **infra.gitleaks-bump-8.30.1** — Bump `VER=8.30.0` → `VER=8.30.1` in `.github/workflows/secret-scan.yml`. Patch release 2026-03-21, no rule changes in notes. Currency only. Acceptance: workflow diff ≤ 1 line. Pillar: Infrastructure.
+
 ### Per-unit audit docs (PRD §5.5) — 123 total
 
 - [P2] **audit.gpk.all** — Author `docs/PRD/audits/units/gpk/<id>.md` for each of 99 catalog GPK entries (skill-standard header: category, status, license, obfuscated, source provenance, public surface, settings, risks, tests, verification plan). Batch with `sadd:subagent-driven-development`. Acceptance: 99/99 files exist and pass the audit-header CI check. Pillar: Documentation.

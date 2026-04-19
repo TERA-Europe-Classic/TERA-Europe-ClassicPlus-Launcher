@@ -1,0 +1,90 @@
+{
+  "identifier": "migrated",
+  "description": "permissions that were migrated from v1",
+  "local": true,
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "fs:allow-read-file",
+    "fs:allow-write-file",
+    "fs:allow-read-dir",
+    "fs:allow-mkdir",
+    "fs:allow-remove",
+    "fs:allow-exists",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        "$APP/*",
+        "$RESOURCE/*"
+      ]
+    },
+    "core:window:allow-maximize",
+    "core:window:allow-unmaximize",
+    "core:window:allow-minimize",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-close",
+    "core:window:allow-start-dragging",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "args": [
+            "/C",
+            "start",
+            {
+              "validator": "\\S+"
+            }
+          ],
+          "cmd": "cmd",
+          "name": "open-url",
+          "sidecar": false
+        }
+      ]
+    },
+    "shell:allow-open",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "dialog:allow-message",
+    "dialog:allow-ask",
+    "dialog:allow-confirm",
+    {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "https://*.tera-europe.net/*"
+        },
+        {
+          "url": "https://*.tera-germany.de/*"
+        },
+        {
+          "url": "https://*.crazy-esports.com/*"
+        },
+        {
+          "url": "https://auth.tera-europe.net/*"
+        },
+        {
+          "url": "https://dl.tera-europe.net/*"
+        },
+        {
+          "url": "https://web.tera-germany.de/*"
+        },
+        {
+          "url": "https://tera-europe-classic.com/*"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/*"
+        },
+        {
+          "url": "http://192.168.1.128:8090/*"
+        }
+      ]
+    },
+    "notification:default",
+    "process:allow-restart",
+    "process:allow-exit",
+    "process:default"
+  ]
+}

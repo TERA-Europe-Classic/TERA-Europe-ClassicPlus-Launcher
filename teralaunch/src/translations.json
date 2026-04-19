@@ -1,5 +1,8 @@
 {
     "FRA": {
+        "OFFLINE_BANNER_TITLE": "Impossible de joindre le serveur du portail",
+        "OFFLINE_BANNER_DESC": "Le serveur est peut-être hors ligne, ou votre connexion est interrompue.",
+        "OFFLINE_BANNER_RETRY": "Réessayer",
         "LOGIN_REQUIRED": "Connexion requise",
         "READY_TO_PLAY": "Prêt à jouer",
         "WEBSITE": "Site web",
@@ -160,9 +163,22 @@
         "MODS_ONBOARDING_TITLE": "Nouveau : Mods",
         "MODS_ONBOARDING_BODY": "Parcourez des outils communautaires comme Shinra Meter et TCC — installez-les, activez-les et lancez-les avec TERA en un clic. Ouvrez la fenêtre Mods à tout moment via l'icône à côté des paramètres.",
         "MODS_ONBOARDING_DISMISS": "Compris",
-        "MODS_ONBOARDING_OPEN": "Ouvrir Mods…"
+        "MODS_ONBOARDING_OPEN": "Ouvrir Mods…",
+        "MODS_ARIA_MORE": "Plus",
+        "MODS_TITLE_ENABLED_HINT": "Activé — démarre avec le jeu",
+        "MODS_TITLE_DISABLED_HINT": "Désactivé — cliquer pour activer",
+        "MODS_MENU_DETAILS": "Détails",
+        "MODS_MENU_OPEN_SOURCE": "Ouvrir la source",
+        "MODS_MENU_UNINSTALL": "Désinstaller",
+        "MODS_ARIA_CLOSE": "Fermer",
+        "MODS_TITLE_CLOSE_ESC": "Fermer (Echap)",
+        "MODS_ARIA_CATEGORY_FILTER": "Filtre par catégorie",
+        "MODS_ARIA_KIND_FILTER": "Filtre par type"
     },
     "EUR": {
+        "OFFLINE_BANNER_TITLE": "Can't reach the portal server",
+        "OFFLINE_BANNER_DESC": "The server may be offline, or your connection is down.",
+        "OFFLINE_BANNER_RETRY": "Retry",
         "LOGIN_REQUIRED": "Login required",
         "READY_TO_PLAY": "Ready to play",
         "WEBSITE": "Website",
@@ -323,9 +339,22 @@
         "MODS_ONBOARDING_TITLE": "New: Mods",
         "MODS_ONBOARDING_BODY": "Browse community tools like Shinra Meter and TCC — install, enable, and launch them alongside TERA in one click. Open the Mods popup any time from the icon next to Settings.",
         "MODS_ONBOARDING_DISMISS": "Got it",
-        "MODS_ONBOARDING_OPEN": "Open Mods…"
+        "MODS_ONBOARDING_OPEN": "Open Mods…",
+        "MODS_ARIA_MORE": "More",
+        "MODS_TITLE_ENABLED_HINT": "Enabled — runs with the game",
+        "MODS_TITLE_DISABLED_HINT": "Disabled — click to enable",
+        "MODS_MENU_DETAILS": "Details",
+        "MODS_MENU_OPEN_SOURCE": "Open source",
+        "MODS_MENU_UNINSTALL": "Uninstall",
+        "MODS_ARIA_CLOSE": "Close",
+        "MODS_TITLE_CLOSE_ESC": "Close (Esc)",
+        "MODS_ARIA_CATEGORY_FILTER": "Category filter",
+        "MODS_ARIA_KIND_FILTER": "Kind filter"
     },
     "RUS": {
+        "OFFLINE_BANNER_TITLE": "Не удаётся связаться с сервером портала",
+        "OFFLINE_BANNER_DESC": "Возможно, сервер отключён или ваше соединение прервано.",
+        "OFFLINE_BANNER_RETRY": "Повторить",
         "LOGIN_REQUIRED": "Требуется вход",
         "READY_TO_PLAY": "Готов к игре",
         "WEBSITE": "Сайт",
@@ -486,9 +515,22 @@
         "MODS_ONBOARDING_TITLE": "Новое: Моды",
         "MODS_ONBOARDING_BODY": "Просматривайте инструменты сообщества, такие как Shinra Meter и TCC — устанавливайте, включайте и запускайте их вместе с TERA одним кликом. Открыть окно модов можно в любое время по иконке рядом с настройками.",
         "MODS_ONBOARDING_DISMISS": "Понятно",
-        "MODS_ONBOARDING_OPEN": "Открыть моды…"
+        "MODS_ONBOARDING_OPEN": "Открыть моды…",
+        "MODS_ARIA_MORE": "Ещё",
+        "MODS_TITLE_ENABLED_HINT": "Включено — работает с игрой",
+        "MODS_TITLE_DISABLED_HINT": "Отключено — нажмите, чтобы включить",
+        "MODS_MENU_DETAILS": "Подробности",
+        "MODS_MENU_OPEN_SOURCE": "Открыть источник",
+        "MODS_MENU_UNINSTALL": "Удалить",
+        "MODS_ARIA_CLOSE": "Закрыть",
+        "MODS_TITLE_CLOSE_ESC": "Закрыть (Esc)",
+        "MODS_ARIA_CATEGORY_FILTER": "Фильтр категорий",
+        "MODS_ARIA_KIND_FILTER": "Фильтр по типу"
     },
     "GER": {
+        "OFFLINE_BANNER_TITLE": "Portal-Server nicht erreichbar",
+        "OFFLINE_BANNER_DESC": "Der Server ist möglicherweise offline oder deine Verbindung ist unterbrochen.",
+        "OFFLINE_BANNER_RETRY": "Erneut versuchen",
         "LOGIN_REQUIRED": "Anmeldung erforderlich",
         "READY_TO_PLAY": "Bereit zum Spielen",
         "WEBSITE": "Webseite",
@@ -649,6 +691,16 @@
         "MODS_ONBOARDING_TITLE": "Neu: Mods",
         "MODS_ONBOARDING_BODY": "Durchsuchen Sie Community-Tools wie Shinra Meter und TCC — installieren, aktivieren und zusammen mit TERA mit einem Klick starten. Das Mods-Fenster jederzeit über das Symbol neben den Einstellungen öffnen.",
         "MODS_ONBOARDING_DISMISS": "Verstanden",
-        "MODS_ONBOARDING_OPEN": "Mods öffnen…"
+        "MODS_ONBOARDING_OPEN": "Mods öffnen…",
+        "MODS_ARIA_MORE": "Mehr",
+        "MODS_TITLE_ENABLED_HINT": "Aktiviert — läuft mit dem Spiel",
+        "MODS_TITLE_DISABLED_HINT": "Deaktiviert — zum Aktivieren klicken",
+        "MODS_MENU_DETAILS": "Details",
+        "MODS_MENU_OPEN_SOURCE": "Quelle öffnen",
+        "MODS_MENU_UNINSTALL": "Deinstallieren",
+        "MODS_ARIA_CLOSE": "Schließen",
+        "MODS_TITLE_CLOSE_ESC": "Schließen (Esc)",
+        "MODS_ARIA_CATEGORY_FILTER": "Kategoriefilter",
+        "MODS_ARIA_KIND_FILTER": "Typ-Filter"
     }
 }

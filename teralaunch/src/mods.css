@@ -179,47 +179,37 @@
     border-color: var(--primary, #22d3ee);
 }
 
-.mods-filter-group {
-    display: inline-flex;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
-    padding: 3px;
-    gap: 2px;
-}
-
-.mods-filter-chip {
-    background: none;
-    border: 0;
-    color: rgba(255, 255, 255, 0.6);
-    padding: 6px 12px;
-    font-size: 12px;
-    cursor: pointer;
-    border-radius: 6px;
-    transition: background 120ms ease, color 120ms ease;
-}
-
-.mods-filter-chip:hover {
-    color: var(--text, #fff);
-}
-
-.mods-filter-chip.active {
-    background: rgba(34, 211, 238, 0.15);
-    color: var(--primary, #22d3ee);
-}
-
-/* Category chip row — secondary filter below the kind chips. Wraps
-   across lines when the catalog has many categories; horizontal scroll
-   on narrow viewports. */
-.mods-category-row {
+/* fix.mods-categories-ui (iter 85): unified filter strip.
+   Kind chips (All/External/GPK) and category chips share one row
+   with a vertical divider between them. Both now use .mods-filter-chip
+   with identical pill geometry — same padding, same font-size, same
+   border-radius (999px). The segmented-control wrapper around kind
+   chips was dropped so nothing looks container-boxed while categories
+   float free. */
+.mods-filters-row {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 6px;
     padding: 0 4px 6px;
     margin-top: -6px;
 }
 
-.mods-category-chip {
+.mods-filter-group {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.mods-filters-divider {
+    display: inline-block;
+    width: 1px;
+    height: 18px;
+    background: rgba(255, 255, 255, 0.12);
+    margin: 0 4px;
+}
+
+.mods-filter-chip {
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.08);
     color: rgba(255, 255, 255, 0.65);
@@ -231,15 +221,25 @@
     transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
 }
 
-.mods-category-chip:hover {
+.mods-filter-chip:hover {
     color: var(--text, #fff);
     border-color: rgba(255, 255, 255, 0.16);
 }
 
-.mods-category-chip.active {
+.mods-filter-chip.active {
     background: rgba(34, 211, 238, 0.18);
     border-color: rgba(34, 211, 238, 0.4);
     color: var(--primary, #22d3ee);
+}
+
+/* Category sub-group inside .mods-filters-row. Plain inline-flex so it
+   wraps with the kind chips around it. The row-level spacing + padding
+   is owned by the parent .mods-filters-row. */
+.mods-category-row {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-width: 0;
 }
 
 /* Panes */

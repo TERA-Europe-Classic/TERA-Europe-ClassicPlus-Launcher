@@ -215,7 +215,10 @@ mod tests {
         };
         info.zeroize();
         // auth_key zeroed.
-        assert!(info.auth_key.is_empty(), "auth_key must be empty after zeroize");
+        assert!(
+            info.auth_key.is_empty(),
+            "auth_key must be empty after zeroize"
+        );
         // Non-sensitive fields preserved (skipped by derive).
         assert_eq!(info.user_name, "keeper");
         assert_eq!(info.user_no, 42);

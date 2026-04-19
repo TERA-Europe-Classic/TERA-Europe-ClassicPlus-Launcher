@@ -93,3 +93,409 @@ fn last_close_terminates_overlays() {
         "last close (remaining=0) must tear overlays down"
     );
 }
+
+/// Wiring guard for fix.overlay-lifecycle-wiring. The pure predicate is
+/// unit-tested above; this test source-inspects `commands/game.rs` to
+/// assert the overlay-stop call is gated by `decide_overlay_action`
+/// rather than firing unconditionally. Without this, a future commit
+/// could silently restore the old "stop on every close" behaviour and
+/// all the predicate tests would still pass.
+#[test]
+fn game_rs_gates_overlay_stop_on_decide_overlay_action() {
+    let body = std::fs::read_to_string("src/commands/game.rs")
+        .expect("commands/game.rs must exist");
+
+    let predicate_pos = body.find("decide_overlay_action(").expect(
+        "commands/game.rs must call decide_overlay_action — wiring missing (fix.overlay-lifecycle-wiring)",
+    );
+    let stop_pos = body
+        .find("stop_auto_launched_external_apps")
+        .expect("commands/game.rs must still call stop_auto_launched_external_apps on last close");
+
+    assert!(
+        predicate_pos < stop_pos,
+        "decide_overlay_action must be called BEFORE stop_auto_launched_external_apps \
+         in commands/game.rs — otherwise the stop is unconditional and overlays would \
+         tear down on partial closes (PRD 3.2.12 regression)."
+    );
+
+    // Guard against the stop call escaping the decision branch. If
+    // someone reintroduces a bare `stop_auto_launched_external_apps();`
+    // outside the `if decide_overlay_action(...) == Terminate` block,
+    // a second occurrence of the stop call would surface here.
+    let second_stop = body[stop_pos + "stop_auto_launched_external_apps".len()..]
+        .find("stop_auto_launched_external_apps");
+    assert!(
+        second_stop.is_none(),
+        "commands/game.rs has multiple calls to stop_auto_launched_external_apps — \
+         only one, gated by decide_overlay_action, is allowed."
+    );
+}
+
+// --------------------------------------------------------------------
+// Iter 158 structural pins — predicate signatures + enum variant sets.
+// --------------------------------------------------------------------
+//
+// The models above prove the decision tables are correct for the known
+// inputs. These pins protect the SHAPE of the production predicates so
+// a refactor that widens `decide_spawn(bool) -> Spawn|Attach` into a
+// 3-way decision, or adds a `Force` enum variant, or drops the
+// case-insensitive process match, can't land silently. Each pin names
+// the specific failure mode and why it breaks §3.2.
+
+const EXTERNAL_APP_RS: &str = "src/services/mods/external_app.rs";
+
+fn external_app_src() -> String {
+    std::fs::read_to_string(EXTERNAL_APP_RS)
+        .unwrap_or_else(|e| panic!("{EXTERNAL_APP_RS} must be readable: {e}"))
+}
+
+/// The pure predicate `decide_spawn` must accept exactly `(bool)` and
+/// return `SpawnDecision`. A refactor to `(bool, bool)` (adding a
+/// `force: bool` parameter) would let a caller override the gate. A
+/// refactor to return `Option<SpawnDecision>` would push the None-case
+/// to callers, each of whom could forget it.
+#[test]
+fn decide_spawn_signature_is_bool_to_spawndecision() {
+    let body = external_app_src();
+    assert!(
+        body.contains("pub fn decide_spawn(already_running: bool) -> SpawnDecision"),
+        "PRD 3.2.11: external_app.rs must export \
+         `pub fn decide_spawn(already_running: bool) -> SpawnDecision` \
+         verbatim. A widened signature opens gate-bypass paths."
+    );
+}
+
+/// `SpawnDecision` must have exactly two variants: `Attach` and `Spawn`.
+/// Adding a third variant (e.g. `Force`, `Queued`) requires every call
+/// site to handle the new case — a forgotten `_ => Spawn` match arm
+/// would double-spawn Shinra/TCC.
+#[test]
+fn spawn_decision_enum_has_exactly_attach_and_spawn() {
+    let body = external_app_src();
+    let enum_pos = body
+        .find("pub enum SpawnDecision {")
+        .expect("SpawnDecision enum must exist");
+    let rest = &body[enum_pos..];
+    let close = rest.find("\n}").expect("SpawnDecision must close");
+    let variants_body = &rest[..close];
+    assert!(
+        variants_body.contains("Attach"),
+        "SpawnDecision must have `Attach` variant"
+    );
+    assert!(
+        variants_body.contains("Spawn"),
+        "SpawnDecision must have `Spawn` variant"
+    );
+    // Count variant headers by counting commas on non-doc-comment lines.
+    // Simplest shape check: the variants body must NOT mention any
+    // third identifier that ends a line with `,`. Approximation: look
+    // for `    X` idents that aren't `Attach`/`Spawn`/comment/doc.
+    let extra_variants: Vec<&str> = variants_body
+        .lines()
+        .filter(|l| {
+            let t = l.trim();
+            !t.is_empty()
+                && !t.starts_with("///")
+                && !t.starts_with("//")
+                && !t.starts_with("pub enum")
+                && !t.starts_with("Attach")
+                && !t.starts_with("Spawn")
+        })
+        .collect();
+    assert!(
+        extra_variants.is_empty(),
+        "PRD 3.2.11: SpawnDecision must have EXACTLY two variants \
+         (Attach, Spawn). Extra variants would force a fallback arm at \
+         every call site — a forgotten arm silently double-spawns.\n\
+         Extras: {extra_variants:?}"
+    );
+}
+
+/// `decide_overlay_action` must accept exactly `(usize)` and return
+/// `OverlayLifecycleAction`. The `usize` is load-bearing: `i32` could
+/// pass a negative count (making `== 0` false for `-1`), and an
+/// `Option<usize>` would push the None-case to callers (None treated
+/// as "keep running" by default would leak overlays).
+#[test]
+fn decide_overlay_action_signature_is_usize_to_lifecycleaction() {
+    let body = external_app_src();
+    assert!(
+        body.contains(
+            "pub fn decide_overlay_action(remaining_clients: usize) -> OverlayLifecycleAction"
+        ),
+        "PRD 3.2.12: external_app.rs must export \
+         `pub fn decide_overlay_action(remaining_clients: usize) -> \
+         OverlayLifecycleAction` verbatim. usize is load-bearing \
+         (can't be negative); Option<usize> pushes None handling out."
+    );
+}
+
+/// `OverlayLifecycleAction` must have exactly two variants:
+/// `KeepRunning` and `Terminate`. A third variant (e.g. `Deferred`)
+/// would introduce ambiguity around when overlays actually stop.
+#[test]
+fn overlay_lifecycle_enum_has_exactly_keeprunning_and_terminate() {
+    let body = external_app_src();
+    let enum_pos = body
+        .find("pub enum OverlayLifecycleAction {")
+        .expect("OverlayLifecycleAction enum must exist");
+    let rest = &body[enum_pos..];
+    let close = rest.find("\n}").expect("OverlayLifecycleAction must close");
+    let variants_body = &rest[..close];
+    assert!(
+        variants_body.contains("KeepRunning"),
+        "OverlayLifecycleAction must have `KeepRunning`"
+    );
+    assert!(
+        variants_body.contains("Terminate"),
+        "OverlayLifecycleAction must have `Terminate`"
+    );
+    let extra_variants: Vec<&str> = variants_body
+        .lines()
+        .filter(|l| {
+            let t = l.trim();
+            !t.is_empty()
+                && !t.starts_with("///")
+                && !t.starts_with("//")
+                && !t.starts_with("pub enum")
+                && !t.starts_with("KeepRunning")
+                && !t.starts_with("Terminate")
+        })
+        .collect();
+    assert!(
+        extra_variants.is_empty(),
+        "PRD 3.2.12: OverlayLifecycleAction must have EXACTLY two \
+         variants. Extras introduce ambiguity about when overlays \
+         stop.\nExtras: {extra_variants:?}"
+    );
+}
+
+/// `check_spawn_decision` must route through `decide_spawn(
+/// is_process_running(...))`. If the convenience wrapper gets rewritten
+/// to inline the logic (`if is_process_running(...) { Attach } else {
+/// Spawn }`), the pure predicate stops being the single source of
+/// truth — a later tweak to `decide_spawn` won't propagate to the
+/// wrapper, creating two paths that can diverge.
+#[test]
+fn check_spawn_decision_routes_through_pure_predicate() {
+    let body = external_app_src();
+    let fn_pos = body
+        .find("pub fn check_spawn_decision(")
+        .expect("check_spawn_decision must exist");
+    let window = &body[fn_pos..body.len().min(fn_pos + 400)];
+    assert!(
+        window.contains("decide_spawn(is_process_running("),
+        "PRD 3.2.11: check_spawn_decision must call \
+         `decide_spawn(is_process_running(exe_name))`. Inlining the \
+         branch splits the attach-once rule into two call sites that \
+         can silently drift.\n\
+         Window:\n{window}"
+    );
+}
+
+/// `is_process_running` must compare process names case-insensitively.
+/// Windows is case-insensitive for executable names, so `SHINRA.exe`,
+/// `Shinra.exe`, and `shinra.exe` all refer to the same binary. A
+/// refactor that drops `.to_ascii_lowercase()` on either side would
+/// miss `SHINRA.exe` when asked about `Shinra.exe`, allowing a
+/// double-spawn.
+#[test]
+fn is_process_running_is_case_insensitive() {
+    let body = external_app_src();
+    let fn_pos = body
+        .find("pub fn is_process_running(")
+        .expect("is_process_running must exist");
+    let window = &body[fn_pos..body.len().min(fn_pos + 700)];
+    // Both sides of the comparison must be lowercased — the input name
+    // once, and each OS-level process name each iteration.
+    let lowercase_count = window.matches("to_ascii_lowercase()").count();
+    assert!(
+        lowercase_count >= 2,
+        "PRD 3.2.11: is_process_running must call \
+         `.to_ascii_lowercase()` on BOTH sides of the comparison \
+         (input exe_name + each OS process name). Found \
+         {lowercase_count}; expected ≥ 2. A one-sided compare misses \
+         `SHINRA.exe` vs `Shinra.exe` and permits a double-spawn.\n\
+         Window:\n{window}"
+    );
+}
+
+// --------------------------------------------------------------------
+// Iter 207 structural pins — meta-guard self-reference + sysinfo usage
+// pattern + game-count source + Terminate-gate wrapping + stop_process
+// case-insensitive mirror.
+// --------------------------------------------------------------------
+//
+// The eleven pins above cover the pure-predicate model, its signature,
+// and three call-site wirings. They do NOT pin: (a) the guard's own
+// module header cites PRD 3.2.11 + 3.2.12 (meta-guard contract); (b)
+// `is_process_running` uses the sysinfo `System::new()` +
+// `refresh_processes(All, true)` + `processes().values().any(...)`
+// pattern — a refactor to a lock-file-based shortcut would keep the
+// signature but silently return stale data after a hard-kill; (c) the
+// `remaining_clients` value in `commands/game.rs` must come from
+// `teralib::get_running_game_count()` — if a drive-by refactor hardcodes
+// it to `0`, `decide_overlay_action` would tear overlays down on EVERY
+// close; (d) the `stop_auto_launched_external_apps()` call must be
+// wrapped by `if decide_overlay_action(...) == OverlayLifecycleAction::
+// Terminate` — the existing wiring pin checks ordering, not the gate
+// operator; (e) `stop_process_by_name` must mirror `is_process_running`'s
+// case-insensitive compare — if detection says SHINRA is running but
+// stop can't find it to kill, cleanup fails silently on Windows.
+
+const GUARD_FILE: &str = "tests/multi_client.rs";
+const GAME_RS: &str = "src/commands/game.rs";
+
+fn guard_src() -> String {
+    std::fs::read_to_string(GUARD_FILE).expect("tests/multi_client.rs must exist")
+}
+
+fn game_rs_src() -> String {
+    std::fs::read_to_string(GAME_RS).expect("commands/game.rs must exist")
+}
+
+/// The guard's module header must cite both PRDs it protects — 3.2.11
+/// (attach-once) and 3.2.12 (overlay lifecycle) — plus the PRD-slug
+/// `multi-client-attach-once` so a grep for either surfaces this file.
+#[test]
+fn guard_file_header_cites_prd_slugs() {
+    let body = guard_src();
+    let header = &body[..body.len().min(1500)];
+    assert!(
+        header.contains("PRD 3.2.11"),
+        "meta-guard contract: tests/multi_client.rs header must cite \
+         `PRD 3.2.11` (multi-client-attach-once). Without it, a \
+         reader chasing an overlay-lifecycle regression won't land \
+         here via section-grep.\nHeader:\n{header}"
+    );
+    assert!(
+        header.contains("multi-client-attach-once"),
+        "meta-guard contract: header must carry the PRD slug \
+         `multi-client-attach-once` — name-based grep is the primary \
+         cross-reference path between PRD P-slots and guards."
+    );
+}
+
+/// `is_process_running` must use the sysinfo `System::new()` +
+/// `refresh_processes(All, true)` + `processes().values()` pattern.
+/// A drive-by refactor to a lock-file or PID-file shortcut would
+/// satisfy the case-insensitive-compare pin but silently return
+/// stale data after a hard-kill / crash (no file cleanup). Pin the
+/// actual sysinfo path.
+#[test]
+fn is_process_running_uses_sysinfo_refresh_all_pattern() {
+    let body = external_app_src();
+    let fn_pos = body
+        .find("pub fn is_process_running(")
+        .expect("is_process_running must exist");
+    let window = &body[fn_pos..body.len().min(fn_pos + 600)];
+    assert!(
+        window.contains("System::new()"),
+        "PRD 3.2.11: is_process_running must construct a fresh \
+         `System::new()` — a cached static could return stale data \
+         across the spawn/close cycle.\nWindow:\n{window}"
+    );
+    assert!(
+        window.contains("refresh_processes(sysinfo::ProcessesToUpdate::All, true)"),
+        "PRD 3.2.11: is_process_running must call \
+         `refresh_processes(sysinfo::ProcessesToUpdate::All, true)` \
+         — the second arg `true` triggers removal of stale PIDs, \
+         without which the fn could report a killed process as \
+         still running.\nWindow:\n{window}"
+    );
+    assert!(
+        window.contains("system.processes().values()"),
+        "PRD 3.2.11: is_process_running must walk `system.processes()\
+         .values()` — a lock-file or PID-file shortcut would miss \
+         processes started outside the launcher (user ran SHINRA \
+         directly) and permit a double-spawn."
+    );
+}
+
+/// In `commands/game.rs`, the `remaining_clients` argument to
+/// `decide_overlay_action(...)` must come from
+/// `teralib::get_running_game_count()` — the single source of truth
+/// for active client count. A hardcoded literal (`0` or `1`) or a
+/// drive-by refactor to a private counter would decouple the policy
+/// from reality.
+#[test]
+fn game_rs_remaining_clients_comes_from_teralib_count() {
+    let body = game_rs_src();
+    // Locate the decide_overlay_action call site.
+    let call_pos = body
+        .find("decide_overlay_action(remaining_clients)")
+        .expect("commands/game.rs must call `decide_overlay_action(remaining_clients)`");
+    // The binding of `remaining_clients` must come from teralib.
+    let before = &body[..call_pos];
+    let binding_pos = before
+        .rfind("let remaining_clients")
+        .expect("commands/game.rs must bind `let remaining_clients = ...` before the call");
+    let binding_line_end = before[binding_pos..]
+        .find('\n')
+        .map(|n| binding_pos + n)
+        .unwrap_or(before.len());
+    let binding_line = &before[binding_pos..binding_line_end];
+    assert!(
+        binding_line.contains("teralib::get_running_game_count()"),
+        "PRD 3.2.12: `let remaining_clients` in commands/game.rs must \
+         be bound to `teralib::get_running_game_count()` — it's the \
+         single source of truth for the count. A literal or private \
+         counter decouples the overlay-lifecycle decision from the \
+         actual number of TERA.exe processes.\nBinding: {binding_line}"
+    );
+}
+
+/// The `stop_auto_launched_external_apps()` call in commands/game.rs
+/// must be wrapped by `if decide_overlay_action(...) ==
+/// OverlayLifecycleAction::Terminate`. The existing wiring pin
+/// (`game_rs_gates_overlay_stop_on_decide_overlay_action`) checks
+/// ORDERING (predicate before stop) but not the GATE OPERATOR — a
+/// refactor to `!= Terminate` or `== KeepRunning` would satisfy the
+/// ordering pin while inverting the policy (terminate on every
+/// partial close).
+#[test]
+fn game_rs_stop_is_gated_by_terminate_branch() {
+    let body = game_rs_src();
+    // Find the gate line that wraps the stop call.
+    let gate_pos = body
+        .find("if decide_overlay_action(remaining_clients) == OverlayLifecycleAction::Terminate {")
+        .expect(
+            "PRD 3.2.12: commands/game.rs must gate stop with \
+             `if decide_overlay_action(remaining_clients) == \
+             OverlayLifecycleAction::Terminate {` — the equality \
+             operator and Terminate variant are both load-bearing.",
+        );
+    // The stop call must live inside this gate (within ~200 chars).
+    let window = &body[gate_pos..body.len().min(gate_pos + 300)];
+    assert!(
+        window.contains("stop_auto_launched_external_apps"),
+        "PRD 3.2.12: `stop_auto_launched_external_apps()` must be \
+         called INSIDE the `== Terminate` gate body, not after the \
+         block.\nWindow:\n{window}"
+    );
+}
+
+/// `stop_process_by_name` must mirror `is_process_running`'s case-
+/// insensitive compare. Windows is case-insensitive for executable
+/// names; if detection says `SHINRA.exe` is running but stop can't
+/// match `Shinra.exe` in the process table, cleanup fails silently
+/// on last-close and overlays leak across launcher restarts.
+#[test]
+fn stop_process_by_name_is_case_insensitive_mirror() {
+    let body = external_app_src();
+    let fn_pos = body
+        .find("pub fn stop_process_by_name(")
+        .expect("stop_process_by_name must exist");
+    let window = &body[fn_pos..body.len().min(fn_pos + 800)];
+    let lowercase_count = window.matches("to_ascii_lowercase()").count();
+    assert!(
+        lowercase_count >= 2,
+        "PRD 3.2.11: stop_process_by_name must call \
+         `.to_ascii_lowercase()` on BOTH sides of the match (input \
+         exe_name + each OS process name). Found {lowercase_count}; \
+         expected ≥ 2. A one-sided compare means detection finds \
+         SHINRA but stop can't kill it — overlays leak across \
+         launcher lifetimes.\nWindow:\n{window}"
+    );
+}

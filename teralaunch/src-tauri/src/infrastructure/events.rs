@@ -130,12 +130,14 @@ impl TauriWindowEmitter {
 impl EventEmitter for TauriWindowEmitter {
     #[cfg(not(tarpaulin_include))]
     fn emit<S: Serialize + Clone>(&self, event: &str, payload: S) -> Result<(), String> {
+        use tauri::Emitter;
         self.window.emit(event, payload).map_err(|e| e.to_string())
     }
 
     #[cfg(not(tarpaulin_include))]
     fn emit_all<S: Serialize + Clone>(&self, event: &str, payload: S) -> Result<(), String> {
-        // Window can only emit to itself; for emit_all, use the window's emit
+        use tauri::Emitter;
+        // In v2, Emitter::emit broadcasts to all listeners — no separate emit_all.
         self.window.emit(event, payload).map_err(|e| e.to_string())
     }
 }
@@ -158,17 +160,17 @@ impl TauriAppEmitter {
 impl EventEmitter for TauriAppEmitter {
     #[cfg(not(tarpaulin_include))]
     fn emit<S: Serialize + Clone>(&self, event: &str, payload: S) -> Result<(), String> {
-        use tauri::Manager;
+        use tauri::Emitter;
         self.app_handle
-            .emit_all(event, payload)
+            .emit(event, payload)
             .map_err(|e| e.to_string())
     }
 
     #[cfg(not(tarpaulin_include))]
     fn emit_all<S: Serialize + Clone>(&self, event: &str, payload: S) -> Result<(), String> {
-        use tauri::Manager;
+        use tauri::Emitter;
         self.app_handle
-            .emit_all(event, payload)
+            .emit(event, payload)
             .map_err(|e| e.to_string())
     }
 }

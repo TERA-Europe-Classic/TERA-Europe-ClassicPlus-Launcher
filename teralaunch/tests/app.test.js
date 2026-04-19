@@ -14,8 +14,11 @@ const mockAppWindow = {
 const mockMessage = vi.fn();
 const mockAsk = vi.fn();
 
-// Set up global Tauri mock
+// Set up global Tauri mock.
+// v2 exposes invoke under `core`; keep `tauri` alias so any lingering
+// legacy-lookup paths still resolve until M3 fully deletes them.
 global.window.__TAURI__ = {
+    core: { invoke: mockInvoke },
     tauri: { invoke: mockInvoke },
     event: { listen: mockListen },
     window: { appWindow: mockAppWindow, WebviewWindow: vi.fn() },

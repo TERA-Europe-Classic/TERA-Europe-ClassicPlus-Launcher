@@ -10,7 +10,7 @@
 use std::path::{Path, PathBuf};
 
 use log::{error, info};
-use tauri::Manager;
+use tauri::Emitter;
 
 use crate::commands::config::load_config;
 use crate::domain::GlobalAuthInfo;
@@ -171,7 +171,7 @@ pub async fn handle_launch_game(
 
     tokio::task::spawn(async move {
         // Emit the game_status_changed event at the start of the launch
-        if let Err(e) = app_handle_clone.emit_all("game_status_changed", true) {
+        if let Err(e) = app_handle_clone.emit("game_status_changed", true) {
             error!("Failed to emit game_status_changed event: {:?}", e);
         }
 
@@ -193,14 +193,14 @@ pub async fn handle_launch_game(
         {
             Ok(exit_status) => {
                 let result = format!("Game exited with status: {:?}", exit_status);
-                if let Err(e) = app_handle_clone.emit_all("game_status", &result) {
+                if let Err(e) = app_handle_clone.emit("game_status", &result) {
                     error!("Failed to emit game_status event: {:?}", e);
                 }
                 info!("{}", result);
             }
             Err(e) => {
                 let error = format!("Error launching game: {:?}", e);
-                if let Err(emit_err) = app_handle_clone.emit_all("game_status", &error) {
+                if let Err(emit_err) = app_handle_clone.emit("game_status", &error) {
                     error!("Failed to emit game_status event: {:?}", emit_err);
                 }
                 error!("{}", error);
@@ -211,18 +211,28 @@ pub async fn handle_launch_game(
             "Emitting game_ended event for user_no: {}",
             user_no_for_event
         );
-        if let Err(e) = app_handle_clone.emit_all("game_ended", user_no_for_event) {
+        if let Err(e) = app_handle_clone.emit("game_ended", user_no_for_event) {
             error!("Failed to emit game_ended event: {:?}", e);
         }
 
-        // Tear down any external mods we launched for this game so they
-        // don't linger after the client is gone.
-        crate::commands::mods::stop_auto_launched_external_apps();
+        // Overlay lifecycle (PRD 3.2.12 / 3.2.13, fix.overlay-lifecycle-
+        // wiring). If another TERA client is still running, leave the
+        // external-app overlays (Shinra / TCC) attached to it — only tear
+        // them down when the last client has exited. The pure predicate
+        // `decide_overlay_action` carries the policy; the wiring lives
+        // here so the policy decision is colocated with the close event.
+        use crate::services::mods::external_app::{
+            decide_overlay_action, OverlayLifecycleAction,
+        };
+        let remaining_clients = teralib::get_running_game_count();
+        if decide_overlay_action(remaining_clients) == OverlayLifecycleAction::Terminate {
+            crate::commands::mods::stop_auto_launched_external_apps();
+        }
 
         // Game status is tracked by teralib via PID map - it sends updates via watch channel
         // Check if all games have finished
         if !teralib::is_game_running() {
-            if let Err(e) = app_handle_clone.emit_all("game_status_changed", false) {
+            if let Err(e) = app_handle_clone.emit("game_status_changed", false) {
                 error!("Failed to emit game_status_changed event: {:?}", e);
             }
             info!("All game instances finished");

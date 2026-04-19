@@ -13,7 +13,9 @@ $cargoTauriCheck = Get-Command cargo-tauri -ErrorAction SilentlyContinue
 # - You can either:
 #   1) Paste base64-encoded private key into $PrivateKeyInline and password into $PrivateKeyPasswordInline, OR
 #   2) Place files next to this script: tauri_private_key.txt and tauri_private_key_password.txt
-#   3) Or set environment variables TAURI_PRIVATE_KEY and TAURI_KEY_PASSWORD before running the script
+#   3) Or set env vars TAURI_PRIVATE_KEY / TAURI_KEY_PASSWORD (legacy v1 names) — this script
+#      forwards them to the v2 names TAURI_SIGNING_PRIVATE_KEY /
+#      TAURI_SIGNING_PRIVATE_KEY_PASSWORD that the v2 CLI reads.
 # NOTE: Do NOT commit real secrets to git. These values are optional; if none provided, build continues without auto-signing.
 # ===============================
 $PrivateKeyInline = $null          # e.g. @"BASE64_KEY_HERE"@
@@ -151,10 +153,15 @@ if ($null -ne $PrivateKeyPasswordInline -and -not [string]::IsNullOrWhiteSpace($
 }
 
 if ($resolvedKey -and -not [string]::IsNullOrWhiteSpace($resolvedKey)) {
+    # Tauri v2 reads TAURI_SIGNING_PRIVATE_KEY(_PASSWORD); set both the v2
+    # names and the legacy v1 names so either CLI version finds the key.
+    $env:TAURI_SIGNING_PRIVATE_KEY = $resolvedKey.Trim()
     $env:TAURI_PRIVATE_KEY = $resolvedKey.Trim()
     # Always set password (even empty string) — Tauri requires it to decrypt the key
-    $env:TAURI_KEY_PASSWORD = if ($resolvedPwd) { $resolvedPwd.Trim() } else { "" }
-    Write-Host "`n[OK] Updater auto-signing aktiviert (TAURI_PRIVATE_KEY gesetzt)" -ForegroundColor $success
+    $pwdTrim = if ($resolvedPwd) { $resolvedPwd.Trim() } else { "" }
+    $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = $pwdTrim
+    $env:TAURI_KEY_PASSWORD = $pwdTrim
+    Write-Host "`n[OK] Updater auto-signing aktiviert (TAURI_SIGNING_PRIVATE_KEY gesetzt)" -ForegroundColor $success
 } else {
     Write-Host "`n[!] Kein privater Signierschluessel gefunden - Bundler zeigt ggf. Hinweis, Artefakte werden trotzdem erstellt." -ForegroundColor $warn
 }
@@ -194,7 +201,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "[!] npm run tauri build failed. Trying cargo tauri..." -ForegroundColor $warn
     if (-not $cargoTauriCheck) {
         Write-Host "Installing cargo-tauri..."
-        cargo install --locked tauri-cli@^1
+        cargo install --locked tauri-cli@^2
     }
     cargo tauri build
 }

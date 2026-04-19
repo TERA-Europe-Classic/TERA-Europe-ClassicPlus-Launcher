@@ -10,6 +10,8 @@ use std::sync::Arc;
 use dotenvy::dotenv;
 use log::{error, info, LevelFilter};
 use tauri::Manager;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+use tauri_plugin_updater::UpdaterExt;
 use tokio::sync::Mutex;
 
 use state::set_pending_deep_link;
@@ -271,45 +273,75 @@ fn main() {
     }
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(game_state)
         .setup(|app| {
             let window = app
-                .get_window("main")
+                .get_webview_window("main")
                 .expect("Main window not found - check tauri.conf.json");
             info!("Tauri setup started");
 
             // Keep window hidden until updater check completes (when auto-install is enabled).
             let _ = window.hide();
 
-            let app_handle_for_update = app.handle();
+            let app_handle_for_update = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 if should_auto_install_updater() {
                     let mut should_show_window = true;
-                    match app_handle_for_update.updater().check().await {
-                        Ok(update) => {
-                            if update.is_update_available() {
-                                match update.download_and_install().await {
-                                    Ok(_status) => {
-                                        // On success the process may exit/restart
-                                        should_show_window = false;
-                                    }
-                                    Err(e) => {
-                                        error!("Updater failed: {}", e);
+                    match app_handle_for_update.updater() {
+                        Ok(updater) => match updater.check().await {
+                            Ok(Some(update)) => {
+                                // PRD 3.1.9 — refuse downgrades / replays.
+                                // `update.version` is the advertised server
+                                // version; only install when strictly newer
+                                // than CARGO_PKG_VERSION. See
+                                // services::updater_gate::should_accept_update.
+                                let current = env!("CARGO_PKG_VERSION");
+                                let remote = update.version.as_str();
+                                if !services::updater_gate::should_accept_update(
+                                    current, remote,
+                                ) {
+                                    error!(
+                                        "Updater refused: remote {} is not strictly newer than current {} (downgrade policy, PRD 3.1.9)",
+                                        remote, current
+                                    );
+                                } else {
+                                    match update
+                                        .download_and_install(|_, _| {}, || {})
+                                        .await
+                                    {
+                                        Ok(_status) => {
+                                            // On success the process may exit/restart
+                                            should_show_window = false;
+                                        }
+                                        Err(e) => {
+                                            error!("Updater failed: {}", e);
+                                        }
                                     }
                                 }
                             }
-                        }
+                            Ok(None) => {}
+                            Err(e) => {
+                                error!("Failed to check updates: {}", e);
+                            }
+                        },
                         Err(e) => {
-                            error!("Failed to check updates: {}", e);
+                            error!("Failed to get updater: {}", e);
                         }
                     }
 
                     if should_show_window {
-                        if let Some(win) = app_handle_for_update.get_window("main") {
+                        if let Some(win) = app_handle_for_update.get_webview_window("main") {
                             let _ = win.show();
                         }
                     }
-                } else if let Some(win) = app_handle_for_update.get_window("main") {
+                } else if let Some(win) = app_handle_for_update.get_webview_window("main") {
                     let _ = win.show();
                 }
             });
@@ -364,6 +396,8 @@ fn main() {
             commands::mods::launch_external_app,
             commands::mods::stop_external_app,
             commands::mods::open_mods_folder,
+            commands::mods::recover_clean_mapper,
+            commands::mods::preview_mod_install_conflicts,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

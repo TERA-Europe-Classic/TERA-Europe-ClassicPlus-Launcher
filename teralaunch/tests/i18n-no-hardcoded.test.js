@@ -38,23 +38,12 @@ const TARGETS = [
 
 // Each entry: exact literal substring that's known-English-hardcoded but
 // not yet wired to i18n. When you fix a leak, delete its allowlist row.
-const ALLOWLIST = [
-    // mods.js — overflow button aria-label; app.js lacks data-translate-aria-label
-    { file: 'teralaunch/src/mods.js', literal: 'aria-label="More"' },
-    // mods.js — toggle title ternary; dynamic data-translate-title is awkward
-    { file: 'teralaunch/src/mods.js', literal: "'Enabled — runs with the game'" },
-    { file: 'teralaunch/src/mods.js', literal: "'Disabled — click to enable'" },
-    // mods.js — status pill inline text (no data-translate on the span)
-    { file: 'teralaunch/src/mods.js', literal: '>Running<' },
-    // mods.js — overflow popover menu items (no data-translate on the spans)
-    { file: 'teralaunch/src/mods.js', literal: '>Details<' },
-    { file: 'teralaunch/src/mods.js', literal: '>Open source<' },
-    { file: 'teralaunch/src/mods.js', literal: '>Uninstall<' },
-    // mods.html — close buttons (app.js doesn't wire data-translate-aria-label yet)
-    { file: 'teralaunch/src/mods.html', literal: 'aria-label="Close"' },
-    { file: 'teralaunch/src/mods.html', literal: 'title="Close (Esc)"' },
-    { file: 'teralaunch/src/mods.html', literal: 'aria-label="Category filter"' },
-];
+//
+// fix.mods-hardcoded-i18n-strings (iter 77) burned this list down to
+// zero. The scanner now enforces strict-zero on the TARGETS below — any
+// new `aria-label=""` / `title=""` / `placeholder=""` with English copy
+// and no corresponding `data-translate-*` sibling fails CI.
+const ALLOWLIST = [];
 
 function stripAllowlist(content, file) {
     let stripped = content;
@@ -143,21 +132,16 @@ describe('i18n no-hardcoded-english (PRD 3.7.4)', () => {
         ).toEqual([]);
     });
 
-    it('allowlist is non-empty and documented', () => {
-        // If someone empties the allowlist without deleting every source
-        // leak, this test asserts the allowlist still reflects real code.
-        // Each entry points at a specific follow-up the fix.mods-i18n-* P1
-        // backlog will burn down. If the allowlist ever goes to zero,
-        // delete this block and enforce strict-zero.
-        expect(ALLOWLIST.length).toBeGreaterThan(0);
-        for (const entry of ALLOWLIST) {
-            const p = path.join(REPO_ROOT, entry.file);
-            const raw = fs.readFileSync(p, 'utf8');
-            expect(
-                raw.includes(entry.literal),
-                `stale allowlist entry: "${entry.literal}" no longer appears in ${entry.file} — delete this row`,
-            ).toBe(true);
-        }
+    it('allowlist is empty (strict-zero enforced after burn-down)', () => {
+        // Flipped in iter 77. Before: "allowlist is non-empty" (the list
+        // documented the 10 known leaks the P1 burn-down was queued
+        // against). After fix.mods-hardcoded-i18n-strings landed, every
+        // leak was wired through i18n, so the allowlist is now the empty
+        // array and the scanner enforces strict-zero. If someone
+        // re-introduces a leak, the `no new hardcoded English` test
+        // fails; if someone ADDS an entry back to the allowlist (to
+        // paper over a new leak instead of fixing it), this test fails.
+        expect(ALLOWLIST).toEqual([]);
     });
 
     it('detector flags a seeded leak in synthetic input', () => {
