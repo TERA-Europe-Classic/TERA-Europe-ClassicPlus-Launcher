@@ -832,4 +832,131 @@ mod tests {
         revert_partial_install_file(&dest);
         assert!(!dest.exists());
     }
+
+    // --- Progress-event rate (PRD 3.6.3) ------------------------------------
+    //
+    // Server emits N chunks with inter-chunk delays so the client-side
+    // stream actually surfaces each chunk separately — on loopback, a
+    // single `write_all(body)` gets coalesced into one hyper poll, which
+    // isn't what a real 10 Mbit/s link does. The chunked helper reproduces
+    // the "bytes trickle in over the wire" shape we actually want to pin.
+
+    async fn serve_chunked(chunks: Vec<Vec<u8>>, delay: std::time::Duration) -> (u16, usize) {
+        use tokio::io::AsyncWriteExt;
+        use tokio::net::TcpListener;
+
+        let total: usize = chunks.iter().map(|c| c.len()).sum();
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+
+        tokio::spawn(async move {
+            if let Ok((mut sock, _)) = listener.accept().await {
+                use tokio::io::AsyncReadExt;
+                let mut buf = [0u8; 1024];
+                let _ = sock.read(&mut buf).await;
+
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\n\
+                     Content-Length: {total}\r\n\
+                     Content-Type: application/octet-stream\r\n\
+                     Connection: close\r\n\r\n"
+                );
+                let _ = sock.write_all(response.as_bytes()).await;
+                let _ = sock.flush().await;
+
+                for chunk in chunks {
+                    if sock.write_all(&chunk).await.is_err() {
+                        return;
+                    }
+                    if sock.flush().await.is_err() {
+                        return;
+                    }
+                    tokio::time::sleep(delay).await;
+                }
+                let _ = sock.shutdown().await;
+            }
+        });
+
+        (port, total)
+    }
+
+    /// PRD 3.6.3 acceptance: progress events emit ≥ 10/s on a 10 Mbit/s
+    /// simulated link. 20 chunks × 64 KB with 20 ms pacing ≈ 400 ms on
+    /// the wire → ~50 callbacks/s, well above the bar. Assert both the
+    /// count (≥ 10) and the rate (≥ 10 Hz).
+    #[tokio::test]
+    async fn at_least_10hz() {
+        let chunk = vec![0xABu8; 64 * 1024];
+        let chunks: Vec<Vec<u8>> = std::iter::repeat_n(chunk, 20).collect();
+        let (port, total_bytes) =
+            serve_chunked(chunks, std::time::Duration::from_millis(20)).await;
+        let url = format!("http://127.0.0.1:{port}/stream.bin");
+
+        let body = vec![0xABu8; total_bytes];
+        let correct_sha = hex_lower(&Sha256::digest(&body));
+        let tmp = TempDir::new().unwrap();
+        let dest = tmp.path().join("stream.bin");
+
+        let count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let count_cb = count.clone();
+        let start = std::time::Instant::now();
+
+        download_file(&url, &correct_sha, &dest, move |_, _| {
+            count_cb.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        })
+        .await
+        .expect("download should succeed");
+
+        let elapsed = start.elapsed();
+        let total = count.load(std::sync::atomic::Ordering::Relaxed);
+        let rate = total as f64 / elapsed.as_secs_f64();
+
+        assert!(
+            total >= 10,
+            "progress must fire at least 10 times on a 20-chunk stream; got {total} in {elapsed:?}"
+        );
+        assert!(
+            rate >= 10.0,
+            "progress rate must be ≥10 Hz; got {rate:.2}/s ({total} events in {elapsed:?})"
+        );
+    }
+
+    /// Sanity control: prove the callback actually fires per chunk, not
+    /// once per request. Without this, a broken implementation that
+    /// coalesced everything into one final callback would still pass
+    /// `at_least_10hz` if elapsed was short enough to push the rate
+    /// above 10 Hz for 1 event.
+    #[tokio::test]
+    async fn callback_count_scales_with_chunks() {
+        let small = vec![0x5Au8; 16 * 1024];
+        let chunks_5: Vec<Vec<u8>> = std::iter::repeat_n(small.clone(), 5).collect();
+        let chunks_15: Vec<Vec<u8>> = std::iter::repeat_n(small, 15).collect();
+
+        async fn count_for(chunks: Vec<Vec<u8>>) -> usize {
+            let total_bytes: usize = chunks.iter().map(|c| c.len()).sum();
+            let (port, _) =
+                serve_chunked(chunks, std::time::Duration::from_millis(10)).await;
+            let url = format!("http://127.0.0.1:{port}/s.bin");
+            let body = vec![0x5Au8; total_bytes];
+            let sha = hex_lower(&Sha256::digest(&body));
+            let tmp = TempDir::new().unwrap();
+            let dest = tmp.path().join("s.bin");
+            let count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let count_cb = count.clone();
+            download_file(&url, &sha, &dest, move |_, _| {
+                count_cb.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            })
+            .await
+            .unwrap();
+            count.load(std::sync::atomic::Ordering::Relaxed)
+        }
+
+        let c5 = count_for(chunks_5).await;
+        let c15 = count_for(chunks_15).await;
+
+        assert!(
+            c15 > c5,
+            "expected c15 > c5 to prove per-chunk emission; got c5={c5}, c15={c15}"
+        );
+    }
 }
