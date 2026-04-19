@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 94
-last_work_iteration: 94
+iteration_counter: 95
+last_work_iteration: 95
 last_research_sweep: 90
 last_revalidation: 72
 last_revalidation_status: all-gates-green
@@ -16,15 +16,29 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 75
+total_items_done: 76
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: fef2097
+tauri_v2_migration_last_commit: b9712c6
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 95 WORK — adv.sigkill-mid-download DONE (worktree).**
+>
+> Worktree commit `b9712c6`. Closes a PRD §5.3 adversarial-corpus item. Registry-side recovery was already covered by 4 tests in `registry.rs` (`recover_stuck_installs` flips stranded Installing → Error on boot). Iter 95 pins the filesystem side:
+>
+> - `sigkill_recovery_external_retry_clears_dest_dir_before_extract` — source-inspects `external_app.rs::download_and_extract` for `remove_dir_all(dest_dir)` appearing BEFORE `extract_zip(` in source order. Without the pre-extract cleanup, a SIGKILL mid-extract would leave the dead install's files mixed with the retry's extract output (franken-mod tree).
+> - `sigkill_recovery_gpk_retry_truncates_partial_via_fs_write` — source-inspects `download_file` for `fs::write(dest_file` (truncating write). A refactor to `OpenOptions::append` or pre-existing file-handle write would leave partial GPK bytes from the killed install mixed with the new download.
+> - `sigkill_recovery_detector_self_test` — proves both detectors bite on synthetic bad shapes (missing cleanup; cleanup after extract).
+>
+> Rationale: downloads buffer in memory via `fetch_bytes_streaming`, so SIGKILL mid-download leaves NO on-disk partial. Residual failure mode is SIGKILL DURING the commit step; the retry path's pre-write cleanup is the invariant that keeps re-install deterministic. Structural/source-inspection pin matches the wiring-guard pattern established by iters 74, 79, 83, 86.
+>
+> Acceptance: 851/851 Rust (was 848, +3), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
+>
+> Next iter picks from shrinking P1 non-pin backlog: `adv.tampered-catalog` (higher scope — reqwest wiring), or §3 reliability items.
 
 > **Iter 94 WORK — pin.external.download-extract DONE (worktree).**
 >
@@ -581,7 +595,7 @@ tauri_v2_migration_ready_for_squash_merge: true
 - [P1] **adv.tampered-exe** — Covered by 3.1.11.
 - [DONE @ iter 79] **adv.bogus-gpk-footer** — Extended `parse_mod_file_rejects_non_tmm_gpks` from 1 fixture to 9 covering empty / too-small / wrong-magic / magic-only / misplaced-magic / huge-composite-count / small-non-magic shapes. Three invariants pinned: never panics, non-TMM surfaces as Err or empty-container Ok, install_gpk gate catches it. Structural guards in `tests/bogus_gpk_footer.rs` (4 tests) pin the test presence + magic-check branch + install_gpk empty-container gate across refactors. Worktree commit `39b09e4`. Pillar: Security.
 - [P1] **adv.composite-object-collision** — Covered by 3.3.3.
-- [P1] **adv.sigkill-mid-download** — Author test: registry row recoverable to Error on boot, partial file removed. Acceptance: test passes. Pillar: Reliability.
+- [DONE @ iter 95] **adv.sigkill-mid-download** — Closed on worktree commit `b9712c6`. Registry side already covered by 4 tests in `registry.rs` (`recover_stuck_installs` flips stranded Installing → Error on boot). Filesystem side pinned by 3 source-inspection tests in `tests/crash_recovery.rs`: (a) `download_and_extract` clears dest_dir via `remove_dir_all` BEFORE `extract_zip` (ordering-checked) — prevents retry-after-SIGKILL mixing dead install's files with new extract's tree; (b) `download_file` uses truncating `fs::write(dest_file, ...)` — prevents partial-GPK-byte contamination on retry; (c) detector self-test proves both checks bite on synthetic bad shapes. Downloads buffer in memory via `fetch_bytes_streaming`, so SIGKILL mid-download leaves no on-disk partial — the residual failure mode is SIGKILL during commit, which both invariants cover. Pillar: Reliability.
 - [P1] **adv.disk-full** — Covered by 3.2.8.
 
 ### Test pinning (PRD §5.4) — author before any refactor
