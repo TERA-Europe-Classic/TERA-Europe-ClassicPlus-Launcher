@@ -7,19 +7,21 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 17
-last_work_iteration: 17
+iteration_counter: 18
+last_work_iteration: 18
 last_research_sweep: 10
 last_revalidation: never
 last_revalidation_status: never
 last_retrospective: never
 last_blocked_retry: never
-last_investigation_iteration: 9
+last_investigation_iteration: 18
 total_items_done: 13
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
 
+> **Iter 18 note:** partial progress on `sec.tauri-v1-eol-plan`. Audit draft committed at `docs/PRD/audits/security/tauri-v2-migration.md`. Recommendation stands (migrate). Remaining acceptance gated on 4 human decision gates — re-attempt at BLOCKED RE-TRY every 50 iters or on sign-off.
+>
 > **Iter 13 note:** partial progress on `3.1.6.secret-leak-scan`. gitleaks ran across all 5 repos (6,665 commits, 366 MB); 33 raw hits triaged to 1 true positive + 4 leaky-but-not-secret + 28 false positives. Audit doc committed at `docs/PRD/audits/security/secret-leak-scan.md` (commit 01064c9). 4 new items queued below (3 fix + 1 infra). No git history rewrite performed (not authorised without human sign-off per §12 safety valves).
 
 > **Iter 9 note:** partial progress on `3.1.13.portal-https`. Audit draft committed at `docs/PRD/audits/security/portal-https-migration.md` (commit dc604d0). Remaining acceptance gated on production HTTPS endpoint (human infra).
@@ -56,7 +58,7 @@ total_iterations_to_cap: 1000
 
 ### Security (PRD §3.1)
 
-- [P0] **sec.tauri-v1-eol-plan** — Tauri 2.0 stable shipped 2024-10-02; 1.x is security-backport-only with all feature work on v2. CSP-per-window, capability ACLs, and updater-signature-v2 are v2-only — gates PRD items 3.1.8 (anti-reverse), 3.1.9 (updater-downgrade), 3.1.12 (CSP unsafe-inline). Action: author `docs/PRD/audits/security/tauri-v2-migration.md` with migration scope + risk assessment, then decide stay-on-1 vs migrate. Acceptance: audit doc signed off with a concrete plan (either: migrate, with milestones; or: stay with documented compensating controls). Pillar: Security. Discovered iter 10 RESEARCH SWEEP.
+- [P0] **sec.tauri-v1-eol-plan** — Tauri 2.0 stable shipped 2024-10-02; 1.x is security-backport-only with all feature work on v2. CSP-per-window, capability ACLs, and updater-signature-v2 are v2-only — gates PRD items 3.1.8 (anti-reverse), 3.1.9 (updater-downgrade), 3.1.12 (CSP unsafe-inline). Action: author `docs/PRD/audits/security/tauri-v2-migration.md` with migration scope + risk assessment, then decide stay-on-1 vs migrate. Acceptance: audit doc signed off with a concrete plan (either: migrate, with milestones; or: stay with documented compensating controls). Pillar: Security. Discovered iter 10 RESEARCH SWEEP. **Iter 18 status:** audit draft authored documenting 1.x surface (40 commands, 11 allowlist categories, 1 window, CSP+unsafe-inline, active updater), breaking changes (allowlist→capabilities, plugins split into 7 crates, JS API path changes, v2 updater manifest), 7-milestone migration scope, recommendation = migrate. Remaining acceptance gated on human sign-off of 4 decision gates (migrate-vs-stay, target v2 version, version bump, dual-format latest.json duration).
 - [P0] **3.1.13.portal-https** — Migrate `teralib/src/config/config.json` portal API URL from `http://192.168.1.128:8090` (current) to HTTPS endpoint before Classic+ public launch. Acceptance: config URL starts with `https://`; end-to-end login works against HTTPS endpoint; audit doc signed off. Pillar: Security. **Iter 9 status:** audit draft authored at `docs/PRD/audits/security/portal-https-migration.md` (commit dc604d0). Remaining acceptance gated on external human infra (production FQDN + TLS cert + reverse proxy). Re-attempt at BLOCKED RE-TRY every 50 iters or when human provides the endpoint.
 - [P0] **3.1.8.anti-reverse-hardening** — Enable Rust release-profile LTO + strip + CFG + stack-canary; apply `cryptify`/`chamox` string obfuscation to all sensitive string literals (portal URLs, AuthKey-adjacent code, update-server URL, deploy paths). Author `docs/PRD/audits/security/anti-reverse.md` with build-output inspection (IDA/Ghidra screenshots showing obfuscated strings). Acceptance: audit doc signed off; release build flags verified in `Cargo.toml`. Pillar: Security.
 - [P0] **3.1.10.tcc-shinra-binary-hardening** — Strip TCC + Shinra release-mode debug symbols; evaluate ConfuserEx / Obfuscar for IL-obfuscation on sensitive types (e.g. sniffer keys, session-decryption code). Author `docs/PRD/audits/security/tcc-shinra-binary-hardening.md`. Acceptance: release binaries show no `.pdb`-adjacent symbols; audit doc signed off. Pillar: Security.
