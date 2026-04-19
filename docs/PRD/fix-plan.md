@@ -7,9 +7,9 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 209
+iteration_counter: 210
 last_work_iteration: 209
-last_research_sweep: 190
+last_research_sweep: 210
 last_revalidation: 200
 last_revalidation_status: all-gates-green
 last_retrospective: 60
@@ -25,6 +25,10 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: b8d45c2
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 210 RESEARCH SWEEP — zero new advisories, zero dep drift, zero regressions across 20-iter window (iter 190→210). Doc: `docs/PRD/audits/research/sweep-iter-210.md`.**
+>
+> 19 allowed warnings (unchanged from iter 170/180/190). Both documented ignores (RUSTSEC-2026-0097 rand, RUSTSEC-2026-0007 bytes) still in force. Cargo.toml zero changes in window; Cargo.lock touched once (iter 202) as test-build side-effect, no version bumps. +90 Rust tests added via 19 `test(...)` commits across iter 191-209. Tauri 2.x ecosystem: no new CVE-class advisories 2026-04-01..2026-04-20. Zero actionable items; backlog unchanged. Next sweep: iter 220. Next revalidation: iter 220 (N%20=0).
 
 > **Iter 209 WORK — pin.meta-hygiene-KNOWN_GUARDS-nodups+suffix-convention+MIN_BYTES-literal+TESTS_DIR-verbatim+count-floor DONE (worktree).**
 >
