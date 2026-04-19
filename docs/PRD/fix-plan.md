@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 76
-last_work_iteration: 76
+iteration_counter: 77
+last_work_iteration: 77
 last_research_sweep: 70
 last_revalidation: 72
 last_revalidation_status: all-gates-green
@@ -16,15 +16,26 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 18
-total_items_done: 58
+total_items_done: 59
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 5e46d71
+tauri_v2_migration_last_commit: b05bf16
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 77 WORK — fix.mods-hardcoded-i18n-strings DONE (worktree).**
+>
+> Pre-squash filler work, higher blast radius than the iter 74-76 wiring trio (touched 4 locales + 2 source files + a test). Worktree commit `b05bf16`. Closes the iter-48 P1: the 10-entry hardcoded-English allowlist in i18n-no-hardcoded.test.js is now empty and the scanner enforces strict-zero. **Every user-facing English string in mods.html + mods.js now routes through the i18n layer.**
+> - `app.js::updateAllTranslations()` grew a `data-translate-aria-label` pass (sibling to the existing title/placeholder handlers).
+> - `mods.html` static 3 leaks → `data-translate-aria-label` + `data-translate-title` attributes on the three close/category buttons.
+> - `mods.js` dynamic 7 leaks → `${window.App?.t('KEY') ?? 'fallback'}` template-interpolation shells in each innerHTML template. Scanner skips them per its existing `includes('${')` rule; the defensive `??` fallback keeps the UI functional even if `window.App` isn't yet bound (during initial render).
+> - `translations.json`: 9 new keys × 4 locales = 36 additions. Proper translations in each locale (FRA/EUR/RUS/GER). i18n-parity still 4/4, i18n-jargon still 3/3.
+> - `i18n-no-hardcoded.test.js`: allowlist `[]`, "allowlist is non-empty" → "allowlist is empty (strict-zero enforced)."
+>
+> Four P1 filler items shipped since the M8 validation gate (iters 74-77: overlay-lifecycle, clean-recovery, conflict-modal, hardcoded-i18n). Worktree ready state unchanged — still `ready_for_squash_merge: true`. Next iter (78) either picks a fresh PRD §3 item (P1 backlog is deep) or starts the M6-b-rustc-CFG-via-CI work if the user wants to cover that before squash.
 
 > **Iter 76 WORK — fix.conflict-modal-wiring DONE (worktree).**
 >
@@ -346,7 +357,7 @@ tauri_v2_migration_ready_for_squash_merge: true
   - **M0 DONE @ iter 63**: worktree `../tauri-v2-migration` created from main @ 6860d86; baseline snapshot doc committed on worktree branch as cc33d92. Pinned: rustc 1.89.0, cargo 1.89.0, node v24.1.0, tauri 1.0 + 15 features, @tauri-apps/cli 1.6.3, 41 Tauri commands, 11 allowlist categories, 9 HTTP scope entries, 790 Rust + 431 JS = 1221 tests, v0.1.10 setup.exe 52.05 MB, 7 CI gates green, minisign pubkey fingerprint RWSEL+9/IIo3Gw3Vn1pXMl8p+ykWyKsZ/dzjmVrs0Ll2v1v9rE0yed2L.
   - **M1 SPLIT @ iter 64**: `cargo tauri migrate` (CLI 2.10.1) errored first pass on a `links = "web_kit2"` conflict between dead dep `devtools@0.3.3` and `tauri-plugin-notification@2`. Pre-flight commit c85f7a8 dropped `devtools` (zero imports confirmed). Re-ran migrate, succeeded. Produced: Cargo.toml tauri 1.0 → 2, tauri-build 1 → 2, 15-feature flag list dropped, 6 plugin crates added (process/shell/http/notification/dialog/fs — all "2"), updater moved under desktop cfg(target); tauri.conf.json full shape rewrite; capabilities/migrated.json + desktop.json generated with all 9 HTTP URLs + fs scope + shell open-url custom command preserved verbatim; 13 src/ files + 4 tests/ refactored imports/API paths; main.rs .plugin(...) initialisers appended; package.json + lock with @tauri-apps/plugin-* packages. 23 files / 2151+ / 1941- lines. **M1a commit d708455 = pure tool output, does NOT build** — 44 compile errors, dominant class `get_window("main")` → v2 renamed to `get_webview_window("main")` at call sites the tool missed, plus Manager-trait re-pathing. All mechanical renames. Split preserves diff-reviewability (reviewer can see tool-output vs human-touchup separately).
   - **M1b** next iter fixes the v1→v2 API drift so `cargo build --release` passes. Remaining after M1b: M2 JS imports, M3 command-surface review (scope now reduced since tool handled most of it), M4 updater dual-format, M5 CSP tightening (closes 3.1.12), M6 anti-reverse (closes 3.1.8), M7 downgrade refusal (closes 3.1.9), M8 squash merge + deploy, M9 monitor. Est. +1 iter for the M1 split → 10–12 iterations to M8. Acceptance: every PRD §3.1 Tauri-v2-gated P0 closes as side-effect; full CI green on v2; 0.1.x users auto-upgrade cleanly. Pillar: Security.
-- [P1] **fix.mods-hardcoded-i18n-strings** — Burn down the 10 documented allowlist entries in `teralaunch/tests/i18n-no-hardcoded.test.js`. Work split: (1) teach `app.js::updateAllTranslations()` to handle `data-translate-aria-label` so aria/close/overflow/category buttons can be annotated; (2) annotate the 7 mods.js leaks + 3 mods.html leaks with the new attribute; (3) add the 7-10 new translation keys to all 4 locales in `src/translations.json` (parity test at 3.7.1 is the guardrail). Acceptance: allowlist length goes to 0, `i18n-no-hardcoded.test.js::no new hardcoded English outside the allowlist` still passes with the final `expect(ALLOWLIST.length).toBe(0)` assertion flipped. Pillar: i18n. Discovered iter 48.
+- [DONE] fix.mods-hardcoded-i18n-strings — burned down on worktree commit `b05bf16` (iter 77). `app.js::updateAllTranslations()` extended with `data-translate-aria-label` handler (sets aria-label via setAttribute on each match). mods.html: 3 static leaks annotated with the new attribute (titlebar close, detail close, category filter). mods.js: 7 dynamic leaks wrapped in `${window.App?.t('KEY') ?? 'fallback'}` template-interpolation shells so the scanner's `includes('${')` skip kicks in (overflow aria-label, toggle enabled/disabled titles, running pill, details/open-source/uninstall popover items). 9 new translation keys added to all 4 locales (FRA/EUR/RUS/GER) with proper translations — key-parity + jargon tests both clean. ALLOWLIST flipped `[]` and the non-empty assertion flipped to strict-zero "allowlist is empty (strict-zero enforced after burn-down)." 431/431 Vitest, 821/821 Rust, clippy clean. Pillar: i18n. Verified @ iter 77.
 
 ### Security follow-ups from iter-27 self-integrity
 
