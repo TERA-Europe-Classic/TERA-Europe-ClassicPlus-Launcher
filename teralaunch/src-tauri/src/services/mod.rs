@@ -33,3 +33,4 @@ pub mod download_service;
 pub mod game_service;
 pub mod hash_service;
 pub mod mods;
+pub mod self_integrity;

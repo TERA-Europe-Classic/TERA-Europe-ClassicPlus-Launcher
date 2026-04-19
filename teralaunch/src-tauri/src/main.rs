@@ -95,6 +95,101 @@ fn should_auto_install_updater() -> bool {
     )
 }
 
+/// Runs the self-integrity check against a sidecar baseline. Designed so the
+/// dev path (no sidecar present) is a WARN, not an error, while production
+/// mismatch triggers a native Windows MessageBox and terminates the process
+/// before any Tauri setup runs.
+///
+/// The sidecar file is `<exe_dir>/self_hash.sha256`, containing a 64-char
+/// hex sha256 (whitespace stripped). It's signed by the release pipeline's
+/// minisign key alongside the `.zip` / `.nsis.zip` artefacts so a local
+/// attacker who patches the exe cannot trivially also rewrite a matching
+/// baseline.
+fn run_self_integrity_check() {
+    use services::self_integrity::{verify_self, IntegrityResult, REINSTALL_PROMPT};
+
+    let exe = match std::env::current_exe() {
+        Ok(p) => p,
+        Err(e) => {
+            log::warn!("self-integrity: current_exe() failed: {e}; skipping");
+            return;
+        }
+    };
+    let sidecar = match exe.parent() {
+        Some(d) => d.join("self_hash.sha256"),
+        None => {
+            log::warn!("self-integrity: exe has no parent dir; skipping");
+            return;
+        }
+    };
+
+    let raw = match std::fs::read_to_string(&sidecar) {
+        Ok(s) => s,
+        Err(_) => {
+            log::warn!(
+                "self-integrity: sidecar {} not present; skipping (expected in dev, unexpected in release)",
+                sidecar.display()
+            );
+            return;
+        }
+    };
+    let expected = raw.trim();
+    if expected.len() != 64 || !expected.chars().all(|c| c.is_ascii_hexdigit()) {
+        log::warn!(
+            "self-integrity: sidecar content is not a 64-char hex digest; skipping ({} bytes)",
+            expected.len()
+        );
+        return;
+    }
+
+    match verify_self(expected) {
+        IntegrityResult::Match => {
+            log::info!("self-integrity: launcher matches baseline");
+        }
+        IntegrityResult::Unreadable(reason) => {
+            log::warn!("self-integrity: could not read launcher: {reason}");
+        }
+        IntegrityResult::Mismatch { .. } => {
+            log::error!("self-integrity: launcher has been modified since release");
+            log::error!("{REINSTALL_PROMPT}");
+            show_integrity_failure_dialog(REINSTALL_PROMPT);
+            std::process::exit(2);
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn show_integrity_failure_dialog(message: &str) {
+    use std::iter::once;
+    use std::os::windows::ffi::OsStrExt;
+    use winapi::um::winuser::{MessageBoxW, MB_ICONERROR, MB_OK};
+
+    let title: Vec<u16> = std::ffi::OsStr::new("Launcher Integrity Check Failed")
+        .encode_wide()
+        .chain(once(0))
+        .collect();
+    let body: Vec<u16> = std::ffi::OsStr::new(message)
+        .encode_wide()
+        .chain(once(0))
+        .collect();
+
+    // SAFETY: both buffers are null-terminated UTF-16 owned by us.
+    unsafe {
+        MessageBoxW(
+            std::ptr::null_mut(),
+            body.as_ptr(),
+            title.as_ptr(),
+            MB_OK | MB_ICONERROR,
+        );
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn show_integrity_failure_dialog(_message: &str) {
+    // Non-Windows dev builds: the log::error! above already carries the
+    // prompt text; the launcher isn't distributed on these platforms.
+}
+
 #[cfg(not(tarpaulin_include))]
 fn main() {
     dotenv().ok();
@@ -148,6 +243,12 @@ fn main() {
     // Configure only the teralib logger
     log::set_boxed_logger(Box::new(tera_logger)).expect("Failed to set logger");
     log::set_max_level(LevelFilter::Info);
+
+    // PRD 3.1.11.self-integrity. Verify the exe against the signed sidecar
+    // baseline before doing any more work. If the sidecar is absent (dev
+    // builds) we log a warning and continue; release builds should always
+    // ship the sidecar.
+    run_self_integrity_check();
 
     let game_status_receiver = teralib::get_game_status_receiver();
     let game_state = GameState {
