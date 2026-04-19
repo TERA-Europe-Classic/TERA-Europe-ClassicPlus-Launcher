@@ -487,6 +487,36 @@ pub fn ensure_backup(game_root: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// Validates that a TMM container filename from an untrusted `.gpk` is a
+/// plain leaf name (no separators, no parent traversal, no drive letters,
+/// no null bytes, not dot-only). Real TMM containers are flat filenames
+/// like `S1Data_2.gpk`; anything else is either malformed or hostile.
+pub(crate) fn is_safe_gpk_container_filename(name: &str) -> bool {
+    if name.is_empty() {
+        return false;
+    }
+    if name.contains('/') || name.contains('\\') {
+        return false;
+    }
+    if name.contains('\0') {
+        return false;
+    }
+    if name == "." || name == ".." {
+        return false;
+    }
+    // Reject any literal `..` component (even embedded, e.g. "foo..bar")
+    // just in case some platform normalises it.
+    if name.contains("..") {
+        return false;
+    }
+    // Windows drive-letter prefix (e.g. "C:foo").
+    let bytes = name.as_bytes();
+    if bytes.len() >= 2 && bytes[1] == b':' {
+        return false;
+    }
+    true
+}
+
 /// Installs a mod by:
 ///   1. Reading the vanilla mapper from `.clean` (or the current mapper
 ///      as a fallback — first install will hit this path).
@@ -496,9 +526,9 @@ pub fn ensure_backup(game_root: &Path) -> Result<(), String> {
 ///      new file + offset.
 ///   5. Writing the encrypted mapper back to disk.
 pub fn install_gpk(game_root: &Path, source_gpk: &Path) -> Result<ModFile, String> {
-    ensure_backup(game_root)?;
-
-    // Parse the mod file.
+    // Parse the mod file BEFORE touching any filesystem state (including the
+    // backup). This way a rejected install leaves `.clean` untouched (PRD
+    // 3.1.4.gpk-deploy-sandbox).
     let gpk_bytes =
         fs::read(source_gpk).map_err(|e| format!("Failed to read mod file: {}", e))?;
     let modfile = parse_mod_file(&gpk_bytes)?;
@@ -507,6 +537,12 @@ pub fn install_gpk(game_root: &Path, source_gpk: &Path) -> Result<ModFile, Strin
             "Mod file has no TMM container name — this .gpk is not TMM-compatible."
                 .into(),
         );
+    }
+    if !is_safe_gpk_container_filename(&modfile.container) {
+        return Err(format!(
+            "Mod container filename '{}' is unsafe — refusing to deploy (would escape CookedPC).",
+            modfile.container
+        ));
     }
     if modfile.packages.is_empty() {
         return Err("Mod file declares no composite packages to override.".into());
@@ -517,6 +553,8 @@ pub fn install_gpk(game_root: &Path, source_gpk: &Path) -> Result<ModFile, Strin
                 .into(),
         );
     }
+
+    ensure_backup(game_root)?;
 
     // Copy the mod file into CookedPC with the exact container filename TMM
     // expects. The game loads whatever the mapper points at, so the filename
@@ -585,6 +623,12 @@ pub fn install_gpk(game_root: &Path, source_gpk: &Path) -> Result<ModFile, Strin
 ///      of this mod's object paths.
 ///   3. Deletes the `.gpk` from CookedPC.
 pub fn uninstall_gpk(game_root: &Path, container: &str, object_paths: &[String]) -> Result<(), String> {
+    if !is_safe_gpk_container_filename(container) {
+        return Err(format!(
+            "Refusing to uninstall: container filename '{}' is unsafe — would escape CookedPC.",
+            container
+        ));
+    }
     let backup = backup_path(game_root);
     if !backup.exists() {
         return Err(
@@ -634,6 +678,7 @@ fn _unused_cursor_suppress(_: Cursor<Vec<u8>>, _: Box<dyn Read>) {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::TempDir;
 
     #[test]
     fn encrypt_then_decrypt_is_identity() {
@@ -692,5 +737,80 @@ mod tests {
         let m = parse_mod_file(&bytes).unwrap();
         assert!(m.container.is_empty());
         assert_eq!(m.packages.len(), 1);
+    }
+
+    /// PRD 3.1.4.gpk-deploy-sandbox. The TMM container filename in a `.gpk`
+    /// mod footer is attacker-controlled — a hostile mod can set it to
+    /// `../../Windows/foo.gpk` and install_gpk's `game_root.join(CookedPC)
+    /// .join(&modfile.container)` would resolve through Path's parent
+    /// traversal, escaping CookedPC. `is_safe_gpk_container_filename` is
+    /// the first gate; this test pins it over ≥5 `..`-based vectors plus
+    /// absolute-path, drive-letter, separator, null, and dot-only variants.
+    #[test]
+    fn deploy_path_clamped_inside_game_root() {
+        // Negative: every one of these must be rejected.
+        let hostile = [
+            // ..-based (5+, per PRD bar)
+            "..",
+            "../evil.gpk",
+            "../../evil.gpk",
+            "..\\evil.gpk",
+            "..\\..\\evil.gpk",
+            "foo..bar.gpk",  // embedded .. too (prevents creative normalisation bypasses)
+            // Absolute POSIX
+            "/etc/passwd",
+            // Subdir with forward or back slash
+            "sub/evil.gpk",
+            "sub\\evil.gpk",
+            // Windows drive-letter
+            "C:evil.gpk",
+            "D:/evil.gpk",
+            // Null byte / empty / dot-only
+            "\0evil.gpk",
+            "evil\0.gpk",
+            "",
+            ".",
+        ];
+        for name in hostile {
+            assert!(
+                !is_safe_gpk_container_filename(name),
+                "vector {name:?} must be rejected"
+            );
+        }
+
+        // Positive control: realistic TMM container names are plain leafs.
+        let safe = [
+            "S1Data_2.gpk",
+            "ModFile.gpk",
+            "a.gpk",
+            "file_with_underscore.bin",
+            "no-extension",
+        ];
+        for name in safe {
+            assert!(
+                is_safe_gpk_container_filename(name),
+                "vector {name:?} should have been accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn uninstall_gpk_rejects_hostile_container_before_any_fs_write() {
+        // Lightweight higher-level proof that the sandbox is wired up on
+        // uninstall (mirror of install's entry-point check). No game root
+        // fs state is needed: we expect the guard to err out immediately.
+        let tmp = TempDir::new().unwrap();
+        let err = uninstall_gpk(tmp.path(), "../escape.gpk", &[])
+            .expect_err("uninstall must reject hostile container");
+        assert!(
+            err.contains("unsafe") || err.contains("escape"),
+            "unexpected error: {err}"
+        );
+        // tmp should have no CookedPC dir or any other artifact created.
+        let entries: Vec<_> = fs::read_dir(tmp.path()).unwrap().flatten().collect();
+        assert!(
+            entries.is_empty(),
+            "uninstall created filesystem state despite rejection: {entries:?}"
+        );
     }
 }
