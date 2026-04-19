@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 85
-last_work_iteration: 85
+iteration_counter: 86
+last_work_iteration: 86
 last_research_sweep: 80
 last_revalidation: 72
 last_revalidation_status: all-gates-green
@@ -16,15 +16,25 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 18
-total_items_done: 66
+total_items_done: 67
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: a84349e
+tauri_v2_migration_last_commit: 825ec70
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 86 WORK — sec.shell-scope-hardening DONE (worktree).**
+>
+> Third of five iter-80 queued P2 items closed. Worktree commit `825ec70`. Defence-in-depth against CVE-2025-31477 regression: `tauri.conf.json` now pins `"plugins": { "shell": { "open": true } }` — the Tauri 2.x advisory's recommended value (restricts the `open` endpoint to the mailto/http/https allowlist explicitly).
+> - Plugin 2.3.5 (our pin) already carries the fix by default; this commit makes it config-explicit so a future plugin default-flip can't silently re-open the surface.
+> - New wiring guard at `tests/shell_scope_pinned.rs` (3 tests): value is literally `true` (rejects false/regex-string/missing), stanza lives under top-level `.plugins` (rejects the v1-shaped `tauri.allowlist.shell` block), detector self-test with negative fixtures.
+>
+> Acceptance: 834/834 Rust (was 831, +3 new in shell_scope_pinned), clippy clean, 449/449 JS unchanged (Rust-only change). Worktree ready state unchanged — `ready_for_squash_merge: true`.
+>
+> Two iter-80 items remain: `dep.dedupe-reqwest-zip` (P2, iter 87) and `dep.vitest-bump-post-squash` (P3, post-squash only).
 
 > **Iter 85 WORK — fix.mods-categories-ui DONE (worktree). Third and last user-reported P1 from iter 82 triage closed.**
 >
