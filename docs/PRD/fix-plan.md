@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 201
-last_work_iteration: 201
+iteration_counter: 202
+last_work_iteration: 202
 last_research_sweep: 190
 last_revalidation: 200
 last_revalidation_status: all-gates-green
@@ -16,28 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 176
+total_items_done: 177
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 89144af
+tauri_v2_migration_last_commit: 935dd9b
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 201 WORK — pin.http-allowlist-path+identifier+prod-scopes+regex DONE (worktree). First WORK after 200-iter milestone.**
+> **Iter 202 WORK — pin.parallel-install-guard-header+err-short-circuits-save+ensure_loaded-ordering+upsert-on-success+poisoned-lock DONE (worktree).**
 >
-> Worktree commit `89144af`. §3.1.5 security-pillar pair (with iter-199 http_redirect_offlist); http_allowlist had 9 tests (iter 104 creation + iter 156 +5); 45 iters untouched. Brings to 14.
+> Worktree commit `935dd9b`. §3.2.7 functionality-pillar (concurrent install safety); parallel_install had 9 tests (iter 159); 43 iters untouched. Pairs with §3.2 recovery-pillar trio (iter 194-196). Brings to 14.
 >
 > Five new source-inspection pins:
-> 1. `guard_file_header_cites_prd_3_1_5` — header cites §3.1.5 + `http allowlist` nomenclature
-> 2. `capability_file_path_is_migrated_json_verbatim` — guard reads `capabilities/migrated.json` verbatim; rename caught here, not only via panic-at-test-time
-> 3. `load_scopes_filters_by_http_default_identifier_only` — `if id != "http:default" { continue; }` filter must be present; a future `http:*` capability's allow list would otherwise union in
-> 4. `capability_contains_required_production_scopes` — pin `*.tera-europe.net` + `tera-europe-classic.com` + `raw.githubusercontent.com` scopes; absence breaks specific launcher features
-> 5. `url_extraction_regex_handles_common_literal_shapes` — self-test URL regex + trim on quoted / trailing-punctuation / format-string shapes
+> 1. `guard_file_header_cites_prd_and_parallel_install_name` — header cites PRD 3.2.7 + `parallel-install-serialised`
+> 2. `mutate_closure_err_short_circuits_before_save` — pins `let result = f(&mut state.registry)?;` shape + ordering vs `state.registry.save(`; a future refactor that swallows the `?` would silently persist partial state
+> 3. `mutate_calls_ensure_loaded_before_write_lock` — `ensure_loaded()?` strictly before `MODS_STATE.write()`; inversion would deadlock (ensure_loaded itself acquires write)
+> 4. `try_claim_installing_upserts_row_on_success` — body must call `self.upsert(row)` AFTER the `matches!(slot.status, ModStatus::Installing)` refusal; dropping upsert would cause row loss on first-claim
+> 5. `mutate_surfaces_poisoned_lock_error_explicitly` — `"Mods state poisoned"` via `.map_err(|e|`; removing the branded message would silently drop lock poisoning signal
 >
-> http_allowlist: 9 → 14 tests. 1238 Rust (+5), clippy clean, vitest 449/449.
+> parallel_install: 9 → 14 tests. 1243 Rust (+5), clippy clean, vitest 449/449.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
