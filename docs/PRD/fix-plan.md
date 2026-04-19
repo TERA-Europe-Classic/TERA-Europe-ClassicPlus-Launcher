@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 134
-last_work_iteration: 134
+iteration_counter: 135
+last_work_iteration: 135
 last_research_sweep: 130
 last_revalidation: 120
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 114
+total_items_done: 115
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 8e2cf78
+tauri_v2_migration_last_commit: 95489d0
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 135 WORK — pin.meta-hygiene-guard DONE (worktree).**
+>
+> Worktree commit `95489d0`. The worktree now carries 18 structural drift-guard files (iters 86-131) + 1 meta-guard. Each of the 18 follows three hand-enforced conventions: module-level `//!` header, detector self-test fn, traceable anchor (PRD criterion / P-slot / iter / named audit). Nothing programmatically enforced these conventions, so a future guard-author could skip them silently.
+>
+> New `tests/meta_hygiene_guard.rs` (5 tests):
+> 1. `known_guard_list_matches_disk` — `KNOWN_GUARDS` list ↔ `fs::read_dir("tests")` must match exactly. Silent deletion OR silent addition both trip.
+> 2. `every_guard_carries_module_doc_header` — first non-blank line must start with `//!`
+> 3. `every_guard_carries_a_detector_self_test` — file must have at least one `fn *_self_test` or `fn *_detector*` 
+> 4. `every_guard_header_cites_a_traceable_anchor` — header must contain PRD `3.x.y` / §3 / `fix.*` / `sec.*` / `adv.*` / `pin.*` / `iter N` / `Classic+` / `tauri-v1` / `tauri-v2` / `CVE-`
+> 5. `meta_guard_hygiene_detector_self_test` on 3 bad shapes + 1 positive
+>
+> All 18 existing guards pass the hygiene contract unmodified (confirmed at test-time). File enumeration via `fs::read_dir` at runtime so the meta-guard auto-picks-up new guard files; contributors only need to keep `KNOWN_GUARDS` in sync when files are added or removed.
+>
+> Acceptance: 964/964 Rust (was 959, +5), clippy clean (needed `&Path` not `&PathBuf` per ptr_arg lint), 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 134 WORK — pin.§3.3.4-e2e-playwright + JS-idiom-extension DONE (worktree).**
 >
