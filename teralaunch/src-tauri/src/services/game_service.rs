@@ -106,12 +106,21 @@ pub fn get_executable_path(game_path: &Path) -> PathBuf {
 }
 
 /// Launch parameters for the game.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// `ticket` is session-sensitive — it's the short-lived credential passed
+/// to TERA.exe on the command line. `ZeroizeOnDrop` overwrites its buffer
+/// when the struct drops. Other fields are filenames / user-visible state
+/// with no secret content and are `#[zeroize(skip)]`.
+#[derive(Debug, Clone, PartialEq, Eq, zeroize::Zeroize, zeroize::ZeroizeOnDrop)]
 pub struct LaunchParams {
+    #[zeroize(skip)]
     pub executable_path: PathBuf,
+    #[zeroize(skip)]
     pub account_name: String,
+    #[zeroize(skip)]
     pub character_count: String,
     pub ticket: String,
+    #[zeroize(skip)]
     pub language: String,
 }
 
@@ -521,5 +530,33 @@ mod tests {
     fn format_exit_status_none() {
         let status = format_exit_status(None);
         assert!(status.contains("terminated"));
+    }
+
+    // --- PRD 3.1.7.zeroize-audit ------------------------------------------
+
+    #[test]
+    fn launch_params_zeroize_clears_ticket() {
+        use zeroize::Zeroize;
+        let mut p = LaunchParams {
+            executable_path: PathBuf::from("/path/to/TERA.exe"),
+            account_name: "acct".to_string(),
+            character_count: "1".to_string(),
+            ticket: "super-secret-ticket-value".to_string(),
+            language: "EUR".to_string(),
+        };
+        p.zeroize();
+        assert!(p.ticket.is_empty(), "ticket must be empty after zeroize");
+        // Non-sensitive fields preserved (skipped by derive).
+        assert_eq!(p.account_name, "acct");
+        assert_eq!(p.language, "EUR");
+        assert_eq!(p.character_count, "1");
+        assert_eq!(p.executable_path, PathBuf::from("/path/to/TERA.exe"));
+    }
+
+    #[test]
+    fn launch_params_implements_zeroize_on_drop() {
+        use zeroize::ZeroizeOnDrop;
+        fn assert_zod<T: ZeroizeOnDrop>() {}
+        assert_zod::<LaunchParams>();
     }
 }

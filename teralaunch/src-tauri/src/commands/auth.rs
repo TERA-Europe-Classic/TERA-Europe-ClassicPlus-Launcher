@@ -8,6 +8,7 @@
 
 use log::info;
 use serde_json::json;
+use zeroize::Zeroizing;
 
 use crate::domain::{CONNECT_TIMEOUT_SECS, DOWNLOAD_TIMEOUT_SECS};
 use crate::infrastructure::{HttpClient, ReqwestClient};
@@ -39,6 +40,10 @@ async fn login_with_client<H: HttpClient>(
     password: String,
     login_url: &str,
 ) -> Result<String, String> {
+    // Wrap the password the moment we cross into this fn so the buffer is
+    // zeroed on drop — whether we return early on validation failure or fall
+    // through to the HTTP request. (PRD 3.1.7.zeroize-audit)
+    let password = Zeroizing::new(password);
     if auth_service::validate_credentials(&username, &password).is_err() {
         return Err("Username and password cannot be empty".to_string());
     }
@@ -46,7 +51,7 @@ async fn login_with_client<H: HttpClient>(
     // Build JSON payload for v100 API
     let payload = json!({
         "login": username,
-        "password": password
+        "password": password.as_str()
     });
 
     // Single POST request to v100 login endpoint
@@ -115,6 +120,9 @@ async fn register_with_client<H: HttpClient>(
     password: String,
     register_url: &str,
 ) -> Result<String, String> {
+    // PRD 3.1.7.zeroize-audit: zeroize password buffer on drop, regardless
+    // of which branch we take.
+    let password = Zeroizing::new(password);
     if auth_service::validate_registration(&login, &email, &password).is_err() {
         return Err("All fields must be provided".to_string());
     }
@@ -123,7 +131,7 @@ async fn register_with_client<H: HttpClient>(
     let payload = json!({
         "login": login,
         "email": email,
-        "password": password
+        "password": password.as_str()
     });
 
     let res = client.post(register_url, &payload.to_string()).await?;

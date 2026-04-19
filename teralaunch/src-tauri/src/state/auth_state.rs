@@ -43,16 +43,20 @@ pub fn get_auth_info() -> Option<GlobalAuthInfo> {
         user_no: guard.user_no,
         character_count: guard.character_count.clone(),
     })
+    // NB: the returned GlobalAuthInfo derives ZeroizeOnDrop; callers who let
+    // it drop get auth_key zeroed automatically. Don't move out of it field-
+    // by-field at call sites — assign the whole struct instead.
 }
 
 /// Sets the global authentication info.
 /// Recovers from poisoned lock by using `into_inner`.
 pub fn set_auth_info(info: GlobalAuthInfo) {
     let mut guard = GLOBAL_AUTH_INFO.write().unwrap_or_else(|e| e.into_inner());
-    guard.auth_key = info.auth_key;
-    guard.user_name = info.user_name;
-    guard.user_no = info.user_no;
-    guard.character_count = info.character_count;
+    // Swap the whole struct — GlobalAuthInfo derives ZeroizeOnDrop which
+    // implements Drop, so we can't move fields out of `info` individually.
+    // The old guard contents drop at end of scope, zeroing the prior
+    // auth_key (PRD 3.1.7).
+    *guard = info;
 }
 
 /// Clears the global authentication info (resets to default).

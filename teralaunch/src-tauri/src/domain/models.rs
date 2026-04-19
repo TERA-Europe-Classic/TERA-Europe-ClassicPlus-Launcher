@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// Information about a file that needs to be downloaded/updated
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -24,11 +25,21 @@ pub struct CachedFileInfo {
     pub last_modified: SystemTime,
 }
 
-/// Global authentication information stored after login
-#[derive(Default)]
+/// Global authentication information stored after login.
+///
+/// `auth_key` is session-sensitive — it authenticates every subsequent Portal
+/// API call until logout. The struct derives `ZeroizeOnDrop` so the auth_key
+/// buffer is overwritten when the struct drops (e.g. on logout reset or
+/// process exit). Non-sensitive fields (`user_name`, `user_no`,
+/// `character_count`) are `#[zeroize(skip)]` because wiping them serves no
+/// security purpose.
+#[derive(Default, Zeroize, ZeroizeOnDrop)]
 pub struct GlobalAuthInfo {
+    #[zeroize(skip)]
     pub character_count: String,
+    #[zeroize(skip)]
     pub user_no: i32,
+    #[zeroize(skip)]
     pub user_name: String,
     pub auth_key: String,
 }
@@ -190,5 +201,32 @@ mod tests {
         assert_eq!(auth_info.user_no, 12345);
         assert_eq!(auth_info.user_name, "test_user");
         assert_eq!(auth_info.auth_key, "secret_key_123");
+    }
+
+    // --- PRD 3.1.7.zeroize-audit ------------------------------------------
+
+    #[test]
+    fn global_auth_info_zeroize_clears_auth_key() {
+        let mut info = GlobalAuthInfo {
+            character_count: "5".to_string(),
+            user_no: 42,
+            user_name: "keeper".to_string(),
+            auth_key: "super-secret-auth-key".to_string(),
+        };
+        info.zeroize();
+        // auth_key zeroed.
+        assert!(info.auth_key.is_empty(), "auth_key must be empty after zeroize");
+        // Non-sensitive fields preserved (skipped by derive).
+        assert_eq!(info.user_name, "keeper");
+        assert_eq!(info.user_no, 42);
+        assert_eq!(info.character_count, "5");
+    }
+
+    #[test]
+    fn global_auth_info_implements_zeroize_on_drop() {
+        // Compile-time bound: derived ZeroizeOnDrop guarantees Drop zeroes
+        // auth_key. If the derive is removed, this won't compile.
+        fn assert_zod<T: ZeroizeOnDrop>() {}
+        assert_zod::<GlobalAuthInfo>();
     }
 }
