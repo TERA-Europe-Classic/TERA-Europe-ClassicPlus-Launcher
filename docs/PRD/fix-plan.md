@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 65
-last_work_iteration: 65
+iteration_counter: 66
+last_work_iteration: 66
 last_research_sweep: 60
 last_revalidation: 60
 last_revalidation_status: regression-resolved-next-iter
@@ -19,11 +19,22 @@ last_investigation_iteration: 18
 total_items_done: 52
 total_items_regressed: 0
 total_iterations_to_cap: 1000
-tauri_v2_migration_milestone: M1
+tauri_v2_migration_milestone: M2
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: f13e2bd
+tauri_v2_migration_last_commit: 65cd30c
 ```
+
+> **Iter 66 WORK — Tauri v2 M2 DONE (worktree).**
+>
+> Executed M2 on the `tauri-v2-migration` worktree. The migration-plan prescription was "rewrite `@tauri-apps/api/*` ES imports", but this codebase uses `withGlobalTauri: true` exclusively and has zero such imports — so the real M2 work for our shape was the globalTauri namespace rename + CLI bump. Worktree commit `65cd30c`:
+> - `@tauri-apps/cli` ^1.6.0 → ^2 (installed 2.10.1). Plugin JS packages already at v2 from M1.
+> - `window.__TAURI__.tauri.invoke` → `window.__TAURI__.core.invoke` with `.tauri` fallback, in both `src/app.js` and `src/mods.js`.
+> - Test global mocks in `tests/app.test.js` + `tests/search-perf.test.js` dual-key `core` + `tauri` so the `||` fallback resolves cleanly under vitest.
+>
+> Vitest acceptance: 10 files / 431 tests green in 1.56s. No regressions.
+>
+> Deferred explicitly to M3 (command-surface review): `window.__TAURI__.window.appWindow` → `getCurrentWebviewWindow`; plugin-namespaced globals (`.dialog`, `.shell`, `.updater`, `.app.getVersion`) that v2 only exposes with per-plugin opt-in — the runtime surfaces that use them (settings folder picker, external-link open, `app.getVersion` telemetry) need the v2 shape. Updater API reshape (checkUpdate gone) lands in M4 dual-format. Next iter (67) executes M3.
 
 > **Iter 65 WORK — Tauri v2 M1 DONE (worktree).**
 >
