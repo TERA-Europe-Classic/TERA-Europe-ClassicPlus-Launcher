@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 88
-last_work_iteration: 88
+iteration_counter: 89
+last_work_iteration: 89
 last_research_sweep: 80
 last_revalidation: 72
 last_revalidation_status: all-gates-green
@@ -16,15 +16,25 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 69
+total_items_done: 70
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: fd8c89c
+tauri_v2_migration_last_commit: ef1c01d
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 89 WORK — pin.tmm.parser DONE (worktree).**
+>
+> Worktree commit `ef1c01d`. Companion to iter 79's adversarial corpus — happy-path golden-file pin for `parse_mod_file`. A silent refactor that reorders footer slots, flips endian-ness, or reshuffles `read_prefixed_string` would break every TMM-packaged mod and surface only at install time; this pin catches it at commit time.
+> - **3 new inline tests** in `tmm.rs::tests`: `golden_v1_fixture_parses_to_expected_modfile` (hand-packed 136-byte v1 fixture, asserts every ModFile + ModPackage field byte-for-byte), `golden_fixture_shape_is_stable` (regression guard on the fixture itself — length 136, magic at tail, interior probes), `golden_parse_is_deterministic` (double-parse yields identical structs; catches hidden state).
+> - **TMM-format landmine documented inline:** v1 (legacy) puts PACKAGE_MAGIC at the "version" footer slot; v2+ puts a small integer there + has 4 TFC slots. Getting this discrimination wrong on first draft triggered a test failure; the corrected fixture uses PACKAGE_MAGIC at that slot with an inline warning comment.
+>
+> Acceptance: 837/837 Rust (was 834, +3 new), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
+>
+> Remaining pin.tmm trio: `pin.tmm.cipher` (3-pass mapper cipher), `pin.tmm.merger` (property-based composite-merge). Both still P1. Iter 90 is **RESEARCH SWEEP** (N%10=0 cadence) — iter 91 picks the next pin or another P1.
 
 > **Iter 88 WORK — infra.gitleaks-allowlist DONE (worktree).**
 >
@@ -522,7 +532,7 @@ tauri_v2_migration_ready_for_squash_merge: true
 ### Test pinning (PRD §5.4) — author before any refactor
 
 - [P1] **pin.tmm.cipher** — Golden-file test for `tmm.rs` 3-pass cipher (GeneratePackageMapper XOR + middle-outward swap + Key1 shuffle). Acceptance: byte-for-byte pin of current cipher output on a fixture mapper. Pillar: Reliability.
-- [P1] **pin.tmm.parser** — Golden-file test for `parse_mod_file` on a fixture GPK mod. Acceptance: fixture → expected `ModFile` struct byte-for-byte. Pillar: Reliability.
+- [DONE @ iter 89] **pin.tmm.parser** — Closed on worktree commit `ef1c01d`. Hand-packed 136-byte v1 fixture (1 composite package, ASCII strings, no TFC extras) inline in `tmm.rs::tests`. Three tests pin every ModFile + ModPackage field byte-for-byte, guard the fixture shape itself against drift, and assert parse determinism. TMM v1/v2+ discrimination landmine documented inline. Companion to iter 79's adversarial corpus — together they pin both halves of the parser contract. Pillar: Reliability.
 - [P1] **pin.tmm.merger** — Property-based test for composite-merge output stability on randomised mod sets. Acceptance: merge(A, B) == merge(A; apply B). Pillar: Reliability.
 - [P1] **pin.external.download-extract** — Golden-file test for `external_app.rs` download + extract flow on a fixture zip. Acceptance: output tree byte-for-byte. Pillar: Reliability.
 - [P1] **pin.tcc.classic-plus-sniffer** — Pinned-bytes test for `TCC/TeraPacketParser/Sniffing/ClassicPlusSniffer.cs` mirror-read state machine. Acceptance: fixture stream → expected packet stream. Pillar: Reliability.
