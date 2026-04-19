@@ -7,9 +7,9 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 149
+iteration_counter: 150
 last_work_iteration: 149
-last_research_sweep: 130
+last_research_sweep: 150
 last_revalidation: 140
 last_revalidation_status: all-gates-green
 last_retrospective: 60
@@ -22,9 +22,19 @@ total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 577e424
+tauri_v2_migration_last_commit: e33d2d8
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 150 RESEARCH SWEEP — all-gates-green.**
+>
+> Worktree commit `e33d2d8` adds `docs/PRD/audits/research/sweep-iter-150.md`. cargo audit passes both workspaces with documented ignores — 19 upstream-locked warnings unchanged; teralib zero findings. cargo tree -d delta vs iter 130: all 10 tracked crate versions identical (rand 0.9.2, bytes 1.11.0, reqwest 0.12.28+0.13.2, etc.). Exit criteria for RUSTSEC-2026-0097 + RUSTSEC-2026-0007 still unmet.
+>
+> Ecosystem quiet: tauri 2.10.3, tauri-plugin-notification 2.3.3, tauri-plugin-http 2.5.8, tauri-plugin-updater 2.10.1, reqwest 0.12.28, rustls 0.103.12, zip 4.x — all unchanged since iter 130.
+>
+> **Guard-extension batch characterises the iter 130-150 window**: only 2 new guard files (mods_categories_ui_scanner_guard + meta_hygiene_guard); 17 existing guards deepened. Net: +55 Rust tests (949 → 1004), 20 additive commits, zero regressions. 1000-test threshold crossed at iter 148.
+>
+> Backlog: C# pins + §3.3.1 + §3.8.7 remain documented-deferred. `ready_for_squash_merge: true` unchanged since iter 100 (5 revalidations have reaffirmed). Next formal revalidation: iter 160.
 
 > **Iter 149 WORK — pin.tampered-catalog-failclosed-extension DONE (worktree).**
 >
