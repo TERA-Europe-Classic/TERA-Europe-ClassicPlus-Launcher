@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 190
-last_work_iteration: 189
+iteration_counter: 191
+last_work_iteration: 191
 last_research_sweep: 190
 last_revalidation: 180
 last_revalidation_status: all-gates-green
@@ -16,23 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 166
+total_items_done: 167
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 13afeb4
+tauri_v2_migration_last_commit: 764d247
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 190 RESEARCH SWEEP — zero dep drift, zero new advisories (docs/PRD/audits/research/sweep-iter-190.md).**
+> **Iter 191 WORK — pin.add-mod-from-file-tauri-attrs+handler+map-err+dest-sandbox DONE (worktree).**
 >
-> N%10=0 cadence. cargo audit with iter-112 ignores: 19 allowed warnings unchanged from iter 170/180. Full-scan: 1 vulnerability (RUSTSEC-2026-0007 bytes, upstream-gated) + 22 allowed warnings — audit database grew but no new crate-level advisories landed in our Cargo.lock closure. Iter-112 ignores still hold; neither exit criterion fired. 127 commits since main divergence (+9 since iter 180), all `test(...)`.
+> Worktree commit `764d247`. First WORK after N=190 research sweep. PRD §3.3.4 functionality-pillar wiring guard had 11 tests (iter 107 creation + iter-151 +6); brings it to 16 with defense-in-depth on command exposure and filesystem sandboxing.
 >
-> Milestone: scanner sweep complete (iter 181-187) — every untouched scanner guard now carries ≥ 12 pins with real-file defense-in-depth. CVE-defence chain (shell_scope_pinned + shell_open_callsite + tampered_catalog) deepened at iter 188-189 to ≥ 10 pins each.
+> Five new source-inspection pins:
+> 1. `guard_file_header_cites_prd_and_playwright_spec` — guard cites PRD 3.3.4 + `mod-import-file.spec.js`
+> 2. `fn_is_tauri_command_and_async` — `#[tauri::command]` attr + `pub async fn` (sync blocks UI during fs::read)
+> 3. `fn_is_registered_in_invoke_handler` — real `src/main.rs` lists `commands::mods::add_mod_from_file`; without it invoke() errors "command not found" and Playwright fails while pins pass
+> 4. `fs_errors_are_mapped_not_unwrapped` — body must use `.map_err(|e|` on fs ops; raw `.unwrap()` panics backend, frontend sees channel death not reason
+> 5. `fs_write_dest_is_rooted_under_gpk_dir` — source-order `get_gpk_dir()` < `gpk_dir.join(...)` < `fs::write(&dest,...)`; reject write to user-supplied `path` (path-traversal sink)
 >
-> Zero actionables. Every open item from iter 170 remains open (upstream-gated advisories + §3.3.1/§3.8.7 unshipped + C# pins deferred). `ready_for_squash_merge: true` unchanged.
+> add_mod_from_file_wiring: 11 → 16 tests. 1193 Rust (+5), clippy clean, vitest 449/449.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
