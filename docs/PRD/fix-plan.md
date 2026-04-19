@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 218
-last_work_iteration: 218
+iteration_counter: 219
+last_work_iteration: 219
 last_research_sweep: 210
 last_revalidation: 200
 last_revalidation_status: all-gates-green
@@ -16,15 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 192
+total_items_done: 193
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 1e012e6
+tauri_v2_migration_last_commit: 4dee2a3
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 219 WORK — pin.shell-open-guard-header+3-path-constants+sister-scope-guard+openExternal-wrapper+main-window-capability DONE (worktree).**
+>
+> Worktree commit `4dee2a3`. §3.1.5 CVE-2025-31477 shell-open call-site; shell_open_callsite_guard had 12 tests (iter 128 creation + iter 184 +5); 35 iters untouched. Brings to 17.
+>
+> Five new source-inspection pins (meta-guard + path constants + cross-guard integrity + production-wrapper shape + capability scope):
+> 1. `guard_file_header_cites_prd_3_1_5_and_cve_2025_31477` — header cites both `PRD 3.1.5` and `CVE-2025-31477`; meta-guard contract
+> 2. `all_path_constants_are_canonical` — SCANNER + APP_JS + CAPABILITIES path constants pinned verbatim
+> 3. `sister_scope_guard_still_present` — `tests/shell_scope_pinned.rs` (the scope-half of the CVE defence-in-depth) must exist with > 1000 bytes AND still cite CVE-2025-31477; cross-guard integrity
+> 4. `app_js_openexternal_wrapper_exists_and_calls_shell_open` — src/app.js `openExternal(url)` method body contains `window.__TAURI__.shell.open(...)`; the funnel every external-link call flows through
+> 5. `capabilities_windows_scope_is_main_not_wildcard` — capabilities/migrated.json windows = `["main"]` (exactly 1 entry); wildcard would apply shell:allow-open to untrusted future webviews
+>
+> shell_open_callsite_guard: 12 → 17 tests. 1323 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 218 WORK — pin.classicplus-guards-header+3-path-constants+stub-live-body-no-network+config-no-residue+ALLOWED-count DONE (worktree).**
 >
