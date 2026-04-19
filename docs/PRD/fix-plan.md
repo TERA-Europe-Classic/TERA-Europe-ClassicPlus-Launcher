@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 155
-last_work_iteration: 155
+iteration_counter: 156
+last_work_iteration: 156
 last_research_sweep: 150
 last_revalidation: 140
 last_revalidation_status: all-gates-green
@@ -16,15 +16,31 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 133
+total_items_done: 134
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: d866688
+tauri_v2_migration_last_commit: d6f28b4
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 156 WORK — pin.http-allowlist-shape+matcher DONE (worktree).**
+>
+> Worktree commit `d6f28b4`. PRD §3.1.5 `http_allowlist.rs` previously had 3 tests: one scanner (every mod URL literal has a capability scope match) + 2 matcher-helper unit tests. The SHAPE of the capability itself and the matcher's defensive defaults were unprotected — a subtle widening (bare-TLD wildcard, stray http:// scope, expanded test-hosts skip-list, permissive `host_matches` rewrite) would pass every existing test while silently opening exfiltration paths.
+>
+> Six new pins + infrastructure refactor (promoted local `test_hosts` array to module-level `TEST_HOSTS` const so the pin can lock its exact contents):
+> 1. `test_hosts_is_exactly_pinned_set` — {example.com, 127.0.0.1, localhost}; adding `attacker.com` silently accepts exfiltration URLs
+> 2. `capability_http_allow_entries_are_https_only` — every scope https:// except the sole documented `LAN_DEV_HTTP_SCOPE` = `http://192.168.1.128:8090/*`
+> 3. `capability_contains_documented_lan_dev_http_scope` — ties the LAN scope atomically to `csp_audit.rs::csp_connect_src_permits_lan_portal_endpoint` (iter 152) so the three surfaces the §3.1.13 portal-https cutover touches can't drift
+> 4. `capability_wildcard_scopes_have_minimum_depth` — blocks `*.com`, `*.net` etc.; wildcard suffix must span 2+ labels
+> 5. `host_matches_rejects_bare_tld_wildcard_attack` — symbolic pin: `"com"` never matches `"*.com"`; regressing to `ends_with` opens the bare-TLD hijack class
+> 6. `host_of_rejects_non_http_schemes` — scheme allowlist now explicitly refuses `file://`, `javascript:`, `data:`, `ws://`, `gopher://`
+>
+> http_allowlist: 3 → 9 tests.
+>
+> Acceptance: 1037/1037 Rust (was 1031, +6), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 155 WORK — pin.zeroize-production-derives DONE (worktree).**
 >
