@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 143
-last_work_iteration: 143
+iteration_counter: 144
+last_work_iteration: 144
 last_research_sweep: 130
 last_revalidation: 140
 last_revalidation_status: all-gates-green
@@ -16,15 +16,31 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 122
+total_items_done: 123
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: ef57e34
+tauri_v2_migration_last_commit: 3f821cb
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 144 WORK — pin.secret-scan-workflow-extension DONE (worktree).**
+>
+> Worktree commit `3f821cb`. PRD §3.1.6 secret_scan_guard previously pinned workflow existence + config structure + audit citation but left the WORKFLOW TRIGGER, CHECKOUT shape, VERSION pinning, and ALLOWLIST non-emptiness unprotected.
+>
+> Four new assertions:
+> 1. `secret_scan_workflow_triggers_on_push_and_pull_request` — both `push: branches: [main]` AND `pull_request:` must fire the job; either-only lets a class of commit slip past
+> 2. `secret_scan_workflow_uses_full_fetch_depth` — `fetch-depth: 0` required because the shallow checkout default breaks `--log-opts=RANGE` base-SHA resolution
+> 3. `secret_scan_workflow_pins_semver_version` — `VER=X.Y.Z` must parse as 3-part all-digit semver; floating tags (`latest`, `main`) break supply-chain determinism
+> 4. `gitleaks_allowlist_arrays_are_non_empty` — `regexes` + `paths` arrays must each have ≥1 entry (empty = dead-code smell or mid-edit drift)
+>
+> Extended detector self-test with 4 new bad shapes (push-only trigger, shallow checkout, floating `latest`, empty regexes).
+>
+> secret_scan_guard: 4 → 8 tests.
+>
+> Acceptance: 987/987 Rust (was 983, +4), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 143 WORK — pin.crate-comment-body-length DONE (worktree).**
 >
