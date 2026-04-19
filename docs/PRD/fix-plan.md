@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 125
-last_work_iteration: 125
+iteration_counter: 126
+last_work_iteration: 126
 last_research_sweep: 120
 last_revalidation: 120
 last_revalidation_status: all-gates-green
@@ -16,15 +16,32 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 106
+total_items_done: 107
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: b3660e4
+tauri_v2_migration_last_commit: 2789023
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 126 WORK — pin.shell-open-callsite-scanner DONE (worktree).**
+>
+> Worktree commit `2789023`. PRD §3.1.5 CVE-2025-31477 shell-scope defence has two halves: scope-file (iter 86 `shell_scope_pinned.rs`) + call-site (iter 82 `shell-open-callsite.test.js` Vitest scanner). The scope-file half already had a Rust pin; the call-site half had none. A refactor that weakened the JS scanner (dropped a sink regex, widened SAFE_IDENTIFIERS without provenance, collapsed the classifier) would pass Vitest against a weakened detector.
+>
+> New `tests/shell_open_callsite_guard.rs` (7 tests):
+> 1. Scanner exists, self-identifies, cites CVE-2025-31477
+> 2. Both sink shapes covered (`window.__TAURI__.shell.open` + `App.openExternal`/`this.openExternal`) with escaped JS-regex form verbatim
+> 3. SAFE_IDENTIFIERS has >=3 entries, each with provenance `//` comment (invariant: every allowed identifier cites WHY it's not attacker-controllable)
+> 4. Classifier keeps all four safe-shape branches (string literal, backtick-no-interp, URLS.external.*, safe template interpolation)
+> 5. Both self-tests retained (negative `bites on seeded bad input` + positive `accepts every currently allowed shape`), with fixtures exercising each safe-shape branch
+> 6. Scanned `app.js` exists and is >10KB
+> 7. Detector self-test on 4 synthetic bad shapes
+>
+> Third in the iter-124/125/126 JS-scanner-pin chain. Parallel pattern to iter 124 `i18n_no_hardcoded_guard` + iter 125 `i18n_scanner_guard`.
+>
+> Acceptance: 928/928 Rust (was 921, +7), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 125 WORK — pin.i18n-jargon+parity-scanners DONE (worktree).**
 >
