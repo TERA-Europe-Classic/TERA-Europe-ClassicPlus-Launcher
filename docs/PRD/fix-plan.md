@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 73
-last_work_iteration: 73
+iteration_counter: 74
+last_work_iteration: 74
 last_research_sweep: 70
 last_revalidation: 72
 last_revalidation_status: all-gates-green
@@ -16,15 +16,23 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 18
-total_items_done: 55
+total_items_done: 56
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 0903b68
+tauri_v2_migration_last_commit: 7a7a9e0
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 74 WORK — fix.overlay-lifecycle-wiring DONE (worktree).**
+>
+> Pre-squash filler work. Worktree commit `7a7a9e0`. The P1 reliability gap from iter 31: pure predicate `external_app::decide_overlay_action` had been unit-tested but never wired into the actual game-close event — overlays (Shinra/TCC) were being torn down on EVERY close, not just the last-client close, violating PRD 3.2.12 on multi-client setups.
+> - `commands/game.rs` post-exit block: `stop_auto_launched_external_apps()` call now gated by `decide_overlay_action(teralib::get_running_game_count())`. Partial close (remaining ≥ 1) → overlays stay; last close (remaining = 0) → teardown.
+> - `tests/multi_client.rs` appended source-inspection guard `game_rs_gates_overlay_stop_on_decide_overlay_action` — asserts predicate call appears before stop call in source order + stop call appears exactly once. The predicate-only tests from iter 31 couldn't catch a regression where the call is removed; this guard closes that gap.
+>
+> Acceptance: 814/814 (was 813, +1 new guard), clippy clean. Worktree ready state unchanged — still `ready_for_squash_merge: true`, awaiting user authorisation. Next iter (75) picks another P1 filler: candidates still include `fix.clean-recovery-wiring`, `fix.conflict-modal-wiring`, `fix.mods-hardcoded-i18n-strings`.
 
 > **Iter 73 WORK — M6-b teralib CONFIG obfuscation DONE (worktree).**
 >
@@ -309,7 +317,7 @@ tauri_v2_migration_ready_for_squash_merge: true
 
 - [P1] **fix.clean-recovery-wiring** — Wire `tmm::recover_missing_clean` behind a Tauri command + a Recovery button in the Settings panel. Currently the function is `#[allow(dead_code)]` — users with a missing `.clean` have no in-launcher path to recover. Acceptance: Playwright test drives the button, invoke() hits the command, modal confirms success or shows the "verify game files" instruction. Pillar: Reliability. Discovered iter 43.
 - [P1] **fix.conflict-modal-wiring** — `services::mods::tmm::detect_conflicts` is unit-tested but not yet wired. Add Tauri command `preview_mod_install_conflicts(id: String) -> Vec<ModConflict>` that loads vanilla (from `.clean`) and current mapper, parses the catalog's source GPK (if already downloaded) or returns the catalog-declared (composite, object) tuples, and returns conflicts. Frontend calls it before `install_mod`; on non-empty result, renders the modal with last-install-wins disclaimer + log entry. Acceptance: Playwright test in `mod-conflict-warning.spec.js` can drive the modal via a mocked `invoke()` return and assert the disclaimer text renders. Pillar: Functionality. Discovered iter 32.
-- [P1] **fix.overlay-lifecycle-wiring** — `external_app::decide_overlay_action` is unit-tested but not yet wired into a real close-event listener. Wire the teralib game-count watch channel such that on each TERA.exe close: measure `get_running_game_count()`, call `decide_overlay_action`, and when `Terminate` is returned, stop each enabled external-app mod via `stop_process_by_name`. Acceptance: integration test drives a simulated close through the channel and asserts the overlay-stop side-effect. Pillar: Reliability. Discovered iter 31.
+- [DONE] fix.overlay-lifecycle-wiring — wired on worktree commit `7a7a9e0` (iter 74). `commands/game.rs` post-game-exit block now reads `teralib::get_running_game_count()`, calls `external_app::decide_overlay_action`, and only fires `stop_auto_launched_external_apps()` when the predicate returns `Terminate`. Previous code tore down overlays on EVERY close, which violated 3.2.12 on multi-client setups. Acceptance met via source-inspection guard `tests/multi_client.rs::game_rs_gates_overlay_stop_on_decide_overlay_action` — asserts the predicate call precedes the stop call in source order AND the stop call appears exactly once (catches a sibling-branch reintroduction). Pure-predicate tests `partial_close_keeps_overlays` + `last_close_terminates_overlays` already existed @ iter 31; the guard closes the gap between "predicate works" and "predicate is actually called." 814/814 green, clippy clean. Pillar: Reliability. Verified @ iter 74.
 - [P1-IN-PROGRESS] **tauri-v2-migration-plan** — Plan doc committed @ iter 62: `docs/PRD/audits/security/tauri-v2-migration-plan.md`. Context7 lookup surfaced `cargo tauri migrate` (automated migration tool) and `bundle.createUpdaterArtifacts: "v1Compatible"` (single-flag dual-format solution), collapsing the original hand-port plan from iter 57 into 10 tool-assisted milestones. Migration invariants locked: main never transits through broken state, existing users don't lose auto-update, no minisign key rotation, CI gates pass at every milestone, no test regression. Target: Tauri 2.x latest stable; launcher 0.2.0; indefinite dual-format window.
   - **M0 DONE @ iter 63**: worktree `../tauri-v2-migration` created from main @ 6860d86; baseline snapshot doc committed on worktree branch as cc33d92. Pinned: rustc 1.89.0, cargo 1.89.0, node v24.1.0, tauri 1.0 + 15 features, @tauri-apps/cli 1.6.3, 41 Tauri commands, 11 allowlist categories, 9 HTTP scope entries, 790 Rust + 431 JS = 1221 tests, v0.1.10 setup.exe 52.05 MB, 7 CI gates green, minisign pubkey fingerprint RWSEL+9/IIo3Gw3Vn1pXMl8p+ykWyKsZ/dzjmVrs0Ll2v1v9rE0yed2L.
   - **M1 SPLIT @ iter 64**: `cargo tauri migrate` (CLI 2.10.1) errored first pass on a `links = "web_kit2"` conflict between dead dep `devtools@0.3.3` and `tauri-plugin-notification@2`. Pre-flight commit c85f7a8 dropped `devtools` (zero imports confirmed). Re-ran migrate, succeeded. Produced: Cargo.toml tauri 1.0 → 2, tauri-build 1 → 2, 15-feature flag list dropped, 6 plugin crates added (process/shell/http/notification/dialog/fs — all "2"), updater moved under desktop cfg(target); tauri.conf.json full shape rewrite; capabilities/migrated.json + desktop.json generated with all 9 HTTP URLs + fs scope + shell open-url custom command preserved verbatim; 13 src/ files + 4 tests/ refactored imports/API paths; main.rs .plugin(...) initialisers appended; package.json + lock with @tauri-apps/plugin-* packages. 23 files / 2151+ / 1941- lines. **M1a commit d708455 = pure tool output, does NOT build** — 44 compile errors, dominant class `get_window("main")` → v2 renamed to `get_webview_window("main")` at call sites the tool missed, plus Manager-trait re-pathing. All mechanical renames. Split preserves diff-reviewability (reviewer can see tool-output vs human-touchup separately).
