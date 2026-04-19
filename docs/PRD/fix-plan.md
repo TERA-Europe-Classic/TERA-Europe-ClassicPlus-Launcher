@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 112
-last_work_iteration: 112
+iteration_counter: 113
+last_work_iteration: 113
 last_research_sweep: 110
 last_revalidation: 100
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 93
+total_items_done: 94
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: f39ab31
+tauri_v2_migration_last_commit: fed37f1
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 113 WORK — pin.add-mod-from-file-wiring DONE (worktree).**
+>
+> Worktree commit `fed37f1`. Closes PRD §3.3.4 Rust-side coverage gap: criterion was pinned only by the Playwright `user_imported_gpk_deploys` spec. `add_mod_from_file` is a `#[tauri::command]` async entry point — bin-crate can't unit-test it directly, so the Rust wiring can regress silently if someone refactors the fn body without touching the command name.
+>
+> New `tests/add_mod_from_file_wiring.rs` (6 tests) source-inspects the fn body and pins five must-present wires:
+> 1. `tmm::parse_mod_file(&bytes)` — rejects non-TMM GPKs before any disk write
+> 2. `is_safe_gpk_container_filename` — PRD 3.1.4 deploy-sandbox predicate
+> 3. `Sha256::digest(&bytes)` — id derivation (`local.<sha12>` format)
+> 4. `try_deploy_gpk(` — best-effort mapper patch attempt
+> 5. `mods_state::mutate` + `reg.upsert(` — registry persistence
+>
+> Plus detector self-test with 3 synthetic bad shapes. PRD §3.3.4 cell now cites both the Playwright IPC flow AND the Rust-side wiring guard.
+>
+> Acceptance: 881/881 Rust (was 875, +6), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 112 WORK — dep.rand-and-bytes-advisory-ignore + audit-tuning DONE (worktree).**
 >
