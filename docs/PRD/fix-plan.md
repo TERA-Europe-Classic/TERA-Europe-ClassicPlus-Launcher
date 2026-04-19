@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 136
-last_work_iteration: 136
+iteration_counter: 137
+last_work_iteration: 137
 last_research_sweep: 130
 last_revalidation: 120
 last_revalidation_status: all-gates-green
@@ -16,15 +16,31 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 116
+total_items_done: 117
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 4d38177
+tauri_v2_migration_last_commit: c76fa92
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 137 WORK — pin.claude-md-sections-extension DONE (worktree).**
+>
+> Worktree commit `c76fa92`. `claude_md_guard.rs` previously pinned only §3.8.1 Mod Manager section. CLAUDE.md is loaded into every Claude Code session's context automatically, so silent removal of any top-level section costs every future loop iter (agent has to re-derive the context from source).
+>
+> Four new assertions extend the guard:
+> 1. `every_expected_section_heading_exists_in_claude_md` — all 7 top-level sections present (`Build & Development Commands`, `v100 API (Classic+ Server)`, `Architecture`, `Known Gaps`, `Cargo Feature Flags`, `Testing`, `Mod Manager`)
+> 2. `v100_api_section_documents_four_endpoints` — 4 subsections (`### Authentication`, `### Registration`, `### Account Info`, `### Other Endpoints`) + LAN dev base URL `192.168.1.128:8090` pinned (tracks §3.1.13 portal-https migration)
+> 3. `cargo_feature_flags_section_documents_skip_updates` — `skip-updates` + `custom-protocol` flags documented (the only in-repo explanation of these flags' purpose)
+> 4. `testing_section_cites_test_paths` — `teralaunch/tests` + `src-tauri` paths cited
+>
+> Extended detector self-test with 3 new bad shapes (missing section, partial API subsections, missing skip-updates flag).
+>
+> claude_md_guard: 3 → 7 tests.
+>
+> Acceptance: 969/969 Rust (was 965, +4), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 136 WORK — pin.meta-hygiene-non-stub DONE (worktree).**
 >
