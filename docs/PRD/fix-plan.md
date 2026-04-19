@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 167
-last_work_iteration: 167
+iteration_counter: 168
+last_work_iteration: 168
 last_research_sweep: 150
 last_revalidation: 160
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 145
+total_items_done: 146
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: a9d5006
+tauri_v2_migration_last_commit: 76e0f42
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 168 WORK — pin.deploy-scope-exit-codes+import-safety DONE (worktree).**
+>
+> Worktree commit `76e0f42`. PRD §3.1.14 `deploy_scope_infra_guard.rs` previously had 8 tests (iter 115+145 extensions): file exists + workflow invokes + step precedes upload + API exports + prefix constants + kasserver host + self-test ordering + detector self-test. Iter 168 adds 5 new angles the existing pins miss: exit-code semantics (the CI contract), import safety (sibling-test reuse), fail-closed empty-URL branch (broken-regex trap), and the `ftps?:\/\/` regex shape (scheme coverage).
+>
+> Five new source-inspection pins on `teralaunch/tests/deploy_scope.spec.js`:
+> 1. `scope_script_exits_nonzero_on_violations` — `process.exit(1)` on FAIL branch; an exit(0) makes CI pass despite detected violations
+> 2. `scope_script_exits_zero_on_success` — explicit `process.exit(0)` pinned; blocks a future post-check refactor from leaving exit status implicit
+> 3. `scope_script_has_entry_point_guard_for_import_safety` — `main()` must be wrapped behind `entryBasename === 'deploy_scope.spec.js'` so sibling tests can import without triggering process.exit() / file I/O
+> 4. `scope_script_treats_zero_urls_as_violation_not_success` — `if (urls.length === 0)` must push a violation; a broken regex that matches nothing would otherwise silently pass every deploy
+> 5. `scope_script_ftp_regex_matches_both_schemes` — `ftps?:\/\/` with optional `s?`; dropping it skips every FTPS upload (which is what prod uses)
+>
+> deploy_scope_infra_guard: 8 → 13 tests.
+>
+> Acceptance: 1093/1093 Rust (was 1088, +5), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 167 WORK — pin.portal-https-draft-status+url-shape DONE (worktree).**
 >
