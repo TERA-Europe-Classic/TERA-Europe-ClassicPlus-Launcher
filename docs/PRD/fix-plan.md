@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 135
-last_work_iteration: 135
+iteration_counter: 136
+last_work_iteration: 136
 last_research_sweep: 130
 last_revalidation: 120
 last_revalidation_status: all-gates-green
@@ -16,15 +16,25 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 115
+total_items_done: 116
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 95489d0
+tauri_v2_migration_last_commit: 4d38177
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 136 WORK — pin.meta-hygiene-non-stub DONE (worktree).**
+>
+> Worktree commit `4d38177`. Extended `meta_hygiene_guard.rs` with a non-stub check: every `tests/*_guard.rs` file must call `fs::read_to_string` or `fs::read_dir` somewhere. A guard that only reasons about inline string literals is a STUB — its self-test can pass while the real invariant silently rots (no file-read means no drift detection against the source-of-truth).
+>
+> Survey before writing the test: all 19 guards have at least 1 file-read primitive (lowest: `architecture_doc_guard` / `changelog_guard` / `claude_md_guard` at 1; highest: `prd_path_drift_guard` / `i18n_scanner_guard` / `mods_categories_ui_scanner_guard` at 11). All pass the non-stub check unmodified.
+>
+> Extended detector self-test with bad-shape (stub body with no `fs::*` calls) and positive (real-file-reading body).
+>
+> Acceptance: 965/965 Rust (was 964, +1), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 135 WORK — pin.meta-hygiene-guard DONE (worktree).**
 >
