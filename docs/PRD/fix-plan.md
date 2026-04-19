@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 110
-last_work_iteration: 109
+iteration_counter: 111
+last_work_iteration: 111
 last_research_sweep: 110
 last_revalidation: 100
 last_revalidation_status: all-gates-green
@@ -16,15 +16,27 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 91
+total_items_done: 92
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 24af9f6
+tauri_v2_migration_last_commit: 37492b9
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 111 WORK — dep.teralib-dotenv-drop DONE (clears RUSTSEC-2021-0141).**
+>
+> Worktree commit `37492b9`. Iter 110 flagged `dotenv 0.15.0` unmaintained in teralib. Investigation surfaced a cleaner fix than planned: the dep was **genuinely unused** — zero `use dotenv::` imports in teralib/src/, no env-macro references, no build.rs use, no `.env` file present. The dep had been dead weight since added.
+>
+> **Fix:** removed the line from `teralib/Cargo.toml`. No migration to `dotenvy` needed. Dep count drops from 234 → 233. Also: `teralib/Cargo.lock` was previously untracked; committed alongside the fix so future lockfile-gated audits see consistent state.
+>
+> **Verification:** `cargo audit` on teralib now reports zero advisories (was 1 unmaintained warning). teralaunch full suite green: 875 Rust (unchanged), 449 JS, clippy clean (both workspaces).
+>
+> **One advisory remains:** RUSTSEC-2026-0097 (rand 0.9.2 unsound) on the teralaunch side, pulled in by tauri-plugin-notification + chamox + quinn-proto chain. Iter 112 will add `--ignore RUSTSEC-2026-0097` to `cargo-audit.yml` with a cite comment since the unsoundness is not exploitable in our code pattern.
+>
+> Acceptance: 875/875 Rust unchanged, 449/449 JS unchanged, clippy clean, teralib cargo audit clean. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 110 RESEARCH SWEEP — two real advisories surfaced.**
 >
