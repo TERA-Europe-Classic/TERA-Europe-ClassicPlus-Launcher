@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 204
-last_work_iteration: 204
+iteration_counter: 205
+last_work_iteration: 205
 last_research_sweep: 190
 last_revalidation: 200
 last_revalidation_status: all-gates-green
@@ -16,30 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 179
+total_items_done: 180
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: b1c1ff0
+tauri_v2_migration_last_commit: a16ee6d
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 204 WORK — pin.crate-comment-guard-header+MODS_DIR-path+rs-extension-filter+doc-floor-constants+forbidden-markers DONE (worktree). crate_comment_guard was the last < 10-count file in tests/ (found at 8 during iter 204 sweep).**
+> **Iter 205 WORK — pin.zeroize-guard-header+login/register-Zeroizing-wrapper+non-sensitive-field-skip-classification DONE (worktree).**
 >
-> Worktree commit `b1c1ff0`. §3.8.2 — `src/services/mods/*.rs` crate-level doc comments; crate_comment_guard had 8 tests (iter 104 creation + iter 143 +1 + iter 179 +4); 25 iters untouched. Brings to 13.
+> Worktree commit `a16ee6d`. §3.1.7 zeroize-audit (credential handling); zeroize_audit had 10 tests (iter 97 creation + iter 155 +5); 50 iters untouched. Brings to 15.
 >
-> Five new source-inspection pins (meta-guard layer — previous 8 walk the filesystem, these pin the guard file itself):
-> 1. `guard_file_header_cites_prd_3_8_2_and_self_name` — header cites `PRD 3.8.2` + `crate-level` nomenclature
-> 2. `mods_dir_constant_is_services_mods_path` — `const MODS_DIR: &str = "src/services/mods";` verbatim; off-by-one typos silently read empty listings
-> 3. `rs_file_extension_filter_is_lowercase_rs` — `Some("rs")` verbatim; typo to `"rust"` would filter everything out with a root-cause-obscuring error
-> 4. `doc_floor_constants_remain_positive` — `MIN_DOC_BODY_CHARS = 100` + `MIN_DOC_LINES = 2` both pinned; regression to 0 silently no-ops both floors
-> 5. `forbidden_wip_markers_include_all_four` — MARKERS slice contains TODO, FIXME, XXX, HACK verbatim; each maps to a distinct WIP convention
+> Five new source-inspection pins (meta-guard + call-site + field-classification layer):
+> 1. `guard_file_header_cites_prd_3_1_7` — header cites `PRD 3.1.7` + `zeroize` nomenclature
+> 2. `login_with_client_wraps_password_in_zeroizing` — `let password = Zeroizing::new(password);` in commands/auth.rs, strictly BEFORE `validate_credentials`; otherwise the early-Err path leaks the raw `String` buffer
+> 3. `register_with_client_wraps_password_in_zeroizing` — same pattern for register path; same rationale (validation-branch leak path)
+> 4. `global_auth_info_non_sensitive_fields_explicitly_skipped` — character_count / user_no / user_name each carry `#[zeroize(skip)]`; pins the classification SET so new fields force a deliberate class decision
+> 5. `launch_params_non_sensitive_fields_explicitly_skipped` — executable_path / account_name / character_count / language each carry `#[zeroize(skip)]`; `ticket` remains the only wiped field
 >
-> crate_comment_guard: 8 → 13 tests. 1253 Rust (+5), clippy clean, vitest 449/449.
->
-> **Milestone (corrected)**: every test file in `teralaunch/src-tauri/tests/` now carries ≥ 10 pins. Prior iter-203 note missed crate_comment_guard (at 8) — iter 204 closed that gap.
+> zeroize_audit: 10 → 15 tests. 1258 Rust (+5), clippy clean, vitest 449/449.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
