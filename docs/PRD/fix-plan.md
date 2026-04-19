@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 127
-last_work_iteration: 127
+iteration_counter: 128
+last_work_iteration: 128
 last_research_sweep: 120
 last_revalidation: 120
 last_revalidation_status: all-gates-green
@@ -16,15 +16,32 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 108
+total_items_done: 109
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 5a3b49f
+tauri_v2_migration_last_commit: eda0425
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 128 WORK — pin.classicplus-disabled-features-scanner DONE (worktree).**
+>
+> Worktree commit `eda0425`. `teralaunch/tests/classicplus-guards.test.js` enforces the CLAUDE.md Classic+ disabled-features contract: OAuth + leaderboard + profile/register/forum/privacy + news/patch-notes/launcher-updater all return empty URLs or stubs that no-op. This test is the ONLY automated guard against a merge from upstream Classic that re-wires a disabled feature.
+>
+> New `tests/classicplus_guards_scanner_guard.rs` (7 tests):
+> 1. Scanner exists + self-identifies as Classic+ contract test
+> 2. URLS fixture covers every disabled feature (launcher triplet empty; news/patchNotes empty; register/forum/privacy/profile empty; Discord + helpdesk retained)
+> 3. URLS.leaderboard section entirely absent (not just empty-string) — asserts `toBeUndefined`
+> 4. Seven disabled-stub tests retained (startOAuth, handleOAuthCallback, checkDeepLink, ensureAuthSession, getLeaderboardConsent, setLeaderboardConsent, checkLeaderboardConsent)
+> 5. Six URL-guard tests retained (loadNewsFeed, loadPatchNotes, checkLauncherUpdate, openRegisterPopup, handleViewProfile, versionInfo) + setupHeaderLinks
+> 6. LoadStartPage guard retained (page-load path is a separate news-fetch entry point)
+> 7. Detector self-test on 4 synthetic bad shapes
+>
+> Fifth in the iter-124/125/126/127/128 JS-scanner-pin chain. The chain has now pinned the five structurally-invariant JS scanners (i18n-no-hardcoded / jargon / parity / shell-open-callsite / search-perf / classicplus-guards).
+>
+> Acceptance: 942/942 Rust (was 935, +7), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 127 WORK — pin.search-perf-bench DONE (worktree).**
 >
