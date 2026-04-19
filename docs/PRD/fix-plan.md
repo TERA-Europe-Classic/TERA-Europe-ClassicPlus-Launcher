@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 70
-last_work_iteration: 70
+iteration_counter: 71
+last_work_iteration: 71
 last_research_sweep: 70
 last_revalidation: 60
 last_revalidation_status: regression-resolved-next-iter
@@ -16,14 +16,24 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 18
-total_items_done: 53
+total_items_done: 54
 total_items_regressed: 0
 total_iterations_to_cap: 1000
-tauri_v2_migration_milestone: M6-partial
+tauri_v2_migration_milestone: M7
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 8d7c349
+tauri_v2_migration_last_commit: 9898af0
 ```
+
+> **Iter 71 WORK — Tauri v2 M7 DONE (worktree). PRD 3.1.9 closed.**
+>
+> Executed M7 on the `tauri-v2-migration` worktree, commit `9898af0`. Updater now refuses manifests advertising a version that isn't strictly newer than the running binary, closing PRD §3.1.9. Prevents the canonical signed-downgrade-to-vulnerable attack even when the mirror is hostile and the minisign key is rotated.
+> - `Cargo.toml`: `+ semver = "1"`.
+> - `src/services/updater_gate.rs` (new): `pub fn should_accept_update(current, remote) -> bool`. Policy: strict-greater semver; pre-release semantics apply (`0.2.0-rc.1 < 0.2.0`); unparseable input refuses (conservative default blocks mangled/hostile manifests). 12 inline unit tests cover the policy surface.
+> - `src/main.rs::setup()` updater block: gate called before `update.download_and_install` with `CARGO_PKG_VERSION` vs `update.version`. On refusal: `error!()` log + skip install.
+> - `tests/updater_downgrade.rs` (new, 7 tests): 5 symbolic-parity spec tests mirror the predicate via `semver` directly so a future drift from "strictly greater" fails independently; 2 source-inspection wiring guards (`updater_gate` is pub mod with expected fn signature; `main.rs` calls gate before `.download_and_install` in source order).
+>
+> Acceptance: `cargo test --release --test updater_downgrade` → 7/7; full `cargo test --release` → **813/813** (776 unit + 3+4+4+3+4+4+2+2+7+4 integration = 37; +12 inline updater_gate tests + 7 new integration vs iter 70 794 baseline, zero regressions); clippy --all-targets --release -- -D warnings → clean. Next iter (72) executes M8: full validation sweep + squash-merge prep. Consider squeezing M6-b (cryptify string obfuscation) in before M8 if iter budget allows — else defer to post-merge.
 
 > **Iter 70 WORK — Tauri v2 M6 partial (anti-reverse tier 1, worktree) + RESEARCH SWEEP.**
 >
