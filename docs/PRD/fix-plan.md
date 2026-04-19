@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 171
-last_work_iteration: 171
+iteration_counter: 172
+last_work_iteration: 172
 last_research_sweep: 170
 last_revalidation: 160
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 149
+total_items_done: 150
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 9907cdb
+tauri_v2_migration_last_commit: ba8e1e3
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 172 WORK — pin.tauri-v2-audit-milestones+ready-state DONE (worktree). 🎯 crossed total_items_done=150.**
+>
+> Worktree commit `ba8e1e3`. `tauri_v2_migration_audit_guard.rs` previously had 8 tests (iter 122+147): file presence + min line count + umbrella PRD citation + validation M8 + min line floor + plan automation cites + umbrella 3-way PRD items + baseline SHA. Iter 172 widens to the decision-rubric + readiness-state surface those pins skip — the evidence trail backing the user-gated squash merge.
+>
+> Five new source-inspection pins on `docs/PRD/audits/security/tauri-v2-migration*.md`:
+> 1. `plan_doc_enumerates_all_milestones_m0_through_m9` — all 10 `### M<N>` headings (M0 through M9) required; dropping any erases that milestone from the plan's dependency chain
+> 2. `validation_doc_has_ready_state_section_and_flags_user_gated_squash` — `## Ready state` section + `ready for user-gated squash merge` phrase; the human-prose claim backing the fix-plan's machine-parseable `ready_for_squash_merge: true`
+> 3. `validation_doc_cites_iter_62_as_pre_migration_baseline` — `iter 62` citation so the M0/M8 diff columns have a reproducible anchor
+> 4. `umbrella_doc_carries_decision_rubric_sections` — `## Risks of staying on 1.x`, `## Risks of migrating`, `## Recommendation`, `## Acceptance` all required; the decision rubric that justifies the migration
+> 5. `validation_doc_has_rollback_pointer_section` — `## Rollback pointer` heading + cross-ref to plan doc's Rollback strategy; readiness without documented rollback is a one-way door
+>
+> tauri_v2_migration_audit_guard: 8 → 13 tests.
+>
+> Acceptance: 1108/1108 Rust (was 1103, +5), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`. Crossed `total_items_done=150` milestone.
 
 > **Iter 171 WORK — pin.secret-scan-scoped+install-hardening DONE (worktree).**
 >
