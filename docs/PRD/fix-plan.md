@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 62
-last_work_iteration: 62
+iteration_counter: 63
+last_work_iteration: 63
 last_research_sweep: 60
 last_revalidation: 60
 last_revalidation_status: regression-resolved-next-iter
@@ -19,6 +19,9 @@ last_investigation_iteration: 18
 total_items_done: 52
 total_items_regressed: 0
 total_iterations_to_cap: 1000
+tauri_v2_migration_milestone: M0
+tauri_v2_migration_worktree: ../tauri-v2-migration
+tauri_v2_migration_branch: tauri-v2-migration
 ```
 
 > **Iter 60 RESEARCH + REVALIDATION + RETROSPECTIVE.**
@@ -195,7 +198,9 @@ total_iterations_to_cap: 1000
 - [P1] **fix.clean-recovery-wiring** — Wire `tmm::recover_missing_clean` behind a Tauri command + a Recovery button in the Settings panel. Currently the function is `#[allow(dead_code)]` — users with a missing `.clean` have no in-launcher path to recover. Acceptance: Playwright test drives the button, invoke() hits the command, modal confirms success or shows the "verify game files" instruction. Pillar: Reliability. Discovered iter 43.
 - [P1] **fix.conflict-modal-wiring** — `services::mods::tmm::detect_conflicts` is unit-tested but not yet wired. Add Tauri command `preview_mod_install_conflicts(id: String) -> Vec<ModConflict>` that loads vanilla (from `.clean`) and current mapper, parses the catalog's source GPK (if already downloaded) or returns the catalog-declared (composite, object) tuples, and returns conflicts. Frontend calls it before `install_mod`; on non-empty result, renders the modal with last-install-wins disclaimer + log entry. Acceptance: Playwright test in `mod-conflict-warning.spec.js` can drive the modal via a mocked `invoke()` return and assert the disclaimer text renders. Pillar: Functionality. Discovered iter 32.
 - [P1] **fix.overlay-lifecycle-wiring** — `external_app::decide_overlay_action` is unit-tested but not yet wired into a real close-event listener. Wire the teralib game-count watch channel such that on each TERA.exe close: measure `get_running_game_count()`, call `decide_overlay_action`, and when `Terminate` is returned, stop each enabled external-app mod via `stop_process_by_name`. Acceptance: integration test drives a simulated close through the channel and asserts the overlay-stop side-effect. Pillar: Reliability. Discovered iter 31.
-- [P1-IN-PROGRESS] **tauri-v2-migration-plan** — Plan doc committed @ iter 62: `docs/PRD/audits/security/tauri-v2-migration-plan.md`. Context7 lookup surfaced `cargo tauri migrate` (automated migration tool) and `bundle.createUpdaterArtifacts: "v1Compatible"` (single-flag dual-format solution), collapsing the original hand-port plan from iter 57 into 10 tool-assisted milestones. Migration invariants locked: main never transits through broken state, existing users don't lose auto-update, no minisign key rotation, CI gates pass at every milestone, no test regression. Target: Tauri 2.x latest stable; launcher 0.2.0; indefinite dual-format window. Milestones: M0 worktree + baseline, M1 `cargo tauri migrate`, M2 JS imports, M3 command-surface review, M4 updater dual-format, M5 CSP tightening (closes 3.1.12), M6 anti-reverse (closes 3.1.8), M7 downgrade refusal (closes 3.1.9), M8 squash merge + deploy, M9 monitor. Est. 10–12 iterations. Acceptance: every PRD §3.1 Tauri-v2-gated P0 closes as side-effect; full CI green on v2; 0.1.x users auto-upgrade cleanly. Pillar: Security. Next iter creates the worktree + starts M0.
+- [P1-IN-PROGRESS] **tauri-v2-migration-plan** — Plan doc committed @ iter 62: `docs/PRD/audits/security/tauri-v2-migration-plan.md`. Context7 lookup surfaced `cargo tauri migrate` (automated migration tool) and `bundle.createUpdaterArtifacts: "v1Compatible"` (single-flag dual-format solution), collapsing the original hand-port plan from iter 57 into 10 tool-assisted milestones. Migration invariants locked: main never transits through broken state, existing users don't lose auto-update, no minisign key rotation, CI gates pass at every milestone, no test regression. Target: Tauri 2.x latest stable; launcher 0.2.0; indefinite dual-format window.
+  - **M0 DONE @ iter 63**: worktree `../tauri-v2-migration` created from main @ 6860d86; baseline snapshot doc committed on worktree branch as cc33d92. Pinned: rustc 1.89.0, cargo 1.89.0, node v24.1.0, tauri 1.0 + 15 features, @tauri-apps/cli 1.6.3, 41 Tauri commands, 11 allowlist categories, 9 HTTP scope entries, 790 Rust + 431 JS = 1221 tests, v0.1.10 setup.exe 52.05 MB, 7 CI gates green, minisign pubkey fingerprint RWSEL+9/IIo3Gw3Vn1pXMl8p+ykWyKsZ/dzjmVrs0Ll2v1v9rE0yed2L.
+  - Remaining: M1 `cargo tauri migrate`, M2 JS imports, M3 command-surface review, M4 updater dual-format, M5 CSP tightening (closes 3.1.12), M6 anti-reverse (closes 3.1.8), M7 downgrade refusal (closes 3.1.9), M8 squash merge + deploy, M9 monitor. Est. 9–11 iterations to M8. Acceptance: every PRD §3.1 Tauri-v2-gated P0 closes as side-effect; full CI green on v2; 0.1.x users auto-upgrade cleanly. Pillar: Security.
 - [P1] **fix.mods-hardcoded-i18n-strings** — Burn down the 10 documented allowlist entries in `teralaunch/tests/i18n-no-hardcoded.test.js`. Work split: (1) teach `app.js::updateAllTranslations()` to handle `data-translate-aria-label` so aria/close/overflow/category buttons can be annotated; (2) annotate the 7 mods.js leaks + 3 mods.html leaks with the new attribute; (3) add the 7-10 new translation keys to all 4 locales in `src/translations.json` (parity test at 3.7.1 is the guardrail). Acceptance: allowlist length goes to 0, `i18n-no-hardcoded.test.js::no new hardcoded English outside the allowlist` still passes with the final `expect(ALLOWLIST.length).toBe(0)` assertion flipped. Pillar: i18n. Discovered iter 48.
 
 ### Security follow-ups from iter-27 self-integrity
