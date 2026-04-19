@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 74
-last_work_iteration: 74
+iteration_counter: 75
+last_work_iteration: 75
 last_research_sweep: 70
 last_revalidation: 72
 last_revalidation_status: all-gates-green
@@ -16,15 +16,27 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 18
-total_items_done: 56
+total_items_done: 57
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 7a7a9e0
+tauri_v2_migration_last_commit: 261b5f3
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 75 WORK — fix.clean-recovery-wiring DONE (worktree).**
+>
+> Pre-squash filler work. Worktree commit `261b5f3`. Closes the P1 reliability gap from iter 43: `tmm::recover_missing_clean` had been unit-tested since then but was behind `#[allow(dead_code)]` — users with a missing `.clean` backup had no in-launcher recovery path.
+> - `commands/mods.rs`: new `#[tauri::command] pub async fn recover_clean_mapper()` — thin wrapper, resolves game root via shared `resolve_game_root()` helper, delegates to the tmm predicate.
+> - `services/mods/tmm.rs`: `#[allow(dead_code)]` dropped from `recover_missing_clean` — it's now live-called.
+> - `main.rs::generate_handler!`: registered.
+> - `tests/clean_recovery.rs` (new, 3 guards): source-inspects mods.rs for the fn decl + adjacent `#[tauri::command]` attribute + delegate calls; grep on main.rs for the qualified path; asserts dead_code gate is gone.
+>
+> Frontend Settings-panel Recovery button still a follow-up UI item (separate iter once design settles) — the command itself is live and invoke-able.
+>
+> Acceptance: 817/817 (was 814, +3 new wiring guards), clippy clean. Worktree ready state unchanged — still `ready_for_squash_merge: true`, awaiting user authorisation. Next iter (76) picks from the remaining P1 fillers: `fix.conflict-modal-wiring` (similar scope to the two wiring items landed in iters 74-75) or `fix.mods-hardcoded-i18n-strings` (higher blast radius, 4-locale parity).
 
 > **Iter 74 WORK — fix.overlay-lifecycle-wiring DONE (worktree).**
 >
@@ -315,7 +327,7 @@ tauri_v2_migration_ready_for_squash_merge: true
 
 ### Reliability follow-ups from iter-31
 
-- [P1] **fix.clean-recovery-wiring** — Wire `tmm::recover_missing_clean` behind a Tauri command + a Recovery button in the Settings panel. Currently the function is `#[allow(dead_code)]` — users with a missing `.clean` have no in-launcher path to recover. Acceptance: Playwright test drives the button, invoke() hits the command, modal confirms success or shows the "verify game files" instruction. Pillar: Reliability. Discovered iter 43.
+- [DONE] fix.clean-recovery-wiring — wired on worktree commit `261b5f3` (iter 75). Tauri command `commands::mods::recover_clean_mapper` (thin async wrapper) resolves game root via the shared `resolve_game_root()` helper and delegates to `tmm::recover_missing_clean`; registered in `main.rs::generate_handler!`. Dropped the `#[allow(dead_code)]` gate on the underlying predicate. Acceptance met via new 3-test integration suite `tests/clean_recovery.rs` — source-inspection guards that (a) the fn is annotated `#[tauri::command]` (attribute within 200 chars of decl), (b) delegates to `tmm::recover_missing_clean` + uses `resolve_game_root`, (c) is registered in the generate_handler list, (d) the dead_code gate is gone. Frontend Settings-panel Recovery button is a follow-up UI item — the command itself is live and invoke-able now. 817/817 Rust tests, clippy clean. Pillar: Reliability. Verified @ iter 75.
 - [P1] **fix.conflict-modal-wiring** — `services::mods::tmm::detect_conflicts` is unit-tested but not yet wired. Add Tauri command `preview_mod_install_conflicts(id: String) -> Vec<ModConflict>` that loads vanilla (from `.clean`) and current mapper, parses the catalog's source GPK (if already downloaded) or returns the catalog-declared (composite, object) tuples, and returns conflicts. Frontend calls it before `install_mod`; on non-empty result, renders the modal with last-install-wins disclaimer + log entry. Acceptance: Playwright test in `mod-conflict-warning.spec.js` can drive the modal via a mocked `invoke()` return and assert the disclaimer text renders. Pillar: Functionality. Discovered iter 32.
 - [DONE] fix.overlay-lifecycle-wiring — wired on worktree commit `7a7a9e0` (iter 74). `commands/game.rs` post-game-exit block now reads `teralib::get_running_game_count()`, calls `external_app::decide_overlay_action`, and only fires `stop_auto_launched_external_apps()` when the predicate returns `Terminate`. Previous code tore down overlays on EVERY close, which violated 3.2.12 on multi-client setups. Acceptance met via source-inspection guard `tests/multi_client.rs::game_rs_gates_overlay_stop_on_decide_overlay_action` — asserts the predicate call precedes the stop call in source order AND the stop call appears exactly once (catches a sibling-branch reintroduction). Pure-predicate tests `partial_close_keeps_overlays` + `last_close_terminates_overlays` already existed @ iter 31; the guard closes the gap between "predicate works" and "predicate is actually called." 814/814 green, clippy clean. Pillar: Reliability. Verified @ iter 74.
 - [P1-IN-PROGRESS] **tauri-v2-migration-plan** — Plan doc committed @ iter 62: `docs/PRD/audits/security/tauri-v2-migration-plan.md`. Context7 lookup surfaced `cargo tauri migrate` (automated migration tool) and `bundle.createUpdaterArtifacts: "v1Compatible"` (single-flag dual-format solution), collapsing the original hand-port plan from iter 57 into 10 tool-assisted milestones. Migration invariants locked: main never transits through broken state, existing users don't lose auto-update, no minisign key rotation, CI gates pass at every milestone, no test regression. Target: Tauri 2.x latest stable; launcher 0.2.0; indefinite dual-format window.
