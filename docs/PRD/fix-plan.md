@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 178
-last_work_iteration: 178
+iteration_counter: 179
+last_work_iteration: 179
 last_research_sweep: 170
 last_revalidation: 160
 last_revalidation_status: all-gates-green
@@ -16,28 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 156
+total_items_done: 157
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 1226c4e
+tauri_v2_migration_last_commit: 4018ccc
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 178 WORK — pin.prd-path-drift-table-invariants DONE (worktree).**
+> **Iter 179 WORK — pin.crate-comment-shape-invariants DONE (worktree).**
 >
-> Worktree commit `1226c4e`. PRD §3.0 `prd_path_drift_guard.rs` previously had 6 tests (iter 97+132-134): per-entry drift + JS variants + fixed-paths regression + detector self-test. Iter 178 widens to 5 more angles on the pin table itself and the PRD-line floor.
+> Worktree commit `4018ccc`. PRD §3.8.2 `crate_comment_guard.rs` previously had 3 tests (iter 104+143): prefix check + char-body floor + detector self-test. Iter 179 widens to 5 more angles — last WORK before N=180 REVALIDATION; structural-guard sweep now symmetric across architecture_doc, lessons_learned, prd_path_drift, crate_comment.
 >
-> Five new source-inspection pins on the guard's `PINS` + `JS_PINS` tables and `docs/PRD/mod-manager-perfection.md`:
-> 1. `pins_table_has_no_duplicate_triples` — HashSet check on `(criterion, source_path, test_name)` for both tables; copy-paste doubles can't silently inflate coverage
-> 2. `pin_count_meets_minimum_floor` — `MIN_RUST_PINS=30`, `MIN_JS_PINS=3` floors so the drift-guard itself can't be gutted by deletion
-> 3. `every_pin_source_path_exists_on_disk` — explicit `fs::exists` check with clear failure message; catches renames the field-drift pin misses when the PRD row is also deleted
-> 4. `prd_file_meets_minimum_line_count` — `MIN_PRD_LINES=300` (PRD is 437); truncated PRD can't pass with a shrunk cite table
-> 5. `pins_span_multiple_prd_sections` — BTreeSet of `§X.Y` prefixes must include 3.1, 3.2, 3.3 on Rust side plus at least one JS entry under 3.4-3.8; whole sections can't disappear
+> Five new source-inspection pins on every `src/services/mods/*.rs` file:
+> 1. `every_mods_source_file_has_multi_line_doc_block` — `MIN_DOC_LINES=2`; a single long line trips iter-143 char floor but hides invariants behind summary
+> 2. `no_crate_doc_contains_wip_marker` — TODO/FIXME/XXX/HACK in `//!` block bakes the gap into prod
+> 3. `every_mods_source_file_has_doc_at_top_of_file` — Rustdoc treats inner-item `//!` as attribute docs, not crate docs; mid-file `//!` is silently wrong
+> 4. `expected_mods_filename_set_is_present` — locks canonical set {catalog, external_app, mod, registry, tmm, types} so a rename can't slip past the iter-104 count floor
+> 5. `every_mods_doc_first_line_has_nonempty_summary` — `MIN_SUMMARY_CHARS=20` on stripped first `//!` line; stub first line + padding can't pass combined floors
 >
-> prd_path_drift_guard: 6 → 11 tests. 1138 Rust (+5), clippy clean, vitest 449/449.
+> crate_comment_guard: 3 → 8 tests. 1143 Rust (+5), clippy clean, vitest 449/449.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
