@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 141
-last_work_iteration: 141
+iteration_counter: 142
+last_work_iteration: 142
 last_research_sweep: 130
 last_revalidation: 140
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 120
+total_items_done: 121
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 747a915
+tauri_v2_migration_last_commit: a93381b
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 142 WORK — pin.portal-https-structural-extension DONE (worktree).**
+>
+> Worktree commit `a93381b`. PRD §3.1.13 portal-HTTPS `portal_https_guard.rs` previously only checked URL scheme (https/LAN/empty) + audit doc. Nothing pinned the structural config-file shape, so new keys could sneak in, action URLs could drift from `API_BASE_URL`, or updater URLs could be populated silently.
+>
+> Three new assertions:
+> 1. `config_json_has_exact_expected_key_set` — 8 expected keys pinned (API_BASE_URL + 5 action URLs + HASH_FILE_URL + FILE_SERVER_URL); extras and missing both trip
+> 2. `action_urls_share_api_base_prefix` — all 5 action URLs must start with `API_BASE_URL`, enforcing atomic flip during the production HTTPS cutover. A drift (base updated but action forgotten) is a silent mis-wire
+> 3. `updater_urls_remain_empty_until_endpoint_ships` — HASH_FILE_URL + FILE_SERVER_URL stay `""` until Classic+ ships its updater endpoint; populating silently enables self-update without the hash baseline CLAUDE.md documents as missing
+>
+> Extended detector self-test with 3 new bad shapes (rogue extra key, drifted action prefix, populated updater URL).
+>
+> portal_https_guard: 3 → 6 tests.
+>
+> Acceptance: 982/982 Rust (was 979, +3), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 141 WORK — pin.changelog-release-shape DONE (worktree).**
 >
