@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 182
-last_work_iteration: 182
+iteration_counter: 183
+last_work_iteration: 183
 last_research_sweep: 170
 last_revalidation: 180
 last_revalidation_status: all-gates-green
@@ -16,30 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 159
+total_items_done: 160
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 3e537d0
+tauri_v2_migration_last_commit: 2348752
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 182 WORK — pin.offline-banner-real-file-skeleton+i18n+app-js-order DONE (worktree).**
+> **Iter 183 WORK — pin.classicplus-guards-it-floor+hosts+stub-early-return+teralib-empty DONE (worktree).**
 >
-> Worktree commit `3e537d0`. UX-pillar balance vs iter 181's perf-pillar add; continues the post-revalidation non-doc-layer sweep on the oldest untouched scanner guards.
+> Worktree commit `2348752`. Continues the post-revalidation non-doc-layer sweep on security-adjacent scanner guards. Classic+ is the contract that keeps upstream Classic features disabled — a merge that re-wires OAuth / leaderboard / a URL guard would re-expose surface the Classic+ portal doesn't support.
 >
-> fix.offline-empty-state `offline_banner_scanner_guard.rs` previously had 7 tests (iter 84 creation baseline): file self-identify + DOM skeleton + `.ready`-before-await + idempotent retry + i18n parity + reference files + detector self-test. Iter 182 widens to 5 more angles, adding a defense-in-depth layer that reads the real `src/index.html` + `src/translations.json` + `src/app.js` directly.
+> `classicplus_guards_scanner_guard.rs` previously had 7 tests (iter 125-128 JS-scanner chain baseline): file self-identify + URLs fixture coverage + no leaderboard + 7 stubs + 6 URL guards + LoadStartPage + detector self-test. Iter 183 widens to 5 more angles, adding defense-in-depth real-file pins for `src/app.js` + `teralib/src/config/config.json`.
 >
 > Five new source-inspection pins:
-> 1. `offline_scanner_has_at_least_four_it_blocks` — floor of 4 so the 4 iter-84 invariants can't be deleted piecemeal
-> 2. `offline_scanner_carries_no_only_or_skip_markers` — reject `it.only` / `describe.only` / `it.skip` / `xit` / `xdescribe`
-> 3. `index_html_carries_full_offline_banner_skeleton` — real `src/index.html` must carry all 6 DOM pieces; catches scanner-fixture-vs-production drift
-> 4. `translations_json_has_offline_banner_keys_in_all_four_locales` — real `src/translations.json` checked per-locale for the full 3x4 key matrix
-> 5. `app_js_ready_flip_precedes_first_await_in_init` — real `src/app.js` post-comment-strip: `classList.add('ready')` offset < first `await ` offset inside `async init()`. `strip_js_comments` helper prevents prose `await` in iter-84 comment block from breaking the order check.
+> 1. `classicplus_scanner_has_minimum_it_count` — floor of 10 `it(` blocks (expect 14 = 7 stubs + 6 URL guards + 1 LoadStartPage)
+> 2. `classicplus_scanner_carries_no_only_or_skip_markers` — reject local-dev `.only` / `.skip` / `xit` / `xdescribe`
+> 3. `classicplus_scanner_urls_fixture_contains_only_allowed_hosts` — extracts every URL from `URLS = {...}` and requires one of three approved hosts (192.168.1.128 / discord.com / helpdesk.crazy-esports.com)
+> 4. `app_js_classicplus_stubs_reach_early_return` — real `src/app.js` must keep all 7 stubs AND each body must contain `return` + a `Classic+` marker comment
+> 5. `teralib_config_keeps_hash_and_file_server_empty` — real `teralib/src/config/config.json` must keep `HASH_FILE_URL: ""` + `FILE_SERVER_URL: ""` (Rust half of no-updater contract)
 >
-> offline_banner_scanner_guard: 7 → 12 tests. 1153 Rust (+5), clippy clean, vitest 449/449.
+> classicplus_guards_scanner_guard: 7 → 12 tests. 1158 Rust (+5), clippy clean, vitest 449/449.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
