@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 105
-last_work_iteration: 105
+iteration_counter: 106
+last_work_iteration: 106
 last_research_sweep: 100
 last_revalidation: 100
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 86
+total_items_done: 87
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 8c31a5c
+tauri_v2_migration_last_commit: 1a2a583
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 106 WORK — docs.architecture-mods-state + guard DONE (worktree).**
+>
+> Worktree commit `1a2a583`. Closes PRD §3.8.4 coverage gap: doc required sections for 7 subsystems; ARCHITECTURE.md had 6 of 7 — `mods_state.rs` was missing.
+>
+> Added section "3a. Mods state (in-memory guard)" between Registry (§3) and External-app (§4). Covers: lazy-load + write-through semantics of the RwLock wrapper around registry.rs; the atomic `try_claim_installing` primitive that gates parallel installs (PRD 3.2.7); module-boundary invariants (lock poisoning surfaces cleanly; no direct `MODS_STATE.write()` outside the module).
+>
+> New `tests/architecture_doc_guard.rs` (3 tests):
+> 1. `every_required_subsystem_has_doc_coverage` — checks all 7 subsystem file paths appear in the doc; fails with a list of missing entries so future additions are caught immediately.
+> 2. `doc_has_structural_section_headings` — sanity check that the doc has >=7 `## ` headings (not one prose paragraph).
+> 3. Detector self-test with synthetic partial-coverage + no-headings bad shapes.
+>
+> Parallel to iter 104's `crate_comment_guard.rs`: both tests enforce documentation invariants structurally so regression is a test failure, not a doc-review miss.
+>
+> Acceptance: 865/865 Rust (was 862, +3), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 105 WORK — infra.troubleshoot-coverage-ci DONE (worktree).**
 >
