@@ -509,7 +509,8 @@ fn guard_path_constants_are_canonical() {
 #[test]
 fn detector_self_test_covers_all_nine_era_shapes() {
     let src = fs::read_to_string("tests/tampered_catalog.rs")
-        .expect("tests/tampered_catalog.rs must exist");
+        .expect("tests/tampered_catalog.rs must exist")
+        .replace("\r\n", "\n");
     let fn_pos = src
         .find("fn tampered_catalog_wiring_detector_self_test()")
         .expect("self-test fn must exist");

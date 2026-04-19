@@ -164,7 +164,9 @@ fn cargo_toml_declares_expected_bin_crate() {
 /// break compilation of the entire integration-test suite.
 #[test]
 fn tempfile_is_declared_in_dev_dependencies() {
-    let toml = fs::read_to_string(CARGO_TOML).expect("Cargo.toml must exist");
+    let toml = fs::read_to_string(CARGO_TOML)
+        .expect("Cargo.toml must exist")
+        .replace("\r\n", "\n");
     // Locate `[dev-dependencies]` and verify `tempfile` appears after
     // it (before the next `[` section header).
     let dev_pos = toml

@@ -492,7 +492,8 @@ fn forbidden_markers_list_covers_six_disable_variants() {
 #[test]
 fn detector_self_test_carries_both_era_synthetic_shapes() {
     let src = fs::read_to_string("tests/mods_categories_ui_scanner_guard.rs")
-        .expect("tests/mods_categories_ui_scanner_guard.rs must exist");
+        .expect("tests/mods_categories_ui_scanner_guard.rs must exist")
+        .replace("\r\n", "\n");
     let fn_pos = src
         .find("fn mods_categories_ui_scanner_guard_detector_self_test()")
         .expect("self-test fn must exist");

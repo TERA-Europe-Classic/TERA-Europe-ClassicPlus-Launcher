@@ -162,7 +162,7 @@ fn detect_conflicts_body(src: &str) -> &str {
 /// site and hide the no-conflict case.
 #[test]
 fn detect_conflicts_signature_is_two_maps_plus_modfile_to_vec() {
-    let src = tmm_src();
+    let src = tmm_src().replace("\r\n", "\n");
     assert!(
         src.contains(
             "pub fn detect_conflicts(\n    vanilla_map: &HashMap<String, MapperEntry>,\n    current_map: &HashMap<String, MapperEntry>,\n    incoming: &ModFile,\n) -> Vec<ModConflict>"
@@ -307,7 +307,9 @@ fn guard_file_header_cites_fix_slot() {
 /// to be side-effect-free. Reject any write-classed call.
 #[test]
 fn preview_command_has_no_write_side_effects() {
-    let src = fs::read_to_string(COMMANDS_MODS_RS).expect("commands/mods.rs must exist");
+    let src = fs::read_to_string(COMMANDS_MODS_RS)
+        .expect("commands/mods.rs must exist")
+        .replace("\r\n", "\n");
     let fn_pos = src
         .find("pub async fn preview_mod_install_conflicts")
         .expect("preview_mod_install_conflicts must exist");

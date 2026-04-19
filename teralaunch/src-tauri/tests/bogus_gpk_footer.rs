@@ -203,7 +203,7 @@ fn parse_mod_file_read_back_guards_cursor_underflow() {
 /// degenerate ModFile.
 #[test]
 fn install_gpk_has_four_fail_closed_gates() {
-    let src = read_tmm_rs();
+    let src = read_tmm_rs().replace("\r\n", "\n");
     let fn_pos = src
         .find("pub fn install_gpk")
         .expect("install_gpk must exist");
