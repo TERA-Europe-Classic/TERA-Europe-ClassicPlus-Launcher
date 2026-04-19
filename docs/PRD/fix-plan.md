@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 96
-last_work_iteration: 96
+iteration_counter: 97
+last_work_iteration: 97
 last_research_sweep: 90
 last_revalidation: 72
 last_revalidation_status: all-gates-green
@@ -16,15 +16,38 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 77
+total_items_done: 78
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 0990473
+tauri_v2_migration_last_commit: 1ced792
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 97 WORK — docs.prd-path-drift-fix DONE (worktree).**
+>
+> Worktree commit `1ced792`. Iters 61-95 migrated several "integration" tests from `tests/foo.rs` to inline `src/services/mods/foo.rs::tests` because bin-crate tests can't import library types (the `ModEntry`/`Registry` import limitation we hit in iter 78, 89, etc.). The PRD §3 / §5.2 tables were not updated and drifted — four rows cited `tests/foo.rs` files that never existed. A future contributor scanning the PRD to verify a criterion is pinned would have come up empty.
+>
+> Fixed paths:
+> - §3.1.2: `tests/gpk_install_hash.rs` → `services/mods/external_app.rs::tests`
+> - §3.1.4: `tests/gpk_deploy_sandbox.rs` → `services/mods/tmm.rs::tests`
+> - §3.2.2: `tests/crash_recovery.rs::tests::` (nonsensical `::tests::` suffix on bin-crate integration test) → `services/mods/registry.rs::tests` (behavioural) + `tests/crash_recovery.rs` (JSON contract + iter-95 filesystem pins)
+> - §3.2.4: `tests/full_cycle.rs` → `services/mods/tmm.rs::tests`
+> - Plus two §5.2 "New tests required" bullet points.
+>
+> New `tests/prd_path_drift_guard.rs` (4 tests) pins this:
+> 1. `every_pin_source_file_has_named_test` — curated list of 7 known-shipped invariants; source file exists + `fn <test_name>` grep-findable.
+> 2. `every_pin_is_cited_in_prd_row` — PRD row for that criterion mentions the source path + test name.
+> 3. `iter_97_fixed_paths_do_not_regress` — the 4 stale paths must NOT reappear.
+> 4. Detector self-test.
+>
+> Scope note: many §3 rows cite tests that genuinely don't exist yet (unshipped — `every_catalog_entry_lifecycle.rs`, `mod-accessibility.spec.js`, etc.). Those are PRD-as-spec, not drift. The guard deliberately doesn't try to parse the full table; curated list is enough to catch future rename-without-update drift.
+>
+> Acceptance: 860/860 Rust (was 856, +4), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
+>
+> Next iter (iter 98) still WORK. Iter 100 will be double-duty (N%10=0 RESEARCH SWEEP + N%20=0 REVALIDATION).
 
 > **Iter 96 WORK — adv.tampered-catalog DONE (worktree).**
 >
