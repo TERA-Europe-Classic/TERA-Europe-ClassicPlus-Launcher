@@ -267,6 +267,80 @@ pub fn get_entry_by_incomplete_object_path<'a>(
     map.values().find(|e| incomplete_paths_equal(&e.object_path, path))
 }
 
+// --- Install-time conflict detection (PRD 3.3.3) ---------------------------
+
+/// One `(composite, object)` slot that's already been patched by a different
+/// mod than the one about to install. The user should confirm before
+/// overwriting — last-install-wins is our semantic, but opaque.
+///
+/// Call-site wiring (tauri command preview_mod_install_conflicts + frontend
+/// modal) is follow-up P1 `fix.conflict-modal-wiring`; predicate stays
+/// `pub` so the command can import it when that work lands.
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModConflict {
+    pub composite_name: String,
+    pub object_path: String,
+    /// The container filename the existing mapper entry points at. Neither
+    /// the vanilla file nor the incoming mod's container.
+    pub previous_filename: String,
+}
+
+/// Inspects the current mapper vs the vanilla mapper (from `.clean`) and the
+/// incoming `modfile`, and returns one `ModConflict` per slot whose current
+/// filename is neither the vanilla nor the incoming mod's container.
+///
+/// Three cases:
+/// - `current == vanilla` → no mod patched this yet → no conflict.
+/// - `current == incoming.container` → re-install of the same mod → no conflict.
+/// - otherwise → a *different* mod owns this slot → conflict.
+///
+/// Matches the lookup semantic `install_gpk` uses (region_lock gates
+/// exact-path vs. incomplete-path equality).
+#[allow(dead_code)]
+pub fn detect_conflicts(
+    vanilla_map: &HashMap<String, MapperEntry>,
+    current_map: &HashMap<String, MapperEntry>,
+    incoming: &ModFile,
+) -> Vec<ModConflict> {
+    let mut conflicts = Vec::new();
+
+    for pkg in &incoming.packages {
+        let current = if incoming.region_lock {
+            get_entry_by_object_path(current_map, &pkg.object_path)
+        } else {
+            get_entry_by_incomplete_object_path(current_map, &pkg.object_path)
+        };
+        let current = match current {
+            Some(e) => e,
+            None => continue, // slot doesn't exist — install_gpk will raise
+        };
+
+        let vanilla = if incoming.region_lock {
+            get_entry_by_object_path(vanilla_map, &pkg.object_path)
+        } else {
+            get_entry_by_incomplete_object_path(vanilla_map, &pkg.object_path)
+        };
+
+        let is_vanilla_unchanged = vanilla
+            .map(|v| v.filename.eq_ignore_ascii_case(&current.filename))
+            .unwrap_or(false);
+        let is_self_reinstall = current
+            .filename
+            .eq_ignore_ascii_case(&incoming.container);
+
+        if !is_vanilla_unchanged && !is_self_reinstall {
+            conflicts.push(ModConflict {
+                composite_name: current.composite_name.clone(),
+                object_path: current.object_path.clone(),
+                previous_filename: current.filename.clone(),
+            });
+        }
+    }
+
+    conflicts
+}
+
 // --- Mod file (.gpk with TMM metadata) reader -------------------------------
 
 #[derive(Debug, Clone, Default)]
@@ -792,6 +866,122 @@ mod tests {
                 "vector {name:?} should have been accepted"
             );
         }
+    }
+
+    // --- PRD 3.3.3.conflict-warning-ui -------------------------------------
+
+    fn mapper_with(entries: &[(&str, &str, &str)]) -> HashMap<String, MapperEntry> {
+        // entries: (composite_name, object_path, filename). The map is keyed
+        // by a unique synthetic string so multiple object_paths can share a
+        // composite — production mappers don't have a 1:1 composite:entry
+        // shape, but `get_entry_by_object_path` iterates `values()` anyway
+        // so any unique key works.
+        entries
+            .iter()
+            .map(|(c, o, f)| {
+                (
+                    format!("{c}|{o}"),
+                    MapperEntry {
+                        composite_name: (*c).to_string(),
+                        object_path: (*o).to_string(),
+                        filename: (*f).to_string(),
+                        offset: 0,
+                        size: 0,
+                    },
+                )
+            })
+            .collect()
+    }
+
+    fn modfile_with(container: &str, object_paths: &[&str]) -> ModFile {
+        let mut m = ModFile {
+            container: container.to_string(),
+            region_lock: true,
+            ..Default::default()
+        };
+        for p in object_paths {
+            m.packages.push(ModPackage {
+                object_path: (*p).to_string(),
+                ..Default::default()
+            });
+        }
+        m
+    }
+
+    #[test]
+    fn detect_conflicts_returns_empty_on_vanilla_current() {
+        // current mapper is vanilla → no mod has patched this slot yet.
+        let vanilla = mapper_with(&[("S1UI", "S1UI_Party.Foo", "S1Data.gpk")]);
+        let current = vanilla.clone();
+        let incoming = modfile_with("mymod.gpk", &["S1UI_Party.Foo"]);
+        assert!(detect_conflicts(&vanilla, &current, &incoming).is_empty());
+    }
+
+    #[test]
+    fn detect_conflicts_returns_empty_on_self_reinstall() {
+        // current already points at the incoming mod's container — re-install.
+        let vanilla = mapper_with(&[("S1UI", "S1UI_Party.Foo", "S1Data.gpk")]);
+        let current = mapper_with(&[("S1UI", "S1UI_Party.Foo", "mymod.gpk")]);
+        let incoming = modfile_with("mymod.gpk", &["S1UI_Party.Foo"]);
+        assert!(detect_conflicts(&vanilla, &current, &incoming).is_empty());
+    }
+
+    #[test]
+    fn detect_conflicts_flags_other_mod_owning_slot() {
+        let vanilla = mapper_with(&[("S1UI", "S1UI_Party.Foo", "S1Data.gpk")]);
+        let current = mapper_with(&[("S1UI", "S1UI_Party.Foo", "othermod.gpk")]);
+        let incoming = modfile_with("mymod.gpk", &["S1UI_Party.Foo"]);
+
+        let conflicts = detect_conflicts(&vanilla, &current, &incoming);
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].composite_name, "S1UI");
+        assert_eq!(conflicts[0].object_path, "S1UI_Party.Foo");
+        assert_eq!(conflicts[0].previous_filename, "othermod.gpk");
+    }
+
+    #[test]
+    fn detect_conflicts_reports_multiple_slots() {
+        // Incoming mod touches 2 slots, both owned by a different mod.
+        let vanilla = mapper_with(&[
+            ("S1UI", "S1UI_Party.Foo", "S1Data.gpk"),
+            ("S1UI", "S1UI_Inv.Bar", "S1Data.gpk"),
+        ]);
+        let current = mapper_with(&[
+            ("S1UI", "S1UI_Party.Foo", "othermod.gpk"),
+            ("S1UI", "S1UI_Inv.Bar", "othermod.gpk"),
+        ]);
+        let incoming = modfile_with("mymod.gpk", &["S1UI_Party.Foo", "S1UI_Inv.Bar"]);
+
+        let conflicts = detect_conflicts(&vanilla, &current, &incoming);
+        assert_eq!(conflicts.len(), 2);
+    }
+
+    #[test]
+    fn detect_conflicts_mixed_slots_partial_report() {
+        // Incoming touches 2 slots; one vanilla (ok), one owned by other mod.
+        let vanilla = mapper_with(&[
+            ("S1UI", "S1UI_Party.Foo", "S1Data.gpk"),
+            ("S1UI", "S1UI_Inv.Bar", "S1Data.gpk"),
+        ]);
+        let current = mapper_with(&[
+            ("S1UI", "S1UI_Party.Foo", "S1Data.gpk"),       // vanilla
+            ("S1UI", "S1UI_Inv.Bar", "othermod.gpk"),       // conflict
+        ]);
+        let incoming = modfile_with("mymod.gpk", &["S1UI_Party.Foo", "S1UI_Inv.Bar"]);
+
+        let conflicts = detect_conflicts(&vanilla, &current, &incoming);
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].object_path, "S1UI_Inv.Bar");
+    }
+
+    #[test]
+    fn detect_conflicts_missing_slot_is_not_a_conflict() {
+        // Slot doesn't exist in the current mapper — install_gpk will raise
+        // a different error; this fn shouldn't double-report.
+        let vanilla: HashMap<String, MapperEntry> = HashMap::new();
+        let current: HashMap<String, MapperEntry> = HashMap::new();
+        let incoming = modfile_with("mymod.gpk", &["S1UI_Party.Foo"]);
+        assert!(detect_conflicts(&vanilla, &current, &incoming).is_empty());
     }
 
     #[test]
