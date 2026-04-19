@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 226
-last_work_iteration: 226
+iteration_counter: 227
+last_work_iteration: 227
 last_research_sweep: 220
 last_revalidation: 220
 last_revalidation_status: all-gates-green
@@ -16,15 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 199
+total_items_done: 200
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 8cc8460
+tauri_v2_migration_last_commit: e283773
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 227 WORK — pin.clean-recovery-ensure-backup-copy-direction+2-path-constants+CookedPC-path-helpers+shared-helper-sourcing+4-hazard-header-enumeration DONE (worktree).**
+>
+> Worktree commit `e283773`. PRD §3.2.9 clean-recovery-logic + fix.clean-recovery-wiring; clean_recovery had 13 tests (iter 151 creation + iter 164 +5 + iter 195 +5); 32 iters untouched. Brings to 18. Milestone: **total_items_done=200**.
+>
+> Five new source-inspection pins (sister direction pin + path constants + CookedPC construction + shared-helper sourcing + header hazard map):
+> 1. `ensure_backup_copies_src_to_dst_not_reverse` — sister pin to iter-195's direction check; iter 195 only pinned recover_missing_clean
+> 2. `guard_path_constants_are_canonical` — TMM_RS + GUARD_SOURCE pinned verbatim
+> 3. `mapper_and_backup_path_helpers_join_via_cooked_pc_dir` — both helpers construct via `game_root.join(COOKED_PC_DIR).join(MAPPER_FILE|BACKUP_FILE)`; dropping COOKED_PC_DIR points recovery at wrong directory
+> 4. `backup_functions_source_paths_via_shared_helpers` — both ensure_backup + recover_missing_clean source src/dst via `mapper_path(game_root)` / `backup_path(game_root)`; not inline join
+> 5. `guard_header_enumerates_four_iter_164_refactor_hazards` — header enumerates 4 hazards (dropped dst.exists / dropped TMM_MARKER / dropped idempotence / renamed constants)
+>
+> clean_recovery: 13 → 18 tests. 1358 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 226 WORK — pin.tampered-catalog-4-path-constants+9-shape-self-test+fn-uniqueness+header-fn-enumeration+install_mod-ModKind-dispatch DONE (worktree).**
 >
