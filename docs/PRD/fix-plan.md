@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 202
-last_work_iteration: 202
+iteration_counter: 203
+last_work_iteration: 203
 last_research_sweep: 190
 last_revalidation: 200
 last_revalidation_status: all-gates-green
@@ -16,28 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 177
+total_items_done: 178
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 935dd9b
+tauri_v2_migration_last_commit: 83c65e2
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 202 WORK — pin.parallel-install-guard-header+err-short-circuits-save+ensure_loaded-ordering+upsert-on-success+poisoned-lock DONE (worktree).**
+> **Iter 203 WORK — pin.bogus-gpk-PACKAGE_MAGIC-const+sandbox-branches+uninstall-sandbox+fs-read-binary+corpus-small-fixtures DONE (worktree). Final 9-count file — every integration test in tests/ now ≥ 10 pins.**
 >
-> Worktree commit `935dd9b`. §3.2.7 functionality-pillar (concurrent install safety); parallel_install had 9 tests (iter 159); 43 iters untouched. Pairs with §3.2 recovery-pillar trio (iter 194-196). Brings to 14.
+> Worktree commit `83c65e2`. §5.3 adv.bogus-gpk-footer + §3.1.4 gpk-deploy-sandbox; bogus_gpk_footer had 9 tests (iter 163 +5 over iter 87 baseline); 40 iters untouched. Brings to 14.
 >
 > Five new source-inspection pins:
-> 1. `guard_file_header_cites_prd_and_parallel_install_name` — header cites PRD 3.2.7 + `parallel-install-serialised`
-> 2. `mutate_closure_err_short_circuits_before_save` — pins `let result = f(&mut state.registry)?;` shape + ordering vs `state.registry.save(`; a future refactor that swallows the `?` would silently persist partial state
-> 3. `mutate_calls_ensure_loaded_before_write_lock` — `ensure_loaded()?` strictly before `MODS_STATE.write()`; inversion would deadlock (ensure_loaded itself acquires write)
-> 4. `try_claim_installing_upserts_row_on_success` — body must call `self.upsert(row)` AFTER the `matches!(slot.status, ModStatus::Installing)` refusal; dropping upsert would cause row loss on first-claim
-> 5. `mutate_surfaces_poisoned_lock_error_explicitly` — `"Mods state poisoned"` via `.map_err(|e|`; removing the branded message would silently drop lock poisoning signal
+> 1. `package_magic_constant_has_canonical_value` — `const PACKAGE_MAGIC: u32 = 0x9E2A83C1;` verbatim; silent rename would leave corpus tests vacuously passing
+> 2. `sandbox_predicate_retains_all_rejection_branches` — 7 branches inside `is_safe_gpk_container_filename` (empty / `/` / `\\` / `\0` / `.` / `..` / embedded `..` / drive-letter); each maps to a distinct adversary class
+> 3. `uninstall_gpk_calls_sandbox_predicate_first` — symmetric gate on the uninstall path; prevents tampered-registry → traversal rollback
+> 4. `install_gpk_reads_source_as_raw_bytes` — `fs::read(source_gpk)` not `fs::read_to_string`; UTF-8 validation would swap out the surgical footer-parse error surface the corpus pins depend on
+> 5. `adversarial_corpus_retains_small_buffer_fixtures` — the `&[]` + `&[0,0,0]` fixtures are the ONLY inputs exercising the `end < 4` underflow branch; dropping them would let the guard regress silently
 >
-> parallel_install: 9 → 14 tests. 1243 Rust (+5), clippy clean, vitest 449/449.
+> bogus_gpk_footer: 9 → 14 tests. 1248 Rust (+5), clippy clean, vitest 449/449.
+>
+> **Milestone**: every integration test in `teralaunch/src-tauri/tests/` now carries ≥ 10 structural pins. No lowest-baseline file remains.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
