@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 67
-last_work_iteration: 67
+iteration_counter: 68
+last_work_iteration: 68
 last_research_sweep: 60
 last_revalidation: 60
 last_revalidation_status: regression-resolved-next-iter
@@ -19,11 +19,19 @@ last_investigation_iteration: 18
 total_items_done: 52
 total_items_regressed: 0
 total_iterations_to_cap: 1000
-tauri_v2_migration_milestone: M3
+tauri_v2_migration_milestone: M4-partial
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 576f44e
+tauri_v2_migration_last_commit: 9983474
 ```
+
+> **Iter 68 WORK — Tauri v2 M4 partial (deploy-path v2-ready, worktree).**
+>
+> Executed M4 partial on the `tauri-v2-migration` worktree. `bundle.createUpdaterArtifacts: "v1Compatible"` was already set by the migrate tool in M1 (tauri.conf.json:26). The real M4 work this iter was catching two deploy-path breakers the tool didn't flag. Worktree commit `9983474`:
+> - `.github/workflows/deploy.yml`: env block `TAURI_PRIVATE_KEY` → `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_KEY_PASSWORD` → `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (v2 renamed the env var names the CLI reads; GitHub-secret names stay unchanged so no secret rotation). Version read: `$json.package.version` → `$json.version` with a fallback for pre-v2 refs.
+> - `builder.ps1`: forwards legacy v1 env-var names to v2 equivalents so user `.env` + file-based workflows keep working; cargo fallback `tauri-cli@^1` → `tauri-cli@^2`.
+>
+> **Why partial.** Full M4 acceptance per the migration plan needs `.nsis.zip` + `.nsis.zip.sig` artefacts produced + a bundle-size check vs the 52.05 MB baseline from iter 63. The signing key is a GitHub secret only (not in local env), so running `npm run tauri build` locally would skip the `.sig` artefact — defeating the check. Punted the live artefact inventory to the first post-merge deploy.yml run at v0.2.0; the bundle-size gate (iter 54) will fire there automatically. Next iter (69) executes M5 (CSP tightening — can land independently, closes PRD 3.1.12).
 
 > **Iter 67 WORK — Tauri v2 M3 DONE (worktree).**
 >
