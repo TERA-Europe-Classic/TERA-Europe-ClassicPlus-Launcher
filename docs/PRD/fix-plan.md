@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 194
-last_work_iteration: 194
+iteration_counter: 195
+last_work_iteration: 195
 last_research_sweep: 190
 last_revalidation: 180
 last_revalidation_status: all-gates-green
@@ -16,28 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 170
+total_items_done: 171
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 5c1124c
+tauri_v2_migration_last_commit: 9d843b3
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 194 WORK — pin.crash-recovery-load-err+create+revert+first-run DONE (worktree).**
+> **Iter 195 WORK — pin.clean-recovery-missing-mapper+map-err+TMM-marker+copy-direction DONE (worktree).**
 >
-> Worktree commit `5c1124c`. §3.2.2 functionality-pillar; crash_recovery had 11 tests (iter 104 creation + iter 95 adv.sigkill + iter 161 +5); brings to 16. Pairs with iter 193 conflict_modal (both §3.2).
+> Worktree commit `9d843b3`. §3.2.9 functionality-pillar; clean_recovery had 8 tests (iter 104 creation + iter 164 +5); brings to 13. Pairs with iter 194 crash_recovery (both recovery paths).
 >
 > Five new source-inspection pins:
-> 1. `guard_file_cites_prd_and_adv_sigkill` — header cites `PRD 3.2.2` + `adv.sigkill-mid-download` (anywhere in file)
-> 2. `registry_load_maps_serde_err_to_user_facing_string` — `Registry::load` must `.map_err(|e| format!(...))?` on both `fs::read_to_string` AND `serde_json::from_str`; raw `.unwrap()` panics the launcher on corrupt registry
-> 3. `download_and_extract_create_dir_all_precedes_extract_zip` — source-order `fs::create_dir_all(dest_dir)` < `extract_zip(...)`; prevents ENOENT on first-install
-> 4. `download_and_extract_reverts_partial_on_extract_zip_failure` — body must carry `if let Err(e) = extract_zip(...)` + `revert_partial_install_dir(dest_dir)` (PRD 3.2.8 disk-full-revert)
-> 5. `registry_load_returns_default_on_missing_path` — `if !path.exists() { return Ok(Self::default()); }` precedes any `fs::read`; fresh-install ergonomics
+> 1. `guard_file_header_cites_prd_and_fix_slot` — header cites `fix.clean-recovery-wiring` + `§3.2.9`
+> 2. `recover_missing_clean_has_missing_mapper_error_branch` — body must carry `if !src.exists()` returning error citing `CompositePackageMapper.dat not found` + `Verify game files` guidance
+> 3. `backup_and_recover_use_map_err_not_unwrap` — both `ensure_backup` and `recover_missing_clean` must use `.map_err(|e| format!(...))?`; raw `.unwrap()` panics the process
+> 4. `tmm_marker_constant_is_pinned_verbatim` — `const TMM_MARKER: &str = "tmm_marker";`; sentinel for "is this mapper modded?" — renaming lets recover stamp modded mappers as vanilla
+> 5. `recover_missing_clean_copies_src_to_dst_not_reverse` — reject `fs::copy(&dst, &src)` — reversed direction copies missing backup over current mapper, destroys install
 >
-> crash_recovery: 11 → 16 tests. 1208 Rust (+5), clippy clean, vitest 449/449.
+> clean_recovery: 8 → 13 tests. 1213 Rust (+5), clippy clean, vitest 449/449.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
