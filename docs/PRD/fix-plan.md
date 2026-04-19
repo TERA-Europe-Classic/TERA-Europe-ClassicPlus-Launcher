@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 80
-last_work_iteration: 79
+iteration_counter: 81
+last_work_iteration: 81
 last_research_sweep: 80
 last_revalidation: 72
 last_revalidation_status: all-gates-green
@@ -16,15 +16,26 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 18
-total_items_done: 61
+total_items_done: 62
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 4421a97
+tauri_v2_migration_last_commit: e52cad4
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 81 WORK — dep.rustls-webpki-bump DONE (worktree).**
+>
+> Pre-squash filler work on the ready-for-squash worktree. Worktree commit `e52cad4`. First of five iter-80 queued P2 items closed — `cargo update -p rustls-webpki --precise 0.103.12`. Lockfile-only change (2 lines), no source touched. Clears three RUSTSEC advisory rows flagged by the iter-80 sweep:
+> - RUSTSEC-2026-0049 (CRL distribution-point matching, non-exploitable in reqwest default config)
+> - RUSTSEC-2026-0098 (URI name-constraint bypass, non-exploitable on public Web PKI)
+> - RUSTSEC-2026-0099 (wildcard-cert bypass, requires attacker-controlled CA)
+>
+> Rationale for picking this first: smallest scope of the queued P2s, fastest verify cycle, clears 3 advisory rows that would fail a future `cargo audit` CI gate in one commit. Four P2 items remain queued for iters 82-85: `sec.shell-scope-hardening`, `sec.shell-open-call-sites-pinned`, `dep.dedupe-reqwest-zip`, plus the iter-80 P3 `dep.vitest-bump-post-squash`.
+>
+> Acceptance: 828/828 Rust (unchanged from iter 79 — pure lockfile bump, no new tests expected), clippy clean, 431/431 JS. Worktree ready state unchanged — `ready_for_squash_merge: true`. Seven items shipped since M8 validation (iters 74-81: overlay-lifecycle, clean-recovery, conflict-modal, hardcoded-i18n, http-redirect-offlist, bogus-gpk-footer, rustls-webpki-bump). Next iter (82) picks the next P2 — recommend `sec.shell-open-call-sites-pinned` (JS-only, 1 test file, follows existing i18n-scanner pattern).
 
 > **Iter 80 RESEARCH SWEEP — findings landed on worktree.**
 >
