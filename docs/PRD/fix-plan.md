@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 146
-last_work_iteration: 146
+iteration_counter: 147
+last_work_iteration: 147
 last_research_sweep: 130
 last_revalidation: 140
 last_revalidation_status: all-gates-green
@@ -16,15 +16,33 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 125
+total_items_done: 126
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 462d48a
+tauri_v2_migration_last_commit: 42590aa
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 147 WORK — pin.tauri-v2-audit-depth DONE (worktree).**
+>
+> Worktree commit `42590aa`. The 4 M0-M8 audit docs are the evidence backing the user-gated squash merge (`ready_for_squash_merge: true` since iter 100). `tauri_v2_migration_audit_guard` previously only checked file presence + surface-sanity keywords + a single §3.1 reference; the docs' actual load-bearing content could silently rot.
+>
+> Four new assertions:
+> 1. `every_audit_doc_meets_minimum_line_count` — each doc ≥100 lines (truncation past ~50% points at a stub replacement, partial edit, or silent revert)
+> 2. `plan_doc_cites_key_automation_artefacts` — `cargo tauri migrate` + `v1Compatible` must stay. These are the iter-62 automation facts the whole plan depends on; dropping either breaks the reasoning chain
+> 3. `umbrella_doc_cites_three_unlocked_prd_items` — 3.1.8 + 3.1.9 + 3.1.12 all referenced (the full dependency chain justifying the migration)
+> 4. `baseline_doc_anchors_to_main_commit_sha` — header carries a 7+-char hex SHA so the pre-migration state is re-checkoutable for future diff-audit
+>
+> Extended detector self-test with 4 new bad shapes (truncated doc, missing automation citation, partial umbrella, baseline without SHA).
+>
+> tauri_v2_migration_audit_guard: 4 → 8 tests.
+>
+> **Milestone: 999/999 Rust tests (+4).** Next iter crosses the 1000-test threshold.
+>
+> Acceptance: 999/999 Rust (was 995, +4), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 146 WORK — pin.anti-reverse-extension DONE (worktree).**
 >
