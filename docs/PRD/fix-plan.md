@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 184
-last_work_iteration: 184
+iteration_counter: 185
+last_work_iteration: 185
 last_research_sweep: 170
 last_revalidation: 180
 last_revalidation_status: all-gates-green
@@ -16,30 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 161
+total_items_done: 162
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: e96cce8
+tauri_v2_migration_last_commit: 02340c0
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 184 WORK — pin.shell-open-it-floor+app-js-coverage+capability-shape+dom-reject DONE (worktree).**
+> **Iter 185 WORK — pin.i18n-no-hardcoded-sibling+prod-wiring DONE (worktree).**
 >
-> Worktree commit `e96cce8`. Third post-revalidation non-doc-layer sweep on security-critical scanners; CVE-2025-31477 (Tauri shell-plugin scope) defence-in-depth.
+> Worktree commit `02340c0`. Fourth post-revalidation non-doc-layer sweep; user-facing quality pillar (i18n) gets defense-in-depth pins on real `src/mods.js` + `src/mods.html`.
 >
-> `shell_open_callsite_guard.rs` previously had 7 tests (iter 127 creation baseline): file self-identify + both sink shapes + SAFE_IDENTIFIERS provenance + 4 classifier branches + positive/negative self-tests + scanned app.js + detector self-test. Iter 184 widens to 5 more angles, adding defense-in-depth real-file pins for `src/app.js` call-site count + `capabilities/migrated.json` capability shape.
+> `i18n_no_hardcoded_guard.rs` previously had 8 tests (iter 124 creation baseline): file exists + TARGETS + strict-zero allowlist + 3 attribute rules + looksEnglish + reference files + self-test + detector self-test. Iter 185 widens to 5 more angles on the scanner's sibling-attribute logic and production i18n wiring.
 >
 > Five new source-inspection pins:
-> 1. `shell_open_scanner_has_minimum_it_count` — floor of 5 `it(` blocks
-> 2. `shell_open_scanner_carries_no_only_or_skip_markers` — reject dev-local `.only` / `.skip` / `xit` / `xdescribe`
-> 3. `app_js_has_shell_open_call_sites_under_scanner_coverage` — real `src/app.js` must carry ≥ 3 call sites; zero means scanner trivially passes
-> 4. `capabilities_shell_allow_open_is_bare_string` — real `capabilities/migrated.json` must keep `"shell:allow-open"` as bare string; reject object-form with custom `allow` scope that could re-introduce `file://` / `smb://` / `nfs://`
-> 5. `scanner_safe_identifiers_reject_dom_input_patterns` — SAFE_IDENTIFIERS must not contain `.value` / `.innerText` / `.textContent` / `.innerHTML` / `document.` / `window.location` entries (attacker-controllable DOM sources)
+> 1. `i18n_scanner_has_minimum_it_count` — floor ≥ 3 `it(` blocks
+> 2. `i18n_scanner_carries_no_only_or_skip_markers` — reject dev-local `.only` / `.skip` / `xit` / `xdescribe`
+> 3. `scanner_enforces_sibling_data_translate_check` — scanner must reference `data-translate-aria-label=` AND carry `continue` in leak loop; without the sibling check every annotated element flags, defeating iter-77 strict-zero
+> 4. `mods_js_uses_i18n_wrapper_calls` — real `src/mods.js` must carry ≥ 3 `.t(` wrapper calls (App?.t / App.t / this.t)
+> 5. `mods_html_carries_data_translate_markers` — real `src/mods.html` must carry ≥ 5 `data-translate=` markers
 >
-> shell_open_callsite_guard: 7 → 12 tests. 1163 Rust (+5), clippy clean, vitest 449/449.
+> i18n_no_hardcoded_guard: 8 → 13 tests. 1168 Rust (+5), clippy clean, vitest 449/449.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
