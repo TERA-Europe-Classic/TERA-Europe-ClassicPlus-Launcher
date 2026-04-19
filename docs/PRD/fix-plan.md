@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 197
-last_work_iteration: 197
+iteration_counter: 198
+last_work_iteration: 198
 last_research_sweep: 190
 last_revalidation: 180
 last_revalidation_status: all-gates-green
@@ -16,30 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 173
+total_items_done: 174
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: dafdb9b
+tauri_v2_migration_last_commit: 4bf35eb
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 197 WORK — pin.csp-style-tradeoff+img+font+no-widening DONE (worktree).**
+> **Iter 198 WORK — pin.self-integrity-header+nonzero-exit+unreadable-advisory+bailout+import DONE (worktree).**
 >
-> Worktree commit `dafdb9b`. §3.1.12 security-pillar; csp_audit had 8 tests (iter 38 creation + iter 152 +4); last touched 45 iters ago — smallest baseline among guards still at ≤10 tests. Brings to 13.
->
-> Audit-driven pick: scanned `tests/*.rs` for lowest test count + oldest last-touched; csp_audit was the clear leader among untouched files (crate_comment_guard also at 8 but extended iter 179, i.e. 18 iters ago).
+> Worktree commit `4bf35eb`. §3.1.11 security-pillar anti-tamper; self_integrity had 8 tests (iter 31 creation + iter 153 +5); last extended 45 iters ago — pairs with iter 197 csp_audit on the "lowest-baseline, most-stale" audit track. Brings to 13.
 >
 > Five new source-inspection pins:
-> 1. `guard_file_header_cites_prd_and_style_src_tradeoff` — header cites `PRD 3.1.12` + explains deliberate style-src / unsafe-inline trade-off
-> 2. `csp_defines_style_src_with_documented_shape` — style-src = `'self'` + `'unsafe-inline'` (documented) + reject `*` widening
-> 3. `csp_defines_img_src_without_unsafe_inline` — img-src has `'self'` + `data:` but NOT `'unsafe-inline'` (copy-paste-drift signal; SVG-script attack surface)
-> 4. `csp_defines_font_src_explicitly` — font-src present, not relying on default-src fallback (future default-src tightening would silently break fonts)
-> 5. `csp_has_no_object_or_frame_src_widening` — if object-src/frame-src defined, reject `*` / `data:` / `blob:` / `https:` widening
+> 1. `guard_file_header_cites_prd_3_1_11` — header cites `PRD 3.1.11` + `self-integrity`
+> 2. `mismatch_branch_exits_with_nonzero_code` — must call `std::process::exit(2)`; reject `exit(0)` (zero signals success to wrapping scripts, defeats tamper signal)
+> 3. `unreadable_result_arm_warns_and_continues` — Unreadable arm must `log::warn!` and NOT `process::exit` — transient conditions (file lock, AV quarantine) aren't tampering signals
+> 4. `sidecar_bailouts_warn_and_return_early` — ≥3 early `return;` before `match verify_self`, one per bailout (no parent dir / missing sidecar / malformed hex)
+> 5. `verify_self_is_imported_from_services_module` — must `use services::self_integrity::{verify_self, IntegrityResult, REINSTALL_PROMPT}`; silent stub swap guarded
 >
-> csp_audit: 8 → 13 tests. 1223 Rust (+5), clippy clean, vitest 449/449.
+> self_integrity: 8 → 13 tests. 1228 Rust (+5), clippy clean, vitest 449/449.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
