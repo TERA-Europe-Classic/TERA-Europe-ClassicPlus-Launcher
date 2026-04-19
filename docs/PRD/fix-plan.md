@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 100
-last_work_iteration: 99
+iteration_counter: 101
+last_work_iteration: 101
 last_research_sweep: 100
 last_revalidation: 100
 last_revalidation_status: all-gates-green
@@ -16,15 +16,29 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 81
+total_items_done: 82
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 5efdf80
+tauri_v2_migration_last_commit: d7a693d
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 101 WORK — infra.cargo-audit-ci DONE (worktree).**
+>
+> Worktree commit `d7a693d`. Closes the P3 queued by iter 100's sweep. New `.github/workflows/cargo-audit.yml` runs `cargo audit --deny warnings` against both Rust workspaces (teralaunch/src-tauri + teralib) on every push to main + every PR + daily at 04:17 UTC.
+>
+> Complements the manual sweep cadence (every 10 loop iters, can lag up to 9 iters); CI catches new RUSTSEC advisories on the next push or schedule fire. Caches cargo-audit binary + advisory-db so cold runs aren't dominated by install / DB-fetch time. Matches the self-install pattern used by `secret-scan.yml` (gitleaks).
+>
+> No ignore list carried. Iter-87 dep-dedup audit documented the reqwest 0.12/0.13 + zip 2/4 duplication as upstream-gated but noted every advisory found at that time was either not applicable or already fixed in both resolved versions. If a future advisory lands that we've decided not to act on, add `--ignore RUSTSEC-YYYY-NNNN` with a cite comment; no silent ignores.
+>
+> Parallel to iter-13/88 gitleaks infrastructure: iter 13 first ran the historical scan, iter 88 added the allowlist + permanent CI. iter 101 is the equivalent first-CI-run for RUSTSEC.
+>
+> Acceptance: 860/860 Rust unchanged, 449/449 JS unchanged, clippy clean (workflow addition only — no Rust/JS code touched). Worktree ready state unchanged — `ready_for_squash_merge: true`.
+>
+> Local install of cargo-audit hit a transient Windows link error (LNK1105, AV interference), irrelevant since CI runs on Ubuntu. Workflow self-validates on first CI run; if advisories surface that need to be ignored, that's a follow-up iter.
 
 > **Iter 100 DOUBLE-DUTY — RESEARCH SWEEP + REVALIDATION both DONE (worktree).**
 >
