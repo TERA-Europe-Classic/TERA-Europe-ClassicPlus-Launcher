@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 102
-last_work_iteration: 102
+iteration_counter: 103
+last_work_iteration: 103
 last_research_sweep: 100
 last_revalidation: 100
 last_revalidation_status: all-gates-green
@@ -16,15 +16,29 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 83
+total_items_done: 84
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 7322ce9
+tauri_v2_migration_last_commit: 81f82fe
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 103 WORK — docs.prd-drift-fix-catalog-parse + pin.registry-recovery-direct DONE (worktree).**
+>
+> Worktree commit `81f82fe`. Scan of `registry.rs` + `catalog.rs` test blocks surfaced a **7th PRD path drift**: §3.2.6 cited `teralaunch/tests/catalog-parse.test.js::malformed_entries_filtered` (non-existent — no such frontend test file was ever created). The actual catalog-parse-error test lives inline at `src/services/mods/catalog.rs::tests::malformed_entries_filtered` plus 3 companion tests (`malformed_envelope_is_hard_error`, `every_entry_malformed_returns_empty_catalog`, `empty_mods_array_yields_empty_catalog`).
+>
+> Drift-guard: 27 → 30 pins. New:
+> - §3.2.2 `recover_stuck_installs_flips_installing_to_error` — direct recovery-predicate pin; complements the end-to-end `mid_install_sigkill_recovers_to_error` already cited
+> - §3.2.6 `malformed_entries_filtered` — fixes the new path drift
+>
+> Also extended `iter_97_fixed_paths_do_not_regress` to include the new stale path `teralaunch/tests/catalog-parse.test.js` so it can't regress.
+>
+> **Total PRD path drifts fixed across iter 97-103:** 7. 4 @ iter 97 (gpk_install_hash, gpk_deploy_sandbox, full_cycle, crash_recovery::tests::), 1 @ iter 98 (zeroize_audit::all_sensitive_strings_zeroize), 1 @ iter 99 (clean_recovery_logic singular), 1 @ iter 103 (catalog-parse.test.js).
+>
+> Acceptance: 860/860 Rust (unchanged — pins extend existing test bodies), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 102 WORK — pin.composite-collision-and-toggle-symmetry DONE (worktree).**
 >
