@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 91
-last_work_iteration: 91
+iteration_counter: 92
+last_work_iteration: 92
 last_research_sweep: 90
 last_revalidation: 72
 last_revalidation_status: all-gates-green
@@ -16,15 +16,26 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 71
+total_items_done: 73
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 8e9933f
+tauri_v2_migration_last_commit: 5e6b026
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 92 WORK — infra.gitleaks-bump-8.30.1 + pin.tmm.cipher DONE (worktree). TWO items closed.**
+>
+> Worktree commits `9e7727f` (gitleaks) + `5e6b026` (cipher pin).
+>
+> 1. **infra.gitleaks-bump-8.30.1** (P3) — one-line workflow bump `VER=8.30.0 → 8.30.1`. Iter-90 sweep queue fully cleared.
+> 2. **pin.tmm.cipher** (P1) — golden-file pin for the 3-pass mapper cipher. Second in the pin.tmm trio after iter 89 parser pin. 4 new inline tests: `golden_cipher_encrypt_zeros_16` (byte-for-byte pin with hand-traced derivation in the const doc comment), `golden_cipher_round_trip_identity` (5 fixtures including tail-unaligned + multi-block), `golden_cipher_key1_is_permutation` (KEY1 bijective on 0..16), `golden_cipher_key2_is_exact_constant` (KEY2 == `b"GeneratePackageMapper"`, 21 bytes). Hand-traced golden value verified on first run.
+>
+> Acceptance: 841/841 Rust (was 837, +4), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
+>
+> **Iter-80 and iter-90 sweep queues both fully cleared.** Remaining pin.tmm trio: `pin.tmm.merger` (property-based composite-merge). Larger P1 backlog available: `adv.sigkill-mid-download`, `adv.tampered-catalog`, assorted §3 items.
 
 > **Iter 91 WORK — dep.time-bump DONE (worktree).**
 >
@@ -550,7 +561,7 @@ tauri_v2_migration_ready_for_squash_merge: true
 
 ### Test pinning (PRD §5.4) — author before any refactor
 
-- [P1] **pin.tmm.cipher** — Golden-file test for `tmm.rs` 3-pass cipher (GeneratePackageMapper XOR + middle-outward swap + Key1 shuffle). Acceptance: byte-for-byte pin of current cipher output on a fixture mapper. Pillar: Reliability.
+- [DONE @ iter 92] **pin.tmm.cipher** — Closed on worktree commit `5e6b026`. 4 inline tests in `tmm.rs::tests`: byte-for-byte encrypt_mapper(&[0;16]) pin with hand-traced derivation, encrypt↔decrypt round-trip on 5 fixtures (incl. tail-unaligned + 3-block buffers), KEY1 bijective-on-0..16 structural guard, KEY2 == `b"GeneratePackageMapper"` literal pin. Pillar: Reliability.
 - [DONE @ iter 89] **pin.tmm.parser** — Closed on worktree commit `ef1c01d`. Hand-packed 136-byte v1 fixture (1 composite package, ASCII strings, no TFC extras) inline in `tmm.rs::tests`. Three tests pin every ModFile + ModPackage field byte-for-byte, guard the fixture shape itself against drift, and assert parse determinism. TMM v1/v2+ discrimination landmine documented inline. Companion to iter 79's adversarial corpus — together they pin both halves of the parser contract. Pillar: Reliability.
 - [P1] **pin.tmm.merger** — Property-based test for composite-merge output stability on randomised mod sets. Acceptance: merge(A, B) == merge(A; apply B). Pillar: Reliability.
 - [P1] **pin.external.download-extract** — Golden-file test for `external_app.rs` download + extract flow on a fixture zip. Acceptance: output tree byte-for-byte. Pillar: Reliability.
