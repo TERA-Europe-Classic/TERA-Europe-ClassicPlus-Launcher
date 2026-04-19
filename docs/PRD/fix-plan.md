@@ -7,15 +7,15 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 3
-last_work_iteration: 3
+iteration_counter: 4
+last_work_iteration: 4
 last_research_sweep: never
 last_revalidation: never
 last_revalidation_status: never
 last_retrospective: never
 last_blocked_retry: never
 last_investigation_iteration: 2
-total_items_done: 2
+total_items_done: 3
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
@@ -47,7 +47,6 @@ total_iterations_to_cap: 1000
 
 ### Infrastructure (must exist before most P0 tests can be written)
 
-- [P0] **infra.tcc-test-project** — Add `TCC.Tests/` xUnit project to TCC solution. Acceptance: `dotnet test TCC.sln -c Release` runs ≥ 1 passing test. Pillar: Reliability.
 - [P0] **infra.shinra-test-project** — Add `ShinraMeter.Tests/` xUnit project to Shinra solution. Acceptance: `dotnet test ShinraMeter.sln -c Release` runs ≥ 1 passing test. Pillar: Reliability.
 - [P0] **infra.catalog-ci** — Author `.github/workflows/catalog-ci.yml` for `external-mod-catalog`: JSON validity + schema + URL reachability gates. Acceptance: PR that breaks `catalog.json` fails CI. Pillar: Reliability (PRD §11 clause 9).
 - [P0] **infra.playwright-split** — Split monolithic `teralaunch/tests/e2e/launcher.spec.js` (866 lines) into feature-scoped files matching §3 criterion layout. Acceptance: one file per `mod-*` feature; `npm run test:e2e` green. Pillar: Reliability.
@@ -248,6 +247,7 @@ The `verified @ iter N` stamp is updated by each REVALIDATION iteration. Any `[D
 - [DONE] 3.3.13 update detection + launch banner — commit 4c489a6, proof: `teralaunch/src/mods.js::loadInstalled` version drift flip + `app.js::checkModUpdatesOnLaunch`, verified @ iter 0 (note: needs e2e test `mod-update-flow.spec.js::version_drift_shows_update` before fully DONE — demote to P1 if first REVALIDATION finds the test missing)
 - [DONE] infra.rust-integration-tests — commit b464c70, proof: `teralaunch/src-tauri/tests/smoke.rs` + `tests/common/mod.rs`, `cargo test --test smoke` → 2/2 passed in debug, verified @ iter 1. Release-mode also passes as of commit 16760b8 (see fix.cargo-test-release-lto-link DONE below).
 - [DONE] fix.cargo-test-release-lto-link — commit 16760b8, proof: `cargo test --release --test smoke` → 2/2 passed, 0 collisions; `cargo build --release` regression check → clean. Root cause: cargo#6313, `crate-type = ["cdylib","rlib"]` on path-dep teralib triggered double-build under test mode. Fix: drop unused cdylib + unify tokio across teralib/src-tauri + delete advisory teralib Cargo.lock + remove vestigial `[[bin]] tera_launcher` stub. Verified @ iter 3.
+- [DONE] infra.tcc-test-project — TCC commit 5204f2b0, proof: `dotnet test TCC.sln -c Release` → 1/1 passed, 0 warnings. Scaffold: `TCC/TCC.Tests/{TCC.Tests.csproj, SmokeTests.cs}` (xunit 2.5.3, net8.0). Known follow-up (new P1): upgrade TCC.Tests TFM to `net8.0-windows` when first ProjectReference to TCC.Core/TCC.Utils is added. Verified @ iter 4.
 
 ## META (human review)
 
