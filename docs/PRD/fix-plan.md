@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 168
-last_work_iteration: 168
+iteration_counter: 169
+last_work_iteration: 169
 last_research_sweep: 150
 last_revalidation: 160
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 146
+total_items_done: 147
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 76e0f42
+tauri_v2_migration_last_commit: c0bb3bc
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 169 WORK — pin.anti-reverse-psk-obfuscation+manifest DONE (worktree).**
+>
+> Worktree commit `c0bb3bc`. PRD §3.1.8 `anti_reverse_guard.rs` previously had 11 tests (iter 118+146): Cargo.toml release flags + obfuscation crates + /guard:cf wiring + audit-doc citations. Iter 169 widens to the build.rs side those pins skip — PSK obfuscation, fail-closed build, Windows manifest embed, global-CFG absence, and build-rerun triggers.
+>
+> Five new source-inspection pins on `build.rs` + `windows-app-manifest.xml` + (absent) `.cargo/config.toml`:
+> 1. `mirror_psk_is_xor_obfuscated_before_codegen` — `*b ^= 0xB3;` required on BOTH config-file + env-var paths (≥ 2 occurrences); without XOR the plaintext PSK is visible in target/ generated sources
+> 2. `mirror_psk_build_panics_on_missing_config` — `panic!("Mirror PSK not configured...")` required + must name both config sources; silent fallback to zero-bytes produces an auth-bypass-able binary
+> 3. `windows_app_manifest_is_embedded_in_build` — `WindowsAttributes::new().app_manifest(include_str!(...))` + manifest must carry Common-Controls v6 (TaskDialogIndirect for §3.1.11 self-integrity dialog) + `dpiAware=true/pm` + at least one `supportedOS` entry
+> 4. `cargo_config_does_not_globally_enable_cfg_instrumentation` — `.cargo/config.toml` (if present) must not carry `control-flow-guard=checks`; build.rs's iter-118 comment explicitly warns this OOMs dev builds under LTO
+> 5. `build_rs_declares_rerun_triggers_for_psk_sources` — `cargo:rerun-if-env-changed=MIRROR_PSK_HEX` + `cargo:rerun-if-changed=<cfg_path>` both required; without them, Cargo caches the generated PSK and a rotation ships the stale key
+>
+> anti_reverse_guard: 11 → 16 tests. Issue during dev: I initially asserted `requireAdministrator` on the manifest, but the actual file uses `asInvoker` — the manifest ships for DPI + TaskDialogIndirect reasons, not elevation. Pin corrected to match reality before committing.
+>
+> Acceptance: 1098/1098 Rust (was 1093, +5), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 168 WORK — pin.deploy-scope-exit-codes+import-safety DONE (worktree).**
 >
