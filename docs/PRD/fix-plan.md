@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 108
-last_work_iteration: 108
+iteration_counter: 109
+last_work_iteration: 109
 last_research_sweep: 100
 last_revalidation: 100
 last_revalidation_status: all-gates-green
@@ -16,15 +16,37 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 89
+total_items_done: 90
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: eea7309
+tauri_v2_migration_last_commit: 609d659
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 109 WORK — docs.changelog-guard DONE (worktree).**
+>
+> Worktree commit `609d659`. Last WORK before iter 110 (N%10=0 RESEARCH SWEEP). Closes PRD §3.8.5: "Per-release player-facing CHANGELOG.md in plain English (no conventional-commit prefixes)." Threshold was "0 matches for `^feat|^fix|^chore`". Current state verified: 125-line CHANGELOG with zero offenders.
+>
+> New `tests/changelog_guard.rs` (3 tests):
+> 1. `no_conventional_commit_prefixes` — walks every line, strips leading `- ` / `* ` bullet markers, checks against a 22-prefix blocklist (feat, fix, chore, docs, refactor, test, build, ci, perf, style, revert — each in `:` and `(` form). Fails with line-numbered offenders.
+> 2. `changelog_has_structure_and_content` — >= 1 `## ` heading + >= 10 lines (not a one-line "TBD" file).
+> 3. Detector self-test with raw + bulleted bad shapes and a player-facing good fixture.
+>
+> Also probed §3.8.7 (per-unit audit doc count >= 110): `docs/PRD/audits/units/` directory does NOT exist on worktree — that's a genuine unshipped backlog item, not drift. Skipped for iter 109.
+>
+> **Fifth doc-guard in the iter 104-109 structural-pin batch:**
+> - 104 `crate_comment_guard` (§3.8.2)
+> - 106 `architecture_doc_guard` (§3.8.4)
+> - 107 `claude_md_guard` (§3.8.1)
+> - 108 `lessons_learned_guard` (§3.8.8)
+> - 109 `changelog_guard` (§3.8.5)
+>
+> All §3.8.x structural invariants except §3.8.3 (already a CI gate since iter 105), §3.8.6 (external-repo, deferred), and §3.8.7 (audits/units/ dir not created yet) now pinned by Rust integration tests.
+>
+> Acceptance: 875/875 Rust (was 872, +3), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 108 WORK — docs.lessons-learned-cap-restore + guard DONE (worktree).**
 >
