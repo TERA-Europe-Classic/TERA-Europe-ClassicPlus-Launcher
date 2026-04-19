@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 132
-last_work_iteration: 132
+iteration_counter: 133
+last_work_iteration: 133
 last_research_sweep: 130
 last_revalidation: 120
 last_revalidation_status: all-gates-green
@@ -16,15 +16,27 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 112
+total_items_done: 113
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 9c34bce
+tauri_v2_migration_last_commit: 7fd39be
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 133 WORK — pin.§3.7.4-concrete-citation DONE (worktree).**
+>
+> Worktree commit `7fd39be`. PRD §3.7.4 previously cited `teralaunch/tests/i18n-no-hardcoded.test.js (grep-based)` — a file name without a specific `it()` fn. That broke the JS_PINS drift-guard shape (requires `file::it_name`) and left the criterion partially undefended.
+>
+> Changes:
+> - PRD §3.7.4 cell now cites `teralaunch/tests/i18n-no-hardcoded.test.js::no new hardcoded English outside the allowlist` with explanatory "strict-zero enforced since iter 77 burn-down" annotation. Exit condition tightened from "0 matches" to "0 leaks outside allowlist" (the allowlist is intentionally empty, but the distinction matters).
+> - `prd_path_drift_guard::JS_PINS` gets a 4th entry for §3.7.4. All 4 JS criteria (§3.4.7/§3.6.4/§3.7.1/§3.7.4) now have concrete `file::it_name` citations the drift guard can verify.
+>
+> Drift-guard pin total: 44 → 45. Test fn count unchanged at 6 (JS-pin infrastructure already added in iter 132).
+>
+> Acceptance: 959/959 Rust unchanged, clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 132 WORK — drift-guard JS-side extension DONE (worktree).**
 >
