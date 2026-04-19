@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 170
-last_work_iteration: 169
+iteration_counter: 171
+last_work_iteration: 171
 last_research_sweep: 170
 last_revalidation: 160
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 148
+total_items_done: 149
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: c0bb3bc
+tauri_v2_migration_last_commit: 9907cdb
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 171 WORK — pin.secret-scan-scoped+install-hardening DONE (worktree).**
+>
+> Worktree commit `9907cdb`. PRD §3.1.6 `secret_scan_guard.rs` previously had 8 tests (iter 114+144 extensions): workflow exists + config structure + audit citation + dual triggers + fetch-depth + semver version + non-empty allowlist arrays + detector self-test. Iter 171 widens to 5 new angles.
+>
+> Five new source-inspection pins on `.github/workflows/secret-scan.yml` + `.gitleaks.toml`:
+> 1. `secret_scan_workflow_uses_log_opts_for_scoped_scan` — `--log-opts=` required so gitleaks scans only new commits, not history; rescanning makes iter-13 triaged findings drown real regressions
+> 2. `secret_scan_workflow_handles_both_event_types_in_range_step` — pins the `if [ github.event_name = pull_request ]` branch + both `base.sha` and `github.event.before` references; pairs with iter 144's dual-trigger pin
+> 3. `secret_scan_workflow_install_uses_fail_fast_curl_flags` — `curl -sSfL`; the `-f` flag fails the job on a yanked release instead of silently piping empty bytes to tar
+> 4. `gitleaks_config_regex_tokens_are_word_boundary_anchored` — every allowlist regex must contain `\b`; unanchored `abc123def456` would suppress `abc123def456_real_key` (a real leak hiding behind the fixture allowlist)
+> 5. `gitleaks_config_excludes_all_three_target_dirs` — `target/`, `teralaunch/src-tauri/target/`, `teralib/target/` all pinned; local scans get noisy from any missing workspace's build artefacts
+>
+> secret_scan_guard: 8 → 13 tests.
+>
+> Acceptance: 1103/1103 Rust (was 1098, +5), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 170 RESEARCH SWEEP — zero dep drift, +94 tests since iter 150.**
 >
