@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 214
-last_work_iteration: 214
+iteration_counter: 215
+last_work_iteration: 215
 last_research_sweep: 210
 last_revalidation: 200
 last_revalidation_status: all-gates-green
@@ -16,15 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 188
+total_items_done: 189
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 14ae833
+tauri_v2_migration_last_commit: 04a2276
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 215 WORK — pin.lessons-learned-guard-header+ACTIVE/ARCHIVE-path-constants+LINE_CAP-literal+archive-ordering+Pattern-before-When DONE (worktree).**
+>
+> Worktree commit `04a2276`. §3.8.8 lessons-learned cap + archive; lessons_learned_guard had 12 tests (iter 108 creation + iter 139 +3 + iter 177 +5); 38 iters untouched. Brings to 17.
+>
+> Five new source-inspection pins (meta-guard + path constants + threshold literal + archive ordering + paragraph order):
+> 1. `guard_file_header_cites_prd_3_8_8` — header cites `PRD 3.8.8` + `lessons-learned`; meta-guard contract
+> 2. `active_and_archive_path_constants_are_canonical` — both `ACTIVE` and `ARCHIVE` constants pinned verbatim to their `../../docs/PRD/...` paths
+> 3. `line_cap_constant_is_two_hundred` — pins `const LINE_CAP: usize = 200;`; silent raise would vacate `active_file_exists_and_under_cap`
+> 4. `archive_entries_are_ordered_newest_iter_first` — mirrors active-side ordering onto the archive; forward-ordered archive breaks reader convention
+> 5. `every_entry_has_pattern_before_when_to_apply` — `**Pattern.**` appears BEFORE `**When to apply.**`; iter-108 presence check accepts either order, but readers expect setup→guidance
+>
+> lessons_learned_guard: 12 → 17 tests. 1303 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 214 WORK — pin.claude-md-guard-header+CLAUDE_MD-path-constant+MIN_SECTION_LINES-literal+EXPECTED_SECTIONS-count-floor+perfection-loop-fix-plan-cross-ref DONE (worktree).**
 >
