@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 151
-last_work_iteration: 151
+iteration_counter: 152
+last_work_iteration: 152
 last_research_sweep: 150
 last_revalidation: 140
 last_revalidation_status: all-gates-green
@@ -16,15 +16,29 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 129
+total_items_done: 130
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: a1685c9
+tauri_v2_migration_last_commit: 66f97e4
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 152 WORK — pin.csp-bypass+baseline+ipc+portal DONE (worktree).**
+>
+> Worktree commit `66f97e4`. PRD §3.1.12 `csp_audit` previously only pinned script-src's absence of `'unsafe-inline'` + presence of `'self'` + cdnjs. Other CSP bypass classes, the default-src baseline, and Tauri-v2 IPC requirements were unprotected — a CSP edit could widen the attack surface subtly.
+>
+> Four new assertions:
+> 1. `csp_script_src_has_no_wildcard_or_data` — rejects `*` / `data:` / `'unsafe-eval'` / `blob:` tokens (each a separate bypass class that defeats the no-inline-scripts discipline without tripping the existing check)
+> 2. `csp_default_src_is_self` — baseline `'self'` pinned + no `*` widening; without an explicit default, browsers apply lax defaults
+> 3. `csp_connect_src_permits_tauri_v2_ipc` — `ipc:` + `http://ipc.localhost` both required; invoke() fails with CSP violations otherwise
+> 4. `csp_connect_src_permits_lan_portal_endpoint` — `http://192.168.1.128:8090` retained until §3.1.13 prod-HTTPS cutover
+>
+> csp_audit: 4 → 8 tests.
+>
+> Acceptance: 1013/1013 Rust (was 1009, +4), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 151 WORK — pin.add-mod-from-file-order+sig+ctor DONE (worktree).**
 >
