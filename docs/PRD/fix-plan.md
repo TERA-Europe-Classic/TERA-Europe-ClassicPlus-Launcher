@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 163
-last_work_iteration: 163
+iteration_counter: 164
+last_work_iteration: 164
 last_research_sweep: 150
 last_revalidation: 160
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 141
+total_items_done: 142
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: bc9d3c8
+tauri_v2_migration_last_commit: 0abf279
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 164 WORK — pin.clean-recovery-backup-idempotence DONE (worktree).**
+>
+> Worktree commit `0abf279`. PRD §3.2.9 clean-recovery-logic / §3.1.4 `clean_recovery.rs` previously had 3 tests: Tauri command wiring + generate_handler registration + no-dead-code gate. The body of the two backup-management functions — the three-branch policy that protects the vanilla `.clean` baseline — was unprotected. A dropped `dst.exists()` early return, a missing `TMM_MARKER` refusal, or a renamed filename constant would each silently destroy the vanilla baseline with no test failure.
+>
+> Five new source-inspection pins on `src/services/mods/tmm.rs`:
+> 1. `recover_missing_clean_noops_when_backup_already_exists` — early `if dst.exists() { return Ok(()); }` before any `fs::copy`; otherwise every Recover click re-stamps `.clean` with the current (possibly modded) mapper
+> 2. `recover_missing_clean_refuses_modded_current_mapper` — pins the `map.contains_key(TMM_MARKER)` refusal + `Cannot recover .clean` + `verify game files` phrases; without it, a user who deleted `.clean` with mods installed stamps the modded mapper as new vanilla
+> 3. `ensure_backup_is_idempotent_on_existing_backup` — same early-return invariant on `ensure_backup`; re-copy on every install overwrites `.clean` identically to the recover missing-guard scenario
+> 4. `mapper_and_backup_filename_constants_are_pinned` — `MAPPER_FILE = "CompositePackageMapper.dat"` (UE3 literal) + `BACKUP_FILE = "CompositePackageMapper.clean"` verbatim; renaming desyncs every call site
+> 5. `backup_and_recover_functions_stay_pub` — both must stay `pub fn`; `#[tauri::command]` alone doesn't require cross-module visibility, so a silent downgrade to `pub(crate)` would break the wiring
+>
+> clean_recovery: 3 → 8 tests. Closes the §3.1.4 gpk-deploy-sandbox tripod alongside iter 163's parse+gate pins.
+>
+> Acceptance: 1073/1073 Rust (was 1068, +5), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 163 WORK — pin.gpk-parse-bounds+install-gate-order DONE (worktree).**
 >
