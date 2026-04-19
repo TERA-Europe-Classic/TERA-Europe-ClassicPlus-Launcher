@@ -7,9 +7,9 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 189
+iteration_counter: 190
 last_work_iteration: 189
-last_research_sweep: 170
+last_research_sweep: 190
 last_revalidation: 180
 last_revalidation_status: all-gates-green
 last_retrospective: 60
@@ -26,18 +26,13 @@ tauri_v2_migration_last_commit: 13afeb4
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 189 WORK — pin.tampered-catalog-header+enum+sha2+err-prop+state-emit DONE (worktree). Last WORK before N=190 research sweep.**
+> **Iter 190 RESEARCH SWEEP — zero dep drift, zero new advisories (docs/PRD/audits/research/sweep-iter-190.md).**
 >
-> Worktree commit `13afeb4`. §3.1.4 / adv.tampered-catalog had 8 tests (iter 104 creation + iter-149 +3); brings the err-surfacing-chain guard to 13 tests.
+> N%10=0 cadence. cargo audit with iter-112 ignores: 19 allowed warnings unchanged from iter 170/180. Full-scan: 1 vulnerability (RUSTSEC-2026-0007 bytes, upstream-gated) + 22 allowed warnings — audit database grew but no new crate-level advisories landed in our Cargo.lock closure. Iter-112 ignores still hold; neither exit criterion fired. 127 commits since main divergence (+9 since iter 180), all `test(...)`.
 >
-> Five new source-inspection pins:
-> 1. `guard_file_header_cites_prd_and_adv_slot` — guard source cites `PRD 5.3` + `adv.tampered-catalog`
-> 2. `mod_status_enum_carries_canonical_variant_set` — `types.rs` must carry {NotInstalled, Disabled, Running, Starting, Enabled, UpdateAvailable, Error}; surprise add/remove caught here
-> 3. `external_app_uses_sha256_digest_from_sha2_crate` — must import `sha2::`; reject `use md5::` / `use sha1::` / `use md4::` (weaker hashes enable feasible preimage attacks)
-> 4. `install_funcs_pass_propagated_err_to_finalize_error` — both install paths must call `finalize_error(&entry.id, err, &window)` verbatim; a shape change dropping `err` loses the reason
-> 5. `finalize_error_emits_state_error_event_to_window` — must call `window.emit("mod_download_progress", ...)` with `"state": "error"`; without it the UI spinner never resolves
+> Milestone: scanner sweep complete (iter 181-187) — every untouched scanner guard now carries ≥ 12 pins with real-file defense-in-depth. CVE-defence chain (shell_scope_pinned + shell_open_callsite + tampered_catalog) deepened at iter 188-189 to ≥ 10 pins each.
 >
-> tampered_catalog: 8 → 13 tests. 1188 Rust (+5), clippy clean, vitest 449/449.
+> Zero actionables. Every open item from iter 170 remains open (upstream-gated advisories + §3.3.1/§3.8.7 unshipped + C# pins deferred). `ready_for_squash_merge: true` unchanged.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
