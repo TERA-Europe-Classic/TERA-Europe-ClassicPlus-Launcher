@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 118
-last_work_iteration: 118
+iteration_counter: 119
+last_work_iteration: 119
 last_research_sweep: 110
 last_revalidation: 100
 last_revalidation_status: all-gates-green
@@ -16,15 +16,32 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 99
+total_items_done: 100
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: cba3794
+tauri_v2_migration_last_commit: bc89fb3
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 119 WORK — pin.portal-https-migration-drift-guard DONE (worktree). 🎯 total_items_done = 100.**
+>
+> Worktree commit `bc89fb3`. Last WORK iter before iter 120 double-duty (N%10=0 RESEARCH + N%20=0 REVALIDATION). Closes PRD §3.1.13 structural pin.
+>
+> **Pragmatic shape:** config.json still points at the LAN dev endpoint `http://192.168.1.128:8090`. The audit doc carries "Draft — pending production HTTPS endpoint deployment" status explicitly. The drift risk isn't the current LAN state; it's someone accidentally committing a NEW non-https URL that is NOT the LAN endpoint — a staging host on public http, a third-party endpoint, anything that would leak credentials over the internet.
+>
+> New `tests/portal_https_guard.rs` (3 tests):
+> 1. `config_urls_are_https_or_lan_dev_or_empty` — every URL-shaped string in config.json must be `https://`, empty, or contain `192.168.1.128`. Fails with key+value list of offenders.
+> 2. `portal_https_audit_doc_exists_and_flags_pending_status` — audit doc present + "Portal API HTTPS" heading + cites §3.1.13.
+> 3. Detector self-test with synthetic non-LAN http:// offender.
+>
+> **When production HTTPS ships**, the doc transitions to "Signed off" and this guard should tighten (remove the LAN exception).
+>
+> Acceptance: 899/899 Rust (was 896, +3), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
+>
+> **🎯 Milestone:** iter 119 crosses `total_items_done = 100` — a round-number marker for the mod-manager perfection loop. Counted items span §5.4 goldens, §5.3 adversarial corpus, fix/sec/dep/infra categories, and 5 §3.8.x structural doc-guards. The iter-120 revalidation will formally stamp this state.
 
 > **Iter 118 WORK — pin.anti-reverse-hardening-drift-guard DONE (worktree).**
 >
