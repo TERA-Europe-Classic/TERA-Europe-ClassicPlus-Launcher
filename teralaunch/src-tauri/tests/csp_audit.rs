@@ -322,15 +322,14 @@ fn csp_connect_src_carries_self_baseline() {
     );
 }
 
-/// Iter 228: CSP must define exactly six canonical directives —
-/// `default-src`, `script-src`, `style-src`, `font-src`, `img-src`,
-/// `connect-src`. A stealth addition of `object-src: *` / `frame-src:
-/// *` / `worker-src: *` (all sinks that default-src doesn't cover on
-/// every browser) would widen the surface without tripping any of
-/// the name-specific pins. Requiring an exact set makes additions a
-/// conscious guard update.
+/// Iter 229: CSP must define exactly eight canonical directives —
+/// the original six (default/script/style/font/img/connect) plus
+/// the iter-229 hardenings `base-uri` + `form-action`. A stealth
+/// addition of `object-src: *` / `frame-src: *` / `worker-src: *`
+/// (sinks that default-src doesn't cover on every browser) would
+/// widen the surface without tripping any name-specific pin.
 #[test]
-fn csp_defines_exactly_six_canonical_directives() {
+fn csp_defines_exactly_eight_canonical_directives() {
     let csp = load_csp();
     let names: Vec<&str> = csp
         .split(';')
@@ -344,11 +343,13 @@ fn csp_defines_exactly_six_canonical_directives() {
         "font-src",
         "img-src",
         "connect-src",
+        "base-uri",
+        "form-action",
     ];
     assert_eq!(
         names.len(), expected.len(),
-        "PRD 3.1.12 (iter 228): CSP must define exactly 6 canonical \
-         directives (default/script/style/font/img/connect). Got {} \
+        "PRD 3.1.12 (iter 229): CSP must define exactly 8 canonical \
+         directives (the 6 + base-uri + form-action). Got {} \
          directive(s): {:?}. A stealth addition of object-src / \
          frame-src / worker-src widens attack surface.",
         names.len(), names
@@ -356,8 +357,60 @@ fn csp_defines_exactly_six_canonical_directives() {
     for expected_name in expected {
         assert!(
             names.contains(&expected_name),
-            "PRD 3.1.12 (iter 228): CSP must define `{expected_name}` \
+            "PRD 3.1.12 (iter 229): CSP must define `{expected_name}` \
              directive. Got: {names:?}"
+        );
+    }
+}
+
+/// Iter 229: `base-uri` must restrict `<base href>` to `'self'` only.
+/// Without this directive, a DOM injection can insert `<base
+/// href="evil.com">` and redirect all subsequent relative URLs
+/// (scripts, images, links) through the attacker's host — a bypass
+/// of every other directive.
+#[test]
+fn csp_base_uri_is_self() {
+    let csp = load_csp();
+    let tokens = directive_tokens(&csp, "base-uri")
+        .expect("CSP must define a base-uri directive");
+    assert!(
+        tokens.contains(&"'self'"),
+        "PRD 3.1.12 (iter 229): CSP base-uri must contain `'self'`. \
+         Without it, `<base href=evil>` DOM injection redirects all \
+         relative URLs. Got: {tokens:?}"
+    );
+    for bad in ["*", "https:", "data:"] {
+        assert!(
+            !tokens.contains(&bad),
+            "PRD 3.1.12 (iter 229): CSP base-uri must not carry \
+             `{bad}` — any widening defeats the directive's purpose. \
+             Got: {tokens:?}"
+        );
+    }
+}
+
+/// Iter 229: `form-action` must restrict form-submission targets to
+/// `'self'` only. The launcher uses no native `<form>` elements today
+/// (login/register go through `invoke()`) but a future form or DOM
+/// injection could exfiltrate credentials to an external endpoint
+/// without this directive.
+#[test]
+fn csp_form_action_is_self() {
+    let csp = load_csp();
+    let tokens = directive_tokens(&csp, "form-action")
+        .expect("CSP must define a form-action directive");
+    assert!(
+        tokens.contains(&"'self'"),
+        "PRD 3.1.12 (iter 229): CSP form-action must contain \
+         `'self'`. Without it, a DOM-injected form could submit \
+         credentials to an attacker origin. Got: {tokens:?}"
+    );
+    for bad in ["*", "https:", "http:"] {
+        assert!(
+            !tokens.contains(&bad),
+            "PRD 3.1.12 (iter 229): CSP form-action must not carry \
+             `{bad}` — any widening lets forms submit off-origin. \
+             Got: {tokens:?}"
         );
     }
 }
