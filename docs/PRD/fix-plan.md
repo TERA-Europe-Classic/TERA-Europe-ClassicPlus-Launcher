@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 111
-last_work_iteration: 111
+iteration_counter: 112
+last_work_iteration: 112
 last_research_sweep: 110
 last_revalidation: 100
 last_revalidation_status: all-gates-green
@@ -16,15 +16,32 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 92
+total_items_done: 93
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 37492b9
+tauri_v2_migration_last_commit: f39ab31
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 112 WORK — dep.rand-and-bytes-advisory-ignore + audit-tuning DONE (worktree).**
+>
+> Worktree commit `f39ab31`. Iter 112 picked P2 `dep.rand-advisory-ignore-2026-0097` planning to add one ignore flag. Running `cargo audit` locally surfaced a **second vuln** (RUSTSEC-2026-0007, bytes 1.11.0 integer overflow in `BytesMut::reserve`, landed 2026-02-03) that was masked behind the rand report in iter 110's sweep. Both upstream-gated.
+>
+> **Changes to `.github/workflows/cargo-audit.yml`:**
+> 1. `--ignore RUSTSEC-2026-0097` (rand 0.9.2 unsound) — tauri-plugin-notification / chamox / quinn-proto chain. Exit: tauri-plugin-notification bumps rand >= 0.10.
+> 2. `--ignore RUSTSEC-2026-0007` (bytes 1.11.0 overflow) — tokio-util / tower-http / reqwest chain. Exit: upstream bumps bytes to >= 1.11.1. Not exploitable in our code path (bytes usage bounded by reqwest's ~8KB wire chunks).
+> 3. **Dropped `--deny warnings`** on both audit steps. Iter 101 chose it as a defensive default. Iter 112 enumerated the 19 triggered warnings: all upstream-locked (gtk/gdk/atk webview chain, unic-* transitives, proc-macro-error, fxhash, number_prefix). None actionable from our position. Keeping `--deny warnings` would fail CI for no benefit. Default `cargo audit` still fails on vulns (what we want); warnings print informationally.
+>
+> Each `--ignore` flag carries explicit rationale + exit criterion in the yml comment. No silent ignores. Header comment rewritten to document the strategy.
+>
+> **Net effect:** post-squash `cargo-audit` CI run will now be green. Both RUSTSEC-2026-0097 and RUSTSEC-2026-0007 cleared (ignored); RUSTSEC-2021-0141 (dotenv) cleared by iter 111 (dep removal); 19 upstream-locked warnings print but don't fail CI. Iter 110 sweep's deferred cleanup complete.
+>
+> Also absorbed the P3 `infra.cargo-audit-tuning` item from iter 110 — the `--deny warnings` policy decision was exactly what that P3 queued.
+>
+> Acceptance: 875/875 Rust unchanged, 449/449 JS unchanged, clippy clean, cargo audit exit 0 on both workspaces. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 111 WORK — dep.teralib-dotenv-drop DONE (clears RUSTSEC-2021-0141).**
 >
