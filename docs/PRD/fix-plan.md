@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 107
-last_work_iteration: 107
+iteration_counter: 108
+last_work_iteration: 108
 last_research_sweep: 100
 last_revalidation: 100
 last_revalidation_status: all-gates-green
@@ -16,15 +16,33 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 88
+total_items_done: 89
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 42d4a8e
+tauri_v2_migration_last_commit: eea7309
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 108 WORK — docs.lessons-learned-cap-restore + guard DONE (worktree).**
+>
+> Worktree commit `eea7309`. Closes PRD §3.8.8: "lessons-learned.md exists, capped 200 lines, archived when full."
+>
+> **Drift found:** active `docs/PRD/lessons-learned.md` had grown to 212 lines (12 over cap). The every-30 retrospective cadence wasn't tight enough to catch slow growth from iters 28-60 (several iters added entries between retros).
+>
+> **Fix:** archived iter 24 entry (real-vulnerability-in-audit pattern, 17 lines) under a new "Archived 2026-04-19 / iter 108 cap-restore" banner in `lessons-learned.archive.md`. Active file is now 196 lines (4 lines headroom).
+>
+> **Pin:** new `tests/lessons_learned_guard.rs` (4 tests):
+> 1. `active_file_exists_and_under_cap` — asserts 0 < lines <= 200
+> 2. `archive_file_exists` — archival path is a precondition for the cap policy
+> 3. `active_file_header_advertises_cap_policy` — header mentions "200" + "lessons-learned.archive.md" so future editors know about the cap
+> 4. Detector self-test with oversize, empty, no-header shapes
+>
+> Going forward any push that takes the active file over 200 lines fails CI, not just the next every-30 retro. **Fourth in the iter 104-108 doc-guard batch:** crate-comment (104), architecture-doc (106), claude-md (107), lessons-learned (108). All §3.8.x structural doc invariants now enforced by Rust integration tests.
+>
+> Acceptance: 872/872 Rust (was 868, +4), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 107 WORK — docs.claude-md-guard DONE (worktree).**
 >
