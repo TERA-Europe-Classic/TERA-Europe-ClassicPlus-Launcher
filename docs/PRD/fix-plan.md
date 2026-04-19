@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 153
-last_work_iteration: 153
+iteration_counter: 154
+last_work_iteration: 154
 last_research_sweep: 150
 last_revalidation: 140
 last_revalidation_status: all-gates-green
@@ -16,15 +16,31 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 131
+total_items_done: 132
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: a6f3d9f
+tauri_v2_migration_last_commit: ecfe26e
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 154 WORK — pin.updater-gate-predicate+callsite DONE (worktree).**
+>
+> Worktree commit `ecfe26e`. PRD §3.1.9 `updater_downgrade.rs` previously had 5 behavioural tests (predicate correctness for known inputs) + 2 wiring tests (module public, gate precedes install in source order). That left the SHAPE of the predicate and its call site unprotected: a one-character drift (`>` → `>=`) or a refactor that hardcodes `current` would pass every behavioural test but silently re-admit the attack class §3.1.9 was written to block.
+>
+> Six new source-inspection assertions across `services/updater_gate.rs` + `src/main.rs`:
+> 1. `predicate_signature_is_strictly_str_str_bool` — `pub fn should_accept_update(current: &str, remote: &str) -> bool` pinned verbatim, so the defensive conversion stays INSIDE the gate
+> 2. `predicate_uses_semver_crate_not_string_cmp` — `use semver::Version;` + both `Version::parse(...)` calls pinned; lexicographic compare misorders `0.10.0` vs `0.9.0`
+> 3. `predicate_is_strict_greater_not_geq` — `r > c` enforced, `r >= c` forbidden (replay of current version would otherwise be accepted as an update)
+> 4. `predicate_defaults_to_refuse_on_parse_error` — `let (Ok, Ok) = ... else { return false; }` shape pinned so a refactor can't forget the else-branch
+> 5. `main_rs_passes_cargo_pkg_version_to_gate` — `env!("CARGO_PKG_VERSION")` sourced from build-time symbol, not a stale literal
+> 6. `main_rs_refusal_branch_logs_and_skips_install` — refusal arm MUST contain `error!(...)` AND MUST NOT contain `.download_and_install` (gate is decorative if install leaks in)
+>
+> updater_downgrade: 7 → 13 tests.
+>
+> Acceptance: 1025/1025 Rust (was 1019, +6), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 153 WORK — pin.self-integrity-main-wiring DONE (worktree).**
 >
