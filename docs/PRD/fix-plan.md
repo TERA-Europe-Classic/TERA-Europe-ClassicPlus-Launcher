@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 90
-last_work_iteration: 89
+iteration_counter: 91
+last_work_iteration: 91
 last_research_sweep: 90
 last_revalidation: 72
 last_revalidation_status: all-gates-green
@@ -16,15 +16,23 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 70
+total_items_done: 71
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: e65a617
+tauri_v2_migration_last_commit: 8e9933f
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 91 WORK — dep.time-bump DONE (worktree).**
+>
+> First of two iter-90 sweep items closed. Worktree commit `b17ab33` (+ `8e9933f` book-keeping). `cargo update -p time` picked up 0.3.47, clearing RUSTSEC-2026-0009 / CVE-2026-25727 (DoS via deep RFC 2822 input). Lockfile-only change; no source touched. Incidental bumps to num-conv / time-core / time-macros for resolver consistency.
+>
+> Acceptance: 837/837 Rust unchanged, 449/449 JS unchanged, clippy clean. Worktree ready state unchanged — `ready_for_squash_merge: true`. Same mechanical shape as iter 81's rustls-webpki bump.
+>
+> One iter-90 sweep item remains (P3 `infra.gitleaks-bump-8.30.1` — one-line workflow version bump).
 
 > **Iter 90 RESEARCH SWEEP — findings landed on worktree.**
 >
