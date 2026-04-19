@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 101
-last_work_iteration: 101
+iteration_counter: 102
+last_work_iteration: 102
 last_research_sweep: 100
 last_revalidation: 100
 last_revalidation_status: all-gates-green
@@ -16,15 +16,35 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 82
+total_items_done: 83
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: d7a693d
+tauri_v2_migration_last_commit: 7322ce9
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 102 WORK — pin.composite-collision-and-toggle-symmetry DONE (worktree).**
+>
+> Worktree commit `7322ce9`. Extended drift-guard from 22 to 27 pins, concentrated on two thin-coverage criteria:
+>
+> **§3.3.3 — previously cited only the Playwright IPC spec:**
+> - `detect_conflicts_flags_other_mod_owning_slot` — Rust predicate behavioural test (the "detect" half of "surfaces UI warning")
+> - `golden_merger_last_install_wins_on_overlap` — iter-93 pin for "last-installed wins" half
+>
+> The criterion is three links deep (detect + last-wins + UI shape); now all three pinned.
+>
+> **§3.3.15 — previously cited only toggle_intent_only (enable direction):**
+> - `toggle_disable_intent_only` — disable-direction symmetry
+> - `toggle_command_bodies_do_not_spawn_or_kill` — source-inspection structural guard against a future refactor that adds spawn/kill to a toggle body
+>
+> Criterion is four links deep (enable/disable intent + source guard + multi-client lifecycle trio).
+>
+> **Load-bearing effect:** `adv.composite-object-collision`'s "Covered by 3.3.3" cross-reference was cosmetic prior to this iter; now three pinned Rust tests + one Playwright IPC-contract spec all enforce the criterion.
+>
+> Acceptance: 860/860 Rust (unchanged — pins extend existing test bodies, no new fns), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 101 WORK — infra.cargo-audit-ci DONE (worktree).**
 >
