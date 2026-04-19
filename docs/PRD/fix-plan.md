@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 161
-last_work_iteration: 161
+iteration_counter: 162
+last_work_iteration: 162
 last_research_sweep: 150
 last_revalidation: 160
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 139
+total_items_done: 140
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: f56fd79
+tauri_v2_migration_last_commit: 2bfe527
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 162 WORK — pin.conflict-modal-detect-predicate DONE (worktree).**
+>
+> Worktree commit `2bfe527`. PRD §3.2 / fix.conflict-modal-wiring `conflict_modal.rs` previously had 4 tests: Tauri command wiring + bundle helper + `ModConflict` serde + best-effort-on-missing-backup. The pure-predicate body of `tmm::detect_conflicts` — the classifier at the heart of the GPK conflict UX — was unprotected. A case-sensitive filename compare, a missing-slot misclassification, or an asymmetric `region_lock` branch would each produce wrong conflict modals (false positives on case-flipped reinstalls, false negatives on regional lookups).
+>
+> Five new source-inspection pins on `src/services/mods/tmm.rs`:
+> 1. `detect_conflicts_signature_is_two_maps_plus_modfile_to_vec` — `(&HashMap, &HashMap, &ModFile) -> Vec<ModConflict>` verbatim; `&mut` defeats pure contract, `Result<...>` hides no-conflict path
+> 2. `mod_conflict_has_three_string_fields_for_ui` — `composite_name`, `object_path`, `previous_filename` all required by the frontend modal
+> 3. `detect_conflicts_uses_case_insensitive_filename_compare` — ≥2 `.eq_ignore_ascii_case(` calls (vanilla + self-reinstall); `==` falsely reports `Shinra.gpk` vs `shinra.gpk` on Windows
+> 4. `detect_conflicts_skips_missing_current_slots` — `None => continue` required; treating missing slots as conflicts over-reports
+> 5. `detect_conflicts_gates_lookup_on_region_lock_both_sides` — both current+vanilla lookups branch on `if incoming.region_lock`, both lookup helpers invoked; asymmetric gating compares entries from different lookup regimes
+>
+> conflict_modal: 4 → 9 tests.
+>
+> Acceptance: 1063/1063 Rust (was 1058, +5), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 161 WORK — pin.crash-recovery-registry-wiring DONE (worktree).**
 >
