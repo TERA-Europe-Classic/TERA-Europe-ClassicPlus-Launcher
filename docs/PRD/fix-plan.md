@@ -7,24 +7,36 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 119
+iteration_counter: 120
 last_work_iteration: 119
-last_research_sweep: 110
-last_revalidation: 100
+last_research_sweep: 120
+last_revalidation: 120
 last_revalidation_status: all-gates-green
 last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 100
+total_items_done: 101
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: bc89fb3
+tauri_v2_migration_last_commit: cd76a1d
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 120 DOUBLE-DUTY — RESEARCH SWEEP + REVALIDATION, all-gates-green.**
+>
+> Worktree commit `cd76a1d` (`docs/PRD/audits/research/sweep-iter-120.md`). N%10=0 research + N%20=0 revalidation, both fired same iter.
+>
+> **Research sweep:** zero new drift, zero new advisories, zero new P-slot candidates. Iter-110 backlog fully consumed (dep.dotenv @ 111, rand+bytes ignores @ 112, infra.cargo-audit-tuning absorbed @ 112). Iter-112 `--ignore RUSTSEC-2026-0097` (rand) + `--ignore RUSTSEC-2026-0007` (bytes) both retained — neither exit criterion has fired upstream. The reqwest 0.12/0.13 deferral from iter 87 continues to hold. No major bumps in tauri / reqwest / rustls / zip / tokio / serde.
+>
+> **Revalidation:** **899/899** Rust across **28** test binaries (+39 tests / +10 binaries vs iter-100 baseline), 449/449 JS unchanged, clippy clean, cargo audit clean on both workspaces. Zero REGRESSED across 60 commits since worktree divergence. 13 iters-86-119 drift-guards all active. Test delta trace: +2 (iter 104) + +3 (106) + +3 (107) + +4 (108) + +3 (109) + +6 (113) + +4 (114) + +4 (115) + +7 (118) + +3 (119) = +39 (exact match).
+>
+> **Status: all-gates-green.** Worktree `ready_for_squash_merge: true` status stands. Net iter-120 risk delta: zero.
+>
+> Iter 121 (next) picks next WORK item. Iter 130 is next double-duty (sweep only; revalidation cadence is every 20).
 
 > **Iter 119 WORK — pin.portal-https-migration-drift-guard DONE (worktree). 🎯 total_items_done = 100.**
 >
