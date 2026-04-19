@@ -7,15 +7,15 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 47
-last_work_iteration: 47
+iteration_counter: 48
+last_work_iteration: 48
 last_research_sweep: 40
 last_revalidation: 40
 last_revalidation_status: clean
 last_retrospective: 30
 last_blocked_retry: never
 last_investigation_iteration: 18
-total_items_done: 41
+total_items_done: 42
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
@@ -162,7 +162,7 @@ total_iterations_to_cap: 1000
 - [DONE] 3.7.1.key-parity — proof: new test at `teralaunch/tests/i18n-parity.test.js` (4 cases) compares key sets across all locales in `src/translations.json` (FRA, EUR, RUS, GER). `keys_equal_across_locales` uses FRA as reference and diffs missing/extra keys for every other locale; current state is 161 keys across all 4, zero drift. Supporting tests: `translations.json has at least two locales` (guards against a single-locale drop that would make parity meaningless), `every locale has the same key count` (catches a case where two locales have the same count but different key composition), `detector flags a seeded missing key` (self-test with `{lang_a: {shared, only_in_a}, lang_b: {shared}}` fixture, asserts both directions of the diff). `npm test` → 8 files / 424 tests passed (420 pre-existing + 4 new). Verified @ iter 47.
 - [P1] **3.7.2.no-raw-key-leaks** — Test `mod-i18n.spec.js::no_raw_key_leaks` (4 locales). Acceptance: no `MODS_*` keys in DOM. Pillar: i18n.
 - [P1] **3.7.3.language-switch-inplace** — Test `mod-language-switch.spec.js`. Acceptance: re-render in-place, no full reload. Pillar: i18n.
-- [P1] **3.7.4.no-hardcoded-english** — Test `i18n-no-hardcoded.test.js` (grep-based). Acceptance: 0 matches in mods.js/html/app.js mod paths. Pillar: i18n.
+- [DONE] 3.7.4.no-hardcoded-english — proof: new grep-based test at `teralaunch/tests/i18n-no-hardcoded.test.js` (4 cases) scans `mods.js` + `mods.html` for `aria-label` / `title` / `placeholder` attribute values that look English (multi-char word + space + lowercase) and aren't annotated with the corresponding `data-translate-*` sibling attribute. Template-interpolation shells (`${...}`) are skipped — their inner literals are scanned separately. A documented `ALLOWLIST` pins the 10 current-state leaks (7 in mods.js: overflow aria-label, toggle title ternary × 2, Running pill, Details/Open source/Uninstall popover items; 3 in mods.html: 2 × Close aria-label, Category filter aria-label) so the test passes today and any NEW leak fails CI. Self-tests: `targets exist and are non-empty`, `no new hardcoded English outside the allowlist`, `allowlist is non-empty and documented` (fails if an entry no longer appears in source → reminds you to delete stale rows), `detector flags a seeded leak in synthetic input`. `npm test` → 9 files / 428 tests passed (424 + 4 new). Follow-up `fix.mods-hardcoded-i18n-strings` opened to burn down the 10 allowlist entries. Verified @ iter 48.
 
 ### Documentation (PRD §3.8)
 
@@ -173,6 +173,7 @@ total_iterations_to_cap: 1000
 - [P1] **fix.clean-recovery-wiring** — Wire `tmm::recover_missing_clean` behind a Tauri command + a Recovery button in the Settings panel. Currently the function is `#[allow(dead_code)]` — users with a missing `.clean` have no in-launcher path to recover. Acceptance: Playwright test drives the button, invoke() hits the command, modal confirms success or shows the "verify game files" instruction. Pillar: Reliability. Discovered iter 43.
 - [P1] **fix.conflict-modal-wiring** — `services::mods::tmm::detect_conflicts` is unit-tested but not yet wired. Add Tauri command `preview_mod_install_conflicts(id: String) -> Vec<ModConflict>` that loads vanilla (from `.clean`) and current mapper, parses the catalog's source GPK (if already downloaded) or returns the catalog-declared (composite, object) tuples, and returns conflicts. Frontend calls it before `install_mod`; on non-empty result, renders the modal with last-install-wins disclaimer + log entry. Acceptance: Playwright test in `mod-conflict-warning.spec.js` can drive the modal via a mocked `invoke()` return and assert the disclaimer text renders. Pillar: Functionality. Discovered iter 32.
 - [P1] **fix.overlay-lifecycle-wiring** — `external_app::decide_overlay_action` is unit-tested but not yet wired into a real close-event listener. Wire the teralib game-count watch channel such that on each TERA.exe close: measure `get_running_game_count()`, call `decide_overlay_action`, and when `Terminate` is returned, stop each enabled external-app mod via `stop_process_by_name`. Acceptance: integration test drives a simulated close through the channel and asserts the overlay-stop side-effect. Pillar: Reliability. Discovered iter 31.
+- [P1] **fix.mods-hardcoded-i18n-strings** — Burn down the 10 documented allowlist entries in `teralaunch/tests/i18n-no-hardcoded.test.js`. Work split: (1) teach `app.js::updateAllTranslations()` to handle `data-translate-aria-label` so aria/close/overflow/category buttons can be annotated; (2) annotate the 7 mods.js leaks + 3 mods.html leaks with the new attribute; (3) add the 7-10 new translation keys to all 4 locales in `src/translations.json` (parity test at 3.7.1 is the guardrail). Acceptance: allowlist length goes to 0, `i18n-no-hardcoded.test.js::no new hardcoded English outside the allowlist` still passes with the final `expect(ALLOWLIST.length).toBe(0)` assertion flipped. Pillar: i18n. Discovered iter 48.
 
 ### Security follow-ups from iter-27 self-integrity
 
