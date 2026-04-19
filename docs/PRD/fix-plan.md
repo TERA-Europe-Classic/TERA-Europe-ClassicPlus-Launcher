@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 175
-last_work_iteration: 175
+iteration_counter: 176
+last_work_iteration: 176
 last_research_sweep: 170
 last_revalidation: 160
 last_revalidation_status: all-gates-green
@@ -16,15 +16,32 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 153
+total_items_done: 154
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 4853dcb
+tauri_v2_migration_last_commit: 9c5e0e7
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 176 WORK — pin.architecture-preamble+per-section-shape+cross-refs DONE (worktree).**
+>
+> Worktree commit `9c5e0e7`. PRD §3.8.4 `architecture_doc_guard.rs` previously had 6 tests (iter 106+138): subsystem coverage + heading count + 11-section roster + cross-subsystem invariants + known-gaps pointer + detector self-test. Iter 176 widens to 5 per-section STRUCTURE invariants those pins skip.
+>
+> Five new source-inspection pins on `docs/mod-manager/ARCHITECTURE.md`:
+> 1. `preamble_establishes_read_after_claude_md_contract` — first 10 lines must reference `CLAUDE.md` + use the word `subsystem` to set the reading frame
+> 2. `every_numbered_section_names_owning_file` — sections 1-8 must each carry `**File:**` marker; the section-to-code jump depends on it
+> 3. `mods_state_section_documents_rwlock_primitive` — section 3a must mention `RwLock`; ties the doc to iter 159's `parallel_install.rs` lock-type pin
+> 4. `self_integrity_section_documents_sidecar_and_verify` — section 6 must name `self_hash.sha256` + `run_self_integrity_check` + either `MessageBoxW` or `process::exit`; ties to iter 153's self-integrity pins
+> 5. `every_numbered_section_exceeds_minimum_content_lines` — 8-line floor per subsystem section; a stub with just heading + `**File:**` marker would pass that check but give readers nothing
+>
+> architecture_doc_guard: 6 → 11 tests.
+>
+> Mid-iter: initially asserted `verify_self` in section 6 but the doc documents the entry-point `run_self_integrity_check` — corrected before committing. Also hit a clippy `doc-lazy-continuation` on a multi-line doc comment; reworded.
+>
+> Acceptance: 1128/1128 Rust (was 1123, +5), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 175 WORK — pin.claude-md-build-cmds+api-diff+subsections DONE (worktree).**
 >
