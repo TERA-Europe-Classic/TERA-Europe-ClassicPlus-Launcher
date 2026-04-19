@@ -68,12 +68,18 @@ export default defineConfig({
         timeout: 5000,
     },
 
-    /* Run your local dev server before starting the tests */
+    /* Run your local dev server before starting the tests.
+     *
+     * Timeout raised to 10 minutes because `npm run tauri dev` on a cold
+     * cache compiles the Rust backend, which can easily exceed the stock
+     * 120 s budget on this machine. Pre-warming tip: run
+     * `cd teralaunch/src-tauri && cargo build` once before the first e2e
+     * run of the day — subsequent boots hit the warm cache in seconds. */
     webServer: {
         command: 'npm run tauri dev',
         url: 'http://localhost:1420',
         reuseExistingServer: !process.env.CI,
-        timeout: 120000,
+        timeout: 600000,
         stdout: 'pipe',
         stderr: 'pipe',
     },
