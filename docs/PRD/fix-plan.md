@@ -7,24 +7,35 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 86
-last_work_iteration: 86
+iteration_counter: 87
+last_work_iteration: 87
 last_research_sweep: 80
 last_revalidation: 72
 last_revalidation_status: all-gates-green
 last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
-last_investigation_iteration: 18
-total_items_done: 67
+last_investigation_iteration: 87
+total_items_done: 68
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 825ec70
+tauri_v2_migration_last_commit: 38bd3d6
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 87 WORK — dep.dedupe-reqwest-zip DONE (upstream-driven deferral, worktree).**
+>
+> Fourth of five iter-80 queued P2 items closed — documentation-only. Worktree commit `38bd3d6`. Artefact: `docs/PRD/audits/security/dep-dedup-investigation.md`.
+> - **Root cause of both dups:** `tauri-plugin-updater 2.10.1` has jumped ahead of the rest of the Tauri plugin ecosystem (`tauri-plugin-http 2.5.8`, `reqwest_cookie_store 0.8.2`) on reqwest (0.12→0.13) and zip (2→4). Bumping our direct pins is blocked — peers have no 0.13-compat release yet. Downgrading the updater plugin would sacrifice the iter 71 downgrade-refusal gate.
+> - **Cost of the dup:** bounded (~250-400 kB binary size, ~10-15 s cold build, audited advisories in iter 80 all applied to both resolved versions already).
+> - **Exit criteria documented** so a future research sweep knows when to reopen.
+>
+> No code changes; no build/test cycle needed. Acceptance clause "0 duplicates OR documented blocker citing upstream" met by the second clause.
+>
+> **Only iter-80 queue item remaining: `dep.vitest-bump-post-squash` (P3), explicitly post-squash-only.** Next iter (88) picks from the larger P1 backlog: `adv.tampered-catalog`, `adv.sigkill-mid-download`, `pin.tmm.cipher/parser/merger`, `infra.gitleaks-allowlist`, or §3 functionality/reliability items.
 
 > **Iter 86 WORK — sec.shell-scope-hardening DONE (worktree).**
 >
