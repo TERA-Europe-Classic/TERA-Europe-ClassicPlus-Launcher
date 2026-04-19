@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 186
-last_work_iteration: 186
+iteration_counter: 187
+last_work_iteration: 187
 last_research_sweep: 170
 last_revalidation: 180
 last_revalidation_status: all-gates-green
@@ -16,30 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 163
+total_items_done: 164
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: dc67d60
+tauri_v2_migration_last_commit: d0051db
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 186 WORK — pin.mods-categories-ui-kind-count+pill-css+scoped-click DONE (worktree).**
+> **Iter 187 WORK — pin.i18n-scanner-locale-floor+case-insensitive DONE (worktree). Scanner sweep complete.**
 >
-> Worktree commit `dc67d60`. Fifth post-revalidation non-doc-layer sweep; UX-pillar defense-in-depth against iter-85 filter-strip regression.
+> Worktree commit `d0051db`. Last untouched scanner in the iter-124-131 JS-scanner-pin chain. Iter 181-187 scanner sweep complete — every untouched scanner guard has now been widened with defense-in-depth pins on real production files + scanner hygiene.
 >
-> `mods_categories_ui_scanner_guard.rs` previously had 8 tests (iter 131 creation baseline): file self-identify + kind/divider/category DOM order + legacy-class absent + scoped click + unified CSS + single-active-chip + reference files + detector self-test. Iter 186 widens to 5 more angles on real `src/mods.html` + `src/mods.css` + `src/mods.js`.
+> `i18n_scanner_guard.rs` previously had 10 tests (iter 126 creation baseline) covering BOTH jargon + parity scanners: file self-identify ×2 + blocklist verbatim + empty allowlist + 3 parity assertions + diff missing/extra + scanner self-tests ×2 + shared translations file. Iter 187 widens to 5 more angles — per-scanner hygiene + real-file locale/MODS-key floors + case-insensitive jargon match.
 >
 > Five new source-inspection pins:
-> 1. `mods_categories_scanner_has_minimum_it_count` — floor ≥ 5 `it(` blocks
-> 2. `mods_categories_scanner_carries_no_only_or_skip_markers` — reject dev-local `.only` / `.skip` / `xit` / `xdescribe`
-> 3. `mods_html_has_three_kind_chip_data_filter_attrs` — real `src/mods.html` must carry exactly 3 `data-filter=` attrs (All/External/GPK); shrink breaks UX even if scanner fixture stays current
-> 4. `mods_css_keeps_unified_chip_rule_verbatim` — real `src/mods.css` `.mods-filter-chip` rule body must carry `border-radius: 999px` + `padding: 4px 10px` + `font-size: 11px`
-> 5. `mods_js_keeps_scoped_filter_click_selector` — real `src/mods.js` must contain `.mods-filter-group .mods-filter-chip` scoped selector; unscoped form double-binds category chips
+> 1. `i18n_scanners_have_minimum_it_count_each` — floor ≥ 2 `it(` per scanner
+> 2. `i18n_scanners_carry_no_only_or_skip_markers` — reject dev-local `.only` / `.skip` / `xit` / `xdescribe` on both scanners
+> 3. `translations_json_has_four_supported_locales` — real `translations.json` must carry EUR + FRA + GER + RUS; renaming EUR→ENG would pass parity but break UI
+> 4. `translations_json_carries_substantive_mods_key_set` — real file must carry ≥ 40 `MODS_*` keys (10 × 4 locales); stripped i18n surface would render raw keys
+> 5. `jargon_scanner_matches_case_insensitively` — scanner must call `.toLowerCase()` before blocklist check; without it 'TMM' / 'Composite' slip past
 >
-> mods_categories_ui_scanner_guard: 8 → 13 tests. 1173 Rust (+5), clippy clean, vitest 449/449.
+> i18n_scanner_guard: 10 → 15 tests. 1178 Rust (+5), clippy clean, vitest 449/449.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
