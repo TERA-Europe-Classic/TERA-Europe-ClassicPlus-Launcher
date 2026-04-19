@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 213
-last_work_iteration: 213
+iteration_counter: 214
+last_work_iteration: 214
 last_research_sweep: 210
 last_revalidation: 200
 last_revalidation_status: all-gates-green
@@ -16,15 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 187
+total_items_done: 188
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: b44367e
+tauri_v2_migration_last_commit: 14ae833
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 214 WORK — pin.claude-md-guard-header+CLAUDE_MD-path-constant+MIN_SECTION_LINES-literal+EXPECTED_SECTIONS-count-floor+perfection-loop-fix-plan-cross-ref DONE (worktree).**
+>
+> Worktree commit `14ae833`. §3.8.1 CLAUDE.md on-ramp doc; claude_md_guard had 12 tests (iter 107 creation + iter 137 +4 + iter 175 +5); 39 iters untouched. Brings to 17.
+>
+> Five new source-inspection pins (meta-guard + path-constant + threshold-literal + count-floor + cross-file pointer):
+> 1. `guard_file_header_cites_prd_3_8_1` — header cites `PRD 3.8.1` + `CLAUDE.md`; meta-guard contract
+> 2. `claude_md_path_constant_is_canonical` — `const CLAUDE_MD: &str = "../../CLAUDE.md";` verbatim; rename drift hides as opaque "file not readable" errors
+> 3. `min_section_lines_constant_is_thirty` — pins `const MIN_SECTION_LINES: usize = 30;`; silent lowering to 0 vacuates `mod_manager_section_exists_and_meets_size_threshold`
+> 4. `expected_sections_count_meets_floor` — `EXPECTED_SECTIONS.len() ≥ 7`; coordinated list+doc trim passes per-entry pin while stripping roster
+> 5. `running_perfection_loop_subsection_cites_fix_plan_md` — `### Running the perfection loop` subsection must cite `fix-plan.md`; on-ramp pointer that tells fresh loop iters where state lives
+>
+> claude_md_guard: 12 → 17 tests. 1298 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 213 WORK — pin.changelog-guard-header+path-constant+banned-prefix-type-coverage+Cargo-toml-version-sync+substantive-body DONE (worktree).**
 >
