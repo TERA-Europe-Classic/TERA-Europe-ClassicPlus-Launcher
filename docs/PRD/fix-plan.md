@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 193
-last_work_iteration: 193
+iteration_counter: 194
+last_work_iteration: 194
 last_research_sweep: 190
 last_revalidation: 180
 last_revalidation_status: all-gates-green
@@ -16,28 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 169
+total_items_done: 170
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 3c8f3a0
+tauri_v2_migration_last_commit: 5c1124c
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 193 WORK — pin.conflict-modal-purity+shape DONE (worktree). Crossed 1200.**
+> **Iter 194 WORK — pin.crash-recovery-load-err+create+revert+first-run DONE (worktree).**
 >
-> Worktree commit `3c8f3a0`. §3.2 UX-pillar; conflict_modal had 9 tests (iter 104 creation + iter 162 +4); brings to 14. Total Rust tests crossed the 1200 threshold at this commit (1198 → 1203).
+> Worktree commit `5c1124c`. §3.2.2 functionality-pillar; crash_recovery had 11 tests (iter 104 creation + iter 95 adv.sigkill + iter 161 +5); brings to 16. Pairs with iter 193 conflict_modal (both §3.2).
 >
 > Five new source-inspection pins:
-> 1. `guard_file_header_cites_fix_slot` — header cites `fix.conflict-modal-wiring`
-> 2. `preview_command_has_no_write_side_effects` — body rejects `mods_state::mutate` / `reg.upsert(` / `fs::write(` / `ensure_backup(` / `install_gpk(` / `try_deploy_gpk(`; preview is read-only
-> 3. `preview_command_short_circuits_for_non_gpk_entries` — `matches!(entry.kind, ModKind::Gpk)` check + `return Ok(Vec::new())` early-return before mapper-read
-> 4. `detect_conflicts_iterates_over_incoming_packages` — loop `for pkg in &incoming.packages`; reject loops over `current_map` / `vanilla_map`
-> 5. `mod_conflict_has_exactly_three_public_fields` — struct must carry exactly 3 `pub` fields; a 4th drifts IPC schema silently
+> 1. `guard_file_cites_prd_and_adv_sigkill` — header cites `PRD 3.2.2` + `adv.sigkill-mid-download` (anywhere in file)
+> 2. `registry_load_maps_serde_err_to_user_facing_string` — `Registry::load` must `.map_err(|e| format!(...))?` on both `fs::read_to_string` AND `serde_json::from_str`; raw `.unwrap()` panics the launcher on corrupt registry
+> 3. `download_and_extract_create_dir_all_precedes_extract_zip` — source-order `fs::create_dir_all(dest_dir)` < `extract_zip(...)`; prevents ENOENT on first-install
+> 4. `download_and_extract_reverts_partial_on_extract_zip_failure` — body must carry `if let Err(e) = extract_zip(...)` + `revert_partial_install_dir(dest_dir)` (PRD 3.2.8 disk-full-revert)
+> 5. `registry_load_returns_default_on_missing_path` — `if !path.exists() { return Ok(Self::default()); }` precedes any `fs::read`; fresh-install ergonomics
 >
-> conflict_modal: 9 → 14 tests. 1203 Rust (+5), clippy clean, vitest 449/449.
+> crash_recovery: 11 → 16 tests. 1208 Rust (+5), clippy clean, vitest 449/449.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
