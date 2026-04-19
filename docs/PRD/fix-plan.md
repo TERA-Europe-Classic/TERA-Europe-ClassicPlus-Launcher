@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 144
-last_work_iteration: 144
+iteration_counter: 145
+last_work_iteration: 145
 last_research_sweep: 130
 last_revalidation: 140
 last_revalidation_status: all-gates-green
@@ -16,15 +16,31 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 123
+total_items_done: 124
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 3f821cb
+tauri_v2_migration_last_commit: 6af4d99
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 145 WORK — pin.deploy-scope-script-internals DONE (worktree).**
+>
+> Worktree commit `6af4d99`. `deploy_scope_infra_guard` previously pinned the WIRING (scope script file + workflow step + ordering) but not the SCRIPT'S OWN INTERNAL shape. A refactor could drop primary-API exports, widen `ALLOWED_PATH_PREFIX`, drop the kasserver host, or reorder self-tests after the real scan — all silent.
+>
+> Four new assertions:
+> 1. `scope_script_exports_primary_api` — both `extractUploadUrls` and `findScopeViolations` must stay `export function` (the scanner's primary API for sibling-test reuse)
+> 2. `scope_script_allowed_prefix_is_classicplus` — strict verbatim `const ALLOWED_PATH_PREFIX = '/classicplus/';` + the `/classic/classicplus/` CDN dual-prefix allowance. Widening lets deploy write outside the sandbox
+> 3. `scope_script_kasserver_hosts_named` — `web.tera-germany.de` retained in `KASSERVER_HOSTS`
+> 4. `scope_script_runs_self_tests_before_real_scan` — `runSelfTests()` must fire BEFORE `readFileSync(DEPLOY_YML)` — otherwise a broken detector silently rubber-stamps
+>
+> Extended detector self-test with 3 new bad shapes (widened prefix, self-tests-after-scan, missing dual prefix).
+>
+> deploy_scope_infra_guard: 4 → 8 tests.
+>
+> Acceptance: 991/991 Rust (was 987, +4), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 144 WORK — pin.secret-scan-workflow-extension DONE (worktree).**
 >
