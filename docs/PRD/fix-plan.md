@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 220
-last_work_iteration: 219
+iteration_counter: 221
+last_work_iteration: 221
 last_research_sweep: 220
 last_revalidation: 220
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 193
+total_items_done: 194
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 4dee2a3
+tauri_v2_migration_last_commit: 1e47d02
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 221 WORK — pin.smoke-both-landmarks+path-threshold-constants+tempfile-import+no-bin-stanza+sort-call DONE (worktree). Last 12-count file — every test file in tests/ now ≥ 13 pins.**
+>
+> Worktree commit `1e47d02`. Test-harness contract; smoke.rs had 12 tests (iter 64 creation + iter 166 +5 + iter 192 +5); 29 iters untouched. Brings to 17.
+>
+> Five new source-inspection pins (harness-depth: dual-landmark header + constants + fixture wiring + bin-shape + sort call):
+> 1. `header_cites_both_iter_166_and_iter_192_landmarks` — header must cite BOTH iter landmarks; iter-192 pin accepts either/or, letting one go stale
+> 2. `path_and_threshold_constants_are_canonical` — 3 path constants + 2 floor constants (INTEGRATION_TESTS_FLOOR=30, GUARD_FILES_FLOOR=15) pinned verbatim
+> 3. `common_mod_rs_uses_tempfile_crate_directly` — `use tempfile::TempDir;` + `tempfile::tempdir()` in common/mod.rs; a std::env::temp_dir shim would compile but lose auto-cleanup
+> 4. `cargo_toml_has_no_explicit_bin_stanza` — no `[[bin]]` stanza; default src/main.rs convention; extra stanza could add a second binary with diverging name
+> 5. `integration_test_files_helper_sorts_output` — `out.sort();` call for deterministic failure-message ordering across runs
+>
+> smoke: 12 → 17 tests. 1328 Rust (+5), clippy clean, vitest 449/449.
+>
+> **Milestone**: every test file in `teralaunch/src-tauri/tests/` now carries ≥ 13 structural pins.
 
 > **Iter 220 REVALIDATION — all gates green, N%10=0 research sweep absorbed. Doc: `docs/PRD/audits/research/revalidation-iter-220.md`.**
 >
