@@ -7,20 +7,18 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 2
-last_work_iteration: 1
+iteration_counter: 3
+last_work_iteration: 3
 last_research_sweep: never
 last_revalidation: never
 last_revalidation_status: never
 last_retrospective: never
 last_blocked_retry: never
 last_investigation_iteration: 2
-total_items_done: 1
+total_items_done: 2
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
-
-> **Iter 2 note:** planning/investigation iteration on `fix.cargo-test-release-lto-link`. No item completed. Root-cause narrowed to teralib double-build during test mode; fix options documented on the item. Iter 3 will implement fix option (B).
 
 **Iteration type by counter:** `iteration_counter` = last completed iteration's number. For the iteration about to run, compute `N = iteration_counter + 1` and match:
 
@@ -49,20 +47,6 @@ total_iterations_to_cap: 1000
 
 ### Infrastructure (must exist before most P0 tests can be written)
 
-- [P0] **fix.cargo-test-release-lto-link** — `cargo test --release --test smoke` fails. Acceptance: `cargo test --release --test smoke` exits 0. Pillar: Reliability. Required for PRD §11 clause 2.
-
-  **Iter-2 investigation (unfinished):**
-  - Attempt 1 — `cargo test --release --test smoke`: 32 unresolved `teralib::*` externals at link.
-  - Attempt 2 — same with `--features custom-protocol`: same 32 symbols unresolved.
-  - Attempt 3 — `CARGO_PROFILE_RELEASE_LTO=false cargo test --release --test smoke`: filename-collision warning on `teralib.dll/.rlib/.pdb` (teralib lib target built twice); then compile errors about tokio-version mismatch (1.47.1 in teralib lib vs 1.49.0 in consumer).
-  - Control — `cargo build --release` (bin only, no tests): exit 0 in 1m26s.
-  - Root-cause hypothesis: teralib declares `crate-type = ["cdylib","rlib"]` AND has a `[[bin]] name = "tera_launcher"`. When the consumer (`src-tauri`) is in test mode, cargo traverses test-adjacent targets across path deps, triggering a double-build of teralib's lib (once as direct rlib for consumer, once as dep of teralib's bin) with divergent feature sets. LTO-on masks it as unresolved symbols; LTO-off surfaces it as filename collision + tokio version divergence. Notably teralib/Cargo.lock pins tokio 1.47.1 while src-tauri/Cargo.lock has 1.49.0.
-  - Candidate fixes (all require scope beyond single-iter discipline — pick as next iter's PICK):
-    - (A) Restructure teralib: remove `[[bin]] tera_launcher` target if unused, or split into `teralib-core` (lib only) + `teralib-bin` (bin consuming core). Affects teralib/Cargo.toml + any code referencing `tera_launcher`.
-    - (B) Unify tokio versions: delete `teralib/Cargo.lock` (advisory for path-dep), bump teralib's `tokio = "1.47.1"` to `tokio = "1.49"`, verify both lockfiles unify.
-    - (C) Separate target dirs: give teralib its own `CARGO_TARGET_DIR` when built standalone via `.cargo/config.toml`. Minimal but doesn't fix root dual-build.
-    - (D) Consumer lib split: add `src-tauri/src/lib.rs` + move modules, make `[[bin]] main.rs` a thin caller, `[[bin]] test = false`. Large refactor.
-  - Recommend (B) as iter-3 pick — lowest-risk, highest probability of unblocking. (A) as fallback if (B) doesn't close the bin-rebuild gap.
 - [P0] **infra.tcc-test-project** — Add `TCC.Tests/` xUnit project to TCC solution. Acceptance: `dotnet test TCC.sln -c Release` runs ≥ 1 passing test. Pillar: Reliability.
 - [P0] **infra.shinra-test-project** — Add `ShinraMeter.Tests/` xUnit project to Shinra solution. Acceptance: `dotnet test ShinraMeter.sln -c Release` runs ≥ 1 passing test. Pillar: Reliability.
 - [P0] **infra.catalog-ci** — Author `.github/workflows/catalog-ci.yml` for `external-mod-catalog`: JSON validity + schema + URL reachability gates. Acceptance: PR that breaks `catalog.json` fails CI. Pillar: Reliability (PRD §11 clause 9).
@@ -262,7 +246,8 @@ The `verified @ iter N` stamp is updated by each REVALIDATION iteration. Any `[D
 
 - [DONE] 3.2.10 corrupt GPK rejected — commit pre-loop, proof: `teralaunch/src-tauri/src/services/mods/tmm.rs::tests::parse_mod_file_rejects_non_tmm_gpks`, verified @ iter 0
 - [DONE] 3.3.13 update detection + launch banner — commit 4c489a6, proof: `teralaunch/src/mods.js::loadInstalled` version drift flip + `app.js::checkModUpdatesOnLaunch`, verified @ iter 0 (note: needs e2e test `mod-update-flow.spec.js::version_drift_shows_update` before fully DONE — demote to P1 if first REVALIDATION finds the test missing)
-- [DONE] infra.rust-integration-tests — commit b464c70, proof: `teralaunch/src-tauri/tests/smoke.rs` + `tests/common/mod.rs`, `cargo test --test smoke` → 2/2 passed in debug, verified @ iter 1
+- [DONE] infra.rust-integration-tests — commit b464c70, proof: `teralaunch/src-tauri/tests/smoke.rs` + `tests/common/mod.rs`, `cargo test --test smoke` → 2/2 passed in debug, verified @ iter 1. Release-mode also passes as of commit 16760b8 (see fix.cargo-test-release-lto-link DONE below).
+- [DONE] fix.cargo-test-release-lto-link — commit 16760b8, proof: `cargo test --release --test smoke` → 2/2 passed, 0 collisions; `cargo build --release` regression check → clean. Root cause: cargo#6313, `crate-type = ["cdylib","rlib"]` on path-dep teralib triggered double-build under test mode. Fix: drop unused cdylib + unify tokio across teralib/src-tauri + delete advisory teralib Cargo.lock + remove vestigial `[[bin]] tera_launcher` stub. Verified @ iter 3.
 
 ## META (human review)
 
