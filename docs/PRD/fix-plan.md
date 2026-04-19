@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 92
-last_work_iteration: 92
+iteration_counter: 93
+last_work_iteration: 93
 last_research_sweep: 90
 last_revalidation: 72
 last_revalidation_status: all-gates-green
@@ -16,15 +16,29 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 73
+total_items_done: 74
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 5e6b026
+tauri_v2_migration_last_commit: 436a7f0
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 93 WORK — pin.tmm.merger DONE (worktree). pin.tmm trio complete.**
+>
+> Worktree commit `436a7f0`. Third and final pin.tmm item — apply_mod_patches is the "merger" step at deploy time. 4 new inline tests pin both halves of the merge contract:
+> - `golden_merger_commutes_on_disjoint_slots` — 2-mod commutativity
+> - `golden_merger_three_disjoint_mods_all_orders_agree` — all 6 permutations converge; catches path-dependence that could hide at n=2
+> - `golden_merger_last_install_wins_on_overlap` — PRD 3.3.3 contract, same-slot installs diverge by order
+> - `golden_merger_identity_on_empty_modfile` — empty ModFile is a no-op
+>
+> Helper `sorted_entries` normalises HashMap iteration order so the commutativity asserts don't leak hash randomness into the test signal.
+>
+> Acceptance: 845/845 Rust (was 841, +4), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
+>
+> **pin.tmm trio now complete** (parser @ iter 89, cipher @ iter 92, merger @ iter 93). Remaining P1 pin items: `pin.external.download-extract`, `pin.tcc.classic-plus-sniffer`, `pin.shinra.tera-sniffer` (all per PRD §5.4). Plus non-pin P1 backlog: `adv.sigkill-mid-download`, `adv.tampered-catalog`, assorted §3 items.
 
 > **Iter 92 WORK — infra.gitleaks-bump-8.30.1 + pin.tmm.cipher DONE (worktree). TWO items closed.**
 >
@@ -563,7 +577,7 @@ tauri_v2_migration_ready_for_squash_merge: true
 
 - [DONE @ iter 92] **pin.tmm.cipher** — Closed on worktree commit `5e6b026`. 4 inline tests in `tmm.rs::tests`: byte-for-byte encrypt_mapper(&[0;16]) pin with hand-traced derivation, encrypt↔decrypt round-trip on 5 fixtures (incl. tail-unaligned + 3-block buffers), KEY1 bijective-on-0..16 structural guard, KEY2 == `b"GeneratePackageMapper"` literal pin. Pillar: Reliability.
 - [DONE @ iter 89] **pin.tmm.parser** — Closed on worktree commit `ef1c01d`. Hand-packed 136-byte v1 fixture (1 composite package, ASCII strings, no TFC extras) inline in `tmm.rs::tests`. Three tests pin every ModFile + ModPackage field byte-for-byte, guard the fixture shape itself against drift, and assert parse determinism. TMM v1/v2+ discrimination landmine documented inline. Companion to iter 79's adversarial corpus — together they pin both halves of the parser contract. Pillar: Reliability.
-- [P1] **pin.tmm.merger** — Property-based test for composite-merge output stability on randomised mod sets. Acceptance: merge(A, B) == merge(A; apply B). Pillar: Reliability.
+- [DONE @ iter 93] **pin.tmm.merger** — Closed on worktree commit `436a7f0`. 4 inline tests in `tmm.rs::tests` pin both halves of the apply_mod_patches contract: disjoint-slot commutativity (2 mods + 3 mods × 6 permutations), same-slot last-install-wins (PRD 3.3.3), empty-ModFile identity. `sorted_entries` helper normalises HashMap iteration order so hash randomness doesn't leak into assertions. Pragmatic golden-fixture approach (not QuickCheck-property-based but covers the key invariants). Pillar: Reliability.
 - [P1] **pin.external.download-extract** — Golden-file test for `external_app.rs` download + extract flow on a fixture zip. Acceptance: output tree byte-for-byte. Pillar: Reliability.
 - [P1] **pin.tcc.classic-plus-sniffer** — Pinned-bytes test for `TCC/TeraPacketParser/Sniffing/ClassicPlusSniffer.cs` mirror-read state machine. Acceptance: fixture stream → expected packet stream. Pillar: Reliability.
 - [P1] **pin.shinra.tera-sniffer** — Pinned-bytes test for `ShinraMeter/DamageMeter.Sniffing/TeraSniffer.cs` Classic+ branch. Acceptance: fixture stream → expected damage events. Pillar: Reliability.
