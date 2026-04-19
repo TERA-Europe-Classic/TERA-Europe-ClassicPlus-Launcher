@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 191
-last_work_iteration: 191
+iteration_counter: 192
+last_work_iteration: 192
 last_research_sweep: 190
 last_revalidation: 180
 last_revalidation_status: all-gates-green
@@ -16,28 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 167
+total_items_done: 168
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 764d247
+tauri_v2_migration_last_commit: 8aa3b80
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 191 WORK — pin.add-mod-from-file-tauri-attrs+handler+map-err+dest-sandbox DONE (worktree).**
+> **Iter 192 WORK — pin.smoke-harness-deepening DONE (worktree).**
 >
-> Worktree commit `764d247`. First WORK after N=190 research sweep. PRD §3.3.4 functionality-pillar wiring guard had 11 tests (iter 107 creation + iter-151 +6); brings it to 16 with defense-in-depth on command exposure and filesystem sandboxing.
+> Worktree commit `8aa3b80`. Test-harness deepening — smoke is the meta-guard every integration test depends on; its pins have the highest leverage. Baseline was 7 tests (iter-166 creation); brings it to 12 with defense-in-depth on structural-guard subset count + common-module import hygiene + stray-file sanity + per-file test-fn floor + harness traceability.
 >
 > Five new source-inspection pins:
-> 1. `guard_file_header_cites_prd_and_playwright_spec` — guard cites PRD 3.3.4 + `mod-import-file.spec.js`
-> 2. `fn_is_tauri_command_and_async` — `#[tauri::command]` attr + `pub async fn` (sync blocks UI during fs::read)
-> 3. `fn_is_registered_in_invoke_handler` — real `src/main.rs` lists `commands::mods::add_mod_from_file`; without it invoke() errors "command not found" and Playwright fails while pins pass
-> 4. `fs_errors_are_mapped_not_unwrapped` — body must use `.map_err(|e|` on fs ops; raw `.unwrap()` panics backend, frontend sees channel death not reason
-> 5. `fs_write_dest_is_rooted_under_gpk_dir` — source-order `get_gpk_dir()` < `gpk_dir.join(...)` < `fs::write(&dest,...)`; reject write to user-supplied `path` (path-traversal sink)
+> 1. `integration_tests_carry_expected_guard_file_subset_count` — floor ≥ 15 `*_guard.rs` files (currently 19+); separate from iter-166's broader floor so drift-guard subset deletion is caught
+> 2. `common_mod_rs_does_not_use_crate_sources` — `tests/common/mod.rs` must not reference `crate::` (integration binaries have no access to the lib crate through that path)
+> 3. `tests_dir_has_no_stray_cargo_toml_or_target_dir` — reject nested Cargo.toml / Cargo.lock / target/ that would confuse resolver
+> 4. `every_integration_test_file_carries_test_functions` — scan each `tests/*.rs` for ≥ 1 `#[test]` / `#[tokio::test]` / `#[rstest]` attr; whole-file comment-out during merge leaves file counting toward floor but zero assertions
+> 5. `smoke_guard_file_self_identifies_as_harness_contract` — header cites `harness` + `iter 166` so maintainers know this file pins infrastructure, not behaviour
 >
-> add_mod_from_file_wiring: 11 → 16 tests. 1193 Rust (+5), clippy clean, vitest 449/449.
+> smoke: 7 → 12 tests. 1198 Rust (+5), clippy clean, vitest 449/449.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
