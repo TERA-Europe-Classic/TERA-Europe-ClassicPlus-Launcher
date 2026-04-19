@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 63
-last_work_iteration: 63
+iteration_counter: 64
+last_work_iteration: 64
 last_research_sweep: 60
 last_revalidation: 60
 last_revalidation_status: regression-resolved-next-iter
@@ -19,7 +19,7 @@ last_investigation_iteration: 18
 total_items_done: 52
 total_items_regressed: 0
 total_iterations_to_cap: 1000
-tauri_v2_migration_milestone: M0
+tauri_v2_migration_milestone: M1a
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
 ```
@@ -200,7 +200,8 @@ tauri_v2_migration_branch: tauri-v2-migration
 - [P1] **fix.overlay-lifecycle-wiring** — `external_app::decide_overlay_action` is unit-tested but not yet wired into a real close-event listener. Wire the teralib game-count watch channel such that on each TERA.exe close: measure `get_running_game_count()`, call `decide_overlay_action`, and when `Terminate` is returned, stop each enabled external-app mod via `stop_process_by_name`. Acceptance: integration test drives a simulated close through the channel and asserts the overlay-stop side-effect. Pillar: Reliability. Discovered iter 31.
 - [P1-IN-PROGRESS] **tauri-v2-migration-plan** — Plan doc committed @ iter 62: `docs/PRD/audits/security/tauri-v2-migration-plan.md`. Context7 lookup surfaced `cargo tauri migrate` (automated migration tool) and `bundle.createUpdaterArtifacts: "v1Compatible"` (single-flag dual-format solution), collapsing the original hand-port plan from iter 57 into 10 tool-assisted milestones. Migration invariants locked: main never transits through broken state, existing users don't lose auto-update, no minisign key rotation, CI gates pass at every milestone, no test regression. Target: Tauri 2.x latest stable; launcher 0.2.0; indefinite dual-format window.
   - **M0 DONE @ iter 63**: worktree `../tauri-v2-migration` created from main @ 6860d86; baseline snapshot doc committed on worktree branch as cc33d92. Pinned: rustc 1.89.0, cargo 1.89.0, node v24.1.0, tauri 1.0 + 15 features, @tauri-apps/cli 1.6.3, 41 Tauri commands, 11 allowlist categories, 9 HTTP scope entries, 790 Rust + 431 JS = 1221 tests, v0.1.10 setup.exe 52.05 MB, 7 CI gates green, minisign pubkey fingerprint RWSEL+9/IIo3Gw3Vn1pXMl8p+ykWyKsZ/dzjmVrs0Ll2v1v9rE0yed2L.
-  - Remaining: M1 `cargo tauri migrate`, M2 JS imports, M3 command-surface review, M4 updater dual-format, M5 CSP tightening (closes 3.1.12), M6 anti-reverse (closes 3.1.8), M7 downgrade refusal (closes 3.1.9), M8 squash merge + deploy, M9 monitor. Est. 9–11 iterations to M8. Acceptance: every PRD §3.1 Tauri-v2-gated P0 closes as side-effect; full CI green on v2; 0.1.x users auto-upgrade cleanly. Pillar: Security.
+  - **M1 SPLIT @ iter 64**: `cargo tauri migrate` (CLI 2.10.1) errored first pass on a `links = "web_kit2"` conflict between dead dep `devtools@0.3.3` and `tauri-plugin-notification@2`. Pre-flight commit c85f7a8 dropped `devtools` (zero imports confirmed). Re-ran migrate, succeeded. Produced: Cargo.toml tauri 1.0 → 2, tauri-build 1 → 2, 15-feature flag list dropped, 6 plugin crates added (process/shell/http/notification/dialog/fs — all "2"), updater moved under desktop cfg(target); tauri.conf.json full shape rewrite; capabilities/migrated.json + desktop.json generated with all 9 HTTP URLs + fs scope + shell open-url custom command preserved verbatim; 13 src/ files + 4 tests/ refactored imports/API paths; main.rs .plugin(...) initialisers appended; package.json + lock with @tauri-apps/plugin-* packages. 23 files / 2151+ / 1941- lines. **M1a commit d708455 = pure tool output, does NOT build** — 44 compile errors, dominant class `get_window("main")` → v2 renamed to `get_webview_window("main")` at call sites the tool missed, plus Manager-trait re-pathing. All mechanical renames. Split preserves diff-reviewability (reviewer can see tool-output vs human-touchup separately).
+  - **M1b** next iter fixes the v1→v2 API drift so `cargo build --release` passes. Remaining after M1b: M2 JS imports, M3 command-surface review (scope now reduced since tool handled most of it), M4 updater dual-format, M5 CSP tightening (closes 3.1.12), M6 anti-reverse (closes 3.1.8), M7 downgrade refusal (closes 3.1.9), M8 squash merge + deploy, M9 monitor. Est. +1 iter for the M1 split → 10–12 iterations to M8. Acceptance: every PRD §3.1 Tauri-v2-gated P0 closes as side-effect; full CI green on v2; 0.1.x users auto-upgrade cleanly. Pillar: Security.
 - [P1] **fix.mods-hardcoded-i18n-strings** — Burn down the 10 documented allowlist entries in `teralaunch/tests/i18n-no-hardcoded.test.js`. Work split: (1) teach `app.js::updateAllTranslations()` to handle `data-translate-aria-label` so aria/close/overflow/category buttons can be annotated; (2) annotate the 7 mods.js leaks + 3 mods.html leaks with the new attribute; (3) add the 7-10 new translation keys to all 4 locales in `src/translations.json` (parity test at 3.7.1 is the guardrail). Acceptance: allowlist length goes to 0, `i18n-no-hardcoded.test.js::no new hardcoded English outside the allowlist` still passes with the final `expect(ALLOWLIST.length).toBe(0)` assertion flipped. Pillar: i18n. Discovered iter 48.
 
 ### Security follow-ups from iter-27 self-integrity
