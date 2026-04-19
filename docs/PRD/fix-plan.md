@@ -7,18 +7,20 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 8
+iteration_counter: 9
 last_work_iteration: 8
 last_research_sweep: never
 last_revalidation: never
 last_revalidation_status: never
 last_retrospective: never
 last_blocked_retry: never
-last_investigation_iteration: 2
+last_investigation_iteration: 9
 total_items_done: 7
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
+
+> **Iter 9 note:** partial progress on `3.1.13.portal-https`. Audit draft committed at `docs/PRD/audits/security/portal-https-migration.md` (commit dc604d0). 1 of 3 acceptance artefacts authored. Remaining 2 (config flip + end-to-end login) gated on the production HTTPS endpoint, which requires human infra setup (FQDN + TLS cert + reverse proxy). Item stays P0 and will be re-attempted at every BLOCKED RE-TRY (every 50 iters). Iter 10 is RESEARCH SWEEP by counter rule.
 
 **Iteration type by counter:** `iteration_counter` = last completed iteration's number. For the iteration about to run, compute `N = iteration_counter + 1` and match:
 
@@ -50,7 +52,7 @@ total_iterations_to_cap: 1000
 
 ### Security (PRD §3.1)
 
-- [P0] **3.1.13.portal-https** — Migrate `teralib/src/config/config.json` portal API URL from `http://88.99.102.67:8090` to HTTPS endpoint before Classic+ public launch. Author `docs/PRD/audits/security/portal-https-migration.md`. Acceptance: config URL starts with `https://`; end-to-end login works against HTTPS endpoint; audit doc signed off. Pillar: Security.
+- [P0] **3.1.13.portal-https** — Migrate `teralib/src/config/config.json` portal API URL from `http://192.168.1.128:8090` (current) to HTTPS endpoint before Classic+ public launch. Acceptance: config URL starts with `https://`; end-to-end login works against HTTPS endpoint; audit doc signed off. Pillar: Security. **Iter 9 status:** audit draft authored at `docs/PRD/audits/security/portal-https-migration.md` (commit dc604d0). Remaining acceptance gated on external human infra (production FQDN + TLS cert + reverse proxy). Re-attempt at BLOCKED RE-TRY every 50 iters or when human provides the endpoint.
 - [P0] **3.1.6.secret-leak-scan** — Run trufflehog + git-secrets across all 5 repos (`teralaunch`, `teralib`, `external-mod-catalog`, `TCC`, `ShinraMeter`). If any historical secret found, rewrite history (`git filter-repo`), rotate the secret, force-push (secret-leak remediation is the single exception in the destructive-freeze). Add `.github/workflows/secret-scan.yml` to each public repo. Author `docs/PRD/audits/security/secret-leak-scan.md` signed off. Acceptance: CI exits 0; audit doc lists all rotated secrets. Pillar: Security.
 - [P0] **3.1.8.anti-reverse-hardening** — Enable Rust release-profile LTO + strip + CFG + stack-canary; apply `cryptify`/`chamox` string obfuscation to all sensitive string literals (portal URLs, AuthKey-adjacent code, update-server URL, deploy paths). Author `docs/PRD/audits/security/anti-reverse.md` with build-output inspection (IDA/Ghidra screenshots showing obfuscated strings). Acceptance: audit doc signed off; release build flags verified in `Cargo.toml`. Pillar: Security.
 - [P0] **3.1.10.tcc-shinra-binary-hardening** — Strip TCC + Shinra release-mode debug symbols; evaluate ConfuserEx / Obfuscar for IL-obfuscation on sensitive types (e.g. sniffer keys, session-decryption code). Author `docs/PRD/audits/security/tcc-shinra-binary-hardening.md`. Acceptance: release binaries show no `.pdb`-adjacent symbols; audit doc signed off. Pillar: Security.
