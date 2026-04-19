@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 208
-last_work_iteration: 208
+iteration_counter: 209
+last_work_iteration: 209
 last_research_sweep: 190
 last_revalidation: 200
 last_revalidation_status: all-gates-green
@@ -16,28 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 183
+total_items_done: 184
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: bdbe5f8
+tauri_v2_migration_last_commit: b8d45c2
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 208 WORK — pin.portal-https-guard-header+csp-connect-src+tera-path-namespace+canonical-endpoint-names+LAN_DEV_HOST-alignment DONE (worktree).**
+> **Iter 209 WORK — pin.meta-hygiene-KNOWN_GUARDS-nodups+suffix-convention+MIN_BYTES-literal+TESTS_DIR-verbatim+count-floor DONE (worktree).**
 >
-> Worktree commit `bdbe5f8`. §3.1.13 portal-HTTPS migration drift; portal_https_guard had 11 tests (iter 119 creation + iter 141 +1 + iter 142 +3 + iter 167 +4); 41 iters untouched. Brings to 16.
+> Worktree commit `b8d45c2`. §3.8 doc-hygiene pillar (meta-guard contract-of-contracts); meta_hygiene_guard had 11 tests (iter 135 creation + iter 174 +5); 35 iters untouched. Brings to 16.
 >
-> Five new source-inspection pins (meta-guard + cross-config CSP alignment + path namespace + endpoint names + guard-constant alignment):
-> 1. `guard_file_header_cites_prd_3_1_13` — header cites `PRD 3.1.13` + `portal-HTTPS` slug; meta-guard contract
-> 2. `csp_connect_src_admits_current_api_base_host` — tauri.conf.json's CSP connect-src must include API_BASE_URL's origin; if config flips portal host but CSP doesn't, every login silently fails with CSP-block
-> 3. `action_urls_use_tera_path_namespace` — each action URL path starts with `/tera/` (Portal v100 API namespace); drift to `/api/` would pass existing prefix+port pins but 404
-> 4. `action_urls_carry_canonical_endpoint_names` — each action URL ends with canonical endpoint name (`LauncherLoginAction`, `LauncherSignupAction`, `GetAccountInfoByUserNo`, `LauncherMaintenanceStatus`, `ServerList`); typo silently 404s
-> 5. `lan_dev_host_constant_matches_api_base_host` — guard's `LAN_DEV_HOST` constant must equal API_BASE_URL host component (pre-cutover); drift breaks the LAN exception, turning every http:// URL into an offender
+> Five new source-inspection pins (list integrity + meta-guard constants alignment):
+> 1. `known_guards_list_has_no_duplicates` — HashSet-based dedup check; catches copy-paste bumps that pass the sorted-order pin (`["a","a","b","b"]` is sorted)
+> 2. `known_guards_entries_end_with_guard_rs` — discovery-suffix convention; a typo like `architecture_doc.rs` (missing `_guard`) would silently produce a `missing_from_disk` entry with no hint of root cause
+> 3. `min_bytes_floor_constant_is_five_hundred` — pins `const MIN_BYTES: usize = 500;` verbatim; silent lowering to 0 vacuates `every_guard_exceeds_minimum_byte_length`
+> 4. `tests_dir_constant_is_tests_verbatim` — pins `const TESTS_DIR: &str = "tests";`; rename would silently cause `fs::read_dir(TESTS_DIR)` to return empty, vacuating all `for path in discovered_guards()` loops
+> 5. `known_guards_count_meets_current_floor` — `KNOWN_GUARDS.len() ≥ 19`; catches coordinated list+disk trim (set-diff passes while invariants strip silently)
 >
-> portal_https_guard: 11 → 16 tests. 1273 Rust (+5), clippy clean, vitest 449/449.
+> meta_hygiene_guard: 11 → 16 tests. 1278 Rust (+5), clippy clean, vitest 449/449.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
