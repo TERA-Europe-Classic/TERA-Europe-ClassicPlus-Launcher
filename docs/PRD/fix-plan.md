@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 145
-last_work_iteration: 145
+iteration_counter: 146
+last_work_iteration: 146
 last_research_sweep: 130
 last_revalidation: 140
 last_revalidation_status: all-gates-green
@@ -16,15 +16,31 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 124
+total_items_done: 125
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 6af4d99
+tauri_v2_migration_last_commit: 462d48a
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 146 WORK — pin.anti-reverse-extension DONE (worktree).**
+>
+> Worktree commit `462d48a`. `anti_reverse_guard` previously pinned 5 core wires (lto/strip/codegen-1/panic=abort + obfuscation crates + /guard:cf + audit doc). Wires 7-10 extend the coverage to protect against silent regressions in the anti-reverse posture.
+>
+> Four new assertions:
+> 1. `release_profile_maxes_opt_level` — `opt-level = 3` retained. Dense assembly is harder to read (inlining, aggressive CSE, branch folding).
+> 2. `release_profile_does_not_emit_debug_symbols` — explicit `debug = true/1/2/"full"` absent. Debug symbols let reversers rebuild type layouts even after strip.
+> 3. `build_rs_gates_cfg_behind_release_profile` — `/guard:cf` must be gated by `PROFILE == "release"` AND scoped to the bin name `tera-europe-classicplus-launcher` (unconditional CFG OOMs dev builds under LTO per build.rs's own iter-118 comment; bare rustc-link-arg would apply to every workspace bin).
+> 4. `audit_doc_cites_m6_milestone_and_prd_criterion` — audit doc must reference `M6` + `3.1.8` so the build.rs comment's milestone cross-reference stays traceable.
+>
+> Extended detector self-test with 4 new bad shapes (low opt-level, `debug = true`, unconditional `/guard:cf`, audit without M6 cite).
+>
+> anti_reverse_guard: 7 → 11 tests.
+>
+> Acceptance: 995/995 Rust (was 991, +4), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 145 WORK — pin.deploy-scope-script-internals DONE (worktree).**
 >
