@@ -267,6 +267,50 @@ pub fn get_entry_by_incomplete_object_path<'a>(
     map.values().find(|e| incomplete_paths_equal(&e.object_path, path))
 }
 
+// --- Mapper patch application (PRD 3.3.2) ----------------------------------
+
+/// Applies `incoming`'s packages to `map` in-place. For each package:
+/// look up the matching entry by object_path (region_lock picks exact vs.
+/// incomplete match), repoint `(filename, offset, size)` to the incoming
+/// mod's container, and keep `(composite_name, object_path)` so the game
+/// still resolves via the same lookup keys.
+///
+/// PRD 3.3.2: per-object merge. Two mods patching different composites
+/// (or different objects sharing a composite via incomplete-path matching)
+/// both apply — the prior entries for objects the incoming mod doesn't
+/// touch stay intact. Two mods patching the *same* (composite, object)
+/// is a last-install-wins overwrite, surfaced separately by
+/// `detect_conflicts` so the user can approve before this runs.
+///
+/// Err if any requested object_path has no match in the current mapper —
+/// typically a game-version skew; the install aborts before writing.
+pub fn apply_mod_patches(
+    map: &mut HashMap<String, MapperEntry>,
+    incoming: &ModFile,
+) -> Result<(), String> {
+    for pkg in &incoming.packages {
+        let existing = if incoming.region_lock {
+            get_entry_by_object_path(map, &pkg.object_path)
+        } else {
+            get_entry_by_incomplete_object_path(map, &pkg.object_path)
+        };
+        let mut entry = match existing {
+            Some(e) => e.clone(),
+            None => {
+                return Err(format!(
+                    "Composite entry for '{}' not found in mapper. Your game version may not match the mod.",
+                    pkg.object_path
+                ));
+            }
+        };
+        entry.filename = incoming.container.clone();
+        entry.offset = pkg.offset;
+        entry.size = pkg.size;
+        map.insert(entry.composite_name.clone(), entry);
+    }
+    Ok(())
+}
+
 // --- Install-time conflict detection (PRD 3.3.3) ---------------------------
 
 /// One `(composite, object)` slot that's already been patched by a different
@@ -648,29 +692,7 @@ pub fn install_gpk(game_root: &Path, source_gpk: &Path) -> Result<ModFile, Strin
     let decrypted_str = String::from_utf8_lossy(&decrypted).to_string();
     let mut map = parse_mapper(&decrypted_str);
 
-    // Patch entries for each of the mod's packages. We keep the existing
-    // (composite_name, object_path) so the game still looks them up the
-    // same way; we only repoint (filename, offset, size).
-    for pkg in &modfile.packages {
-        let existing = if modfile.region_lock {
-            get_entry_by_object_path(&map, &pkg.object_path)
-        } else {
-            get_entry_by_incomplete_object_path(&map, &pkg.object_path)
-        };
-        let mut entry = match existing {
-            Some(e) => e.clone(),
-            None => {
-                return Err(format!(
-                    "Composite entry for '{}' not found in mapper. Your game version may not match the mod.",
-                    pkg.object_path
-                ));
-            }
-        };
-        entry.filename = modfile.container.clone();
-        entry.offset = pkg.offset;
-        entry.size = pkg.size;
-        map.insert(entry.composite_name.clone(), entry);
-    }
+    apply_mod_patches(&mut map, &modfile)?;
 
     // Drop the TMM marker so the file is recognizable by TMM too.
     map.insert(
@@ -868,19 +890,123 @@ mod tests {
         }
     }
 
+    // --- PRD 3.3.2.per-object-gpk-merge ------------------------------------
+
+    #[test]
+    fn per_object_merge_both_apply() {
+        // Two mods touching different composites (and therefore different
+        // object slots) both apply — neither clobbers the other.
+        let mut map = mapper_with(&[
+            ("S1UI_Party", "S1UI_Party.Foo", "S1Data.gpk"),
+            ("S1UI_Inv", "S1UI_Inv.Bar", "S1Data.gpk"),
+        ]);
+
+        let mod_a = ModFile {
+            container: "modA.gpk".into(),
+            region_lock: true,
+            packages: vec![ModPackage {
+                object_path: "S1UI_Party.Foo".into(),
+                offset: 100,
+                size: 200,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        apply_mod_patches(&mut map, &mod_a).unwrap();
+
+        let mod_b = ModFile {
+            container: "modB.gpk".into(),
+            region_lock: true,
+            packages: vec![ModPackage {
+                object_path: "S1UI_Inv.Bar".into(),
+                offset: 300,
+                size: 400,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        apply_mod_patches(&mut map, &mod_b).unwrap();
+
+        let party = map
+            .values()
+            .find(|e| e.object_path == "S1UI_Party.Foo")
+            .expect("Party entry must survive second install");
+        assert_eq!(party.filename, "modA.gpk");
+        assert_eq!(party.offset, 100);
+        assert_eq!(party.size, 200);
+
+        let inv = map
+            .values()
+            .find(|e| e.object_path == "S1UI_Inv.Bar")
+            .expect("Inv entry must be patched by modB");
+        assert_eq!(inv.filename, "modB.gpk");
+        assert_eq!(inv.offset, 300);
+        assert_eq!(inv.size, 400);
+    }
+
+    #[test]
+    fn patch_apply_aborts_on_unknown_object_path() {
+        // Incoming mod references a slot that doesn't exist in the current
+        // mapper — happens when the game version doesn't match the mod.
+        // Err before writing anything.
+        let mut map = mapper_with(&[("S1UI", "S1UI_Foo.Bar", "S1Data.gpk")]);
+        let incoming = ModFile {
+            container: "mod.gpk".into(),
+            region_lock: true,
+            packages: vec![ModPackage {
+                object_path: "NoSuchComp.NoSuchObj".into(),
+                offset: 0,
+                size: 0,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let err = apply_mod_patches(&mut map, &incoming).unwrap_err();
+        assert!(err.contains("not found in mapper"), "got {err}");
+        // Verify no partial mutation.
+        let orig = map.values().next().unwrap();
+        assert_eq!(orig.filename, "S1Data.gpk");
+    }
+
+    #[test]
+    fn patch_apply_is_idempotent_on_reinstall() {
+        // Re-applying the same modfile to a map that already reflects it
+        // produces the same final state (no extra entries, no drift).
+        let mut map = mapper_with(&[("S1UI", "S1UI_Foo.Bar", "S1Data.gpk")]);
+        let incoming = ModFile {
+            container: "mod.gpk".into(),
+            region_lock: true,
+            packages: vec![ModPackage {
+                object_path: "S1UI_Foo.Bar".into(),
+                offset: 50,
+                size: 75,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+
+        apply_mod_patches(&mut map, &incoming).unwrap();
+        let snapshot: HashMap<_, _> = map
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+
+        apply_mod_patches(&mut map, &incoming).unwrap();
+        assert_eq!(map, snapshot, "re-apply must be idempotent");
+    }
+
     // --- PRD 3.3.3.conflict-warning-ui -------------------------------------
 
     fn mapper_with(entries: &[(&str, &str, &str)]) -> HashMap<String, MapperEntry> {
-        // entries: (composite_name, object_path, filename). The map is keyed
-        // by a unique synthetic string so multiple object_paths can share a
-        // composite — production mappers don't have a 1:1 composite:entry
-        // shape, but `get_entry_by_object_path` iterates `values()` anyway
-        // so any unique key works.
+        // entries: (composite_name, object_path, filename). Keyed by
+        // composite_name to match production `parse_mapper`, which assumes
+        // composite_name is unique per entry (each UPackage has one name).
+        // Tests that want multiple entries must use distinct composite_names.
         entries
             .iter()
             .map(|(c, o, f)| {
                 (
-                    format!("{c}|{o}"),
+                    (*c).to_string(),
                     MapperEntry {
                         composite_name: (*c).to_string(),
                         object_path: (*o).to_string(),
@@ -941,14 +1067,15 @@ mod tests {
 
     #[test]
     fn detect_conflicts_reports_multiple_slots() {
-        // Incoming mod touches 2 slots, both owned by a different mod.
+        // Incoming mod touches 2 slots (distinct composites, distinct
+        // objects), both owned by a different mod.
         let vanilla = mapper_with(&[
-            ("S1UI", "S1UI_Party.Foo", "S1Data.gpk"),
-            ("S1UI", "S1UI_Inv.Bar", "S1Data.gpk"),
+            ("S1UI_Party", "S1UI_Party.Foo", "S1Data.gpk"),
+            ("S1UI_Inv", "S1UI_Inv.Bar", "S1Data.gpk"),
         ]);
         let current = mapper_with(&[
-            ("S1UI", "S1UI_Party.Foo", "othermod.gpk"),
-            ("S1UI", "S1UI_Inv.Bar", "othermod.gpk"),
+            ("S1UI_Party", "S1UI_Party.Foo", "othermod.gpk"),
+            ("S1UI_Inv", "S1UI_Inv.Bar", "othermod.gpk"),
         ]);
         let incoming = modfile_with("mymod.gpk", &["S1UI_Party.Foo", "S1UI_Inv.Bar"]);
 
@@ -960,12 +1087,12 @@ mod tests {
     fn detect_conflicts_mixed_slots_partial_report() {
         // Incoming touches 2 slots; one vanilla (ok), one owned by other mod.
         let vanilla = mapper_with(&[
-            ("S1UI", "S1UI_Party.Foo", "S1Data.gpk"),
-            ("S1UI", "S1UI_Inv.Bar", "S1Data.gpk"),
+            ("S1UI_Party", "S1UI_Party.Foo", "S1Data.gpk"),
+            ("S1UI_Inv", "S1UI_Inv.Bar", "S1Data.gpk"),
         ]);
         let current = mapper_with(&[
-            ("S1UI", "S1UI_Party.Foo", "S1Data.gpk"),       // vanilla
-            ("S1UI", "S1UI_Inv.Bar", "othermod.gpk"),       // conflict
+            ("S1UI_Party", "S1UI_Party.Foo", "S1Data.gpk"),  // vanilla
+            ("S1UI_Inv", "S1UI_Inv.Bar", "othermod.gpk"),    // conflict
         ]);
         let incoming = modfile_with("mymod.gpk", &["S1UI_Party.Foo", "S1UI_Inv.Bar"]);
 
