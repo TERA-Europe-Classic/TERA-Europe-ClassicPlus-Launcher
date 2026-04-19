@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 206
-last_work_iteration: 206
+iteration_counter: 207
+last_work_iteration: 207
 last_research_sweep: 190
 last_revalidation: 200
 last_revalidation_status: all-gates-green
@@ -16,28 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 181
+total_items_done: 182
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 5516264
+tauri_v2_migration_last_commit: 5fafbf1
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 206 WORK — pin.shell-scope-capabilities-narrow+execute-validator+CSP-default-src-self+no-unsafe-eval+script-src-no-wildcard DONE (worktree). All tests in tests/ now ≥ 11 pins.**
+> **Iter 207 WORK — pin.multi-client-guard-header+sysinfo-refresh-all+game-count-source+Terminate-gate+stop_process-case-mirror DONE (worktree). Oldest 11-count file reached (iter 158 → 207 span = 49 iters).**
 >
-> Worktree commit `5516264`. §3.1.5 shell-scope-hardening (CVE-2025-31477 defence chain); shell_scope_pinned had 10 tests (iter 86 creation + iter 148 +3 + iter 188 +5); 18 iters untouched. Brings to 15.
+> Worktree commit `5fafbf1`. §3.2.11 multi-client-attach-once + §3.2.12 overlay-lifecycle; multi_client had 11 tests (iter 85 creation + iter 158 +5 + iter 97 fix.overlay-lifecycle-wiring); 49 iters untouched. Brings to 16.
 >
-> Five new source-inspection pins (runtime-capability layer + CSP positive strictness):
-> 1. `capabilities_shell_permissions_are_narrow` — migrated.json's permission list contains `shell:allow-open` but NOT `shell:default` / `shell:allow-spawn` / `shell:allow-kill`
-> 2. `capabilities_shell_execute_carries_validator` — the `shell:allow-execute` grant (for `cmd /C start <url>` shim) must carry a `validator` field on variable argument slots; dropping it turns the cmd into a generic launcher
-> 3. `csp_has_strict_default_src_self` — positive assertion `default-src 'self'`; the iter-188 negative pin would accept `default-src *` otherwise
-> 4. `csp_rejects_unsafe_eval_everywhere` — no CSP directive contains `'unsafe-eval'`; would amplify XSS into RCE inside the webview, defeating CVE-2025-31477 defence model
-> 5. `csp_script_src_does_not_wildcard_origins` — script-src tokens must not contain bare `*` or scheme-only `https:`; current `'self' https://cdnjs.cloudflare.com` is the load-bearing allowlist
+> Five new source-inspection pins (meta-guard + sysinfo usage + game-count + gate operator + stop-mirror):
+> 1. `guard_file_header_cites_prd_slugs` — header cites `PRD 3.2.11` + `multi-client-attach-once`; name-based grep is primary PRD↔guard cross-ref path
+> 2. `is_process_running_uses_sysinfo_refresh_all_pattern` — sysinfo `System::new()` + `refresh_processes(All, true)` + `processes().values()`; rejects lock-file/PID-file shortcut that misses hard-kills
+> 3. `game_rs_remaining_clients_comes_from_teralib_count` — `let remaining_clients = ...` in commands/game.rs must bind to `teralib::get_running_game_count()`; literal/private-counter decouples policy from reality
+> 4. `game_rs_stop_is_gated_by_terminate_branch` — stop call lives inside `if decide_overlay_action(...) == OverlayLifecycleAction::Terminate`; the `==` operator is load-bearing (existing wiring pin only checks ordering)
+> 5. `stop_process_by_name_is_case_insensitive_mirror` — stop_process must mirror is_process_running's `.to_ascii_lowercase()` on both sides; asymmetric case-folding leaks overlays (detection finds, stop can't kill)
 >
-> shell_scope_pinned: 10 → 15 tests. 1263 Rust (+5), clippy clean, vitest 449/449.
+> multi_client: 11 → 16 tests. 1268 Rust (+5), clippy clean, vitest 449/449.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
