@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 173
-last_work_iteration: 173
+iteration_counter: 174
+last_work_iteration: 174
 last_research_sweep: 170
 last_revalidation: 160
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 151
+total_items_done: 152
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 06df3fe
+tauri_v2_migration_last_commit: 47ed222
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 174 WORK — pin.meta-hygiene-5-new-contract-rules DONE (worktree).**
+>
+> Worktree commit `47ed222`. `meta_hygiene_guard.rs` previously had 6 tests (iter 135-136 baseline): KNOWN_GUARDS match + module header + detector self-test name + traceable anchor + disk-read + detector self-test. Iter 174 adds 5 more rules a stub-author could still violate while satisfying the baseline.
+>
+> Five new pins on every `tests/*_guard.rs` file:
+> 1. `every_guard_has_at_least_two_test_fns` — `#[test]` count ≥ 2; a single-test guard is either a stub or one half of the self-test + real-test pair
+> 2. `every_guard_exceeds_minimum_byte_length` — file size ≥ 500 bytes; a doc-header-only guard with a no-op self-test could pass the baseline while encoding no real invariant
+> 3. `known_guards_list_is_sorted_alphabetically` — unsorted list obscures diffs on addition/removal; the list's utility as a review surface depends on readable order
+> 4. `every_guard_contains_at_least_one_assertion` — `assert!` / `assert_eq!` / `assert_ne!` / `panic!` required; tests without assertions vacuously pass and rubber-stamp every run
+> 5. `meta_hygiene_guard_is_in_its_own_known_list` — dog-fooding; silent deletion of the meta-guard would strand every drift-guard without contract supervision
+>
+> meta_hygiene_guard: 6 → 11 tests. The meta-guard now carries 10 contract rules total (5 baseline + 5 iter-174 extensions).
+>
+> Acceptance: 1118/1118 Rust (was 1113, +5), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 173 WORK — pin.changelog-preamble+hr+titles+ordering DONE (worktree).**
 >
