@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 205
-last_work_iteration: 205
+iteration_counter: 206
+last_work_iteration: 206
 last_research_sweep: 190
 last_revalidation: 200
 last_revalidation_status: all-gates-green
@@ -16,28 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 180
+total_items_done: 181
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: a16ee6d
+tauri_v2_migration_last_commit: 5516264
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 205 WORK — pin.zeroize-guard-header+login/register-Zeroizing-wrapper+non-sensitive-field-skip-classification DONE (worktree).**
+> **Iter 206 WORK — pin.shell-scope-capabilities-narrow+execute-validator+CSP-default-src-self+no-unsafe-eval+script-src-no-wildcard DONE (worktree). All tests in tests/ now ≥ 11 pins.**
 >
-> Worktree commit `a16ee6d`. §3.1.7 zeroize-audit (credential handling); zeroize_audit had 10 tests (iter 97 creation + iter 155 +5); 50 iters untouched. Brings to 15.
+> Worktree commit `5516264`. §3.1.5 shell-scope-hardening (CVE-2025-31477 defence chain); shell_scope_pinned had 10 tests (iter 86 creation + iter 148 +3 + iter 188 +5); 18 iters untouched. Brings to 15.
 >
-> Five new source-inspection pins (meta-guard + call-site + field-classification layer):
-> 1. `guard_file_header_cites_prd_3_1_7` — header cites `PRD 3.1.7` + `zeroize` nomenclature
-> 2. `login_with_client_wraps_password_in_zeroizing` — `let password = Zeroizing::new(password);` in commands/auth.rs, strictly BEFORE `validate_credentials`; otherwise the early-Err path leaks the raw `String` buffer
-> 3. `register_with_client_wraps_password_in_zeroizing` — same pattern for register path; same rationale (validation-branch leak path)
-> 4. `global_auth_info_non_sensitive_fields_explicitly_skipped` — character_count / user_no / user_name each carry `#[zeroize(skip)]`; pins the classification SET so new fields force a deliberate class decision
-> 5. `launch_params_non_sensitive_fields_explicitly_skipped` — executable_path / account_name / character_count / language each carry `#[zeroize(skip)]`; `ticket` remains the only wiped field
+> Five new source-inspection pins (runtime-capability layer + CSP positive strictness):
+> 1. `capabilities_shell_permissions_are_narrow` — migrated.json's permission list contains `shell:allow-open` but NOT `shell:default` / `shell:allow-spawn` / `shell:allow-kill`
+> 2. `capabilities_shell_execute_carries_validator` — the `shell:allow-execute` grant (for `cmd /C start <url>` shim) must carry a `validator` field on variable argument slots; dropping it turns the cmd into a generic launcher
+> 3. `csp_has_strict_default_src_self` — positive assertion `default-src 'self'`; the iter-188 negative pin would accept `default-src *` otherwise
+> 4. `csp_rejects_unsafe_eval_everywhere` — no CSP directive contains `'unsafe-eval'`; would amplify XSS into RCE inside the webview, defeating CVE-2025-31477 defence model
+> 5. `csp_script_src_does_not_wildcard_origins` — script-src tokens must not contain bare `*` or scheme-only `https:`; current `'self' https://cdnjs.cloudflare.com` is the load-bearing allowlist
 >
-> zeroize_audit: 10 → 15 tests. 1258 Rust (+5), clippy clean, vitest 449/449.
+> shell_scope_pinned: 10 → 15 tests. 1263 Rust (+5), clippy clean, vitest 449/449.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
