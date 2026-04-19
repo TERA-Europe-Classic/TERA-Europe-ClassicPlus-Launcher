@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 117
-last_work_iteration: 117
+iteration_counter: 118
+last_work_iteration: 118
 last_research_sweep: 110
 last_revalidation: 100
 last_revalidation_status: all-gates-green
@@ -16,15 +16,32 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 98
+total_items_done: 99
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 465fd5c
+tauri_v2_migration_last_commit: cba3794
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 118 WORK — pin.anti-reverse-hardening-drift-guard DONE (worktree).**
+>
+> Worktree commit `cba3794`. Closes PRD §3.1.8 structural pin: audit doc `docs/PRD/audits/security/anti-reverse.md` was the only citation; a single-line edit to Cargo.toml `[profile.release]` or build.rs would regress hardening silently without tripping any test.
+>
+> New `tests/anti_reverse_guard.rs` (7 tests):
+> 1. `release_profile_enables_lto` — `[profile.release] lto = true`
+> 2. `release_profile_strips_symbols` — `strip = true`
+> 3. `release_profile_hardens_codegen_and_panic` — `codegen-units = 1` + `panic = "abort"`
+> 4. `string_obfuscation_crates_pinned` — `cryptify` + `chamox` deps present (M6-b)
+> 5. `build_rs_passes_cfg_linker_flag` — `/guard:cf` via `cargo:rustc-link-arg-bin` (Windows CFG metadata)
+> 6. `anti_reverse_audit_doc_exists` — doc present + references LTO/strip/CFG keywords
+> 7. Detector self-test with 3 synthetic bad shapes
+>
+> `release_profile_section()` parses out just the `[profile.release]` table so assertions don't accidentally match a flag declared under another profile.
+>
+> Acceptance: 896/896 Rust (was 889, +7), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 117 WORK — pin.merger-goldens-in-drift-guard DONE (worktree).**
 >
