@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 221
-last_work_iteration: 221
+iteration_counter: 222
+last_work_iteration: 222
 last_research_sweep: 220
 last_revalidation: 220
 last_revalidation_status: all-gates-green
@@ -16,15 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 194
+total_items_done: 195
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 1e47d02
+tauri_v2_migration_last_commit: 8e9ffe7
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 222 WORK — pin.deploy-scope-guard-header+2-path-constants+workflow_dispatch-trigger+self-test-pos-neg+upload-URL-classicplus-scope DONE (worktree). Oldest 13-count reached (iter 168 → 222, 54 iters untouched).**
+>
+> Worktree commit `8e9ffe7`. §3.1.14 deploy-scope infra drift; deploy_scope_infra_guard had 13 tests (iter 114 creation + iter 145 +4 + iter 168 +5); 54 iters untouched. Brings to 18.
+>
+> Five new source-inspection pins (meta-guard + path constants + workflow trigger + self-test coverage + cross-file URL scope):
+> 1. `guard_file_header_cites_prd_3_1_14` — header cites `PRD 3.1.14` + `deploy-scope`; meta-guard contract
+> 2. `deploy_yml_and_scope_script_path_constants_are_canonical` — DEPLOY_YML + SCOPE_SCRIPT verbatim
+> 3. `deploy_yml_is_manually_triggered_via_workflow_dispatch` — workflow_dispatch trigger present; no push/schedule/pull_request in `on:` block; Classic+ is user-gated release pipeline
+> 4. `scope_script_self_tests_cover_positive_and_negative_cases` — runSelfTests asserts both `.length === 0` (valid input → no violations) AND `.length > 0` (bad input → violation); single-sided self-test lets always-pass/always-fail classifiers slip through
+> 5. `deploy_yml_ftp_upload_target_is_under_classicplus` — every `ftp://` / `ftps://` URL in the workflow contains `/classicplus/`; defence-in-depth even if scope-gate script is bypassed
+>
+> deploy_scope_infra_guard: 13 → 18 tests. 1333 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 221 WORK — pin.smoke-both-landmarks+path-threshold-constants+tempfile-import+no-bin-stanza+sort-call DONE (worktree). Last 12-count file — every test file in tests/ now ≥ 13 pins.**
 >
