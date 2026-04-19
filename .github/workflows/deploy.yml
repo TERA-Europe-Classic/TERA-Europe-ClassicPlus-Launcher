@@ -169,6 +169,14 @@ jobs:
 
           Set-Content 'latest.json' $latest -NoNewline
 
+      - name: Scope gate (paths must stay under /classicplus/)
+        # PRD 3.1.14.deploy-scope-gate. Refuses to proceed if any upload URL
+        # in this workflow points outside /classicplus/ on kasserver. Guards
+        # against typos, accidental scope widening, and supply-chain edits
+        # that try to redirect a release to /classic/ or the server root.
+        shell: bash
+        run: node teralaunch/tests/deploy_scope.spec.js
+
       - name: Upload to FTPS
         env:
           SFTP_HOST: ${{ secrets.SFTP_HOST }}

@@ -7,15 +7,15 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 24
-last_work_iteration: 24
+iteration_counter: 25
+last_work_iteration: 25
 last_research_sweep: 10
 last_revalidation: 20
 last_revalidation_status: clean
 last_retrospective: never
 last_blocked_retry: never
 last_investigation_iteration: 18
-total_items_done: 18
+total_items_done: 19
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
@@ -77,7 +77,6 @@ total_iterations_to_cap: 1000
 - [P0] **3.1.9.updater-downgrade-refuse** — Patch Tauri updater to refuse downgrades (compare current version vs `latest.json` version; reject older). Author `teralaunch/src-tauri/tests/updater_downgrade.rs::refuses_older_latest_json`. Acceptance: test passes with a signed older `latest.json` fixture. Pillar: Security.
 - [P0] **3.1.11.self-integrity** — Implement launcher self-integrity check at startup (hash exe, compare against embedded baseline). Author `teralaunch/src-tauri/tests/self_integrity.rs::detects_tampered_exe`. Acceptance: test fails cleanly when exe bytes mutated; launcher shows a clear reinstall prompt. Pillar: Security.
 - [P0] **3.1.12.csp-unsafe-inline** — Audit `tauri.conf.json` CSP; remove `unsafe-inline` for `script-src`. Migrate any inline scripts to external modules. Author `teralaunch/src-tauri/tests/csp_audit.rs::csp_denies_inline_scripts`. Acceptance: test asserts CSP contains no `'unsafe-inline'` in `script-src`. Pillar: Security.
-- [P0] **3.1.14.deploy-scope-gate** — Add CI gate in `.github/workflows/deploy.yml` that greps every upload URL and fails the job if any target path is outside `/classicplus/` on kasserver. Author `tests/deploy_scope.spec.js` as the gate script. Acceptance: job red when a test-upload URL points at `/` or `/classic/`. Pillar: Security.
 
 ### Functionality correctness (PRD §3.3)
 
@@ -282,6 +281,7 @@ The `verified @ iter N` stamp is updated by each REVALIDATION iteration. Any `[D
 - [DONE] 3.1.5.http-allowlist — proof: `tests/http_allowlist.rs::every_mod_url_on_allowlist` passes in release. Integration test loads `tauri.conf.json`, extracts `tauri.allowlist.http.scope`, scans every `src/services/mods/*.rs` file for `https?://...` literals, filters test-only hosts (`example.com`, `127.0.0.1`, `localhost`), and asserts each remaining host matches at least one scope entry via `host_matches` (exact-or-leading-`*.`-suffix). Negative proof: removing the `raw.githubusercontent.com` scope entry reproduced the failure locally (`test result: FAILED`); restored after. Also added `https://raw.githubusercontent.com/*` to the allowlist — was missing from `tauri.conf.json` even though `catalog.rs::CATALOG_URL` targets it. Two helper unit tests (`host_matches_wildcard_and_exact`, `host_of_strips_scheme_and_port`) pin the glob matcher. Verified @ iter 22.
 - [DONE] 3.1.2.gpk-install-sha — proof: `services::mods::external_app::tests::sha_mismatch_aborts_before_write_gpk` passes in release. Frames the existing fail-closed contract around the GPK install site: pre-creates a `mods/gpk/` dir, writes to `<gpk_dir>/<id>.gpk` (matching install_gpk_mod's filename convention), passes a deliberate-mismatch SHA, asserts `download_file` returns Err + dest doesn't exist + gpk_dir contents remain empty. Deviation from PRD literal path: PRD specified `tests/gpk_install_hash.rs` but the launcher is a bin crate without a lib target so integration tests can't import `download_file`; the test lives alongside its sibling `sha_mismatch_aborts_before_write` (iter 19) inside the module's `#[cfg(test)]` block. Same contract, richer dest-path assertions. 699 unit + 3 (http_allowlist) + 2 (smoke) integration green, clippy --release clean. Verified @ iter 23.
 - [DONE] 3.1.4.gpk-deploy-sandbox — **Note: real vulnerability found + fixed.** `install_gpk` joined `game_root/CookedPC/<modfile.container>` where `modfile.container` is attacker-controlled (parsed from GPK footer). A hostile mod with container `../../Windows/evil.gpk` would have escaped CookedPC via `fs::copy`. Fix: added `is_safe_gpk_container_filename(name)` predicate rejecting empty, separator-bearing, parent-traversal, null-byte, drive-letter, and dot-only names. Called at the entry of both `install_gpk` and `uninstall_gpk` *before any filesystem state is touched* (reordered install_gpk so parsing + validation run before `ensure_backup` — rejected install leaves `.clean` untouched per PRD acceptance). Test `services::mods::tmm::tests::deploy_path_clamped_inside_game_root` iterates 15 hostile vectors (`..`, `../evil.gpk`, `../../evil.gpk`, `..\evil.gpk`, `..\..\evil.gpk`, `foo..bar.gpk`, `/etc/passwd`, `sub/evil.gpk`, `sub\evil.gpk`, `C:evil.gpk`, `D:/evil.gpk`, `\0evil.gpk`, `evil\0.gpk`, empty, `.`) — 10 more than the PRD `≥5` bar, covering every class of path-escape primitive. Plus 5 positive controls on realistic TMM names. Sibling test `uninstall_gpk_rejects_hostile_container_before_any_fs_write` proves the uninstall guard is wired and leaves a fresh tempdir untouched on rejection. 701 unit + 3 + 2 green, clippy --release clean. Verified @ iter 24.
+- [DONE] 3.1.14.deploy-scope-gate — proof: `teralaunch/tests/deploy_scope.spec.js` is a self-contained Node script that scans `.github/workflows/deploy.yml` for `ftp(s)://` and `https://<kasserver-host>` URLs, extracts each URL's path, and asserts it starts with `/classicplus/` or `/classic/classicplus/` (accepts both since the https cdn prefix is `/classic/classicplus/` while ftp uploads go straight to `/classicplus/`). Ships 11 self-test patterns (5 positive + 5 negative + 1 empty-body) that run on every invocation so the gate can't silently rot. Wired into `deploy.yml` as a step between `Generate latest.json` and `Upload to FTPS`. Positive real-run: 2 upload URLs found, all clean. Negative proof: fed synthetic body with `ftp://host/classic/` and `https://web.tera-germany.de/latest.json` → gate flagged both violations. Vitest 417/417 untouched (script uses `*.spec.js` not `*.test.js` — vitest's include glob excludes it; runs via `node` only). Exported `findScopeViolations` for future unit tests. Verified @ iter 25.
 
 ## META (human review)
 
