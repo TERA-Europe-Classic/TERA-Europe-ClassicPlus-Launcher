@@ -587,6 +587,55 @@ fn backup_path(game_root: &Path) -> PathBuf {
     game_root.join(COOKED_PC_DIR).join(BACKUP_FILE)
 }
 
+/// Recovers a missing `.clean` backup. Intended as a user-triggered one-shot
+/// for the rare case where `.clean` was deleted while no mods were installed.
+///
+/// PRD 3.2.9.clean-recovery-logic. Three branches:
+///   - `.clean` already exists → no-op (safe to call speculatively).
+///   - `.clean` missing, current mapper has no `TMM_MARKER` entry →
+///     treat current as vanilla and copy it to `.clean`. Relies on the TMM
+///     convention that any mapper touched by a TMM-style installer carries
+///     the marker; absent → mods weren't installed via TMM.
+///   - `.clean` missing, current mapper has `TMM_MARKER` → refuse. We'd be
+///     capturing already-modded bytes as the "vanilla" baseline, which
+///     silently breaks uninstall forever. Err message tells the user to
+///     run Steam / their launcher's "verify game files" to restore
+///     `CompositePackageMapper.dat` first.
+#[allow(dead_code)]
+pub fn recover_missing_clean(game_root: &Path) -> Result<(), String> {
+    let src = mapper_path(game_root);
+    let dst = backup_path(game_root);
+
+    if dst.exists() {
+        return Ok(());
+    }
+    if !src.exists() {
+        return Err(format!(
+            "CompositePackageMapper.dat not found at {}. Verify game files.",
+            src.display()
+        ));
+    }
+
+    let current_bytes = fs::read(&src)
+        .map_err(|e| format!("Failed to read mapper: {}", e))?;
+    let decrypted = decrypt_mapper(&current_bytes);
+    let decrypted_str = String::from_utf8_lossy(&decrypted).to_string();
+    let map = parse_mapper(&decrypted_str);
+
+    if map.contains_key(TMM_MARKER) {
+        return Err(
+            "Cannot recover .clean: the current CompositePackageMapper.dat \
+             has mod entries (TMM marker present). Run Steam / the launcher's \
+             \"verify game files\" to restore the vanilla mapper, then retry."
+                .into(),
+        );
+    }
+
+    fs::copy(&src, &dst)
+        .map_err(|e| format!("Failed to back up mapper: {}", e))?;
+    Ok(())
+}
+
 /// Copies the vanilla mapper to `.clean` on first touch. Safe to call on
 /// every install — it's a no-op once the backup exists.
 pub fn ensure_backup(game_root: &Path) -> Result<(), String> {
@@ -1061,6 +1110,89 @@ mod tests {
     fn ensure_backup_errors_when_mapper_missing() {
         let tmp = TempDir::new().unwrap();
         let err = ensure_backup(tmp.path()).unwrap_err();
+        assert!(err.contains("not found"), "got {err}");
+    }
+
+    // --- PRD 3.2.9.clean-recovery-logic ------------------------------------
+
+    /// Writes a realistic-looking encrypted mapper into `<game_root>/CookedPC/`
+    /// with the given map.
+    fn write_mapper_at(game_root: &Path, map: &HashMap<String, MapperEntry>) {
+        let cooked = game_root.join(COOKED_PC_DIR);
+        fs::create_dir_all(&cooked).unwrap();
+        let serialised = serialize_mapper(map);
+        let encrypted = encrypt_mapper(serialised.as_bytes());
+        fs::write(cooked.join(MAPPER_FILE), encrypted).unwrap();
+    }
+
+    #[test]
+    fn clean_recovery_logic_nop_when_backup_exists() {
+        let tmp = TempDir::new().unwrap();
+        let map = mapper_with(&[("S1UI", "S1UI_Foo.Bar", "S1Data.gpk")]);
+        write_mapper_at(tmp.path(), &map);
+        // Pre-existing backup with different bytes.
+        fs::write(
+            tmp.path().join(COOKED_PC_DIR).join(BACKUP_FILE),
+            b"PRE-EXISTING-BACKUP",
+        )
+        .unwrap();
+
+        recover_missing_clean(tmp.path()).unwrap();
+        // Must not have touched the backup (no-op).
+        assert_eq!(
+            fs::read(tmp.path().join(COOKED_PC_DIR).join(BACKUP_FILE)).unwrap(),
+            b"PRE-EXISTING-BACKUP"
+        );
+    }
+
+    #[test]
+    fn clean_recovery_logic_creates_backup_from_vanilla_current() {
+        let tmp = TempDir::new().unwrap();
+        let vanilla = mapper_with(&[
+            ("S1UI_Party", "S1UI_Party.Foo", "S1Data.gpk"),
+            ("S1UI_Inv", "S1UI_Inv.Bar", "S1Data.gpk"),
+        ]);
+        write_mapper_at(tmp.path(), &vanilla);
+
+        recover_missing_clean(tmp.path()).unwrap();
+        // .clean now exists and contains the current mapper bytes.
+        let mapper_bytes = fs::read(tmp.path().join(COOKED_PC_DIR).join(MAPPER_FILE)).unwrap();
+        let backup_bytes = fs::read(tmp.path().join(COOKED_PC_DIR).join(BACKUP_FILE)).unwrap();
+        assert_eq!(mapper_bytes, backup_bytes);
+    }
+
+    #[test]
+    fn clean_recovery_logic_refuses_when_current_is_modded() {
+        // Current mapper carries the TMM_MARKER — means mods were installed.
+        // We don't know what "vanilla" looked like, so we can't recover.
+        let tmp = TempDir::new().unwrap();
+        let mut current = mapper_with(&[("S1UI", "S1UI_Foo.Bar", "modA.gpk")]);
+        current.insert(
+            TMM_MARKER.into(),
+            MapperEntry {
+                filename: TMM_MARKER.into(),
+                object_path: TMM_MARKER.into(),
+                composite_name: TMM_MARKER.into(),
+                offset: 0,
+                size: 0,
+            },
+        );
+        write_mapper_at(tmp.path(), &current);
+
+        let err = recover_missing_clean(tmp.path()).unwrap_err();
+        assert!(
+            err.contains("verify game files") || err.contains("mod entries"),
+            "error must tell user how to recover: {err}"
+        );
+        // .clean must NOT have been written — we don't want to poison the
+        // baseline.
+        assert!(!tmp.path().join(COOKED_PC_DIR).join(BACKUP_FILE).exists());
+    }
+
+    #[test]
+    fn clean_recovery_logic_errors_when_mapper_missing() {
+        let tmp = TempDir::new().unwrap();
+        let err = recover_missing_clean(tmp.path()).unwrap_err();
         assert!(err.contains("not found"), "got {err}");
     }
 
