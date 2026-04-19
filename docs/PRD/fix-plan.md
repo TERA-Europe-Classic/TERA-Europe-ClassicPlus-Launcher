@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 84
-last_work_iteration: 84
+iteration_counter: 85
+last_work_iteration: 85
 last_research_sweep: 80
 last_revalidation: 72
 last_revalidation_status: all-gates-green
@@ -16,15 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 18
-total_items_done: 65
+total_items_done: 66
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: a1ceb04
+tauri_v2_migration_last_commit: a84349e
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 85 WORK — fix.mods-categories-ui DONE (worktree). Third and last user-reported P1 from iter 82 triage closed.**
+>
+> Worktree commit `a84349e`. The L-shape layout and dual chip style in the mods modal filter strip are gone: kind-filter (All/External/GPK) and category chips now share a single `.mods-filters-row` container with a thin vertical divider between them, and both use the same `.mods-filter-chip` class with identical pill geometry.
+> - **HTML:** kind-filter moved out of `.mods-toolbar` (now search-only). New `.mods-filters-row` wraps kind group + divider + category row. `aria-label="Kind filter"` picked up a `data-translate-aria-label` + new i18n key `MODS_ARIA_KIND_FILTER`.
+> - **CSS:** `.mods-filter-chip` base styling unified to pill geometry (999px radius, 4px/10px padding, 11px font). Active state picks up the teal border. `.mods-filter-group` segmented-control wrapper dropped. Dead `.mods-category-chip` rules deleted.
+> - **JS:** kind-filter click handler + setFilter active-class flip scoped to `.mods-filter-group .mods-filter-chip` to prevent double-binding category chips to `setFilter(undefined)` now that both groups share the chip class. renderCategoryChips emits the unified class.
+> - **i18n:** 1 new key × 4 locales (MODS_ARIA_KIND_FILTER in FRA/EUR/RUS/GER).
+> - **Tests (7 new, mods-categories-ui.test.js):** `.mods-filters-row` DOM shape (kind → divider → category order), both groups use `.mods-filter-chip`, `renderCategoryChips` emits the unified class, legacy `.mods-category-chip` is GONE from html/js/css (regression guard), kind-filter click scoped correctly, base + active CSS carry the expected pill geometry, one `.active` chip per group at seed state.
+>
+> Acceptance: 831/831 Rust unchanged (frontend-only), 449/449 JS (was 442, +7), clippy clean. i18n-parity still 4/4, i18n-no-hardcoded still strict-zero.
+>
+> **All three user-reported bugs from iter 82 triage now closed** (P0 resolve-game-root, P1 offline-empty-state, P1 categories-ui). Queue drops back to iter-80 research-sweep P2s: `sec.shell-scope-hardening`, `dep.dedupe-reqwest-zip`, `dep.vitest-bump-post-squash` (P3). Iter 86 picks from those. Worktree still `ready_for_squash_merge: true`.
 
 > **Iter 84 WORK — fix.offline-empty-state DONE (worktree). Second user-reported P1 from iter 82 triage closed.**
 >
@@ -378,7 +391,7 @@ tauri_v2_migration_ready_for_squash_merge: true
 ### User-reported bugs (iter 82 — live triage)
 
 - [DONE @ iter 84] **fix.offline-empty-state** — Closed on worktree commit `a1ceb04`. Paint-first fix: `.mainpage.ready` class now flips as the first statement of `App.init()` (before any await) — the blank-dark-screen failure mode is structurally impossible. New `#offline-banner` element (role="alert", aria-live="polite") + `showOfflineBanner()`/`hideOfflineBanner()` methods with idempotent retry wiring that re-runs `App.init()`. 3 i18n keys × 4 locales added. 7 new tests in `offline-banner.test.js` pin DOM shape, `.ready`-before-await ordering, toggle behaviour, retry handler, idempotency, and i18n parity. Playwright e2e spec deferred as follow-up (would need cold browser boot ≥ 5 min). Pillar: UX / Reliability.
-- [P1] **fix.mods-categories-ui** — The mods modal category pill row (rendered in `src/mods.html` + styled in `src/mods.css`) has two visible defects on the live launcher (user screenshot, iter 82): (a) the "All categories" pill has inconsistent styling vs the per-category pills next to it (different shape / padding / color-weight), and (b) the row sits below the search bar but the kind-filter toggle (All/External/GPK) stays to the right of search, forming an awkward L-shape with no visual group boundary. Fix: unify the pill style across All + per-category entries (same shape, same color policy, same hover state), then re-flow the layout so the category row reads as a single filter section aligned with the kind-filter (either both below search in a shared strip, or categories above search with the kind-filter remaining inline). Acceptance: visual-regression baseline `mods-modal-categories.png` (≤0.1% diff under Playwright) + a Vitest dom-order test pinning the category pill DOM shape. Pillar: UX.
+- [DONE @ iter 85] **fix.mods-categories-ui** — Closed on worktree commit `a84349e`. Unified filter strip: kind-filter + category chips share `.mods-filters-row` with a vertical divider between groups; both groups now use `.mods-filter-chip` (same pill geometry). Dead `.mods-category-chip` class removed from html/js/css. Kind-filter click handler scoped to `.mods-filter-group` to prevent double-binding after the class unification. 7 new Vitest tests pin DOM order (kind → divider → category), chip-class consistency, legacy-class absence (regression guard), CSS pill geometry, and seed-state `.active` invariants. Playwright visual baseline deferred as follow-up (would need cold browser boot ≥ 5 min). Pillar: UX.
 
 ### Reliability (PRD §3.2)
 
