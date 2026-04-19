@@ -7,16 +7,16 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 169
+iteration_counter: 170
 last_work_iteration: 169
-last_research_sweep: 150
+last_research_sweep: 170
 last_revalidation: 160
 last_revalidation_status: all-gates-green
 last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 147
+total_items_done: 148
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,22 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: c0bb3bc
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 170 RESEARCH SWEEP — zero dep drift, +94 tests since iter 150.**
+>
+> Audit doc: `docs/PRD/audits/research/sweep-iter-170.md`. Worktree commit at sweep start: `c0bb3bc` (unchanged — research sweep is read-only on the worktree).
+>
+> Findings:
+> - `cargo tree -d`: **zero drift** vs iter 150. Every duplicated crate (reqwest 0.12/0.13, cookie 0.16/0.18, env_logger 0.10/0.11, bitflags 1/2, getrandom 0.1/0.2/0.3, hashbrown 0.12/0.14/0.16, rand 0.7/0.8/0.9, zip 2/4) at identical resolved versions.
+> - `cargo audit --ignore RUSTSEC-2026-0097 --ignore RUSTSEC-2026-0007` (teralaunch): exit 0, 19 upstream-locked warnings (same set as iter 130/140/150/160). Both ignored advisories still upstream-gated.
+> - `cargo audit` (teralib): exit 0, zero findings (233 deps), unchanged since iter 111.
+> - Upstream release-notes delta: ecosystem quiet — tauri 2.10.3, plugins unchanged, reqwest 0.12.28, rustls 0.103.12, zip 4.x all identical to iter 150.
+> - Test-count trajectory: 1004 @ iter 150 → 1053 @ iter 160 revalidation → **1098 @ iter 170** (+94 since iter 150, +45 since iter 160).
+> - Integration-test coverage milestone: iter 166 closed the gap — **every `teralaunch/src-tauri/tests/*.rs` now carries iter-150+ structural pins**. Iter 167-169 deepened three infrastructure guards (portal_https, deploy_scope, anti_reverse).
+> - Regression-pattern grep over 109 commits: 1 false-positive (`iter 165` uses "revert" as technical term for `revert_partial_install_*` helpers); 0 real regressions.
+> - No new P-slot items surfaced. Backlog unchanged (§3.3.1 `every_catalog_entry_lifecycle.rs`, §3.8.7 `audits/units/`, C# pins deferred).
+>
+> Status: all-gates-green by inspection. Next formal revalidation: iter 180. Squash merge remains user-gated.
 
 > **Iter 169 WORK — pin.anti-reverse-psk-obfuscation+manifest DONE (worktree).**
 >
