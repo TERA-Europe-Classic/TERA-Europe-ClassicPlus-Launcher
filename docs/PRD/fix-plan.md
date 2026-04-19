@@ -7,14 +7,14 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 0
-last_work_iteration: never
+iteration_counter: 1
+last_work_iteration: 1
 last_research_sweep: never
 last_revalidation: never
 last_revalidation_status: never
 last_retrospective: never
 last_blocked_retry: never
-total_items_done: 0
+total_items_done: 1
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
@@ -46,7 +46,7 @@ total_iterations_to_cap: 1000
 
 ### Infrastructure (must exist before most P0 tests can be written)
 
-- [P0] **infra.rust-integration-tests** — Create `teralaunch/src-tauri/tests/` integration-test directory with scaffolding (Cargo.toml `[[test]]` entries, shared fixtures in `tests/common/mod.rs`). Acceptance: `cargo test --release --test smoke` compiles and passes a trivial assertion. Pillar: Reliability.
+- [P0] **fix.cargo-test-release-lto-link** — `cargo test --release --test smoke` fails to link the bin with 32 unresolved `teralib::*` externals, even though `cargo build --release` succeeds. Not triggered by adding `--features custom-protocol`. Root cause suspected: LTO + cfg(test) + path-dep `teralib` interaction strips symbols during test-mode bin rebuild. Fix options: (a) `CARGO_PROFILE_RELEASE_LTO=false` override, (b) add `src/lib.rs` so integration tests link lib instead of bin, (c) `[[bin]] test = false` + refactor unit tests to lib. Acceptance: `cargo test --release --test smoke` exits 0. Pillar: Reliability. Required for PRD §11 clause 2.
 - [P0] **infra.tcc-test-project** — Add `TCC.Tests/` xUnit project to TCC solution. Acceptance: `dotnet test TCC.sln -c Release` runs ≥ 1 passing test. Pillar: Reliability.
 - [P0] **infra.shinra-test-project** — Add `ShinraMeter.Tests/` xUnit project to Shinra solution. Acceptance: `dotnet test ShinraMeter.sln -c Release` runs ≥ 1 passing test. Pillar: Reliability.
 - [P0] **infra.catalog-ci** — Author `.github/workflows/catalog-ci.yml` for `external-mod-catalog`: JSON validity + schema + URL reachability gates. Acceptance: PR that breaks `catalog.json` fails CI. Pillar: Reliability (PRD §11 clause 9).
@@ -246,6 +246,7 @@ The `verified @ iter N` stamp is updated by each REVALIDATION iteration. Any `[D
 
 - [DONE] 3.2.10 corrupt GPK rejected — commit pre-loop, proof: `teralaunch/src-tauri/src/services/mods/tmm.rs::tests::parse_mod_file_rejects_non_tmm_gpks`, verified @ iter 0
 - [DONE] 3.3.13 update detection + launch banner — commit 4c489a6, proof: `teralaunch/src/mods.js::loadInstalled` version drift flip + `app.js::checkModUpdatesOnLaunch`, verified @ iter 0 (note: needs e2e test `mod-update-flow.spec.js::version_drift_shows_update` before fully DONE — demote to P1 if first REVALIDATION finds the test missing)
+- [DONE] infra.rust-integration-tests — commit <pending>, proof: `teralaunch/src-tauri/tests/smoke.rs` + `tests/common/mod.rs`, `cargo test --test smoke` → 2/2 passed in debug, verified @ iter 1
 
 ## META (human review)
 
