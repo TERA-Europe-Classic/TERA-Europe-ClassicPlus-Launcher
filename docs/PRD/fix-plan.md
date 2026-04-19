@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 115
-last_work_iteration: 115
+iteration_counter: 116
+last_work_iteration: 116
 last_research_sweep: 110
 last_revalidation: 100
 last_revalidation_status: all-gates-green
@@ -16,15 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 96
+total_items_done: 97
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 481b070
+tauri_v2_migration_last_commit: 22f9150
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 116 WORK — pin.§5.4-goldens-in-drift-guard DONE (worktree).**
+>
+> Worktree commit `22f9150`. Folded iter 89/92/94 PRD §5.4 "Test-pinning for legacy refactor" artefacts into the iter-97 drift-guard umbrella. Previously only adversarial-style pins were tracked; the byte-for-byte golden captures lived siloed in tmm.rs / external_app.rs without structural coverage against rename/removal.
+>
+> New pins (30 → 33):
+> - §3.1.3 + `golden_extract_multi_entry_tree` (iter-94 extract golden)
+> - §3.2.3 + `golden_cipher_encrypt_zeros_16` (iter-92 cipher golden)
+> - §3.2.10 + `golden_v1_fixture_parses_to_expected_modfile` (iter-89 parser golden)
+>
+> PRD cells updated to cite both pin flavours: adversarial + §5.4 golden on each criterion. Together the two form complete refactor-safety coverage: adversarial catches new exploits, golden catches silent behaviour changes.
+>
+> Acceptance: 889/889 Rust unchanged, clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 115 WORK — pin.deploy-scope-infra-drift-guard DONE (worktree).**
 >
