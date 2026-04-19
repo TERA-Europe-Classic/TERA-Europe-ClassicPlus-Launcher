@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 93
-last_work_iteration: 93
+iteration_counter: 94
+last_work_iteration: 94
 last_research_sweep: 90
 last_revalidation: 72
 last_revalidation_status: all-gates-green
@@ -16,15 +16,26 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 74
+total_items_done: 75
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 436a7f0
+tauri_v2_migration_last_commit: fef2097
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 94 WORK — pin.external.download-extract DONE (worktree).**
+>
+> Worktree commit `fef2097`. Fourth pin.* item shipped in 6 iters (parser @ 89, cipher @ 92, merger @ 93, extract @ 94). Complements the existing single-file happy-path + zip-slip adversarial tests with a golden MULTI-ENTRY output-tree pin:
+> - 3 new inline tests: full-tree content round-trip (ASCII + 256-byte binary 0x00..0xFF + root-level file), no-surprise-entries guard (exact file-list equality), re-extract idempotency.
+> - `build_golden_fixture_zip` helper constructs a deterministic zip via `zip::ZipWriter` + `SimpleFileOptions::default()`. The OUTPUT tree is pinned, not the zip bytes, so a future zip-crate major bump that changes default compression still round-trips cleanly.
+> - Binary-fidelity round-trip catches any UTF-8 coercion, line-ending munging, or encoding surprise — critical for mod bundles shipping DLLs.
+>
+> Acceptance: 848/848 Rust (was 845, +3), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
+>
+> **Rust-side pin coverage now complete** for PRD §5.4. Remaining PRD §5.4 pins live in C# (TCC + Shinra sniffers) and need separate C# tests — out of scope for Rust-crate iteration. Next iter picks from non-pin P1 backlog: `adv.sigkill-mid-download`, `adv.tampered-catalog`, or §3 items.
 
 > **Iter 93 WORK — pin.tmm.merger DONE (worktree). pin.tmm trio complete.**
 >
@@ -578,7 +589,7 @@ tauri_v2_migration_ready_for_squash_merge: true
 - [DONE @ iter 92] **pin.tmm.cipher** — Closed on worktree commit `5e6b026`. 4 inline tests in `tmm.rs::tests`: byte-for-byte encrypt_mapper(&[0;16]) pin with hand-traced derivation, encrypt↔decrypt round-trip on 5 fixtures (incl. tail-unaligned + 3-block buffers), KEY1 bijective-on-0..16 structural guard, KEY2 == `b"GeneratePackageMapper"` literal pin. Pillar: Reliability.
 - [DONE @ iter 89] **pin.tmm.parser** — Closed on worktree commit `ef1c01d`. Hand-packed 136-byte v1 fixture (1 composite package, ASCII strings, no TFC extras) inline in `tmm.rs::tests`. Three tests pin every ModFile + ModPackage field byte-for-byte, guard the fixture shape itself against drift, and assert parse determinism. TMM v1/v2+ discrimination landmine documented inline. Companion to iter 79's adversarial corpus — together they pin both halves of the parser contract. Pillar: Reliability.
 - [DONE @ iter 93] **pin.tmm.merger** — Closed on worktree commit `436a7f0`. 4 inline tests in `tmm.rs::tests` pin both halves of the apply_mod_patches contract: disjoint-slot commutativity (2 mods + 3 mods × 6 permutations), same-slot last-install-wins (PRD 3.3.3), empty-ModFile identity. `sorted_entries` helper normalises HashMap iteration order so hash randomness doesn't leak into assertions. Pragmatic golden-fixture approach (not QuickCheck-property-based but covers the key invariants). Pillar: Reliability.
-- [P1] **pin.external.download-extract** — Golden-file test for `external_app.rs` download + extract flow on a fixture zip. Acceptance: output tree byte-for-byte. Pillar: Reliability.
+- [DONE @ iter 94] **pin.external.download-extract** — Closed on worktree commit `fef2097`. 3 inline golden tests in `external_app.rs::tests`: multi-entry output-tree pin (3 files across 2 dirs, incl. binary 0x00..0xFF round-trip), no-surprise-entries guard (exact file-list set equality), re-extract idempotency. `build_golden_fixture_zip` helper builds the deterministic fixture via `zip::ZipWriter`. Pins the OUTPUT tree, not the zip bytes, so a future zip-crate default-compression change still round-trips cleanly. Pillar: Reliability.
 - [P1] **pin.tcc.classic-plus-sniffer** — Pinned-bytes test for `TCC/TeraPacketParser/Sniffing/ClassicPlusSniffer.cs` mirror-read state machine. Acceptance: fixture stream → expected packet stream. Pillar: Reliability.
 - [P1] **pin.shinra.tera-sniffer** — Pinned-bytes test for `ShinraMeter/DamageMeter.Sniffing/TeraSniffer.cs` Classic+ branch. Acceptance: fixture stream → expected damage events. Pillar: Reliability.
 
