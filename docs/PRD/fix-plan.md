@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 64
-last_work_iteration: 64
+iteration_counter: 65
+last_work_iteration: 65
 last_research_sweep: 60
 last_revalidation: 60
 last_revalidation_status: regression-resolved-next-iter
@@ -19,10 +19,22 @@ last_investigation_iteration: 18
 total_items_done: 52
 total_items_regressed: 0
 total_iterations_to_cap: 1000
-tauri_v2_migration_milestone: M1a
+tauri_v2_migration_milestone: M1
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
+tauri_v2_migration_last_commit: f13e2bd
 ```
+
+> **Iter 65 WORK — Tauri v2 M1 DONE (worktree).**
+>
+> Executed M1b on the `tauri-v2-migration` worktree: fixed the 44 compile errors that `cargo tauri migrate` left for manual cleanup. Pure mechanical v1→v2 API drift — no semantic changes. Worktree commit `f13e2bd`:
+> - `tauri::api::dialog::blocking::FileDialogBuilder` → `tauri_plugin_dialog::DialogExt` (`select_game_folder` now takes auto-injected `AppHandle`, `FilePath::into_path()` on the returned handle).
+> - `use tauri::Emitter;` added to `commands/{config,download,game,hash,mods}.rs` + `infrastructure/events.rs`. `.emit_all(...)` → `.emit(...)` (Emitter trait unifies broadcast; v2 deprecates the dual `emit` vs `emit_all` split).
+> - `get_window("main")` → `get_webview_window("main")` (3 sites in `main.rs`).
+> - `app.updater()` now returns `Result<Updater>`; `check()` returns `Result<Option<Update>>`; `download_and_install` takes `(on_chunk, on_finish)` callbacks (no-op for now, M4 will wire real progress).
+> - `app.handle()` returns `&AppHandle` in v2 — added `.clone()` to fix the borrow-escape on the setup closure spawn.
+>
+> `cargo build --release` now exits 0 on the worktree with zero warnings. Tests + clippy deferred to M3 (command-surface review, which is where the v2 `Window` → `WebviewWindow` + State audit lives). Main branch untouched; migration invariant #1 held. Next iter (66) executes M2: JS API import paths (`@tauri-apps/api/tauri` → `@tauri-apps/api/core`, `api/dialog` → `plugin-dialog`, etc.).
 
 > **Iter 60 RESEARCH + REVALIDATION + RETROSPECTIVE.**
 >
