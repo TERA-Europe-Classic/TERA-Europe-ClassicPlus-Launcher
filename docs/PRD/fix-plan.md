@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 172
-last_work_iteration: 172
+iteration_counter: 173
+last_work_iteration: 173
 last_research_sweep: 170
 last_revalidation: 160
 last_revalidation_status: all-gates-green
@@ -16,15 +16,32 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 150
+total_items_done: 151
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: ba8e1e3
+tauri_v2_migration_last_commit: 06df3fe
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 173 WORK — pin.changelog-preamble+hr+titles+ordering DONE (worktree).**
+>
+> Worktree commit `06df3fe`. PRD §3.8.5 `changelog_guard.rs` previously had 7 tests (iter 109+141): conv-commit absence + structure + Unreleased + em-dash + newest-first header + descending order + detector self-test. Iter 173 widens to 5 document-level shape invariants those pins skip.
+>
+> Five new source-inspection pins on `docs/CHANGELOG.md`:
+> 1. `preamble_advertises_player_facing_purpose` — `Player-facing release notes` + `git log` reference in first 10 lines; intent drift at the header is what leads to conv-commit prefixes
+> 2. `release_sections_are_separated_by_hr_lines` — `---` HR count ≥ heading count; dropping separators makes releases run together visually
+> 3. `release_sections_have_nonempty_title_after_em_dash` — every `## X.Y.Z — TITLE` has non-empty TITLE; empty after the separator passes iter 141's em-dash check but reduces the header to noise
+> 4. `unreleased_section_precedes_numbered_releases` — `## Unreleased` appears BEFORE the first numbered heading; pairs with iter 141's presence pin to enforce newest-first ordering
+> 5. `numbered_release_sections_carry_no_placeholder_markers` — no `TBD`/`TODO`/`FIXME`/`XXX`/`[placeholder]` in shipped release sections (Unreleased is exempt)
+>
+> changelog_guard: 7 → 12 tests.
+>
+> Note: pre-existing flaky `state::download_state::tests::test_hash_cache_lock` fired once under parallelism, passed on retry. Unrelated to this change; tracked informally as a follow-up if it starts biting more often.
+>
+> Acceptance: 1113/1113 Rust (was 1108, +5), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 172 WORK — pin.tauri-v2-audit-milestones+ready-state DONE (worktree). 🎯 crossed total_items_done=150.**
 >
