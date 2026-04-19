@@ -198,7 +198,7 @@ pub fn spawn_app(exe_path: &Path, args: &[String]) -> Result<u32, String> {
     // elevation is needed; otherwise it launches silently like CreateProcess.
     #[cfg(windows)]
     {
-        return spawn_app_shellexec(exe_path, args);
+        spawn_app_shellexec(exe_path, args)
     }
 
     #[cfg(not(windows))]

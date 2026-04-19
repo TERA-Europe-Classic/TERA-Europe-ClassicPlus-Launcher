@@ -57,9 +57,7 @@ pub fn decrypt_mapper(encrypted: &[u8]) -> Vec<u8> {
         offset += KEY1.len();
     }
     // Tail that doesn't fit a full 16-byte block is copied verbatim.
-    for i in offset..size {
-        out[i] = encrypted[i];
-    }
+    out[offset..size].copy_from_slice(&encrypted[offset..size]);
 
     // Pass B (self-inverse): swap pairs from the middle outward.
     // `a` starts at 1, `b` at size-1, both move in +2 / -2 steps, for
@@ -67,7 +65,7 @@ pub fn decrypt_mapper(encrypted: &[u8]) -> Vec<u8> {
     // (swap of a swap is identity).
     let mut a = 1usize;
     let mut b = size.saturating_sub(1);
-    let iters = (size / 2 + 1) / 2;
+    let iters = (size / 2).div_ceil(2);
     for _ in 0..iters {
         if a < size && b < size && a != b {
             out.swap(a, b);
@@ -98,7 +96,7 @@ pub fn encrypt_mapper(decrypted: &[u8]) -> Vec<u8> {
     // Pair swap (same primitive as decrypt — it's self-inverse).
     let mut a = 1usize;
     let mut b = size.saturating_sub(1);
-    let iters = (size / 2 + 1) / 2;
+    let iters = (size / 2).div_ceil(2);
     for _ in 0..iters {
         if a < size && b < size && a != b {
             out.swap(a, b);
@@ -276,7 +274,11 @@ pub struct ModPackage {
     pub object_path: String,
     pub offset: i64,
     pub size: i64,
+    // Parsed from the TMM footer for format parity; not consumed by
+    // the current deployer but preserved to keep round-trip fidelity.
+    #[allow(dead_code)]
     pub file_version: u16,
+    #[allow(dead_code)]
     pub licensee_version: u16,
 }
 
@@ -302,8 +304,10 @@ pub fn parse_mod_file(bytes: &[u8]) -> Result<ModFile, String> {
         return Err("Mod file is too small to contain metadata".into());
     }
 
-    let mut m = ModFile::default();
-    m.mod_file_version = 1;
+    let mut m = ModFile {
+        mod_file_version: 1,
+        ..Default::default()
+    };
 
     let magic_off = end - 4;
     let magic = read_u32_le(bytes, magic_off);
@@ -390,12 +394,14 @@ fn parse_composite_package(bytes: &[u8], off: usize) -> Result<ModPackage, Strin
     if off + 12 > bytes.len() {
         return Err("Composite package offset past EOF".into());
     }
-    let mut p = ModPackage::default();
     // TMM/Model/Mod.cpp:212 — p.Offset = tellg() at entry (the file offset of
     // the package itself, used later to rewrite the mapper entry).
-    p.offset = off as i64;
-    p.file_version = read_u16_le(bytes, off + 4);
-    p.licensee_version = read_u16_le(bytes, off + 6);
+    let mut p = ModPackage {
+        offset: off as i64,
+        file_version: read_u16_le(bytes, off + 4),
+        licensee_version: read_u16_le(bytes, off + 6),
+        ..Default::default()
+    };
     let folder = read_prefixed_string(bytes, off + 12)?;
     if let Some(stripped) = folder.strip_prefix(MOD_PREFIX) {
         p.object_path = stripped.to_string();
@@ -620,6 +626,9 @@ pub fn uninstall_gpk(game_root: &Path, container: &str, object_paths: &[String])
     Ok(())
 }
 
+#[allow(dead_code)]
+fn _unused_cursor_suppress(_: Cursor<Vec<u8>>, _: Box<dyn Read>) {}
+
 // --- Tests ------------------------------------------------------------------
 
 #[cfg(test)]
@@ -685,6 +694,3 @@ mod tests {
         assert_eq!(m.packages.len(), 1);
     }
 }
-
-#[allow(dead_code)]
-fn _unused_cursor_suppress(_: Cursor<Vec<u8>>, _: Box<dyn Read>) {}
