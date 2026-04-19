@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 50
-last_work_iteration: 49
+iteration_counter: 51
+last_work_iteration: 51
 last_research_sweep: 40
 last_revalidation: 40
 last_revalidation_status: clean
@@ -16,7 +16,7 @@ last_retrospective: 30
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 18
-total_items_done: 43
+total_items_done: 44
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
@@ -165,7 +165,7 @@ total_iterations_to_cap: 1000
 - [P1] **3.6.1.modal-open-150ms** — Test `mod-modal-perf.spec.js::cold_open_under_150ms`. Acceptance: p95 ≤ 150 ms across 20 runs. Pillar: Performance.
 - [P1] **3.6.2.download-throughput** — Test `download_throughput.rs::matches_curl_baseline`. Acceptance: ≥ 90 % of raw curl baseline. Pillar: Performance.
 - [P1] **3.6.3.progress-10hz** — Test `progress_rate.rs::at_least_10hz`. Acceptance: ≥ 10 events/s on 10 Mbit/s simulated link. Pillar: Performance.
-- [P1] **3.6.4.search-one-frame** — Test `search-perf.test.js::under_one_frame`. Acceptance: ≤ 16 ms on 300 entries. Pillar: Performance.
+- [DONE] 3.6.4.search-one-frame — proof: new test at `teralaunch/tests/search-perf.test.js` imports `ModsView.filterMatches` (via pre-import stub of `window.__TAURI__`) and benchmarks it on 300 synthetic catalog entries. `under_one_frame` does a warm-up run, then takes the median of 7 timed samples of `filterMatches.call(ctx, entry)` over the full 300 — current median locally: < 1 ms on 300 entries, well under the 16 ms frame budget. Two supporting tests: `filters actually apply` (kind=gpk ctx → every result is gpk; prevents a broken filter from passing perf trivially by always returning true) and `query narrows matches` (query=`term_42` hits entry #42 via substring match on the description field; pins the search semantics). `npm test` → 10 files / 431 tests passed (428 pre-existing + 3 new). Verified @ iter 51.
 - [P1] **3.6.5.scroll-60fps** — Test `mod-scroll-perf.spec.js` via Playwright tracing. Acceptance: 0 long tasks > 50 ms. Pillar: Performance.
 - [P1] **3.6.6.bundle-size-gate** — Author `.github/workflows/deploy.yml` size-diff gate. Acceptance: CI fails if growth > 5 % vs previous tag. Pillar: Performance.
 
