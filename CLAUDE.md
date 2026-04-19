@@ -117,5 +117,69 @@ Without the flag, the launcher handles missing hash files gracefully at runtime 
 ## Testing
 
 - Frontend: 417 tests (Vitest + jsdom) in `teralaunch/tests/`
-- Rust: 693 tests in `teralaunch/src-tauri/`
+- Rust: 736 unit + 4 integration suites (smoke, http_allowlist, self_integrity, multi_client, zeroize_audit, crash_recovery) in `teralaunch/src-tauri/`
+- Playwright e2e: 76 tests in 16 files under `teralaunch/tests/e2e/`
 - Test credentials for v100 API: `imweak` / `!imweak5483`
+
+## Mod Manager
+
+The launcher ships an in-app mod manager spanning external-app mods (Shinra,
+TCC) and GPK-style content mods (TMM-compatible). Feature state, code
+layout, and operational constraints live in one place here so Claude
+doesn't have to re-derive them each session.
+
+### Feature state (iter 35)
+
+| Area | State |
+|---|---|
+| External-app install/uninstall | Shipped — downloads zip, SHA-verifies, extracts into `mods/external/<id>/`, spawns on demand. |
+| External-app lifecycle | Shipped — attach-once spawn decision, overlay-lifecycle predicate on TERA.exe count (wiring to the game-count watch channel is P1 `fix.overlay-lifecycle-wiring`). |
+| GPK install | Shipped — downloads to `mods/gpk/<id>.gpk`, SHA-verifies, deploys via `tmm::install_gpk` (parses mod footer, patches `CompositePackageMapper.dat`, backs up vanilla as `.clean`). Container-filename sandbox prevents path traversal. |
+| GPK conflict detection | Predicate shipped (`tmm::detect_conflicts`); modal UI + Tauri command wiring is P1 `fix.conflict-modal-wiring`. |
+| Add-mod-from-file | Shipped — picks local `.gpk`, parses + SHA + safe-container check + deploy + registry upsert. |
+| Catalog | Shipped — fetches from `raw.githubusercontent.com/TERA-Europe-Classic/external-mod-catalog`, caches for 24h at `<app_data>/mods/catalog-cache.json`. |
+| Registry recovery | Shipped — `Registry::load()` auto-flips stranded `Installing` rows to `Error` on every startup. |
+| Self-integrity | Shipped — launcher sha-verifies its own exe against sidecar baseline before Tauri boot; MessageBox + exit on mismatch. |
+| Anti-reverse (Tauri v2 deps) | Blocked on sec.tauri-v1-eol-plan audit sign-off. |
+
+### Code layout
+
+```
+teralaunch/src-tauri/src/
+├── commands/mods.rs            Tauri command boundary (install/uninstall/enable/disable/launch/stop/add_mod_from_file/open_mods_folder)
+└── services/mods/
+    ├── catalog.rs              Remote catalog fetch + 24h disk cache
+    ├── external_app.rs         Download + zip extraction + spawn + attach-once predicate + overlay lifecycle predicate + safe-container predicate
+    ├── registry.rs             On-disk registry.json; recover_stuck_installs() runs on load
+    ├── tmm.rs                  TMM format parser, mapper encrypt/decrypt, install_gpk, apply_mod_patches, detect_conflicts, is_safe_gpk_container_filename
+    ├── types.rs                ModEntry, ModKind, ModStatus, CatalogEntry, ModEntry::from_catalog, ModEntry::from_local_gpk
+    └── self_integrity.rs       verify_file/verify_self + REINSTALL_PROMPT (referenced by main.rs)
+
+teralaunch/src/                 Frontend — mods.js renders Installed + Browse tabs; import-btn wires to add_mod_from_file
+teralaunch/tests/e2e/           Playwright specs (helpers.js shared; per-describe *.spec.js)
+teralaunch/src-tauri/tests/     Rust integration tests (http_allowlist, multi_client, crash_recovery, zeroize_audit, self_integrity, smoke)
+
+docs/mod-manager/TROUBLESHOOT.md  10 user-facing error categories; covered 1:1 by scripts/check-troubleshoot-coverage.mjs
+docs/PRD/                        PRD + fix-plan + audit docs driving the perfection loop
+```
+
+### Build
+
+Same pipeline as the Classic launcher — `npm run tauri dev` for dev, `npm run tauri build` for NSIS installer. The Rust `[profile.release]` has LTO + strip + codegen-units=1 + panic=abort. Installer + updater zip land under `src-tauri/target/release/bundle/nsis/`.
+
+### Deploy
+
+`.github/workflows/deploy.yml` (`workflow_dispatch`):
+1. Bump version (`patch` / `minor` / `major`) in `tauri.conf.json` + `Cargo.toml` + `package.json`.
+2. Generate changelog from git log since last tag.
+3. Build with `builder.ps1`.
+4. Generate `latest.json` with minisign signature + downloads URL.
+5. Run the **scope gate** (`teralaunch/tests/deploy_scope.spec.js`) — any upload URL outside `/classicplus/` or `/classic/classicplus/` fails the job.
+6. Upload artefacts over FTPS to `ftp://${SFTP_HOST}/classicplus/`.
+7. Commit version bump, tag `v<version>`, push tag, create GitHub release.
+
+The secret-scan workflow (`.github/workflows/secret-scan.yml`) runs gitleaks 8.30.0 against new commits only — historical baseline was triaged in iter 13 (see `docs/PRD/audits/security/secret-leak-scan.md`).
+
+### Running the perfection loop
+
+The mod-manager perfection loop is tracked in `docs/PRD/fix-plan.md`. Machine-parseable YAML header drives iteration type (WORK / REVALIDATION / RESEARCH / RETROSPECTIVE / BLOCKED-RETRY) by counter. `lessons-learned.md` captures patterns worth remembering across sessions. To resume: read the fix-plan header, compute `N = iteration_counter + 1`, pick the iteration type, and do one item.
