@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 157
-last_work_iteration: 157
+iteration_counter: 158
+last_work_iteration: 158
 last_research_sweep: 150
 last_revalidation: 140
 last_revalidation_status: all-gates-green
@@ -16,15 +16,31 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 135
+total_items_done: 136
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 051ed3a
+tauri_v2_migration_last_commit: fc5f78f
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 158 WORK — pin.multi-client-predicate-shape+enums DONE (worktree).**
+>
+> Worktree commit `fc5f78f`. PRD §3.2.11 / §3.2.12 `multi_client.rs` previously had 5 tests: behavioural decision tables + one wiring pin on `commands/game.rs`. The SHAPE of the production predicates and their return-type enums was unprotected — a widened signature (adding a `force: bool` param), a new enum variant, or a one-sided case-insensitive compare would pass every behavioural test while silently opening double-spawn paths.
+>
+> Six new source-inspection pins on `src/services/mods/external_app.rs`:
+> 1. `decide_spawn_signature_is_bool_to_spawndecision` — pins `(already_running: bool) -> SpawnDecision`; `(bool, bool)` widening opens gate-bypass
+> 2. `spawn_decision_enum_has_exactly_attach_and_spawn` — no third variant (e.g. `Force`, `Queued`); a forgotten fallback arm double-spawns Shinra/TCC
+> 3. `decide_overlay_action_signature_is_usize_to_lifecycleaction` — pins `(usize) -> OverlayLifecycleAction`; `usize` is load-bearing (blocks negative counts), `Option<usize>` pushes None handling out
+> 4. `overlay_lifecycle_enum_has_exactly_keeprunning_and_terminate` — no `Deferred` etc.; extras introduce ambiguity about when overlays stop
+> 5. `check_spawn_decision_routes_through_pure_predicate` — `decide_spawn(is_process_running(...))` chain required; inlining splits the attach-once rule into two paths that can silently drift
+> 6. `is_process_running_is_case_insensitive` — both sides of the process-name compare must be `to_ascii_lowercase()`-normalised (≥2 calls); a one-sided compare misses `SHINRA.exe` vs `Shinra.exe` on Windows and allows double-spawn
+>
+> multi_client: 5 → 11 tests.
+>
+> Acceptance: 1048/1048 Rust (was 1042, +6), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 157 WORK — pin.http-redirect-modswide+status-gate DONE (worktree).**
 >
