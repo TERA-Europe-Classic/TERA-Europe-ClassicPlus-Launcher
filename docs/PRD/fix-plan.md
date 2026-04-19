@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 223
-last_work_iteration: 223
+iteration_counter: 224
+last_work_iteration: 224
 last_research_sweep: 220
 last_revalidation: 220
 last_revalidation_status: all-gates-green
@@ -16,15 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 196
+total_items_done: 197
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: b7eb362
+tauri_v2_migration_last_commit: d7932e3
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 224 WORK — pin.i18n-no-hardcoded-guard-header+3-path-constants+iter-77-rationale+3-attribute-sibling-check+{2,}-quantifier DONE (worktree).**
+>
+> Worktree commit `d7932e3`. §3.7.4 i18n no-hardcoded-english; i18n_no_hardcoded_guard had 13 tests (iter 124 creation + iter 185 +5); 39 iters untouched. Brings to 18.
+>
+> Five new source-inspection pins (meta-guard + path constants + rationale comment + sibling coverage + regex-quantifier):
+> 1. `guard_file_header_cites_prd_3_7_4` — header cites `PRD 3.7.4` + `hardcoded`; meta-guard contract
+> 2. `scanner_and_target_path_constants_are_canonical` — SCANNER + TARGET_MODS_JS + TARGET_MODS_HTML pinned verbatim
+> 3. `scanner_allowlist_empty_carries_iter_77_rationale_comment` — `iter 77` + `fix.mods-hardcoded-i18n-strings` comment adjacent to `ALLOWLIST = []`; preserves institutional memory
+> 4. `scanner_sibling_check_covers_all_three_attributes` — `data-translate-aria-label` + `-title` + `-placeholder` all referenced; iter-185 pinned only aria-label
+> 5. `scanner_attribute_regex_minimum_char_length_is_two` — all 3 attribute regexes use `{2,}` quantifier; `+` would flag single-char icon labels, `*` would flag empty values
+>
+> i18n_no_hardcoded_guard: 13 → 18 tests. 1343 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 223 WORK — pin.secret-scan-guard-header+3-path-constants+audit-doc-existence+checkout-pinned-version+gitleaks-version-floor DONE (worktree).**
 >
