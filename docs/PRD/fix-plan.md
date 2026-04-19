@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 154
-last_work_iteration: 154
+iteration_counter: 155
+last_work_iteration: 155
 last_research_sweep: 150
 last_revalidation: 140
 last_revalidation_status: all-gates-green
@@ -16,15 +16,31 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 132
+total_items_done: 133
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: ecfe26e
+tauri_v2_migration_last_commit: d866688
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 155 WORK — pin.zeroize-production-derives DONE (worktree).**
+>
+> Worktree commit `d866688`. PRD §3.1.7 `zeroize_audit.rs` previously had 4 tests that all exercised the `zeroize` crate behaviour in isolation (String::zeroize, Zeroizing<String> deref, compose-with-skip, primitive i32). The PRODUCTION types that actually hold credentials — `GlobalAuthInfo::auth_key` and `LaunchParams::ticket` — were unprotected structurally: a refactor that drops the derive or adds `#[zeroize(skip)]` to a sensitive field would pass every crate-behaviour test but silently leak secrets to heap dumps on Drop.
+>
+> Six new source-inspection assertions across `src/domain/models.rs` + `src/services/game_service.rs` + `Cargo.toml`:
+> 1. `global_auth_info_derives_zeroize_and_zod` — both `Zeroize` AND `ZeroizeOnDrop` on the struct (one without the other breaks callable-wipe OR Drop-wipe)
+> 2. `global_auth_info_auth_key_is_not_skipped` — `pub auth_key: String,` must NOT be preceded by `#[zeroize(skip)]`. The whole struct exists to wipe this field.
+> 3. `launch_params_derives_zeroize_and_zod` — same invariant on the game-launch credential holder
+> 4. `launch_params_ticket_is_not_skipped` — `pub ticket: String,` must NOT be skipped; it's the short-lived credential passed to TERA.exe
+> 5. `cargo_toml_enables_zeroize_derive_feature` — `zeroize_derive` feature required; without it, the derive macros fail to compile. Pin ties the feature to the intent so a refactor that drops both the feature and the derives together can't ship.
+> 6. `field_is_skipped_detector_self_test` — locks the detector's own shape (recognises `#[zeroize(skip)]` on the preceding non-blank line) so a future refactor can't silently make every field look "not skipped"
+>
+> zeroize_audit: 4 → 10 tests.
+>
+> Acceptance: 1031/1031 Rust (was 1025, +6), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 154 WORK — pin.updater-gate-predicate+callsite DONE (worktree).**
 >
