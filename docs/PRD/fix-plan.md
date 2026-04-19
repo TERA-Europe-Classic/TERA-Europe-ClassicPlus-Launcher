@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 137
-last_work_iteration: 137
+iteration_counter: 138
+last_work_iteration: 138
 last_research_sweep: 130
 last_revalidation: 120
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 117
+total_items_done: 118
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: c76fa92
+tauri_v2_migration_last_commit: 6d13ce8
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 138 WORK — pin.architecture-doc-extension DONE (worktree).**
+>
+> Worktree commit `6d13ce8`. Parallel to iter 137 (CLAUDE.md section extension): `architecture_doc_guard.rs` previously checked subsystem-file mentions and heading count, but didn't pin heading names or key section contents.
+>
+> Three new assertions:
+> 1. `every_expected_section_heading_exists` — all 11 `## ` section headings verbatim (§1 Types → §10 Known gaps including §3a Mods state). Renames catch; reader bookmarks preserved.
+> 2. `cross_subsystem_guarantees_section_names_core_invariants` — §9 integration rubric retains 6 core guarantees (Fail-closed, Deploy sandbox, Crash recovery, Self-integrity, Deploy scope, Secret scan).
+> 3. `known_gaps_section_points_to_fix_plan` — §10 retains the pointer to `fix-plan.md` (prevents stale parallel backlog).
+>
+> Extended detector self-test with 3 new bad shapes (missing §9, partial guarantees, orphan known-gaps without pointer).
+>
+> architecture_doc_guard: 3 → 6 tests.
+>
+> Acceptance: 972/972 Rust (was 969, +3), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 137 WORK — pin.claude-md-sections-extension DONE (worktree).**
 >
