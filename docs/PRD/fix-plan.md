@@ -7,19 +7,27 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 59
+iteration_counter: 60
 last_work_iteration: 59
-last_research_sweep: 40
-last_revalidation: 40
-last_revalidation_status: clean
-last_retrospective: 30
+last_research_sweep: 60
+last_revalidation: 60
+last_revalidation_status: regression-found: 1
+last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 18
 total_items_done: 51
-total_items_regressed: 0
+total_items_regressed: 1
 total_iterations_to_cap: 1000
 ```
+
+> **Iter 60 RESEARCH + REVALIDATION + RETROSPECTIVE.**
+>
+> **REVALIDATION — 1 regression found.** `check-troubleshoot-coverage.mjs` now fails: iter 49's tolerant catalog parse (commit 85ac310) added two new error templates (`Failed to read catalog body: {}` and `Catalog JSON envelope is malformed: {}` in `services/mods/catalog.rs`) that were never mirrored in `docs/mod-manager/TROUBLESHOOT.md`. Silently broken for ~10 iterations because the coverage gate isn't run on every commit — only at revalidation. Demoted below to `[P0] REGRESSED`. Other proofs re-ran clean: launcher Rust 764 unit + 3+4+3+4+4+2+2+4 = 790 tests, clippy --release clean, launcher Vitest 10 files / 431 tests, catalog schema-parity gate (21↔21) + 9 self-tests, all other launcher CI gates (bundle-size 10/10, changelog 6/6, mods-crate-docs 5/5). TCC + Shinra tests not re-run this iter (no code changes there since iter 40; last verified @ iter 40).
+>
+> **RESEARCH SWEEP.** No network tools reliable this session; deferred RUSTSEC feed + upstream TCC/Shinra diff + catalog-expansion scouting. Local key-dep version check vs iter 40: tauri 1.0 unchanged (migration plan queued as P1 `tauri-v2-migration-plan`), tokio 1.49 unchanged (RUSTSEC-2025-0023 closed N/A iter 56), aes-gcm 0.10 unchanged (closed N/A iter 55; P2 `sec.remove-dead-aes-gcm-dep` tracks deletion), zip 2.3 unchanged (CVE-2025-29787 at 2.3+ remediated iter 11), reqwest 0.12.23, sha2 0.10.8, hkdf/hmac 0.12, base64 0.22, zeroize 1.7 — all unchanged, no new advisories surfaced via version-pin review. `cargo-audit` binary still uninstalled; P2 `infra.cargo-audit-install` stands. Next RESEARCH SWEEP at iter 70.
+>
+> **RETROSPECTIVE.** `docs/PRD/lessons-learned.md` grown to 212 lines (cap 200; 5 older entries archived to `lessons-learned.archive.md` — iters 3, 13-16, 20, 22, meta). 5 new lessons appended covering iters 45-60: source-inspection guards via include_str!, allowlist-backed CI gates over strict-zero, pause-revert-engage on user interrupts, catch-flawed-plans-at-execution (iter 59 Tauri M1 pivot), and revalidation-catches-what-commits-skip (this iter's TROUBLESHOOT regression is the poster child). No `[META]` PRD-change proposals this iter. Next RETROSPECTIVE at iter 90.
 
 > **Iter 57 no-op work iteration.** User context switched the loop into an interactive "unstick blockers" conversation. 3 side-commits landed: 0a0b5cf (CLAUDE.md portal IP sync + 3.1.13 reframe as DORMANT), 5e5b0fc (Playwright webServer timeout 120s → 600s). Blockers resolved this iter: Tauri v1→v2 migration APPROVED (to be staged as 7 milestones starting M1 frontend JS imports); 3.1.13.portal-https reframed as P0-DORMANT (no production target exists yet — user is building fully local); external-mod-catalog repo CLONED to `../external-mod-catalog` (unlocks 3.8.6 + catalog.* P2s); Playwright webServer cold-start budget raised (unlocks UX/A11y e2e); TCC Discord webhooks acknowledged as already-decided scope per PRD 3.3.7 (not a new decision).
 
@@ -96,6 +104,10 @@ total_iterations_to_cap: 1000
 ---
 
 ## P0 — Blockers / safety / correctness
+
+### REGRESSED (iter 60 revalidation)
+
+- [P0-REGRESSED] **3.8.3.troubleshoot-coverage** — Was [DONE] @ iter 35. Iter 60 revalidation found `scripts/check-troubleshoot-coverage.mjs` now exits 1. Suspect commit: 85ac310 (iter 49 `feat(mods): tolerant catalog parse`). That refactor introduced two new `.map_err(|e\| format!("..."))` templates in `services/mods/catalog.rs` — `Failed to read catalog body: {}` and `Catalog JSON envelope is malformed: {}` — that were never mirrored in `docs/mod-manager/TROUBLESHOOT.md`. Silently broken for ~10 iterations because the gate isn't run on every commit; only at revalidation sweeps. Fix: either (a) add matching entries to TROUBLESHOOT.md so users have resolution guidance for both error paths, or (b) loosen the scanner's signature extraction (e.g. consolidate a shared `Catalog…malformed` prefix) so both collapse to a single covered template. Prefer (a) — these are genuine user-facing failure modes worth documenting. Pillar: Documentation. Discovered iter 60.
 
 ### Infrastructure (must exist before most P0 tests can be written)
 

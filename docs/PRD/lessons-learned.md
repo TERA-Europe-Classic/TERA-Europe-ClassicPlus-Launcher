@@ -12,6 +12,92 @@ Ordering: newest at top.
 
 ---
 
+### 2026-04-19 / iter 60 — revalidation catches what commits skip
+
+**Pattern.** `check-troubleshoot-coverage.mjs` silently regressed at
+iter 49 (tolerant catalog parse added two new `Failed to read catalog
+body:` / `Catalog JSON envelope is malformed:` strings that weren't
+mirrored in `TROUBLESHOOT.md`). The CI gate isn't run on every commit
+— only in revalidation sweeps. Would've drifted further without the
+every-20 revalidation protocol.
+
+**When to apply.** Trust the revalidation cadence — don't over-run
+every gate on every commit (too expensive, hurts the cache). But when
+a commit adds new user-facing error strings, grep-think before
+pushing: is there a coverage gate that I should manually fire? In
+doubt, run `check-troubleshoot-coverage.mjs` + the other grep-based
+scanners in the pre-commit loop.
+
+### 2026-04-19 / iter 59 — catch flawed plans at the moment of execution
+
+**Pattern.** The wake prompt I wrote for iter 59 said "begin Tauri v2
+migration M1: port frontend JS imports only." At the moment of
+starting the work I realised this would transit main through a broken
+runtime state — v2 JS speaks a different invoke protocol from v1
+Rust. Pivoted to a safer P1 (progress-10hz test) + opened a proper
+`tauri-v2-migration-plan` follow-up requiring `sdd:brainstorm` +
+`sdd:plan` on a dedicated worktree.
+
+**When to apply.** Before committing to the first file of a
+multi-commit plan, do a 30-second preflight: does each intermediate
+state leave the system shippable? If any milestone's commit would
+break main, the plan needs reordering or a branch-based execution.
+Listen to the "this is going to break" pre-flight voice — it's
+almost always right.
+
+### 2026-04-19 / iter 57 — pause loop, revert uncommitted edits, then engage
+
+**Pattern.** User interrupted the loop mid-edit to ask a conversation
+question ("talk to me about the blockers"). I had uncommitted work in
+`external_app.rs` for the progress-rate test. Reverted it cleanly via
+`git checkout --` before engaging the conversation. Two iterations
+later (iter 59), I redid the same work fresh — no merge complexity,
+no half-done state hanging in context.
+
+**When to apply.** When the user context-switches the loop into an
+interactive question, check `git status` first. If there's
+uncommitted work: revert it (unless it's substantial — then commit a
+WIP tag first). Engaging on a fresh tree keeps the conversation
+clean and the next loop restart tractable. Mid-edit context is just
+noise.
+
+### 2026-04-19 / iter 48 — allowlist-backed CI gates over strict gates
+
+**Pattern.** `i18n-no-hardcoded.test.js` had 10 pre-existing
+hardcoded-English leaks in mods.js + mods.html. Strict-zero would've
+meant a 10-file i18n refactor + new translation keys in 4 locales —
+weeks of work holding up the iteration. Instead: ship the scanner
+with a documented ALLOWLIST of current-state leaks, plus a test that
+fails if anyone tries to add a NEW leak (regression protection) and
+another that fails if an allowlist entry no longer appears in source
+(forces deletion of stale rows). P1 follow-up tracks burn-down.
+
+**When to apply.** When a new invariant has a non-trivial existing
+backlog, prefer "lock the diff + document the debt" over
+"lock-to-zero + block ship." The allowlist becomes the punch list.
+Strict-zero is correct for NEW code but prevents shipping CI gates
+in active repos with legacy state.
+
+### 2026-04-19 / iter 45 — source-inspection guards for behaviours the type system can't pin
+
+**Pattern.** `toggle_command_bodies_do_not_spawn_or_kill` uses
+`include_str!("mods.rs")` to grep the `pub async fn enable_mod` /
+`disable_mod` bodies for `spawn_app` / `stop_process_by_name`. Fails
+if anyone wires a process op into either toggle command. This is a
+source-level invariant — pure-function extraction handles the
+common case (helper signature structurally forbids spawn), but the
+Tauri-command body wrappers could still drift. Source grep catches
+that class of regression without needing runtime.
+
+**When to apply.** When an invariant reads as "this function must
+not CALL these other functions," and the surface is a
+`#[cfg(not(tarpaulin_include))]` Tauri command body that can't be
+unit-tested, author a sibling test that `include_str!`s the file +
+greps the function body. Cheap, catches drift, doubles as
+documentation.
+
+---
+
 ### 2026-04-19 / iter 30 — bin crate integration-test boundary
 
 **Pattern.** `teralaunch/src-tauri` has no `[lib]` target, so integration
@@ -112,70 +198,9 @@ read the vector list and see what threats we considered. More vectors than
 the PRD asks for is cheap defence in depth (iter 24: 15 vectors vs PRD's
 required 5).
 
-### 2026-04-19 / iter 22 — CI scanner with self-tests
-
-**Pattern.** `tests/deploy_scope.spec.js` and `tests/http_allowlist.rs`
-both ship self-tests that exercise both sides (positive samples must pass,
-negative samples must fail). A silently-broken scanner that accepts
-everything is worse than no scanner — it rubber-stamps a bad diff and
-gives false confidence. Self-tests catch drift in the scanner itself.
-
-**When to apply.** Any grep-based or regex-based CI gate: embed positive
-AND negative test patterns that run on every invocation. If the scanner
-stops finding the negative patterns, CI should turn red before the user's
-actual code is even scanned.
-
-### 2026-04-19 / iter 20 — transient flakes, not regressions
-
-**Pattern.** One launcher test reported FAILED (697/698) on the iter-20
-revalidation, immediately followed by 5 clean runs on a re-run. First
-instinct was "iter-19 SHA test flaked on loopback port". Evidence: 5/5
-clean re-runs of the iter-19 tests in isolation. Conclusion: pre-existing
-unrelated flake, not a regression caused by iter 19's work.
-
-**When to apply.** A single-run failure is not evidence of regression if
-the same test passes deterministically on N>3 reruns. Log + continue.
-But always flag-hunt first: a silent habit of "eh, flake, re-run" is
-how real regressions sneak in.
-
-### 2026-04-19 / iter 13-16 — secret-scan "CI for future, not history"
-
-**Pattern.** gitleaks across 5 repos surfaced 33 findings (1 real, 4
-DPAPI, 28 false positives). Rewriting git history of 5 repos to remove
-triaged-safe historical hits has zero security upside and breaks every
-downstream clone. Instead: CI workflow that only scans *new* commits
-(`pull_request.base..head` or `github.event.before..sha`). Fails on
-any new secret but doesn't re-trip on the historical baseline every
-run.
-
-**When to apply.** For any repo-spanning scanner (secrets, licenses,
-policy checks) with non-zero historical findings: default to
-commit-range scoping, not full-history. Document the triage of the
-historical baseline in an audit file so future maintainers can see
-what was allowlisted and why.
-
-### 2026-04-19 / iter 3 — cargo#6313 workaround: drop unused crate-type
-
-**Pattern.** `teralib` was declared as `crate-type = ["cdylib", "rlib"]`
-but nothing actually dynamically linked against it. Under
-`cargo test --release`, this forces a double-build with conflicting LTO
-on path-deps (cargo#6313, still open). Fix: drop `cdylib`.
-
-**When to apply.** Any Rust workspace member whose `Cargo.toml` declares
-`crate-type = ["cdylib", "rlib"]`: audit who actually consumes the
-cdylib. If nobody, drop it. Saves compile time and sidesteps the
-open cargo bug.
-
-### 2026-04-19 / meta — loop cadence lessons
-
-**Pattern.** Stale `/loop` prompts keep firing with old iter numbers
-(iter 12/13/14 prompts long after counter=30). Always re-orient from
-the machine-readable header in `fix-plan.md` — trust the file, not the
-prompt. The prompt is advisory.
-
-**When to apply.** Every `/loop` wake, first Read the fix-plan header.
-If prompt's iteration number ≠ header counter + 1, the prompt is stale;
-compute `N = counter + 1` fresh and proceed from there.
+*(Entries from iters 3, 13–16, 20, 22, and the meta loop-cadence note
+archived to `lessons-learned.archive.md` at the iter 60 retrospective
+to stay under the 200-line cap. All still valid as reference.)*
 
 ---
 
