@@ -388,25 +388,63 @@ mod tests {
         assert_eq!(body, "world");
     }
 
-    #[test]
-    fn extract_zip_rejects_zip_slip() {
-        let tmp = TempDir::new().unwrap();
-        let dest = tmp.path().join("out");
-        fs::create_dir_all(&dest).unwrap();
-
+    /// Builds a minimal zip whose single entry has the requested path,
+    /// bypassing normalisation the writer might do on well-formed strings.
+    fn build_malicious_zip(entry_name: &str) -> Vec<u8> {
         let mut buf = Vec::new();
         {
             let cursor = Cursor::new(&mut buf);
             let mut w = zip::ZipWriter::new(cursor);
             let opts: zip::write::SimpleFileOptions = Default::default();
-            w.start_file("../evil.txt", opts).unwrap();
+            w.start_file(entry_name, opts).unwrap();
             use std::io::Write;
             w.write_all(b"pwn").unwrap();
             w.finish().unwrap();
         }
+        buf
+    }
 
-        let err = extract_zip(&buf, &dest).unwrap_err();
-        assert!(err.contains("zip-slip"));
+    #[test]
+    fn extract_zip_rejects_zip_slip() {
+        // PRD 3.1.3: at least three attack vectors must be rejected.
+        // Parent-traversal, POSIX-absolute, and Windows drive-letter each
+        // trip zip::read::ZipFile::enclosed_name(), so each returns Err
+        // before any byte is written.
+        let vectors = [
+            "../evil.txt",           // parent traversal
+            "/etc/passwd",           // POSIX absolute
+            "C:/Windows/evil.txt",   // Windows drive-letter absolute (forward slash)
+            "C:\\Windows\\evil.txt", // Windows drive-letter absolute (backslash)
+        ];
+
+        for name in vectors {
+            let tmp = TempDir::new().unwrap();
+            let dest = tmp.path().join("out");
+            fs::create_dir_all(&dest).unwrap();
+
+            let buf = build_malicious_zip(name);
+            extract_zip(&buf, &dest)
+                .expect_err(&format!("vector '{name}' should have been rejected"));
+
+            // Defence in depth: dest root should be untouched (only the empty
+            // "out" dir we created pre-call).
+            let entries: Vec<_> = fs::read_dir(&dest).unwrap().collect();
+            assert!(
+                entries.is_empty(),
+                "vector '{name}' left side effects in dest: {entries:?}"
+            );
+
+            // Also assert nothing escaped into the parent.
+            let escape_siblings: Vec<_> = fs::read_dir(tmp.path())
+                .unwrap()
+                .flatten()
+                .filter(|e| e.file_name() != "out")
+                .collect();
+            assert!(
+                escape_siblings.is_empty(),
+                "vector '{name}' escaped into parent: {escape_siblings:?}"
+            );
+        }
     }
 
     // Note: download_and_extract is network-bound and not unit-tested here.
