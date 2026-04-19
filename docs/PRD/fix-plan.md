@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 165
-last_work_iteration: 165
+iteration_counter: 166
+last_work_iteration: 166
 last_research_sweep: 150
 last_revalidation: 160
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 143
+total_items_done: 144
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 93d17a9
+tauri_v2_migration_last_commit: 8a49601
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 166 WORK — pin.smoke-test-harness-contract DONE (worktree).**
+>
+> Worktree commit `8a49601`. `smoke.rs` was a thin 2-test compile-runs marker. The HARNESS itself — the integration-test directory's file-count floor, the single permitted `common/` submodule, the fixture exports, the Cargo.toml bin-crate shape, and the tempfile dev-dep — was unprotected. A refactor that deletes integration tests wholesale, adds a stray test submodule, flips the crate from bin to lib, or drops the tempfile dep would pass every individual integration test while silently eroding the harness.
+>
+> Five new pins on `teralaunch/src-tauri/`:
+> 1. `integration_tests_dir_meets_minimum_file_count` — floor at ≥ 30 top-level `.rs` files (we have 36); catches a wholesale deletion from a bad rebase
+> 2. `tests_dir_has_only_the_common_submodule` — only `common/` subdir permitted; extras suggest an attempt to share state that doesn't compile across every integration-test binary
+> 3. `common_module_exports_expected_fixtures` — pins `pub fn two_plus_two() -> i32` + `pub fn scratch_dir() -> TempDir` in `tests/common/mod.rs`
+> 4. `cargo_toml_declares_expected_bin_crate` — crate name preserved, no top-level `[lib]` stanza; a switch to lib changes integration-test discovery and silently stops every `#[test]` under `tests/`
+> 5. `tempfile_is_declared_in_dev_dependencies` — `tempfile` required in `[dev-dependencies]`; scratch_dir wraps it and several tests instantiate `TempDir` directly
+>
+> smoke: 2 → 7 tests.
+>
+> Acceptance: 1083/1083 Rust (was 1078, +5), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 165 WORK — pin.disk-full-revert-shape+ordering DONE (worktree).**
 >
