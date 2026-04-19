@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 138
-last_work_iteration: 138
+iteration_counter: 139
+last_work_iteration: 139
 last_research_sweep: 130
 last_revalidation: 120
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 118
+total_items_done: 119
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 6d13ce8
+tauri_v2_migration_last_commit: a418edb
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 139 WORK — pin.lessons-learned-entry-format DONE (worktree).**
+>
+> Worktree commit `a418edb`. Third in the iters 137/138/139 docs-guard-extension batch. lessons-learned.md has a documented entry shape (H3 with `YYYY-MM-DD / iter N — title` then `**Pattern.**` + `**When to apply.**` paragraphs), but `lessons_learned_guard.rs` only checked the 200-line cap + archive presence.
+>
+> Three new assertions:
+> 1. `every_h3_entry_follows_date_iter_format` — every H3 entry matches `### YYYY-MM-DD / iter N — title` (strict-shape check)
+> 2. `every_h3_entry_has_pattern_and_when_to_apply` — each entry block must contain both `**Pattern.**` and `**When to apply.**` paragraphs (pattern without when-to-apply is incomplete)
+> 3. `header_documents_newest_at_top_and_entry_format` — header retains the ordering/format contract so contributors don't chronologically-forward append and drift the file's shape
+>
+> Extended detector self-test with 3 new bad shapes (wrong H3, missing When-to-apply, silent header).
+>
+> lessons_learned_guard: 4 → 7 tests.
+>
+> Acceptance: 975/975 Rust (was 972, +3), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 138 WORK — pin.architecture-doc-extension DONE (worktree).**
 >
