@@ -7,11 +7,11 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 71
-last_work_iteration: 71
+iteration_counter: 72
+last_work_iteration: 72
 last_research_sweep: 70
-last_revalidation: 60
-last_revalidation_status: regression-resolved-next-iter
+last_revalidation: 72
+last_revalidation_status: all-gates-green
 last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
@@ -19,11 +19,25 @@ last_investigation_iteration: 18
 total_items_done: 54
 total_items_regressed: 0
 total_iterations_to_cap: 1000
-tauri_v2_migration_milestone: M7
+tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 9898af0
+tauri_v2_migration_last_commit: b53fbc7
+tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 72 WORK — Tauri v2 M8 validation sweep DONE (worktree). Ready for user-gated squash merge.**
+>
+> Executed M8 on the `tauri-v2-migration` worktree, commit `b53fbc7`. This is the final pre-merge gate — re-ran every CI check from the M0 baseline snapshot against the worktree tip and diffed against pre-migration iter 62 baseline. Doubles as iter-72 REVALIDATION (marked `last_revalidation: 72`, all-gates-green).
+>
+> **All seven CI gates green:** check-bundle-size (10/10 self-tests), check-changelog-plain-english (126 lines, 0 leaks), check-mods-crate-docs (6/6), check-troubleshoot-coverage (51/51 templates), secret-scan (CI-only, no regression risk), deploy-scope (CI-only, `/classicplus/` path preserved statically), catalog README schema (cross-repo, no changes since iter 58).
+> **Tests:** `cargo test --release` 790 → **813 (+23)** — 12 from M7's inline updater_gate unit tests, 4 from M5's csp_audit, 7 from M7's updater_downgrade integration suite. Zero regressions in the 10 pre-existing integration suites. `vitest` 431 → 431 no change. `clippy --all-targets --release -- -D warnings` clean.
+> **Commit sequence** (main..HEAD, 10 commits): cc33d92 (M0) → c85f7a8 (devtools pre-flight) → d708455 (M1a migrate tool raw) → f13e2bd (M1b v1→v2 API renames) → 65cd30c (M2 JS namespace) → 576f44e (M3 command-surface review) → 9983474 (M4 deploy path) → a5fd094 (M5 CSP) → 8d7c349 (M6 anti-reverse tier 1) → 9898af0 (M7 updater downgrade) → b53fbc7 (M8 validation doc).
+> **Migration invariants 1-5 all HELD.** Rollback plan documented: `git revert <squash-sha>` + v0.1.13 hotfix on v1 branch; same minisign key signs both sides so no rotation needed.
+>
+> Validation audit at `docs/PRD/audits/security/tauri-v2-migration-validation.md` on the worktree. Squash merge itself is user-gated per migration plan — do NOT auto-merge. Header flag `tauri_v2_migration_ready_for_squash_merge: true` flags the state.
+>
+> Next action: **user authorises squash merge + 0.2.0 version bump + deploy**. Between now and that authorisation, iter 73 can slot in M6-b (cryptify string-obfuscation of teralib::config::CONFIG) as filler work on the worktree — lands as-is into the squash when the user pulls the trigger.
 
 > **Iter 71 WORK — Tauri v2 M7 DONE (worktree). PRD 3.1.9 closed.**
 >
