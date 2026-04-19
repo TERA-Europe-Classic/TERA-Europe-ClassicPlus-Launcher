@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 222
-last_work_iteration: 222
+iteration_counter: 223
+last_work_iteration: 223
 last_research_sweep: 220
 last_revalidation: 220
 last_revalidation_status: all-gates-green
@@ -16,15 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 195
+total_items_done: 196
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 8e9ffe7
+tauri_v2_migration_last_commit: b7eb362
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 223 WORK — pin.secret-scan-guard-header+3-path-constants+audit-doc-existence+checkout-pinned-version+gitleaks-version-floor DONE (worktree).**
+>
+> Worktree commit `b7eb362`. §3.1.6 secret-scan infra (gitleaks); secret_scan_guard had 13 tests (iter 88 creation + iter 144 +4 + iter 171 +5); 52 iters untouched. Brings to 18.
+>
+> Five new source-inspection pins (meta-guard + path constants + audit-doc existence + supply-chain + version floor):
+> 1. `guard_file_header_cites_prd_3_1_6` — header cites `PRD 3.1.6` + `gitleaks`; meta-guard contract
+> 2. `workflow_config_audit_path_constants_are_canonical` — WORKFLOW + CONFIG + AUDIT_REF path constants verbatim
+> 3. `secret_leak_audit_doc_exists_and_is_non_empty` — `docs/PRD/audits/security/secret-leak-scan.md` exists with > 500 bytes + cites `iter 13`; iter-88 citation pin checks config mentions path but not that doc exists
+> 4. `secret_scan_workflow_pins_checkout_action_version` — `actions/checkout@v4` (or v3/v5); rejects `@main`/`@master`/`@latest` floating refs + unversioned bare form; supply-chain defence
+> 5. `secret_scan_workflow_version_meets_current_floor` — gitleaks VER ≥ 8.30; iter-144 shape pin accepts any 3-part semver, but pin-and-forget at 8.0 would miss recent rule improvements
+>
+> secret_scan_guard: 13 → 18 tests. 1338 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 222 WORK — pin.deploy-scope-guard-header+2-path-constants+workflow_dispatch-trigger+self-test-pos-neg+upload-URL-classicplus-scope DONE (worktree). Oldest 13-count reached (iter 168 → 222, 54 iters untouched).**
 >
