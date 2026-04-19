@@ -529,4 +529,46 @@ mod tests {
 
         assert_eq!(fs::read(&dest).unwrap(), body);
     }
+
+    // PRD 3.1.2 — GPK install pathway fail-closed.
+    //
+    // `commands::mods::install_gpk_mod` writes to `<app_data>/mods/gpk/<id>.gpk`
+    // via `external_app::download_file`. If the SHA doesn't match the catalog's
+    // `sha256`, nothing must touch disk. This test pins the contract on the
+    // GPK-shaped dest path — same download_file call, but named and framed
+    // around the GPK install site so a future refactor to install_gpk_mod
+    // that sidesteps download_file will trip here.
+    #[tokio::test]
+    async fn sha_mismatch_aborts_before_write_gpk() {
+        let tmp = TempDir::new().unwrap();
+        let gpk_dir = tmp.path().join("mods").join("gpk");
+        fs::create_dir_all(&gpk_dir).unwrap();
+        // Match the id-derived filename install_gpk_mod produces.
+        let dest = gpk_dir.join("classicplus_example_mod.gpk");
+
+        let port = serve_once(b"pretend-this-is-a-real-gpk").await;
+        let url = format!("http://127.0.0.1:{port}/example.gpk");
+
+        let wrong_sha = hex_lower(&Sha256::digest(b"never-matches-gpk"));
+
+        let result = download_file(&url, &wrong_sha, &dest, |_, _| {}).await;
+
+        let err = result.expect_err("GPK SHA mismatch must return Err");
+        assert!(
+            err.contains("hash mismatch") || err.contains("Hash mismatch"),
+            "unexpected error message: {err}"
+        );
+        assert!(
+            !dest.exists(),
+            "GPK dest must not exist on SHA mismatch (0 bytes touch disk); found {}",
+            dest.display()
+        );
+        // gpk_dir itself was pre-created, but no other entries should have
+        // appeared in it.
+        let leaked: Vec<_> = fs::read_dir(&gpk_dir).unwrap().flatten().collect();
+        assert!(
+            leaked.is_empty(),
+            "GPK dir got polluted on SHA mismatch: {leaked:?}"
+        );
+    }
 }

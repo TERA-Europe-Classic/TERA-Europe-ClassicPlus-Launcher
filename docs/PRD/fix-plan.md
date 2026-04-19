@@ -7,15 +7,15 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 22
-last_work_iteration: 22
+iteration_counter: 23
+last_work_iteration: 23
 last_research_sweep: 10
 last_revalidation: 20
 last_revalidation_status: clean
 last_retrospective: never
 last_blocked_retry: never
 last_investigation_iteration: 18
-total_items_done: 16
+total_items_done: 17
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
@@ -78,7 +78,6 @@ total_iterations_to_cap: 1000
 - [P0] **3.1.11.self-integrity** — Implement launcher self-integrity check at startup (hash exe, compare against embedded baseline). Author `teralaunch/src-tauri/tests/self_integrity.rs::detects_tampered_exe`. Acceptance: test fails cleanly when exe bytes mutated; launcher shows a clear reinstall prompt. Pillar: Security.
 - [P0] **3.1.12.csp-unsafe-inline** — Audit `tauri.conf.json` CSP; remove `unsafe-inline` for `script-src`. Migrate any inline scripts to external modules. Author `teralaunch/src-tauri/tests/csp_audit.rs::csp_denies_inline_scripts`. Acceptance: test asserts CSP contains no `'unsafe-inline'` in `script-src`. Pillar: Security.
 - [P0] **3.1.14.deploy-scope-gate** — Add CI gate in `.github/workflows/deploy.yml` that greps every upload URL and fails the job if any target path is outside `/classicplus/` on kasserver. Author `tests/deploy_scope.spec.js` as the gate script. Acceptance: job red when a test-upload URL points at `/` or `/classic/`. Pillar: Security.
-- [P0] **3.1.2.gpk-install-sha** — Author `teralaunch/src-tauri/tests/gpk_install_hash.rs::sha_mismatch_aborts_before_write_gpk`. Acceptance: test passes; 0 bytes touch dest on mismatch. Pillar: Security.
 - [P0] **3.1.4.gpk-deploy-sandbox** — Verify (and implement if missing) path-confinement in `tmm.rs` deploy. Author `teralaunch/src-tauri/tests/gpk_deploy_sandbox.rs::deploy_path_clamped_inside_game_root` with ≥ 5 `..`-based vectors. Acceptance: all vectors rejected, `.clean` untouched. Pillar: Security.
 
 ### Functionality correctness (PRD §3.3)
@@ -282,6 +281,7 @@ The `verified @ iter N` stamp is updated by each REVALIDATION iteration. Any `[D
 - [DONE] 3.1.1.external-sha-fail-closed — proof: `services::mods::external_app::tests::sha_mismatch_aborts_before_write` passes in release. Serves a deliberate-mismatch body via a one-shot loopback TCP listener; `download_file` returns `Err("Download hash mismatch: ...")` and `dest.exists() == false`. Sanity control `sha_match_writes_file` asserts the happy path still writes (so the negative test isn't passing by accident). Fail-closed semantics were already structural (SHA check runs in-memory before any `fs::write` / `fs::create_dir_all`); the tests pin the contract. Full release suite 698 unit + 2 integration green, clippy --release clean. Verified @ iter 19.
 - [DONE] 3.1.3.zip-slip-reject — proof: `services::mods::external_app::tests::extract_zip_rejects_zip_slip` passes in release. Table-driven over 4 vectors (parent-traversal `../evil.txt`, POSIX-absolute `/etc/passwd`, Windows drive-letter forward-slash `C:/Windows/evil.txt`, Windows drive-letter backslash `C:\Windows\evil.txt`) — 1 more than the PRD `≥3` bar for defence in depth. Each iteration (a) builds a zip whose single entry has the malicious name, (b) asserts `extract_zip` returns Err, (c) asserts the dest dir is empty afterwards, (d) asserts nothing escaped into the parent. 698 unit + 2 integration green, clippy --release clean. Verified @ iter 21.
 - [DONE] 3.1.5.http-allowlist — proof: `tests/http_allowlist.rs::every_mod_url_on_allowlist` passes in release. Integration test loads `tauri.conf.json`, extracts `tauri.allowlist.http.scope`, scans every `src/services/mods/*.rs` file for `https?://...` literals, filters test-only hosts (`example.com`, `127.0.0.1`, `localhost`), and asserts each remaining host matches at least one scope entry via `host_matches` (exact-or-leading-`*.`-suffix). Negative proof: removing the `raw.githubusercontent.com` scope entry reproduced the failure locally (`test result: FAILED`); restored after. Also added `https://raw.githubusercontent.com/*` to the allowlist — was missing from `tauri.conf.json` even though `catalog.rs::CATALOG_URL` targets it. Two helper unit tests (`host_matches_wildcard_and_exact`, `host_of_strips_scheme_and_port`) pin the glob matcher. Verified @ iter 22.
+- [DONE] 3.1.2.gpk-install-sha — proof: `services::mods::external_app::tests::sha_mismatch_aborts_before_write_gpk` passes in release. Frames the existing fail-closed contract around the GPK install site: pre-creates a `mods/gpk/` dir, writes to `<gpk_dir>/<id>.gpk` (matching install_gpk_mod's filename convention), passes a deliberate-mismatch SHA, asserts `download_file` returns Err + dest doesn't exist + gpk_dir contents remain empty. Deviation from PRD literal path: PRD specified `tests/gpk_install_hash.rs` but the launcher is a bin crate without a lib target so integration tests can't import `download_file`; the test lives alongside its sibling `sha_mismatch_aborts_before_write` (iter 19) inside the module's `#[cfg(test)]` block. Same contract, richer dest-path assertions. 699 unit + 3 (http_allowlist) + 2 (smoke) integration green, clippy --release clean. Verified @ iter 23.
 
 ## META (human review)
 
