@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 158
-last_work_iteration: 158
+iteration_counter: 159
+last_work_iteration: 159
 last_research_sweep: 150
 last_revalidation: 140
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 136
+total_items_done: 137
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: fc5f78f
+tauri_v2_migration_last_commit: dbb521d
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 159 WORK — pin.parallel-install-lock+try-claim DONE (worktree).**
+>
+> Worktree commit `dbb521d`. PRD §3.2.7 `parallel_install.rs` previously had 4 tests that mirrored the claim-table rule behaviourally but left the production wiring unprotected: a lock-type swap (RwLock → per-call Mutex), a write-vs-read flip on `mutate`, a missing write-through save, or a widened refusal in `try_claim_installing` would pass every behavioural test while silently breaking concurrent-install correctness.
+>
+> Five new source-inspection pins across `src/state/mods_state.rs` + `src/services/mods/registry.rs`:
+> 1. `mods_state_is_process_global_rwlock` — `static ref MODS_STATE: RwLock<...>` via `lazy_static!`; per-call locks break cross-command serialisation, `Mutex` serialises reads unnecessarily
+> 2. `mutate_takes_write_lock_not_read` — `.write()` required, `.read()` forbidden; a read-lock lets two concurrent claims both see "no Installing slot" and both upsert
+> 3. `mutate_saves_registry_write_through` — `state.registry.save(...)` must run BEFORE `Ok(result)`; without write-through, a crash mid-install leaves disk+memory diverged and iter-153 auto-recovery can't flip stranded rows
+> 4. `try_claim_installing_refuses_only_on_installing` — pins `matches!(slot.status, ModStatus::Installing)` exactly; widening to `| Error` breaks retry-after-error (`reclaim_over_disabled_or_enabled_ok`), narrowing re-opens the race
+> 5. `try_claim_installing_error_names_the_mod_id` — error must interpolate `row.id` AND carry `already in progress` phrase; the behavioural test `same_id_serialised` pins that string, both pins must stay in sync
+>
+> parallel_install: 4 → 9 tests. Closes the §3.2 concurrent-install surface for formal revalidation at N=160.
+>
+> Acceptance: 1053/1053 Rust (was 1048, +5), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 158 WORK — pin.multi-client-predicate-shape+enums DONE (worktree).**
 >
