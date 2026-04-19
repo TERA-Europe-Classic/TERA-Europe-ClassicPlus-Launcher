@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 227
-last_work_iteration: 227
+iteration_counter: 228
+last_work_iteration: 228
 last_research_sweep: 220
 last_revalidation: 220
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 200
+total_items_done: 201
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: e283773
+tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 228 WORK — pin.csp-audit-GUARD_SOURCE-const+connect-src-self-baseline+6-directive-set+app.security.csp-json-path+iter-152-197-header-cites DONE (worktree).**
+>
+> Worktree commit `8ee9774`. PRD 3.1.12 CSP hardening; csp_audit had 13 tests (iter 77 creation + iter 152 +4 + iter 197 +5); 31 iters untouched. Brings to 18.
+>
+> Five new source-inspection pins (path constant + connect-src baseline + directive-set cardinality + JSON-path shape + extension-iter traceability):
+> 1. `guard_path_constant_is_canonical` — `const GUARD_SOURCE: &str = "tests/csp_audit.rs";` verbatim
+> 2. `csp_connect_src_carries_self_baseline` — iter-152 pinned IPC/LAN; this adds the `'self'` baseline
+> 3. `csp_defines_exactly_six_canonical_directives` — set equality (default/script/style/font/img/connect); stealth additions trip CI
+> 4. `csp_field_lives_at_app_security_csp_json_path` — pin `app.security.csp` JSON path; a v3 schema migration surfaces as guard update not mystery panic
+> 5. `guard_header_cites_both_extension_iters_152_and_197` — traceability of per-iter extension history
+>
+> Side note: the audit surfaced that CSP has **no `base-uri` / `form-action`** directives — real hardening work, not pin-polish; queued separately.
+>
+> csp_audit: 13 → 18 tests. 1363 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 227 WORK — pin.clean-recovery-ensure-backup-copy-direction+2-path-constants+CookedPC-path-helpers+shared-helper-sourcing+4-hazard-header-enumeration DONE (worktree).**
 >
