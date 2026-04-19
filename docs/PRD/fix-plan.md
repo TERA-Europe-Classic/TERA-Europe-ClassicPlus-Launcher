@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 176
-last_work_iteration: 176
+iteration_counter: 177
+last_work_iteration: 177
 last_research_sweep: 170
 last_revalidation: 160
 last_revalidation_status: all-gates-green
@@ -16,15 +16,32 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 154
+total_items_done: 155
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 9c5e0e7
+tauri_v2_migration_last_commit: 3d61823
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 177 WORK — pin.lessons-archive-header+iter-order+dedup DONE (worktree).**
+>
+> Worktree commit `3d61823`. PRD §3.8.8 `lessons_learned_guard.rs` previously had 7 tests (iter 108+139): cap + archive existence + cap advertisement + H3 date-iter format + Pattern/When-to-apply + newest-at-top + detector self-test. Iter 177 widens to 5 more angles.
+>
+> Five new source-inspection pins on `docs/PRD/lessons-learned.md` + `lessons-learned.archive.md`:
+> 1. `archive_file_header_documents_archival_purpose` — archive's own header must reference `lessons-learned.md` + the cap; without self-documentation, contributors might edit the archive directly and the cap policy drifts
+> 2. `active_file_entries_are_ordered_newest_iter_first` — extracts `iter N` from each H3 and asserts strictly descending; complements iter 139's `newest at top` advertisement with actual enforcement
+> 3. `every_h3_entry_has_nonempty_title_after_em_dash` — parallel to iter 173's changelog pin
+> 4. `total_entry_count_across_active_and_archive_meets_floor` — combined H3 count ≥ 10; the retrospective corpus is cumulative, bulk-delete drops below floor
+> 5. `active_and_archive_do_not_duplicate_entries` — no H3 heading in both files; archiving is a MOVE, duplicates indicate copy-paste regression
+>
+> lessons_learned_guard: 7 → 12 tests.
+>
+> Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
+>
+> Acceptance: 1133/1133 Rust (was 1128, +5), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 176 WORK — pin.architecture-preamble+per-section-shape+cross-refs DONE (worktree).**
 >
