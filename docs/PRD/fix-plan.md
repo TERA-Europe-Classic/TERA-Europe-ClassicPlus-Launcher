@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 152
-last_work_iteration: 152
+iteration_counter: 153
+last_work_iteration: 153
 last_research_sweep: 150
 last_revalidation: 140
 last_revalidation_status: all-gates-green
@@ -16,15 +16,31 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 130
+total_items_done: 131
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 66f97e4
+tauri_v2_migration_last_commit: a6f3d9f
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 153 WORK — pin.self-integrity-main-wiring DONE (worktree).**
+>
+> Worktree commit `a6f3d9f`. PRD §3.1.11 `self_integrity.rs` previously only pinned the sha256 behavioural contract (tampered file → different hash). The main.rs wiring that actually invokes the check, validates the sidecar, and terminates on mismatch was unprotected — a refactor could remove the call, swallow `Mismatch`, or move it after Tauri setup.
+>
+> Six new source-inspection assertions against `src/main.rs`:
+> 1. `run_self_integrity_check_invokes_verify_self` — body calls `verify_self(expected)`
+> 2. `mismatch_branch_exits_process` — `Mismatch` arm calls `std::process::exit()`; no graceful continue
+> 3. `sidecar_filename_is_self_hash_sha256` — `self_hash.sha256` literal retained (release-pipeline ↔ launcher contract)
+> 4. `sidecar_validation_requires_64_char_hex` — `expected.len() != 64` + `is_ascii_hexdigit` check
+> 5. `integrity_check_called_before_tauri_builder` — ORDER: `run_self_integrity_check()` must precede `tauri::Builder::default()`. Otherwise check is advisory; tampered binary could render UI first.
+> 6. `mismatch_branch_shows_native_dialog` — `show_integrity_failure_dialog(REINSTALL_PROMPT)` retained (log-only is invisible to end users)
+>
+> self_integrity: 2 → 8 tests.
+>
+> Acceptance: 1019/1019 Rust (was 1013, +6), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 152 WORK — pin.csp-bypass+baseline+ipc+portal DONE (worktree).**
 >
