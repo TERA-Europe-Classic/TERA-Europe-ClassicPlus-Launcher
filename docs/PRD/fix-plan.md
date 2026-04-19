@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 142
-last_work_iteration: 142
+iteration_counter: 143
+last_work_iteration: 143
 last_research_sweep: 130
 last_revalidation: 140
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 121
+total_items_done: 122
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: a93381b
+tauri_v2_migration_last_commit: ef57e34
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 143 WORK — pin.crate-comment-body-length DONE (worktree).**
+>
+> Worktree commit `ef57e34`. `crate_comment_guard` previously pinned only the `//!` prefix on the first non-blank line. A stub header like `//! x` would pass while providing zero explanation of the module — which is the PRD §3.8.2 contract's actual point (a reader should learn WHAT the module does from its crate comment).
+>
+> New assertion:
+> - `every_mods_source_file_has_substantive_doc_body` — the `//!` block body (content + newlines, excluding the `//! ` prefix) must carry ≥100 chars. Survey of current mods: types.rs has ~170 chars (smallest shipped); registry.rs/catalog.rs/external_app.rs/tmm.rs/mod.rs all well over. 100 is the sweet spot — catches stubs without flagging any real header.
+>
+> New helper `crate_doc_body_chars()` strips the `//! ` prefix, counts content + newlines, and stops at the first non-blank code line.
+>
+> Extended detector self-test with 3 new shapes: `//! x` stub (fails), realistic multi-line body (passes), multi-line all-1-char-body lines (fails).
+>
+> crate_comment_guard: 2 → 3 tests.
+>
+> Acceptance: 983/983 Rust (was 982, +1), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 142 WORK — pin.portal-https-structural-extension DONE (worktree).**
 >
