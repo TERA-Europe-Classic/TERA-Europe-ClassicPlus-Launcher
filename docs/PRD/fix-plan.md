@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 174
-last_work_iteration: 174
+iteration_counter: 175
+last_work_iteration: 175
 last_research_sweep: 170
 last_revalidation: 160
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 152
+total_items_done: 153
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 47ed222
+tauri_v2_migration_last_commit: 4853dcb
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 175 WORK — pin.claude-md-build-cmds+api-diff+subsections DONE (worktree).**
+>
+> Worktree commit `4853dcb`. PRD §3.8.1 `claude_md_guard.rs` previously had 7 tests (iter 107+137): section presence + size + body coverage + 7-section roster + v100 API 4-subsection set + Cargo feature flags + Testing paths. Iter 175 widens to 5 new angles those pins skip.
+>
+> Five new source-inspection pins on `CLAUDE.md`:
+> 1. `build_section_documents_core_commands` — 5 commands pinned (`npm install`, `npm run tauri dev`, `npm run tauri build`, `cargo build --features skip-updates`, `./builder.ps1`); missing any leaves new sessions without the working recipe
+> 2. `v100_api_section_has_key_differences_subsection` — `### Key Differences from Classic API` subsection + `| Classic | Classic+ (v100) |` comparison table header; the in-repo rosetta stone for auth refactors
+> 3. `mod_manager_section_has_expected_subsections` — Feature state / Code layout / Build / Deploy / Running the perfection loop all pinned as subsection headings (complements iter 107's body-keyword check)
+> 4. `architecture_section_documents_disabled_features` — `### Disabled Features` heading + stubbed feature class in body (OAuth / leaderboard); without it contributors waste sessions re-wiring intentionally-off features
+> 5. `known_gaps_section_names_specific_gaps` — XML / hash file / removed-command errors all pinned as named gaps; without named items the section becomes a placeholder readers skim past
+>
+> claude_md_guard: 7 → 12 tests.
+>
+> Acceptance: 1123/1123 Rust (was 1118, +5), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 174 WORK — pin.meta-hygiene-5-new-contract-rules DONE (worktree).**
 >
