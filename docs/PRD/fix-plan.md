@@ -7,9 +7,9 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 89
+iteration_counter: 90
 last_work_iteration: 89
-last_research_sweep: 80
+last_research_sweep: 90
 last_revalidation: 72
 last_revalidation_status: all-gates-green
 last_retrospective: 60
@@ -22,9 +22,20 @@ total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: ef1c01d
+tauri_v2_migration_last_commit: e65a617
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 90 RESEARCH SWEEP — findings landed on worktree.**
+>
+> Eleventh research sweep since loop start; scheduled per N%10=0 cadence. Worktree commit `e65a617`. Artefact: `docs/PRD/audits/research/sweep-iter-90.md`. Delta against iter 80 (~5 hours calendar, 9 iters).
+> - **NEW:** RUSTSEC-2026-0009 / CVE-2026-25727 on `time` crate (DoS via stack exhaustion on deep RFC 2822 input). Affects `< 0.3.47`; we resolve `0.3.45`. **Non-exploitable in our usage** (no attacker-controlled RFC 2822 parse; `time` is transitive for timestamp math). Trivial `cargo update -p time --precise 0.3.47` fix. Queued as P2 `dep.time-bump`.
+> - **NEW:** gitleaks v8.30.1 patch release (2026-03-21). No rule changes, currency only. Queued as P3 `infra.gitleaks-bump-8.30.1`.
+> - **UNCHANGED:** all Tauri plugin pins match latest (no releases since 2026-04-04); dep-dedup deferral holds (tauri-plugin-http 2.5.8 still on reqwest 0.12); rustls-webpki 0.103.12 still the fix; no new plugins-workspace or Tauri core advisories; malicious-crate removals (logtrace et al) not in our lock; catalog upstream has no commits since iter-80 `33cf584`.
+>
+> Two new fix-plan entries (1 P2 + 1 P3) queued. No code changes; no test cycle needed.
+>
+> Header: `last_research_sweep: 80 → 90`. `last_work_iteration` stays at 89 (research doesn't count as work). `total_items_done` unchanged at 70. Next sweep: iter 100. `ready_for_squash_merge: true` unchanged.
 
 > **Iter 89 WORK — pin.tmm.parser DONE (worktree).**
 >
