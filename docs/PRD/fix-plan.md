@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 150
-last_work_iteration: 149
+iteration_counter: 151
+last_work_iteration: 151
 last_research_sweep: 150
 last_revalidation: 140
 last_revalidation_status: all-gates-green
@@ -16,15 +16,32 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 128
+total_items_done: 129
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: e33d2d8
+tauri_v2_migration_last_commit: a1685c9
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 151 WORK — pin.add-mod-from-file-order+sig+ctor DONE (worktree).**
+>
+> Worktree commit `a1685c9`. `add_mod_from_file_wiring` previously pinned 5 presence-only wires (parse / sandbox / sha256 / deploy / upsert). Five new assertions cover ORDERING + SIGNATURE + CONSTRUCTOR — three silent-regression classes the presence-only wires didn't catch.
+>
+> Five new assertions:
+> 1. `parse_mod_file_precedes_container_safety_check` — sandbox predicate depends on parsed container name
+> 2. `parse_mod_file_precedes_fs_write_to_gpk_slot` — fail-closed: non-TMM bytes never land on disk
+> 3. `signature_returns_result_mod_entry_string` — exact Tauri idiom (anyhow::Error breaks frontend serialisation)
+> 4. `empty_container_name_is_fail_fast` — iter-33 fix: specific "no container name in footer" error, not a vacuous sandbox pass
+> 5. `id_derivation_uses_from_local_gpk_constructor` — `from_local_gpk` (not `from_catalog`); wrong ctor collides local.<sha12> with catalog.<name>
+>
+> Extended detector self-test with 5 new bad shapes (reversed order, write-first, wrong return type, wrong constructor, missing empty-container check).
+>
+> add_mod_from_file_wiring: 7 → 11 tests.
+>
+> Acceptance: 1009/1009 Rust (was 1004, +5), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 150 RESEARCH SWEEP — all-gates-green.**
 >
