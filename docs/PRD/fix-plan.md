@@ -7,10 +7,10 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 199
+iteration_counter: 200
 last_work_iteration: 199
 last_research_sweep: 190
-last_revalidation: 180
+last_revalidation: 200
 last_revalidation_status: all-gates-green
 last_retrospective: 60
 last_blocked_retry: 50
@@ -26,18 +26,15 @@ tauri_v2_migration_last_commit: 490c33b
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 199 WORK — pin.http-redirect-header+no-invalid-cert+UA+walker-floor+known-weakness DONE (worktree). Last WORK before N=200 REVALIDATION.**
+> **Iter 200 REVALIDATION — 200-iter milestone; all-gates-green (docs/PRD/audits/research/revalidation-iter-200.md).**
 >
-> Worktree commit `490c33b`. §3.1.5 security-pillar redirect-gate; http_redirect_offlist had 8 tests (iter 104 creation + iter 157 +5); 42 iters untouched. Brings to 13.
+> N%20=0 formal cadence + 200-iter major milestone. All gates re-run on worktree `490c33b`. Rust 1233/1233 (+90 vs iter 180 baseline 1143; same pattern as iter 160→180's +90), clippy clean, cargo audit 19 allowed unchanged, vitest 449/449, guard file count 19 unchanged, commit-count since main 136 (+18 since iter 180), regression-pattern grep 2 (both false positives — `revert_partial_install_dir` helper name in iter-165/iter-194 commit messages).
 >
-> Five new source-inspection pins:
-> 1. `guard_file_header_cites_prd_and_adv_slot` — header cites `adv.http-redirect-offlist` + `§3.1.5`
-> 2. `no_mods_client_accepts_invalid_certs` — reject `.danger_accept_invalid_certs(true)` / `.danger_accept_invalid_hostnames(true)` globally under `src/services/mods/*.rs`; MITM defeats the allowlist + redirect gate
-> 3. `every_mods_builder_sets_user_agent` — every `reqwest::Client::builder()` chain must include `.user_agent(...)`; default UA gives operators no actionable server-log signal
-> 4. `mods_rs_files_walker_meets_count_floor` — `mods_rs_files()` must find ≥ 5 files (complements iter-157's name-based self-test with a count floor)
-> 5. `builder_detector_rejects_commented_redirect_calls` — tombstones the naive-substring-match's known weakness against `//`-commented redirect calls as acceptable (caught at code review); future hardening flips the assertion
+> 5/5 recent DONE items (iter 195-199) re-verified green.
 >
-> http_redirect_offlist: 8 → 13 tests. 1233 Rust (+5), clippy clean, vitest 449/449.
+> Milestones achieved iter 181-199: scanner sweep complete (iter 181-187), §3.2 recovery-pillar trio complete (iter 194-196), CVE-defence chain deepened (iter 188-189), audit-driven small-baseline revisit (iter 197-199 raised csp_audit/self_integrity/http_redirect_offlist from 8 → 13 each). **Every guard / integration test in `tests/` now carries ≥ 10 pins.**
+>
+> `ready_for_squash_merge: true` unchanged since iter 94. Next revalidation iter 220; next research sweep iter 210.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
