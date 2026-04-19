@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 106
-last_work_iteration: 106
+iteration_counter: 107
+last_work_iteration: 107
 last_research_sweep: 100
 last_revalidation: 100
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 87
+total_items_done: 88
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 1a2a583
+tauri_v2_migration_last_commit: 42d4a8e
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 107 WORK — docs.claude-md-guard DONE (worktree).**
+>
+> Worktree commit `42d4a8e`. Closes PRD §3.8.1 structural pin: "CLAUDE.md has a `## Mod Manager` section covering feature state + build + deploy, threshold >= 30 lines."
+>
+> Current state verified — section exists at 62 body lines and covers the three topic areas. Until iter 107 this was enforced only by periodic human review; CLAUDE.md is the on-ramp doc every new loop iter reads, so drift would have been expensive.
+>
+> New `tests/claude_md_guard.rs` (3 tests):
+> 1. `mod_manager_section_exists_and_meets_size_threshold` — finds the heading, counts lines to next `## `, asserts >= 30.
+> 2. `mod_manager_section_covers_state_build_and_deploy` — keyword presence check for each of the three required topic areas.
+> 3. Detector self-test with 3 synthetic shapes (no-section, too-short, good fixture).
+>
+> Parallel to iter 104 (`crate_comment_guard.rs`) and iter 106 (`architecture_doc_guard.rs`): triple of structural doc-invariant tests enforcing §3.8.1, §3.8.2, §3.8.4 respectively.
+>
+> Acceptance: 868/868 Rust (was 865, +3), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 106 WORK — docs.architecture-mods-state + guard DONE (worktree).**
 >
