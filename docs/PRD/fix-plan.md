@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 162
-last_work_iteration: 162
+iteration_counter: 163
+last_work_iteration: 163
 last_research_sweep: 150
 last_revalidation: 160
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 140
+total_items_done: 141
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 2bfe527
+tauri_v2_migration_last_commit: bc9d3c8
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 163 WORK — pin.gpk-parse-bounds+install-gate-order DONE (worktree).**
+>
+> Worktree commit `bc9d3c8`. PRD §5.3 adv.bogus-gpk-footer / §3.1.4 gpk-deploy-sandbox `bogus_gpk_footer.rs` previously had 4 tests: adversarial corpus presence + magic-check fallback + empty-container rejection + detector self-test. Three additional defences were unprotected structurally: the parse-bounds guards (tiny-input underflow + truncated-footer cursor underflow), three of the four install_gpk fail-closed gates, and the critical parse-before-filesystem-touch ordering invariant.
+>
+> Five new source-inspection pins on `src/services/mods/tmm.rs`:
+> 1. `parse_mod_file_guards_against_tiny_input_underflow` — `if end < 4` required before `end - 4`; without it a 3-byte input underflows and reads the magic OOB
+> 2. `parse_mod_file_read_back_guards_cursor_underflow` — `read_back_i32` closure must guard `if *p < 4` before `*p -= 4`; truncated footers past the magic check get caught here
+> 3. `install_gpk_has_four_fail_closed_gates` — pins ALL FOUR: empty container, `is_safe_gpk_container_filename`, empty packages, any package with empty object_path (previously only empty-container was pinned)
+> 4. `install_gpk_parses_and_gates_before_filesystem_touch` — `parse_mod_file` + every gate must fire BEFORE `ensure_backup(game_root)?`; a gate that runs after backup corrupts `.clean` on rejection, breaking §3.2 clean-recovery
+> 5. `is_safe_gpk_container_filename_is_pub_crate_helper` — helper stays `pub(crate)`; inlining makes other parse call sites (add_mod_from_file) forget to repeat the sandbox guard
+>
+> bogus_gpk_footer: 4 → 9 tests.
+>
+> Acceptance: 1068/1068 Rust (was 1063, +5), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 162 WORK — pin.conflict-modal-detect-predicate DONE (worktree).**
 >
