@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 164
-last_work_iteration: 164
+iteration_counter: 165
+last_work_iteration: 165
 last_research_sweep: 150
 last_revalidation: 160
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 142
+total_items_done: 143
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 0abf279
+tauri_v2_migration_last_commit: 93d17a9
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 165 WORK — pin.disk-full-revert-shape+ordering DONE (worktree).**
+>
+> Worktree commit `93d17a9`. PRD §3.2.8 disk-full-revert `disk_full.rs` previously had 4 tests modelling the cleanup semantics (revert-on-ENOSPC, partial GPK file, missing-path no-op, idempotence). The PRODUCTION wiring — the actual `revert_partial_install_*` helpers and their call sites in `download_and_extract` / `download_file` — was unprotected. A refactor that changes the revert signature, swaps `remove_dir_all` for `remove_dir`, or reorders the call below `return Err(...)` would pass every behavioural model test while silently breaking production cleanup.
+>
+> Five new source-inspection pins on `src/services/mods/external_app.rs`:
+> 1. `revert_dir_signature_is_unit_returning_best_effort` — must stay `pub(crate) fn ...(dest_dir: &Path) {` (unit return); a `Result` return lets cleanup errors mask the primary ENOSPC/extract error
+> 2. `revert_file_signature_is_unit_returning_best_effort` — same invariant on the single-file GPK path
+> 3. `revert_dir_uses_recursive_remove_dir_all` — `fs::remove_dir_all` required (NOT `fs::remove_dir`); non-recursive fails on any populated extract
+> 4. `revert_dir_runs_before_err_return_in_download_and_extract` — revert must precede `return Err(e)` in the extract-Err branch; return-before-revert makes cleanup dead code
+> 5. `revert_file_runs_before_err_return_in_download_file` — same ordering invariant on the GPK `fs::write` path; leaves a truncated GPK otherwise
+>
+> disk_full: 4 → 9 tests.
+>
+> Acceptance: 1078/1078 Rust (was 1073, +5), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 164 WORK — pin.clean-recovery-backup-idempotence DONE (worktree).**
 >
