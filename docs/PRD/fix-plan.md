@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 148
-last_work_iteration: 148
+iteration_counter: 149
+last_work_iteration: 149
 last_research_sweep: 130
 last_revalidation: 140
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 127
+total_items_done: 128
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: ae7f2c0
+tauri_v2_migration_last_commit: 577e424
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 149 WORK — pin.tampered-catalog-failclosed-extension DONE (worktree).**
+>
+> Worktree commit `577e424`. `tampered_catalog` previously pinned the 3-link error-surfacing chain (downloader text + install routing + finalize_error field flips). Three new links harden the chain against subtler drifts.
+>
+> Three new assertions:
+> 1. `downloaders_verify_sha_before_fs_write` — `Sha256::digest` must appear BEFORE `fs::write` in `download_file`. A reorder would land tampered bytes on disk even when the mismatch Err is returned; behavioural SHA tests still pass (Err is Err) but the fail-closed invariant breaks silently.
+> 2. `finalize_error_signature_takes_error_string` — signature must accept a `String`/`&str` param so `last_error` stashes the real reason. Dropping the param to `(id: &str)` would render "unknown" to users.
+> 3. `mod_status_error_variant_exists` — types.rs keeps the exact variant name `Error`. A rename (`Errored`/`Failed`) breaks `finalize_error` at compile time, but test-time signal is cleaner.
+>
+> Extended detector self-test with 3 new bad shapes (write-before-sha, bare `id`-only signature, enum without `Error` variant).
+>
+> tampered_catalog: 5 → 8 tests.
+>
+> Acceptance: 1004/1004 Rust (was 1001, +3), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 148 WORK — pin.shell-scope-stanza-strict DONE (worktree; 1001 Rust).**
 >
