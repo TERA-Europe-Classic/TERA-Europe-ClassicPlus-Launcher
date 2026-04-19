@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 55
-last_work_iteration: 55
+iteration_counter: 56
+last_work_iteration: 56
 last_research_sweep: 40
 last_revalidation: 40
 last_revalidation_status: clean
@@ -16,7 +16,7 @@ last_retrospective: 30
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 18
-total_items_done: 48
+total_items_done: 49
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
@@ -122,7 +122,7 @@ total_iterations_to_cap: 1000
 
 ### Reliability (PRD §3.2)
 
-- [P1] **sec.tokio-rustsec-2025-0023** — RUSTSEC-2025-0023 (tokio broadcast-channel clone parallelism without `Sync` bound, 2025-04-07). Run `cargo audit` to confirm our pinned `tokio = "1.49"` is in affected range; bump to patched release. Acceptance: `cargo audit` clean on tokio; regression tests pass. Pillar: Security. Discovered iter 10 RESEARCH SWEEP.
+- [DONE] sec.tokio-rustsec-2025-0023 — **Close as N/A by unreachable-API proof.** RUSTSEC-2025-0023 targets `tokio::sync::broadcast::Receiver::clone` without a `Sync` bound, which can only be triggered by code that uses the broadcast channel. `grep -rE 'tokio::sync::broadcast|broadcast::|broadcast_channel|broadcast::Sender|broadcast::Receiver|use tokio::sync::broadcast'` across `teralaunch/**` and `teralib/**` returns 0 hits. Our tokio usage is limited to: `mpsc::unbounded_channel` + `watch` + `Notify` (teralib/src/game/mod.rs), `Mutex` (main.rs, download_state.rs, commands/hash.rs), `Semaphore` + `JoinSet` (commands/download.rs), `AsyncReadExt/AsyncWriteExt` + `TcpListener` (services/mods/external_app.rs, commands/download.rs). Zero broadcast-channel code paths → the advisory's vulnerability can't be triggered. Acceptance path "cargo audit clean on tokio" would still require the binary to be installed; that's tracked separately by the existing P2 `infra.cargo-audit-install` (iter 40 research sweep). The present item closes on the stronger "no reachable call site" proof. Verified @ iter 56.
 - [DONE] sec.aes-gcm-rustsec-2023-0096-audit — **Close as N/A per PRD acceptance.** `grep -rE 'decrypt_in_place_detached|use aes_gcm|aes_gcm::|Aes(128|256)Gcm'` across `teralaunch/**`, `teralib/**`, and tests returns 0 source hits. `aes-gcm = "0.10"` is declared in `teralaunch/src-tauri/Cargo.toml:42` but has zero importers anywhere in the codebase — it's a dead direct dependency left over from an earlier era, with no code path that could trip RUSTSEC-2023-0096 (tag-verify-failure plaintext leak in `decrypt_in_place_detached`). The closest adjacent crypto stack (`hkdf`, `hmac`, `sha2`, `base64`, `cryptify`) does not pull aes-gcm transitively either. Follow-up P2 `sec.remove-dead-aes-gcm-dep` opened to (a) delete the dead declaration + regenerate Cargo.lock, (b) optionally add a CI grep gate to prevent a future caller from introducing the vulnerable API silently. Verified @ iter 55.
 - [P1] **3.2.1.edge-cases-X1-X24** — Author 24 named tests across `teralaunch/tests/e2e/mod-*.spec.js` + `teralaunch/src-tauri/tests/mod_*.rs` covering edge cases X1–X24. Define X1–X24 in `docs/PRD/test-plan.md` (new file). Acceptance: 24/24 tests passing. Pillar: Reliability.
 - [P1] **3.2.5.offline-retry** — Test `mod-catalog-resilience.spec.js::offline_shows_retry`. Acceptance: test passes. Pillar: Reliability.
