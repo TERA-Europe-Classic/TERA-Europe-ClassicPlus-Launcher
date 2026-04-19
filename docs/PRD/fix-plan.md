@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 196
-last_work_iteration: 196
+iteration_counter: 197
+last_work_iteration: 197
 last_research_sweep: 190
 last_revalidation: 180
 last_revalidation_status: all-gates-green
@@ -16,28 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 172
+total_items_done: 173
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 08edf1d
+tauri_v2_migration_last_commit: dafdb9b
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 196 WORK — pin.disk-full-revert-no-panic+missing-skip+pub-crate+path-ref DONE (worktree). §3.2 recovery-pillar trio complete.**
+> **Iter 197 WORK — pin.csp-style-tradeoff+img+font+no-widening DONE (worktree).**
 >
-> Worktree commit `08edf1d`. §3.2.8 functionality-pillar; disk_full had 9 tests (iter 104 creation + iter 165 +5); brings to 14. Completes the §3.2 recovery-pillar trio — crash_recovery (16), clean_recovery (13), disk_full (14) all with real-file defense-in-depth pins.
+> Worktree commit `dafdb9b`. §3.1.12 security-pillar; csp_audit had 8 tests (iter 38 creation + iter 152 +4); last touched 45 iters ago — smallest baseline among guards still at ≤10 tests. Brings to 13.
+>
+> Audit-driven pick: scanned `tests/*.rs` for lowest test count + oldest last-touched; csp_audit was the clear leader among untouched files (crate_comment_guard also at 8 but extended iter 179, i.e. 18 iters ago).
 >
 > Five new source-inspection pins:
-> 1. `guard_file_header_cites_prd_and_disk_full_revert` — header cites `PRD 3.2.8` + `disk-full-revert`
-> 2. `revert_dir_logs_warn_on_failure_not_panic` — body must call `log::warn!` on fs::remove_dir_all Err arm; reject `.unwrap()` / `.expect()` / `panic!` — panic in cleanup masks primary ENOSPC error
-> 3. `revert_file_short_circuits_on_missing_file` — body must carry `if !dest_file.exists() { return; }` before `fs::remove_file`; otherwise ENOENT warn noise on every download-before-write failure
-> 4. `revert_helpers_stay_pub_crate_not_public_api` — reject bare `pub` on either helper; `pub(crate)` keeps sibling-module access without leaking best-effort semantics
-> 5. `revert_helpers_take_path_ref_not_pathbuf_by_value` — signatures must accept `&Path` (zero-alloc); `PathBuf` forces call sites to clone
+> 1. `guard_file_header_cites_prd_and_style_src_tradeoff` — header cites `PRD 3.1.12` + explains deliberate style-src / unsafe-inline trade-off
+> 2. `csp_defines_style_src_with_documented_shape` — style-src = `'self'` + `'unsafe-inline'` (documented) + reject `*` widening
+> 3. `csp_defines_img_src_without_unsafe_inline` — img-src has `'self'` + `data:` but NOT `'unsafe-inline'` (copy-paste-drift signal; SVG-script attack surface)
+> 4. `csp_defines_font_src_explicitly` — font-src present, not relying on default-src fallback (future default-src tightening would silently break fonts)
+> 5. `csp_has_no_object_or_frame_src_widening` — if object-src/frame-src defined, reject `*` / `data:` / `blob:` / `https:` widening
 >
-> disk_full: 9 → 14 tests. 1218 Rust (+5), clippy clean, vitest 449/449.
+> csp_audit: 8 → 13 tests. 1223 Rust (+5), clippy clean, vitest 449/449.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
