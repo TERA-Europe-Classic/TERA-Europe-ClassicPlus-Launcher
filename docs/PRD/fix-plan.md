@@ -7,18 +7,30 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 49
+iteration_counter: 50
 last_work_iteration: 49
 last_research_sweep: 40
 last_revalidation: 40
 last_revalidation_status: clean
 last_retrospective: 30
-last_blocked_retry: never
+last_blocked_retry: 50
+last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 18
 total_items_done: 43
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
+
+> **Iter 50 BLOCKED RE-TRY SWEEP — all still blocked.**
+> Gated items re-checked against current repo state:
+> • `sec.tauri-v1-eol-plan` — still blocked on 4 human decision gates (migrate vs stay, target v2 version, version bump, dual-format latest.json duration). No sign-off in any commit / PR.
+> • `3.1.13.portal-https` — `teralib/src/config/config.json` still has `http://192.168.1.128:8090` for all 7 portal URLs. No production HTTPS endpoint; no infra commit.
+> • `3.1.8.anti-reverse-hardening` — gated on sec.tauri-v1-eol-plan sign-off (CSP-per-window + capability ACLs are v2-only).
+> • `3.1.9.updater-downgrade-refuse` — Tauri v2 gated.
+> • `3.1.12.csp-unsafe-inline` — Tauri v1 CSP limit; v2 gated.
+> • `3.1.10.tcc-shinra-binary-hardening` — needs human audit sign-off on build-output inspection.
+> • `3.3.5 / 3.3.6 / 3.3.7 / 3.3.8 / 3.3.11` — need live Classic+ client access + human in-game audits.
+> No item promoted this iter. Next BLOCKED RE-TRY at iter 100.
 
 > **Iter 40 REVALIDATION + RESEARCH SWEEP — CLEAN.**
 > REVALIDATION: 24 DONE items re-proved (all proofs from iter-20 + iter-21-39 additions).
