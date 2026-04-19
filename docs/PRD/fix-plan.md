@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 156
-last_work_iteration: 156
+iteration_counter: 157
+last_work_iteration: 157
 last_research_sweep: 150
 last_revalidation: 140
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 134
+total_items_done: 135
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: d6f28b4
+tauri_v2_migration_last_commit: 051ed3a
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 157 WORK — pin.http-redirect-modswide+status-gate DONE (worktree).**
+>
+> Worktree commit `051ed3a`. PRD §3.1.5 / adv.http-redirect-offlist `http_redirect_offlist.rs` previously had 3 tests: file-targeted Policy::none() on external_app.rs + catalog.rs + detector self-test. A THIRD builder added later to mods/ would slip past; the second line of defence (status-check rejecting the 302 that Policy::none() returns) was unprotected structurally.
+>
+> Five new pins:
+> 1. `every_mods_rs_builder_has_redirect_none` — walks all `.rs` under `src/services/mods/`; every `reqwest::Client::builder()` call must carry the redirect gate. Prevents a future mirror-check or telemetry beacon from landing without the gate.
+> 2. `mods_rs_no_permissive_redirect_policy_variants` — no `Policy::limited` / `Policy::custom` anywhere under mods/. "One hop is fine" thinking reinstates the 3xx-bounce bypass.
+> 3. `external_app_rejects_non_success_status` — pins the `!response.status().is_success()` gate AND the `Download returned HTTP {}` error format. The builder gate only stops auto-follow; the status-check is what actually surfaces the 302 as a rejection.
+> 4. `catalog_rejects_non_success_status` — same pins for catalog.rs + `Catalog fetch returned HTTP`.
+> 5. `mods_rs_files_walker_self_test` — directory walker self-test; without it, a refactor that breaks the `.rs` filter or repoints `MODS_DIR` makes the builder-gate test trivially pass (zero files walked = zero violations).
+>
+> http_redirect_offlist: 3 → 8 tests. Completes the §3.1.5 triple: iter 156 allowlist shape, iter 157 redirect gate + status-check, existing scanner (every mod URL has scope match).
+>
+> Acceptance: 1042/1042 Rust (was 1037, +5), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 156 WORK — pin.http-allowlist-shape+matcher DONE (worktree).**
 >
