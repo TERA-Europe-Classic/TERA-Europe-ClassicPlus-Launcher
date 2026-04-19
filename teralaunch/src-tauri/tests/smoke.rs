@@ -99,14 +99,19 @@ fn tests_dir_has_only_the_common_submodule() {
         }
     }
     subdirs.sort();
-    assert_eq!(
-        subdirs,
-        vec!["common".to_string()],
-        "tests/ must contain exactly one subdirectory (`common/`). \
-         Extra subdirs suggest an attempt to share state that won't \
-         compile across every integration-test binary. Got: \
-         {subdirs:?}"
-    );
+    // `common/` — shared test fixture module (imported via `mod common;`).
+    // `fixtures/` — read-only static data read by fs::read_to_string in tests
+    //   (catalog-snapshot.json landed iter 229 for §3.3.1).
+    let allowed = ["common".to_string(), "fixtures".to_string()];
+    for subdir in &subdirs {
+        assert!(
+            allowed.contains(subdir),
+            "tests/ must contain only allowed subdirectories \
+             ({allowed:?}). Extra subdirs suggest an attempt to share \
+             state that won't compile across every integration-test \
+             binary. Got unexpected: `{subdir}`."
+        );
+    }
 }
 
 /// `tests/common/mod.rs` must export both fixture helpers. Every
