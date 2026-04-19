@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 131
-last_work_iteration: 131
+iteration_counter: 132
+last_work_iteration: 132
 last_research_sweep: 130
 last_revalidation: 120
 last_revalidation_status: all-gates-green
@@ -16,15 +16,32 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 111
+total_items_done: 112
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: dd668da
+tauri_v2_migration_last_commit: 9c34bce
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 132 WORK — drift-guard JS-side extension DONE (worktree).**
+>
+> Worktree commit `9c34bce`. `prd_path_drift_guard.rs` previously only handled Rust-side pins (the PRD-to-Rust-test mapping for §3.1/§3.2/§3.3 criteria). PRD §3 also cites Vitest tests for criteria whose measurement lives in JS — those weren't covered, so the PRD/JS-test mapping could drift silently.
+>
+> Three JS pins added + two new assertions:
+> - §3.4.7 → `teralaunch/tests/i18n-jargon.test.js::no_jargon_in_translations`
+> - §3.6.4 → `teralaunch/tests/search-perf.test.js::under_one_frame`
+> - §3.7.1 → `teralaunch/tests/i18n-parity.test.js::keys_equal_across_locales`
+>
+> `every_js_pin_source_file_has_named_test` greps for `it('<name>',` (single or double-quoted) in each JS file. `every_js_pin_is_cited_in_prd_row` validates the PRD cell's `teralaunch/tests/<file>::<name>` form.
+>
+> Complements the iter-124-to-131 JS-scanner-pin chain (which pinned scanner INVARIANTS); this iteration pins the PRD-to-scanner CITATION. Both layers protect the §3 measurement chain.
+>
+> Drift-guard pin total: 41 → 44 (38 Rust + 3 JS). Test-fn count in the drift-guard: 4 → 6.
+>
+> Acceptance: 959/959 Rust (was 957, +2), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 131 WORK — pin.mods-categories-ui-scanner DONE (worktree).**
 >
