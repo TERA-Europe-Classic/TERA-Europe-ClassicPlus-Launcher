@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 211
-last_work_iteration: 211
+iteration_counter: 212
+last_work_iteration: 212
 last_research_sweep: 210
 last_revalidation: 200
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 185
+total_items_done: 186
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 6970a21
+tauri_v2_migration_last_commit: aeea582
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 212 WORK — pin.prd-drift-guard-header+criterion-xyz-format+PRD_PATH-constant+cell_for-split+section-3-bound DONE (worktree). Every test file in tests/ now carries ≥ 12 pins.**
+>
+> Worktree commit `aeea582`. §3 measurement-path drift (PRD-to-test cross-ref integrity); prd_path_drift_guard had 11 tests (iter 97 creation + iter 132-134 +4 + iter 178 +5); 34 iters untouched. Brings to 16.
+>
+> Five new source-inspection pins (meta-guard + shape validation + formatter self-test + scope bound):
+> 1. `guard_file_header_cites_prd_section_3_drift` — header cites `PRD §3` + `drift`; meta-guard contract
+> 2. `every_pin_criterion_matches_x_y_z_format` — criteria match digit-dot-digit-dot-digit shape; a typo like `3.1` (no subsection) would match the FIRST §3.1.x row silently
+> 3. `prd_path_constant_points_to_perfection_md` — pins `PRD_PATH` verbatim; rename without atomic constant update causes opaque "file not readable" panics
+> 4. `cell_for_formatter_tracks_inline_vs_integration_split` — `cell_for` emits `::tests::` for `src/...` paths and NO prefix for `tests/...` paths; regression would drift half the cite strings silently
+> 5. `no_pin_criterion_outside_section_3` — pin every criterion starts with `3.`; a `4.1.1` pin either fails row-find opaquely or matches a coincidental cell
+>
+> prd_path_drift_guard: 11 → 16 tests. 1288 Rust (+5), clippy clean, vitest 449/449.
+>
+> **Milestone**: every test file in `teralaunch/src-tauri/tests/` now carries ≥ 12 structural pins.
 
 > **Iter 211 WORK — pin.architecture-doc-guard-header+EXPECTED_SECTIONS-count-floor+registry/external-app/tmm-cross-ties DONE (worktree). First WORK after iter 210 research sweep.**
 >
