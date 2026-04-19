@@ -523,6 +523,28 @@ pub async fn uninstall_mod(id: String, delete_settings: Option<bool>) -> Result<
     Ok(())
 }
 
+/// Applies the "enable" intent to a registry slot: flips the intent flags
+/// on and updates the display status. Pure over `&mut ModEntry` — cannot
+/// spawn a process or touch the filesystem. PRD 3.3.15: toggle is intent
+/// only; actual spawn happens at Launch Game via
+/// `spawn_auto_launch_external_apps`.
+fn apply_enable_intent(slot: &mut ModEntry) {
+    slot.enabled = true;
+    slot.auto_launch = true;
+    slot.status = ModStatus::Enabled;
+    slot.last_error = None;
+}
+
+/// Applies the "disable" intent to a registry slot. PRD 3.3.15: toggle is
+/// intent only — a mod whose process is still alive keeps running; use
+/// `stop_external_app` if you want to terminate it. The status flip to
+/// Disabled is a display label, not a process action.
+fn apply_disable_intent(slot: &mut ModEntry) {
+    slot.enabled = false;
+    slot.auto_launch = false;
+    slot.status = ModStatus::Disabled;
+}
+
 /// Enables a mod. The toggle records intent only — it does NOT start the
 /// external app. Enabled external apps auto-spawn when the user clicks
 /// Launch Game (see `spawn_auto_launch_external_apps`). Enabled GPKs are
@@ -537,10 +559,7 @@ pub async fn enable_mod(id: String) -> Result<ModEntry, String> {
         let slot = reg
             .find_mut(&id)
             .ok_or_else(|| format!("Mod '{}' is not installed", id))?;
-        slot.enabled = true;
-        slot.auto_launch = true;
-        slot.status = ModStatus::Enabled;
-        slot.last_error = None;
+        apply_enable_intent(slot);
         Ok(slot.clone())
     })?;
     Ok(updated)
@@ -560,9 +579,7 @@ pub async fn disable_mod(id: String) -> Result<ModEntry, String> {
         let slot = reg
             .find_mut(&id)
             .ok_or_else(|| format!("Mod '{}' is not installed", id))?;
-        slot.enabled = false;
-        slot.auto_launch = false;
-        slot.status = ModStatus::Disabled;
+        apply_disable_intent(slot);
         Ok(slot.clone())
     })?;
     Ok(updated)
@@ -853,5 +870,110 @@ mod tests {
         assert!(slot.auto_launch);
         assert!(matches!(slot.status, ModStatus::Enabled));
         assert_eq!(slot.version, "1.0.0");
+    }
+
+    /// PRD 3.3.15.toggle-intent-only: the enable toggle must only mutate
+    /// the intent flags on the slot. The helper takes `&mut ModEntry` and
+    /// nothing else — it structurally cannot spawn a process or touch the
+    /// filesystem. This test pins the flag-level contract.
+    #[test]
+    fn toggle_intent_only() {
+        let mut slot = disabled_slot();
+        slot.status = ModStatus::Disabled;
+        slot.last_error = Some("previous crash reason".into());
+
+        apply_enable_intent(&mut slot);
+
+        assert!(slot.enabled, "enable flips enabled=true");
+        assert!(slot.auto_launch, "enable flips auto_launch=true");
+        assert!(matches!(slot.status, ModStatus::Enabled));
+        assert_eq!(
+            slot.last_error, None,
+            "enable clears stale last_error so the UI doesn't re-surface it"
+        );
+    }
+
+    /// Disable toggle is also intent-only. `&mut ModEntry` signature proves
+    /// no process side effects; this test pins the flag flip contract.
+    #[test]
+    fn toggle_disable_intent_only() {
+        let mut slot = disabled_slot();
+        apply_enable_intent(&mut slot);
+        assert!(slot.enabled);
+
+        apply_disable_intent(&mut slot);
+
+        assert!(!slot.enabled, "disable flips enabled=false");
+        assert!(!slot.auto_launch, "disable flips auto_launch=false");
+        assert!(matches!(slot.status, ModStatus::Disabled));
+    }
+
+    /// A running external app stays alive when the user untoggles the
+    /// enable switch. The intent helper is not responsible for killing
+    /// the process — `stop_external_app` is the explicit kill path. The
+    /// `&mut ModEntry` signature is the proof: the helper has no access
+    /// to process state, so it structurally cannot terminate anything.
+    #[test]
+    fn disable_while_running_does_not_kill() {
+        let mut slot = disabled_slot();
+        slot.enabled = true;
+        slot.auto_launch = true;
+        slot.status = ModStatus::Running;
+
+        apply_disable_intent(&mut slot);
+
+        assert!(!slot.enabled);
+        assert!(!slot.auto_launch);
+        // The status flip to Disabled is a display label, not a process
+        // action — the actual child process is unaffected (if it was
+        // running, it continues to run). This test documents that
+        // invariant at the type level: the helper cannot kill because it
+        // only sees `&mut ModEntry`.
+        assert!(matches!(slot.status, ModStatus::Disabled));
+    }
+
+    /// Source-inspection guard. The enable/disable toggle bodies must not
+    /// reference process-level operations. If someone adds
+    /// `external_app::spawn_app(...)` or `stop_process_by_name(...)` to
+    /// `enable_mod` or `disable_mod` (the `#[cfg(not(tarpaulin_include))]`
+    /// Tauri commands that can't be unit-tested directly), this grep-style
+    /// assertion fails.
+    ///
+    /// PRD 3.3.15 says toggles are intent only. The pure helpers above
+    /// cannot spawn/kill by their signature, but the Tauri command bodies
+    /// could — that's what this test watches.
+    #[test]
+    fn toggle_command_bodies_do_not_spawn_or_kill() {
+        let source = include_str!("mods.rs");
+
+        let enable_start = source.find("pub async fn enable_mod").expect("enable_mod present");
+        let enable_body = &source[enable_start..];
+        let enable_body = &enable_body[..enable_body
+            .find("\npub async fn disable_mod")
+            .expect("disable_mod follows")];
+        assert!(
+            !enable_body.contains("spawn_app"),
+            "enable_mod must not spawn — PRD 3.3.15"
+        );
+        assert!(
+            !enable_body.contains("stop_process_by_name"),
+            "enable_mod must not kill — PRD 3.3.15"
+        );
+
+        let disable_start = source
+            .find("pub async fn disable_mod")
+            .expect("disable_mod present");
+        let disable_body = &source[disable_start..];
+        let disable_body = &disable_body[..disable_body
+            .find("\n/// Ad-hoc launch of an external app")
+            .expect("launch_external_app follows")];
+        assert!(
+            !disable_body.contains("spawn_app"),
+            "disable_mod must not spawn — PRD 3.3.15"
+        );
+        assert!(
+            !disable_body.contains("stop_process_by_name"),
+            "disable_mod must not kill — PRD 3.3.15"
+        );
     }
 }
