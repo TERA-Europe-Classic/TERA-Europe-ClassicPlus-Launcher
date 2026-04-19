@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 82
-last_work_iteration: 82
+iteration_counter: 83
+last_work_iteration: 83
 last_research_sweep: 80
 last_revalidation: 72
 last_revalidation_status: all-gates-green
@@ -16,15 +16,26 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 18
-total_items_done: 63
+total_items_done: 64
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 8ad2c1b
+tauri_v2_migration_last_commit: 466524a
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 83 WORK — fix.resolve-game-root-wrong-assumption DONE (worktree). User P0 triaged from iter 82 session closed.**
+>
+> Worktree commit `466524a`. The user-reported P0 from iter 82's live triage landed: `commands/mods.rs::resolve_game_root()` no longer strips 2 parents from the stored game path. GPK install should now succeed on a correctly-configured install.
+> - **Root cause:** `services/config_service::parse_game_config` stores the install **root** (e.g. `C:/Games/TERA`). Only `mods.rs` was treating that value as if it were a `TERA.exe` path and stripping `.parent().and_then(|p| p.parent())`. Every other caller (`download.rs`, `hash.rs`) already treats `game_path` as the install root. On a valid path, the double-strip yielded `C:/` and the `S1Game` existence check failed; shorter paths surfaced as "Configured game path has no parent root".
+> - **Fix:** deleted the `.parent().and_then(|p| p.parent())` chain. Extracted `validate_game_root(PathBuf) -> Result<PathBuf, String>` as a pure predicate so the contract is testable without a real config.ini.
+> - **Tests (3 new, inline):** `validate_game_root_accepts_install_root_with_s1game` (tempdir + S1Game round-trip unchanged), `validate_game_root_rejects_missing_s1game` (tempdir without S1Game errs with the right message), `validate_game_root_source_has_no_parent_walk` (regression guard — source-inspects the fn body for `.parent()` calls).
+>
+> Acceptance: 831/831 Rust (was 828, +3), clippy clean, 436/436 JS. Worktree ready state unchanged — still `ready_for_squash_merge: true`. Bug fix carries to main on user-gated squash.
+>
+> Two P1 user-reported bugs remain queued from iter 82 triage: `fix.offline-empty-state`, `fix.mods-categories-ui`. Three iter-80 research-sweep P2 items also queued: `sec.shell-scope-hardening`, `dep.dedupe-reqwest-zip`, `dep.vitest-bump-post-squash` (P3). Next iter (84) picks the highest-signal — recommend `fix.offline-empty-state` since it's the second live user report.
 
 > **Iter 82 WORK — sec.shell-open-call-sites-pinned DONE (worktree).**
 >
@@ -335,7 +346,7 @@ tauri_v2_migration_ready_for_squash_merge: true
 
 ### User-reported bugs (iter 82 — live triage)
 
-- [P0] **fix.resolve-game-root-wrong-assumption** — `teralaunch/src-tauri/src/commands/mods.rs::resolve_game_root()` treats the stored game path as if it were the `TERA.exe` path and strips two `parent()` levels. But `services/config_service::parse_game_config` returns the **install root** (e.g. `C:/Games/TERA`) — tests at config_service.rs:252/263 confirm. On a correctly-set path, the double-strip yields `C:/` and the `S1Game` existence check fails; on shorter paths the strip returns `None` and surfaces as **"Configured game path has no parent root"** even though the user set a valid path. Every other caller (`commands/download.rs:424`, `commands/hash.rs:220`, etc.) uses `game_path` correctly as the root — only `mods.rs` is wrong. Fix: delete the `.parent().and_then(|p| p.parent())` chain; return `game_path` directly, keep the `S1Game` existence check. Add a unit test that pins the correct behaviour on a representative install layout. Acceptance: test passes with `game_path = C:/Games/TERA` → returns `C:/Games/TERA`; GPK install succeeds end-to-end. Pillar: Functionality / Reliability. **Blocks GPK install for all users with a typical path configuration.**
+- [DONE @ iter 83] **fix.resolve-game-root-wrong-assumption** — Closed on worktree commit `466524a`. Extracted `validate_game_root(PathBuf) -> Result<PathBuf, String>` as a pure predicate; `resolve_game_root()` now just calls `load_config()` + delegates. Three inline tests pin the contract: valid-install round-trip, missing-S1Game error message, and a source-inspection regression guard (`validate_game_root_source_has_no_parent_walk`) that rejects any future `.parent()` call on the same code path. GPK install now works on a correctly-configured install layout. Pillar: Functionality.
 
 ### Functionality correctness (PRD §3.3)
 
