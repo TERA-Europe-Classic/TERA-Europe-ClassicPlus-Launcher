@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 113
-last_work_iteration: 113
+iteration_counter: 114
+last_work_iteration: 114
 last_research_sweep: 110
 last_revalidation: 100
 last_revalidation_status: all-gates-green
@@ -16,15 +16,29 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 94
+total_items_done: 95
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: fed37f1
+tauri_v2_migration_last_commit: 8d1ae3b
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 114 WORK — pin.secret-scan-infra-drift-guard DONE (worktree).**
+>
+> Worktree commit `8d1ae3b`. Closes PRD §3.1.6 infrastructure pin: criterion cites both `.github/workflows/secret-scan.yml` and the iter-13 audit doc. Iter 88 layered on `.gitleaks.toml` + allowlist. Until iter 114 the infra could silently regress (workflow file deleted; config renamed; allowlist broadened without audit citation).
+>
+> New `tests/secret_scan_guard.rs` (4 tests):
+> 1. `secret_scan_workflow_exists_and_runs_gitleaks` — runs gitleaks, pinned-release install URL, passes `--config .gitleaks.toml` explicitly so a config rename fails CI instead of silently reverting to defaults.
+> 2. `gitleaks_config_structure_is_intact` — `[extend] useDefault = true` (layer-not-replace), `[allowlist]` section, `target/` exclusions.
+> 3. `gitleaks_config_cites_audit_reference` — header cites iter 13 audit so allowlist additions stay disciplined.
+> 4. Detector self-test with 3 synthetic bad shapes.
+>
+> Parallel to iter 86 `shell_scope_pinned.rs` + iter 112 cargo-audit comments: same pattern of pinning CI security infrastructure via integration tests so deletion or silent reversion fails fast.
+>
+> Acceptance: 885/885 Rust (was 881, +4), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 113 WORK — pin.add-mod-from-file-wiring DONE (worktree).**
 >
