@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 140
-last_work_iteration: 139
+iteration_counter: 141
+last_work_iteration: 141
 last_research_sweep: 130
 last_revalidation: 140
 last_revalidation_status: all-gates-green
@@ -16,15 +16,31 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 119
+total_items_done: 120
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: f3fa62a
+tauri_v2_migration_last_commit: 747a915
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 141 WORK — pin.changelog-release-shape DONE (worktree).**
+>
+> Worktree commit `747a915`. Fourth in the iters 137/138/139/141 docs-guard-extension batch. `changelog_guard.rs` previously pinned conv-commit-prefix absence + minimum structure; nothing enforced the documented CHANGELOG shape (Unreleased buffer + `## X.Y.Z — title` semver + em-dash + newest-first ordering).
+>
+> Four new assertions:
+> 1. `changelog_carries_unreleased_section` — the `## Unreleased` buffer for incoming release notes must exist (without it, new entries either rewrite the previous release or get dropped)
+> 2. `release_sections_follow_semver_em_dash_shape` — every non-exempt `## ` release heading matches `## X.Y.Z — title` with em-dash U+2014 (not hyphen). Allowed exceptions: `## Unreleased` and legacy terminal `## 0.1.3 and earlier`
+> 3. `header_advertises_newest_release_first_ordering` — header retains the ordering convention wording (prevents chronological-forward append drift)
+> 4. `release_versions_descend_from_top_to_bottom` — strict semver descending from top to bottom (breaks release-notes tooling otherwise)
+>
+> Extended detector self-test with 3 new bad shapes (no Unreleased, hyphen separator, forward-ordered pair) + 1 positive descending pair.
+>
+> changelog_guard: 3 → 7 tests. Docs-guard-extension batch complete: claude_md (3→7), architecture (3→6), lessons_learned (4→7), changelog (3→7) — all four `## PRD §3.8.x` doc guards now have rich structural pins.
+>
+> Acceptance: 979/979 Rust (was 975, +4), clippy clean (needed `<=` not `!(>)` per nonminimal_bool lint), 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 140 REVALIDATION — all-gates-green.**
 >
