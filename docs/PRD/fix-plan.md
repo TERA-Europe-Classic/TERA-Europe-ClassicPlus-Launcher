@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 120
-last_work_iteration: 119
+iteration_counter: 121
+last_work_iteration: 121
 last_research_sweep: 120
 last_revalidation: 120
 last_revalidation_status: all-gates-green
@@ -16,15 +16,31 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 101
+total_items_done: 102
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: cd76a1d
+tauri_v2_migration_last_commit: 798a3bb
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 121 WORK — pin.§3.2.7+§3.2.10-extensions DONE (worktree).**
+>
+> Worktree commit `798a3bb`. Pivoted from the recommended §3.1.10 TCC/Shinra binary-hardening audit (doc doesn't exist — TCC+Shinra are C# forks out of scope for Rust iteration, same pattern as §3.8.7 audits/units/). Instead tightened drift-guard on already-shipped invariants.
+>
+> **Two additions:**
+> - §3.2.10 + `parse_mod_file_rejects_non_tmm_gpks` (iter 79 9-fixture adversarial corpus). Pairs with the iter-89 golden: golden pins positive-path byte-for-byte, corpus pins negative-path (Err on garbage). Both halves of "Corrupt GPK rejected cleanly" now pinned.
+> - §3.2.7 + `same_id_serialised_second_claim_refused` (registry.rs predicate). Complements the integration-level `same_id_serialised` in `tests/parallel_install.rs`. Predicate is the atomic gate that `install_external_mod`/`install_gpk_mod` call; pinning directly catches a refactor that moves the serialise-check elsewhere.
+>
+> PRD §3.2.7 cell updated to cite both integration + direct-predicate tests.
+>
+> **Deferred:** §3.1.10 TCC/Shinra binary-hardening remains documented-as-deferred on the Rust iteration track (C# out-of-scope alongside pin.tcc.classic-plus-sniffer + pin.shinra.tera-sniffer).
+>
+> Drift-guard: 35 → 37 pins.
+>
+> Acceptance: 899/899 Rust unchanged, clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 120 DOUBLE-DUTY — RESEARCH SWEEP + REVALIDATION, all-gates-green.**
 >
