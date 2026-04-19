@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 215
-last_work_iteration: 215
+iteration_counter: 216
+last_work_iteration: 216
 last_research_sweep: 210
 last_revalidation: 200
 last_revalidation_status: all-gates-green
@@ -16,15 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 189
+total_items_done: 190
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 04a2276
+tauri_v2_migration_last_commit: 6e76ab5
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 216 WORK — pin.search-perf-guard-header+SCANNER-path-constant+under_one_frame-it-block+prd-drift-cross-ref+literal-16-budget DONE (worktree).**
+>
+> Worktree commit `6e76ab5`. §3.6.4 search-one-frame perf budget; search_perf_guard had 12 tests (iter 124 creation + iter 181 +5); 35 iters untouched. Brings to 17.
+>
+> Five new source-inspection pins (meta-guard + path constant + named-test-positive + cross-guard PRD-drift integrity + arithmetic-free budget):
+> 1. `guard_file_header_cites_prd_3_6_4` — header cites `PRD 3.6.4` + `search-one-frame` criterion name; meta-guard contract
+> 2. `scanner_path_constant_is_canonical` — `const SCANNER: &str = "../tests/search-perf.test.js";` verbatim
+> 3. `under_one_frame_is_an_actual_it_block` — verifies `it('under_one_frame'` lives in a real `it(...)` call, not just a comment; iter-109 substring check would pass either way
+> 4. `perf_test_is_referenced_in_prd_path_drift_guard` — prd_path_drift_guard.rs must carry a JS_PIN entry for `search-perf.test.js::under_one_frame`; cross-guard integrity
+> 5. `perf_budget_is_literal_16_not_arithmetic` — `toBeLessThanOrEqual(16)` closes IMMEDIATELY with `)`; `toBeLessThanOrEqual(16 * 10)` would pass iter-109 substring check while inflating the budget
+>
+> search_perf_guard: 12 → 17 tests. 1308 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 215 WORK — pin.lessons-learned-guard-header+ACTIVE/ARCHIVE-path-constants+LINE_CAP-literal+archive-ordering+Pattern-before-When DONE (worktree).**
 >
