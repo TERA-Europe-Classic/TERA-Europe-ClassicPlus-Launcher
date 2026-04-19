@@ -7,9 +7,9 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 69
-last_work_iteration: 69
-last_research_sweep: 60
+iteration_counter: 70
+last_work_iteration: 70
+last_research_sweep: 70
 last_revalidation: 60
 last_revalidation_status: regression-resolved-next-iter
 last_retrospective: 60
@@ -19,11 +19,28 @@ last_investigation_iteration: 18
 total_items_done: 53
 total_items_regressed: 0
 total_iterations_to_cap: 1000
-tauri_v2_migration_milestone: M5
+tauri_v2_migration_milestone: M6-partial
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: a5fd094
+tauri_v2_migration_last_commit: 8d7c349
 ```
+
+> **Iter 70 WORK — Tauri v2 M6 partial (anti-reverse tier 1, worktree) + RESEARCH SWEEP.**
+>
+> **WORK (M6-tier-1).** Executed on the `tauri-v2-migration` worktree, commit `8d7c349`. Enabled Windows `/guard:cf` linker flag via `build.rs::cargo:rustc-link-arg-bin` (release builds only). Sets `IMAGE_DLLCHARACTERISTICS_GUARD_CF` in the PE header so the Windows loader applies CIG/ACG/dynamic-code-guard mitigations. Audit doc authored at `docs/PRD/audits/security/anti-reverse.md` — records the enabled tier, enumerates three explicit M6-b defers (full rustc CFG instrumentation, cryptify string-obfuscation of `teralib::config::CONFIG`, release-binary plaintext-grep proof), and explains why the CFG-via-`.cargo/config.toml` approach was rejected (OOM on host build scripts when host == target under LTO). Clippy also caught 3 `manual_contains` residue from iter 69's M5 csp_audit commit — fixed inline. Acceptance: build clean, clippy clean, 794/794 `cargo test --release` (zero regressions). Marked **M6-partial** in the header so M6-b can finish string-obfuscation + CI-scoped full CFG before flipping to M6 DONE.
+>
+> **RESEARCH SWEEP (N=70).** Local pin review vs M6 clippy compile output:
+> - `tauri` 2.10.3 (compiled) — matches migration plan target, current v2.10 line.
+> - `tauri-plugin-updater` 2.10.1 — current.
+> - `tokio` 1.49 pinned; tokio-util 0.7.18 transitively in tree.
+> - `reqwest` 0.12.28 (compiled within `^0.12.23` pin; cargo picked newer patch).
+> - `zip` — **both** 4.6.1 (transitively from a Tauri plugin) AND 2.4.2 (our direct pin of `2.3`, minor bumped in-range) present in build graph. Not a vulnerability — iter 11 CVE-2025-29787 remediation is satisfied at 2.3+. Dual-major is noise from the plugin crate split, not an action item.
+> - `aes-gcm` 0.10.3, `sha2` 0.10.9, `hkdf` 0.12.4, `hmac` 0.12.x, `base64` 0.22, `zeroize` 1.7, `cryptify` 3.1.1, `chamox` 0.1.4 — all current, no advisories.
+> - `cargo-audit` binary still uninstalled locally (P2 `infra.cargo-audit-install` stands).
+>
+> No RUSTSEC advisories surfaced in the migration diff vs iter 62 baseline. No upstream TCC / Shinra pulls this iter (no repo-level remote reviewed — not critical; last full scan iter 40).
+>
+> Next iter (71) executes M7: updater-downgrade refusal (PRD 3.1.9). Next RESEARCH SWEEP at iter 80.
 
 > **Iter 69 WORK — Tauri v2 M5 DONE (worktree). PRD 3.1.12 closed.**
 >
