@@ -7,10 +7,10 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 219
+iteration_counter: 220
 last_work_iteration: 219
-last_research_sweep: 210
-last_revalidation: 200
+last_research_sweep: 220
+last_revalidation: 220
 last_revalidation_status: all-gates-green
 last_retrospective: 60
 last_blocked_retry: 50
@@ -25,6 +25,10 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 4dee2a3
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 220 REVALIDATION — all gates green, N%10=0 research sweep absorbed. Doc: `docs/PRD/audits/research/revalidation-iter-220.md`.**
+>
+> 1323/1323 Rust tests (+90 vs iter 200), clippy clean, 449/449 vitest, 19 audit allowed (unchanged), 19 structural guards, 2 regression-grep matches (both FP). Every test file in tests/ ≥ 12 pins. 200→220 window: iter 201-209 extended earliest-small-baseline files (every file ≥ 10), iter 211-219 extended 11-count files (every file ≥ 12), iter 210 research sweep. Zero source-code changes. N%10=0 sweep absorbed into revalidation (no dep drift 210→220). Both documented ignores (rand, bytes) still in force. `ready_for_squash_merge: true` unchanged since iter 94. Next revalidation: iter 240. Next sweep: iter 230.
 
 > **Iter 219 WORK — pin.shell-open-guard-header+3-path-constants+sister-scope-guard+openExternal-wrapper+main-window-capability DONE (worktree).**
 >
