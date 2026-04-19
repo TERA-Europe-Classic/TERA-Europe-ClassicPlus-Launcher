@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 224
-last_work_iteration: 224
+iteration_counter: 225
+last_work_iteration: 225
 last_research_sweep: 220
 last_revalidation: 220
 last_revalidation_status: all-gates-green
@@ -16,15 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 197
+total_items_done: 198
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: d7932e3
+tauri_v2_migration_last_commit: 0806f62
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 225 WORK — pin.mods-categories-ui-scanner-guard-header+4-path-constants+3000-byte-floor+6-forbidden-markers+both-era-self-test DONE (worktree).**
+>
+> Worktree commit `0806f62`. fix.mods-categories-ui (iter 85) scanner drift guard; mods_categories_ui_scanner_guard had 13 tests (iter 124 creation + iter 186 +5); 39 iters untouched. Brings to 18.
+>
+> Five new source-inspection pins (meta-guard + path constants + threshold literal + marker coverage + self-test era coverage):
+> 1. `guard_module_header_cites_fix_slot_and_scanner_drift_contract` — header cites `fix.mods-categories-ui` + `iter 85` + `scanner drift guard` + `Classes of silent regression`
+> 2. `scanner_and_target_path_constants_are_canonical` — SCANNER + MODS_HTML + MODS_JS + MODS_CSS pinned verbatim
+> 3. `scanner_byte_floor_literal_is_three_thousand` — `body.len() > 3000` literal stays; weaker floor lets stubbed scanner pass
+> 4. `forbidden_markers_list_covers_six_disable_variants` — all 6 vitest disable variants (it.only/describe.only/it.skip/describe.skip/xit/xdescribe)
+> 5. `detector_self_test_carries_both_era_synthetic_shapes` — self-test body carries iter-85-era shapes A–D AND iter-186-era shapes E–G
+>
+> mods_categories_ui_scanner_guard: 13 → 18 tests. 1348 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 224 WORK — pin.i18n-no-hardcoded-guard-header+3-path-constants+iter-77-rationale+3-attribute-sibling-check+{2,}-quantifier DONE (worktree).**
 >
