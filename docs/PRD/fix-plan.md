@@ -7,9 +7,9 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 129
+iteration_counter: 130
 last_work_iteration: 129
-last_research_sweep: 120
+last_research_sweep: 130
 last_revalidation: 120
 last_revalidation_status: all-gates-green
 last_retrospective: 60
@@ -22,9 +22,19 @@ total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: adaf2cc
+tauri_v2_migration_last_commit: adc190a
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 130 RESEARCH SWEEP — all-gates-green.**
+>
+> Worktree commit `adc190a` adds `docs/PRD/audits/research/sweep-iter-130.md`. Fresh cargo audit on both workspaces: teralaunch (662 deps) exits 0 with 19 upstream-locked warnings (same as iter 120); teralib (233 deps) zero findings. cargo tree -d delta vs iter 120: all 10 tracked crate-dup versions unchanged. Exit criteria re-checked for RUSTSEC-2026-0097 (rand) and RUSTSEC-2026-0007 (bytes) — both still unmet, ignores retained.
+>
+> Rust / Tauri ecosystem quiet in iter 120-130 window: tauri 2.10.3, tauri-plugin-notification 2.3.3, tauri-plugin-http 2.5.8, tauri-plugin-updater 2.10.1, reqwest 0.12.28, rustls 0.103.12, zip 4.x — all pins unchanged.
+>
+> Structural-guard delta 120 → 130: +6 new guard files (tauri-v2-migration-audit-quartet, i18n-no-hardcoded, i18n-jargon+parity, shell-open-callsite, search-perf, classicplus-guards, offline-banner) + 2 body-only drift-guard extensions. Rust test-count 899 → 949 (+50). JS tests stable 449/449. Regression scan across 10 iter-120-to-130 commits: zero matches.
+>
+> Backlog clean on advisory/dep track. C# pins + §3.3.1 + §3.8.7 remain documented-deferred. `ready_for_squash_merge: true` unchanged. Formal revalidation at N=140.
 
 > **Iter 129 WORK — pin.offline-banner-scanner DONE (worktree).**
 >
