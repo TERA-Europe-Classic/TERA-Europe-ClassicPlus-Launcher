@@ -246,7 +246,7 @@ The `verified @ iter N` stamp is updated by each REVALIDATION iteration. Any `[D
 
 - [DONE] 3.2.10 corrupt GPK rejected — commit pre-loop, proof: `teralaunch/src-tauri/src/services/mods/tmm.rs::tests::parse_mod_file_rejects_non_tmm_gpks`, verified @ iter 0
 - [DONE] 3.3.13 update detection + launch banner — commit 4c489a6, proof: `teralaunch/src/mods.js::loadInstalled` version drift flip + `app.js::checkModUpdatesOnLaunch`, verified @ iter 0 (note: needs e2e test `mod-update-flow.spec.js::version_drift_shows_update` before fully DONE — demote to P1 if first REVALIDATION finds the test missing)
-- [DONE] infra.rust-integration-tests — commit <pending>, proof: `teralaunch/src-tauri/tests/smoke.rs` + `tests/common/mod.rs`, `cargo test --test smoke` → 2/2 passed in debug, verified @ iter 1
+- [DONE] infra.rust-integration-tests — commit b464c70, proof: `teralaunch/src-tauri/tests/smoke.rs` + `tests/common/mod.rs`, `cargo test --test smoke` → 2/2 passed in debug, verified @ iter 1
 
 ## META (human review)
 
