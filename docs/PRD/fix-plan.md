@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 147
-last_work_iteration: 147
+iteration_counter: 148
+last_work_iteration: 148
 last_research_sweep: 130
 last_revalidation: 140
 last_revalidation_status: all-gates-green
@@ -16,15 +16,29 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 126
+total_items_done: 127
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 42590aa
+tauri_v2_migration_last_commit: ae7f2c0
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 148 WORK — pin.shell-scope-stanza-strict DONE (worktree; 1001 Rust).**
+>
+> Worktree commit `ae7f2c0`. **Crossed the 1000-test threshold: 1001/1001 Rust.** `shell_scope_pinned` is the oldest security guard (iter 86, CVE-2025-31477 defence). Previously pinned `plugins.shell.open = true` + v1-vs-v2 stanza shape. The stanza's OTHER keys + `open`'s scope-override shape were unprotected — an added `execute` block or a scope regex list would silently re-widen the attack surface.
+>
+> Two new assertions:
+> 1. `shell_stanza_contains_only_open_key` — strict exactly-1-key check (`open`). Any added key (`execute`, `sidecar`, `scope` override) trips CI and forces a design review before landing
+> 2. `shell_open_has_no_scope_override` — no sibling `scope` block, and `open` stays a JSON boolean (not an object with a regex list). Either shape would bypass the safe-scheme allowlist
+>
+> Extended detector self-test with 3 new bad shapes (extra stanza key, `open` as scope-object, sibling scope block).
+>
+> shell_scope_pinned: 3 → 5 tests.
+>
+> Acceptance: **1001/1001 Rust (was 999, +2)**, clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 147 WORK — pin.tauri-v2-audit-depth DONE (worktree).**
 >
