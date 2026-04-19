@@ -411,4 +411,84 @@ mod tests {
 
     // Note: download_and_extract is network-bound and not unit-tested here.
     // Integration coverage via a mock HTTP server is tracked separately.
+
+    // --- Fail-closed SHA verification (PRD 3.1.1) ---------------------------
+    //
+    // Spin a one-shot HTTP/1.1 server on a loopback port, have `download_file`
+    // fetch from it with a deliberately-wrong `expected_sha256`, and assert:
+    //   (a) the function returns Err with "hash mismatch" wording,
+    //   (b) the destination file is NOT created (0 bytes touch disk).
+
+    async fn serve_once(body: &'static [u8]) -> u16 {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+
+        tokio::spawn(async move {
+            if let Ok((mut sock, _)) = listener.accept().await {
+                let mut buf = [0u8; 1024];
+                // Drain the request headers; we don't care what they are.
+                let _ = sock.read(&mut buf).await;
+
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\n\
+                     Content-Length: {}\r\n\
+                     Content-Type: application/octet-stream\r\n\
+                     Connection: close\r\n\r\n",
+                    body.len()
+                );
+                let _ = sock.write_all(response.as_bytes()).await;
+                let _ = sock.write_all(body).await;
+                let _ = sock.shutdown().await;
+            }
+        });
+
+        port
+    }
+
+    #[tokio::test]
+    async fn sha_mismatch_aborts_before_write() {
+        let tmp = TempDir::new().unwrap();
+        let dest = tmp.path().join("payload.bin");
+
+        let port = serve_once(b"real-server-bytes").await;
+        let url = format!("http://127.0.0.1:{port}/payload.bin");
+
+        // SHA-256 of "never-matches" — guaranteed not the hash of the body above.
+        let wrong_sha = hex_lower(&Sha256::digest(b"never-matches"));
+
+        let result = download_file(&url, &wrong_sha, &dest, |_, _| {}).await;
+
+        let err = result.expect_err("SHA mismatch must return Err");
+        assert!(
+            err.contains("hash mismatch") || err.contains("Hash mismatch"),
+            "unexpected error message: {err}"
+        );
+        assert!(
+            !dest.exists(),
+            "dest must not exist on SHA mismatch (fail-closed); found {}",
+            dest.display()
+        );
+    }
+
+    #[tokio::test]
+    async fn sha_match_writes_file() {
+        // Sanity control: same path on a correct hash must succeed so the
+        // negative test above isn't passing for the wrong reason.
+        let tmp = TempDir::new().unwrap();
+        let dest = tmp.path().join("payload.bin");
+
+        let body: &'static [u8] = b"exact-bytes";
+        let port = serve_once(body).await;
+        let url = format!("http://127.0.0.1:{port}/payload.bin");
+        let correct_sha = hex_lower(&Sha256::digest(body));
+
+        download_file(&url, &correct_sha, &dest, |_, _| {})
+            .await
+            .expect("matching SHA must succeed");
+
+        assert_eq!(fs::read(&dest).unwrap(), body);
+    }
 }

@@ -7,15 +7,15 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 18
-last_work_iteration: 18
+iteration_counter: 19
+last_work_iteration: 19
 last_research_sweep: 10
 last_revalidation: never
 last_revalidation_status: never
 last_retrospective: never
 last_blocked_retry: never
 last_investigation_iteration: 18
-total_items_done: 13
+total_items_done: 14
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
@@ -70,7 +70,6 @@ total_iterations_to_cap: 1000
 - [P0] **3.1.2.gpk-install-sha** — Author `teralaunch/src-tauri/tests/gpk_install_hash.rs::sha_mismatch_aborts_before_write_gpk`. Acceptance: test passes; 0 bytes touch dest on mismatch. Pillar: Security.
 - [P0] **3.1.4.gpk-deploy-sandbox** — Verify (and implement if missing) path-confinement in `tmm.rs` deploy. Author `teralaunch/src-tauri/tests/gpk_deploy_sandbox.rs::deploy_path_clamped_inside_game_root` with ≥ 5 `..`-based vectors. Acceptance: all vectors rejected, `.clean` untouched. Pillar: Security.
 - [P0] **3.1.5.http-allowlist** — Author `teralaunch/src-tauri/tests/http_allowlist.rs::every_mod_url_on_allowlist` that scans mods code for URL literals and asserts each matches the `tauri.conf.json` HTTP allowlist. Acceptance: test passes; any new URL added to code without allowlist update fails CI. Pillar: Security.
-- [P0] **3.1.1.external-sha-fail-closed** — Add test `teralaunch/src-tauri/src/services/mods/external_app.rs::tests::sha_mismatch_aborts_before_write` asserting SHA mismatch aborts with 0 bytes on disk. Acceptance: test passes. Pillar: Security.
 - [P0] **3.1.3.zip-slip-reject** — Add test `teralaunch/src-tauri/src/services/mods/external_app.rs::tests::extract_zip_rejects_zip_slip` with ≥ 3 attack vectors (absolute, `..`, drive-letter). Acceptance: all rejected; no file written outside install root. Pillar: Security.
 
 ### Functionality correctness (PRD §3.3)
@@ -271,6 +270,7 @@ The `verified @ iter N` stamp is updated by each REVALIDATION iteration. Any `[D
 - [DONE] fix.shinra-teradps-token — no commit needed (already resolved by upstream before the Classic+ fork took commits), proof: `grep -rnE '(TeraDpsToken|TeraDpsUser|H0XJ9RGZO8|KxjWQFyQJp)' --include='*.cs' --include='*.xml' --include='*.json'` in Shinra working tree → 0 hits. Token exists only in historical commits `ea5a3af8` + `fd47e078` (upstream-era). Rewriting fork history gains zero security benefit because the token is in every public clone of upstream. Item closes as a no-op forward fix. Verified @ iter 15.
 - [DONE] infra.secret-scan-ci — commits: launcher 144d56f, catalog 3f7f435, TCC d5a8daa9, Shinra ccc86444. Each `.github/workflows/secret-scan.yml` installs gitleaks 8.30.0 and scans the commit range (`pull_request.base..head` or `github.event.before..sha`) — not full history, so the iter-13-triaged historical findings don't break CI every run. Fails the job on any new finding. Verified @ iter 16 (YAML syntax + URL resolve check).
 - [DONE] 3.1.6.secret-leak-scan (umbrella) — proof: audit `docs/PRD/audits/security/secret-leak-scan.md` (commit 01064c9) enumerates all 33 raw gitleaks findings across 5 repos with disposition (1 upstream-resolved true positive, 4 DPAPI blobs untracked, 28 false positives) + all three sub-items closed: fix.launcher-vs-dir-tracked (978d5b0 + gitignore follow-up this iter), fix.shinra-teradps-token (no-op — upstream-era), infra.secret-scan-ci (launcher 144d56f, catalog 3f7f435, TCC d5a8daa9, Shinra ccc86444). Umbrella acceptance: CI workflows authored on all 4 GitHub repos + audit doc lists all findings and dispositions. CI-green-on-GitHub verification will trip on next push to each repo (workflows scan NEW commits only, so existing baseline exits 0 by construction). Follow-up infra.gitleaks-allowlist stays P1 for future-regression defence. Verified @ iter 17.
+- [DONE] 3.1.1.external-sha-fail-closed — proof: `services::mods::external_app::tests::sha_mismatch_aborts_before_write` passes in release. Serves a deliberate-mismatch body via a one-shot loopback TCP listener; `download_file` returns `Err("Download hash mismatch: ...")` and `dest.exists() == false`. Sanity control `sha_match_writes_file` asserts the happy path still writes (so the negative test isn't passing by accident). Fail-closed semantics were already structural (SHA check runs in-memory before any `fs::write` / `fs::create_dir_all`); the tests pin the contract. Full release suite 698 unit + 2 integration green, clippy --release clean. Verified @ iter 19.
 
 ## META (human review)
 
