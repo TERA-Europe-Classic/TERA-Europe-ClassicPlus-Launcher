@@ -7,15 +7,15 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 48
-last_work_iteration: 48
+iteration_counter: 49
+last_work_iteration: 49
 last_research_sweep: 40
 last_revalidation: 40
 last_revalidation_status: clean
 last_retrospective: 30
 last_blocked_retry: never
 last_investigation_iteration: 18
-total_items_done: 42
+total_items_done: 43
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
@@ -114,7 +114,7 @@ total_iterations_to_cap: 1000
 - [P1] **sec.aes-gcm-rustsec-2023-0096-audit** — RUSTSEC-2023-0096 (aes-gcm `decrypt_in_place_detached` leaks plaintext on tag-verify failure). Grep teralaunch + teralib for `decrypt_in_place_detached`; if no callers, close as N/A. If callers exist, bump aes-gcm and refactor. Acceptance: grep returns zero matches OR patched version in use + test coverage. Pillar: Security. Discovered iter 10 RESEARCH SWEEP.
 - [P1] **3.2.1.edge-cases-X1-X24** — Author 24 named tests across `teralaunch/tests/e2e/mod-*.spec.js` + `teralaunch/src-tauri/tests/mod_*.rs` covering edge cases X1–X24. Define X1–X24 in `docs/PRD/test-plan.md` (new file). Acceptance: 24/24 tests passing. Pillar: Reliability.
 - [P1] **3.2.5.offline-retry** — Test `mod-catalog-resilience.spec.js::offline_shows_retry`. Acceptance: test passes. Pillar: Reliability.
-- [P1] **3.2.6.parse-error-filter** — Test `catalog-parse.test.js::malformed_entries_filtered`. Acceptance: test passes. Pillar: Reliability.
+- [DONE] 3.2.6.parse-error-filter — **Real behaviour change.** Previous `fetch_remote` used `response.json::<Catalog>()` which is strict serde — a single malformed entry would error the entire catalog load and the mods page would render empty-or-broken. Replaced with a tolerant two-phase parser at `services::mods::catalog::parse_catalog_tolerant(body)`: (phase 1) parse envelope as `serde_json::Value` and extract required `version` + `updated_at` + `mods` array — envelope errors are still hard errors; (phase 2) iterate `mods[]`, `serde_json::from_value::<CatalogEntry>` each one, keep successes, drop failures with `log::warn!(…"Catalog entry #{idx} ('{id_hint}') dropped — {err}")` so catalog authors have something to grep. `fetch_remote` now awaits `response.text()` and hands the body to the tolerant parser. 4 new tests in `services::mods::catalog::tests`: `malformed_entries_filtered` (3-entry body with `kind: 42` middle entry → 2 good ids survive, bad id filtered), `empty_mods_array_yields_empty_catalog` (the `mods: []` case is valid), `malformed_envelope_is_hard_error` (missing `mods`, missing `version`, invalid JSON all return Err), `every_entry_malformed_returns_empty_catalog` (page renders empty browse tab instead of error banner — matches the reliability goal). `cargo test --release` → 754 unit + 3 + 3 + 4 + 2 + 2 + 4 passed. Clippy clean. Verified @ iter 49.
 - [P1] **3.2.7.parallel-install-serialised** — Test `parallel_install.rs::same_id_serialised`. Acceptance: test passes; no double-write race. Pillar: Reliability.
 - [P1] **3.2.8.disk-full-revert** — Test `disk_full.rs::revert_on_enospc`. Acceptance: partial writes reversed on ENOSPC. Pillar: Reliability.
 

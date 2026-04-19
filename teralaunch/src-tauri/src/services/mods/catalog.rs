@@ -11,7 +11,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
-use super::types::Catalog;
+use super::types::{Catalog, CatalogEntry};
 
 pub const CATALOG_URL: &str =
     "https://raw.githubusercontent.com/TERA-Europe-Classic/external-mod-catalog/main/catalog.json";
@@ -57,7 +57,9 @@ pub fn save_cache(path: &Path, cached: &CachedCatalog) -> Result<(), String> {
 }
 
 /// Fetch the catalog from the remote URL. Reuses the launcher's existing
-/// `reqwest`-based HTTP stack.
+/// `reqwest`-based HTTP stack. Entries that fail to deserialise are
+/// dropped with a WARN log; the rest of the catalog still surfaces so a
+/// single bad entry can't brick the mods page — see `parse_catalog_tolerant`.
 pub async fn fetch_remote(url: &str) -> Result<Catalog, String> {
     let client = reqwest::Client::builder()
         .user_agent("TERA-Europe-ClassicPlus-Launcher")
@@ -74,10 +76,68 @@ pub async fn fetch_remote(url: &str) -> Result<Catalog, String> {
         return Err(format!("Catalog fetch returned HTTP {}", response.status()));
     }
 
-    response
-        .json::<Catalog>()
+    let body = response
+        .text()
         .await
-        .map_err(|e| format!("Catalog JSON is malformed: {}", e))
+        .map_err(|e| format!("Failed to read catalog body: {}", e))?;
+
+    parse_catalog_tolerant(&body)
+}
+
+/// Parses the catalog JSON document, filtering out entries that fail to
+/// deserialise as `CatalogEntry` while keeping the rest. The top-level
+/// envelope (`version`, `updated_at`, `mods` array) is still required —
+/// a malformed envelope is a hard error. Only individual `mods[]` entries
+/// are skippable.
+///
+/// PRD 3.2.6.parse-error-filter: a single bad catalog entry must not
+/// brick the entire mods page. Entry-level errors are logged at WARN so
+/// catalog authors have something to grep.
+pub fn parse_catalog_tolerant(body: &str) -> Result<Catalog, String> {
+    let envelope: serde_json::Value = serde_json::from_str(body)
+        .map_err(|e| format!("Catalog JSON envelope is malformed: {}", e))?;
+
+    let version = envelope
+        .get("version")
+        .and_then(|v| v.as_u64())
+        .ok_or_else(|| "Catalog JSON missing 'version' (number)".to_string())?
+        as u32;
+
+    let updated_at = envelope
+        .get("updated_at")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    let mods_array = envelope
+        .get("mods")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| "Catalog JSON missing 'mods' (array)".to_string())?;
+
+    let mut mods = Vec::with_capacity(mods_array.len());
+    for (idx, raw) in mods_array.iter().enumerate() {
+        match serde_json::from_value::<CatalogEntry>(raw.clone()) {
+            Ok(entry) => mods.push(entry),
+            Err(err) => {
+                let id_hint = raw
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("<no id>");
+                log::warn!(
+                    "Catalog entry #{} ('{}') dropped — {}",
+                    idx,
+                    id_hint,
+                    err
+                );
+            }
+        }
+    }
+
+    Ok(Catalog {
+        version,
+        updated_at,
+        mods,
+    })
 }
 
 pub fn now_unix() -> u64 {
@@ -162,5 +222,100 @@ mod tests {
         let catalog: Catalog = serde_json::from_str(json).unwrap();
         assert_eq!(catalog.mods.len(), 1);
         assert_eq!(catalog.mods[0].kind, ModKind::External);
+    }
+
+    fn valid_entry_json(id: &str) -> String {
+        format!(
+            r#"{{
+                "id": "{}",
+                "kind": "external",
+                "name": "Example",
+                "author": "Someone",
+                "short_description": "desc",
+                "version": "1.0.0",
+                "download_url": "https://example.com/x.zip",
+                "sha256": "abcd",
+                "executable_relpath": "x.exe"
+            }}"#,
+            id
+        )
+    }
+
+    /// PRD 3.2.6.parse-error-filter: a bad entry (e.g. wrong type on a
+    /// required field) drops just that entry. The rest of the catalog
+    /// surfaces normally.
+    #[test]
+    fn malformed_entries_filtered() {
+        let good = valid_entry_json("good.one");
+        let good_two = valid_entry_json("good.two");
+        // Bad entry: `kind` is a number instead of the required enum string.
+        let bad = r#"{
+            "id": "bad.entry",
+            "kind": 42,
+            "name": "Malformed",
+            "author": "nobody",
+            "short_description": "broken",
+            "version": "0.0.0",
+            "download_url": "https://example.com/m.zip",
+            "sha256": "ff"
+        }"#;
+        let body = format!(
+            r#"{{"version": 1, "updated_at": "2026-04-19T00:00:00Z",
+                 "mods": [{}, {}, {}]}}"#,
+            good, bad, good_two
+        );
+
+        let catalog = parse_catalog_tolerant(&body).expect("envelope valid");
+        assert_eq!(catalog.mods.len(), 2, "bad entry filtered; 2 good survive");
+        let ids: Vec<_> = catalog.mods.iter().map(|m| m.id.as_str()).collect();
+        assert!(ids.contains(&"good.one"));
+        assert!(ids.contains(&"good.two"));
+        assert!(!ids.contains(&"bad.entry"));
+    }
+
+    /// An empty `mods` array is valid — returns an empty catalog without
+    /// error. The envelope itself is still required.
+    #[test]
+    fn empty_mods_array_yields_empty_catalog() {
+        let body = r#"{"version": 1, "updated_at": "2026-04-19T00:00:00Z", "mods": []}"#;
+        let catalog = parse_catalog_tolerant(body).unwrap();
+        assert!(catalog.mods.is_empty());
+        assert_eq!(catalog.version, 1);
+    }
+
+    /// Envelope errors are hard errors — a broken `version` or missing
+    /// `mods` field cannot be recovered by dropping entries.
+    #[test]
+    fn malformed_envelope_is_hard_error() {
+        // Missing `mods` array.
+        let body = r#"{"version": 1, "updated_at": "2026-04-19T00:00:00Z"}"#;
+        let err = parse_catalog_tolerant(body).unwrap_err();
+        assert!(err.contains("'mods'"), "got: {}", err);
+
+        // `version` missing entirely.
+        let body = r#"{"updated_at": "2026-04-19T00:00:00Z", "mods": []}"#;
+        let err = parse_catalog_tolerant(body).unwrap_err();
+        assert!(err.contains("'version'"), "got: {}", err);
+
+        // Not even valid JSON.
+        let err = parse_catalog_tolerant("not json").unwrap_err();
+        assert!(err.contains("envelope"), "got: {}", err);
+    }
+
+    /// Every entry being malformed drops them all but still surfaces a
+    /// valid (empty) catalog — the page renders an empty browse tab
+    /// instead of an error banner, matching the reliability goal.
+    #[test]
+    fn every_entry_malformed_returns_empty_catalog() {
+        let body = r#"{
+            "version": 1,
+            "updated_at": "2026-04-19T00:00:00Z",
+            "mods": [
+                {"id": "a", "kind": 42, "short_description": "broken"},
+                {"not_even_an_entry": true}
+            ]
+        }"#;
+        let catalog = parse_catalog_tolerant(body).unwrap();
+        assert!(catalog.mods.is_empty());
     }
 }
