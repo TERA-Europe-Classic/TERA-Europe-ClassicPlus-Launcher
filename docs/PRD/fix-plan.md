@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 217
-last_work_iteration: 217
+iteration_counter: 218
+last_work_iteration: 218
 last_research_sweep: 210
 last_revalidation: 200
 last_revalidation_status: all-gates-green
@@ -16,15 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 191
+total_items_done: 192
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: ab78a94
+tauri_v2_migration_last_commit: 1e012e6
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 218 WORK — pin.classicplus-guards-header+3-path-constants+stub-live-body-no-network+config-no-residue+ALLOWED-count DONE (worktree).**
+>
+> Worktree commit `1e012e6`. Classic+ disabled-features contract; classicplus_guards_scanner_guard had 12 tests (iter 128 creation + iter 183 +5); 35 iters untouched. Brings to 17.
+>
+> Five new source-inspection pins (meta-guard + path constants + stricter live-body check + config residue + ALLOWED list count):
+> 1. `guard_file_header_cites_classicplus_and_scanner_slug` — header cites `Classic+` + `classicplus-guards.test.js`; meta-guard contract
+> 2. `all_path_constants_are_canonical` — SCANNER + APP_JS + TERALIB_CONFIG path constants all pinned verbatim
+> 3. `app_js_stub_live_body_has_no_network_call` — stricter than iter-183's early-return pin: LIVE body (before first `return`) must not contain `fetch(`/`invoke(`/`await this.`; catches `return await fetch(...)` regression
+> 4. `teralib_config_has_no_classic_residue_keys` — config.json must not carry LEADERBOARD / PROFILE_URL / NEWS_URL / PATCH_NOTES_URL / OAUTH_URL; Classic-era keys deleted from schema entirely
+> 5. `allowed_hosts_list_count_is_three` — iter-183 ALLOWED slice has exactly 3 entries (LAN + Discord + helpdesk); trim would make fixture-host check vacuous
+>
+> classicplus_guards_scanner_guard: 12 → 17 tests. 1318 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 217 WORK — pin.offline-banner-guard-header+4-path-constants+show/hide-helpers+retry-init-inline+strip_js_comments-self-test DONE (worktree).**
 >
