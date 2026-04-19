@@ -7,10 +7,10 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 179
+iteration_counter: 180
 last_work_iteration: 179
 last_research_sweep: 170
-last_revalidation: 160
+last_revalidation: 180
 last_revalidation_status: all-gates-green
 last_retrospective: 60
 last_blocked_retry: 50
@@ -26,18 +26,15 @@ tauri_v2_migration_last_commit: 4018ccc
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 179 WORK — pin.crate-comment-shape-invariants DONE (worktree).**
+> **Iter 180 REVALIDATION — all-gates-green (docs/PRD/audits/research/revalidation-iter-180.md).**
 >
-> Worktree commit `4018ccc`. PRD §3.8.2 `crate_comment_guard.rs` previously had 3 tests (iter 104+143): prefix check + char-body floor + detector self-test. Iter 179 widens to 5 more angles — last WORK before N=180 REVALIDATION; structural-guard sweep now symmetric across architecture_doc, lessons_learned, prd_path_drift, crate_comment.
+> N%20=0 formal revalidation. All gates re-run on worktree `4018ccc`. Rust 1143/1143 (+90 vs iter 160 baseline 1053), clippy -D warnings clean, cargo audit 19 allowed (both ignores still in force, no upstream cadence), vitest 449/449, structural-guard file count 19 (unchanged), commit-count since main 118 (was 100), regression-pattern grep 1 (false positive — `revert` in `test(disk-full)` commit message refers to the `revert_to_vanilla` helper being pinned, not an actual revert). First-run transient flake on `test_hash_cache_lock` consistent with known parallelism flake; subsequent runs clean.
 >
-> Five new source-inspection pins on every `src/services/mods/*.rs` file:
-> 1. `every_mods_source_file_has_multi_line_doc_block` — `MIN_DOC_LINES=2`; a single long line trips iter-143 char floor but hides invariants behind summary
-> 2. `no_crate_doc_contains_wip_marker` — TODO/FIXME/XXX/HACK in `//!` block bakes the gap into prod
-> 3. `every_mods_source_file_has_doc_at_top_of_file` — Rustdoc treats inner-item `//!` as attribute docs, not crate docs; mid-file `//!` is silently wrong
-> 4. `expected_mods_filename_set_is_present` — locks canonical set {catalog, external_app, mod, registry, tmm, types} so a rename can't slip past the iter-104 count floor
-> 5. `every_mods_doc_first_line_has_nonempty_summary` — `MIN_SUMMARY_CHARS=20` on stripped first `//!` line; stub first line + padding can't pass combined floors
+> DONE-item spot-check: 5 most recent (iter 175-179) re-verified green. No stale stamps.
 >
-> crate_comment_guard: 3 → 8 tests. 1143 Rust (+5), clippy clean, vitest 449/449.
+> Doc-layer symmetry milestone: iter 173-179 pushed every canonical doc-layer guard to ≥ 8 pins (changelog, CLAUDE.md, ARCHITECTURE.md, lessons-learned, PRD-drift, crate-comment, meta-hygiene). Doc-layer drift-proof under CI.
+>
+> `ready_for_squash_merge: true` unchanged — user-gated per standing policy. Next revalidation iter 200; next research sweep iter 190.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
