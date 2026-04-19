@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 81
-last_work_iteration: 81
+iteration_counter: 82
+last_work_iteration: 82
 last_research_sweep: 80
 last_revalidation: 72
 last_revalidation_status: all-gates-green
@@ -16,15 +16,26 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 18
-total_items_done: 62
+total_items_done: 63
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: e52cad4
+tauri_v2_migration_last_commit: 8ad2c1b
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 82 WORK — sec.shell-open-call-sites-pinned DONE (worktree).**
+>
+> Second of five iter-80 queued P2s closed. Worktree commit `8ad2c1b`. Defence-in-depth against CVE-2025-31477 regression: new JS test at `teralaunch/tests/shell-open-callsite.test.js` (5 tests, 0 source changes) classifies every `shell.open(X)` / `openExternal(X)` call site by arg shape — string literal, known identifier, URLS.external.* member, or template of those. Bad shapes (bare vars, arbitrary member chains, unsafe template interpolations) fail with file:line:arg. Self-tests pin the classifier in both directions. Plus the detector catches `${locale}` as a sibling interpolation and was extended to accept it with justification (i18n enum, never attacker-controlled).
+>
+> Acceptance: 828/828 Rust (unchanged — JS-only), clippy clean, 436/436 JS (was 431, +5 new). Worktree ready state unchanged — `ready_for_squash_merge: true`. Three iter-80 queued items remain: `sec.shell-scope-hardening`, `dep.dedupe-reqwest-zip`, `dep.vitest-bump-post-squash` (P3).
+>
+> **User-reported bugs this session — three new fix-plan entries queued (see P0/P1 sections below):**
+> - `fix.resolve-game-root-wrong-assumption` (P0) — `commands/mods.rs::resolve_game_root()` strips 2 parents from the stored game path, but `config_service::parse_game_config` returns the install **root** (not the exe), so GPK install always fails with "Configured game path has no parent root" on valid paths. Bug present on both main and worktree. Every other caller (download.rs, hash.rs) treats the path correctly as the install root; only mods.rs is wrong. Fix: delete the 2-parent-strip chain, return `game_path` directly + keep the `S1Game` existence check.
+> - `fix.offline-empty-state` (P1) — When the API is offline, the launcher renders a blank dark screen with no error. User can't tell if the launcher itself is broken or the server is down. Ship a visible offline banner / retry UI instead.
+> - `fix.mods-categories-ui` (P1) — Categories pill row in the mods modal has visual inconsistency ("All categories" styled differently from siblings) and awkward layout (placed below search + filter, creating an L-shape). Needs style unification + layout pass.
 
 > **Iter 81 WORK — dep.rustls-webpki-bump DONE (worktree).**
 >
@@ -322,6 +333,10 @@ tauri_v2_migration_ready_for_squash_merge: true
 - [P0] **3.1.9.updater-downgrade-refuse** — Patch Tauri updater to refuse downgrades (compare current version vs `latest.json` version; reject older). Author `teralaunch/src-tauri/tests/updater_downgrade.rs::refuses_older_latest_json`. Acceptance: test passes with a signed older `latest.json` fixture. Pillar: Security.
 - [P0] **3.1.12.csp-unsafe-inline** — Audit `tauri.conf.json` CSP; remove `unsafe-inline` for `script-src`. Migrate any inline scripts to external modules. Author `teralaunch/src-tauri/tests/csp_audit.rs::csp_denies_inline_scripts`. Acceptance: test asserts CSP contains no `'unsafe-inline'` in `script-src`. Pillar: Security.
 
+### User-reported bugs (iter 82 — live triage)
+
+- [P0] **fix.resolve-game-root-wrong-assumption** — `teralaunch/src-tauri/src/commands/mods.rs::resolve_game_root()` treats the stored game path as if it were the `TERA.exe` path and strips two `parent()` levels. But `services/config_service::parse_game_config` returns the **install root** (e.g. `C:/Games/TERA`) — tests at config_service.rs:252/263 confirm. On a correctly-set path, the double-strip yields `C:/` and the `S1Game` existence check fails; on shorter paths the strip returns `None` and surfaces as **"Configured game path has no parent root"** even though the user set a valid path. Every other caller (`commands/download.rs:424`, `commands/hash.rs:220`, etc.) uses `game_path` correctly as the root — only `mods.rs` is wrong. Fix: delete the `.parent().and_then(|p| p.parent())` chain; return `game_path` directly, keep the `S1Game` existence check. Add a unit test that pins the correct behaviour on a representative install layout. Acceptance: test passes with `game_path = C:/Games/TERA` → returns `C:/Games/TERA`; GPK install succeeds end-to-end. Pillar: Functionality / Reliability. **Blocks GPK install for all users with a typical path configuration.**
+
 ### Functionality correctness (PRD §3.3)
 
 - [P0] **3.3.5.tcc-ingame-verified** — Launch Classic+ live server, verify TCC overlay renders, class window populates, cooldowns tick. Author `docs/PRD/audits/functionality/tcc-ingame-verified.md` with 3 class screenshots (Warrior, Sorcerer, Priest). Acceptance: audit signed off. Pillar: Functionality.
@@ -334,6 +349,11 @@ tauri_v2_migration_ready_for_squash_merge: true
 
 
 ## P1 — Major quality
+
+### User-reported bugs (iter 82 — live triage)
+
+- [P1] **fix.offline-empty-state** — When the launcher can't reach the portal API (`http://192.168.1.128:8090`) — typical on dev/LAN-restart or while the server is offline — the frontend renders a blank dark viewport with no error, no retry button, no indication that the launcher itself isn't broken. User cannot distinguish between "launcher crashed" and "server is down." Fix: ship a visible offline banner (or full-screen error state for unrecoverable network failures) with a Retry button and a one-line explanation ("Can't reach the portal server. The server may be offline, or your connection is down."). Acceptance: `teralaunch/tests/e2e/offline-state.spec.js::shows_offline_banner_on_api_unreachable` passes (mock a network failure on the portal URL, assert the banner + retry button render). Pillar: UX / Reliability.
+- [P1] **fix.mods-categories-ui** — The mods modal category pill row (rendered in `src/mods.html` + styled in `src/mods.css`) has two visible defects on the live launcher (user screenshot, iter 82): (a) the "All categories" pill has inconsistent styling vs the per-category pills next to it (different shape / padding / color-weight), and (b) the row sits below the search bar but the kind-filter toggle (All/External/GPK) stays to the right of search, forming an awkward L-shape with no visual group boundary. Fix: unify the pill style across All + per-category entries (same shape, same color policy, same hover state), then re-flow the layout so the category row reads as a single filter section aligned with the kind-filter (either both below search in a shared strip, or categories above search with the kind-filter remaining inline). Acceptance: visual-regression baseline `mods-modal-categories.png` (≤0.1% diff under Playwright) + a Vitest dom-order test pinning the category pill DOM shape. Pillar: UX.
 
 ### Reliability (PRD §3.2)
 
