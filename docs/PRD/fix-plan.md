@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 68
-last_work_iteration: 68
+iteration_counter: 69
+last_work_iteration: 69
 last_research_sweep: 60
 last_revalidation: 60
 last_revalidation_status: regression-resolved-next-iter
@@ -16,14 +16,26 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 18
-total_items_done: 52
+total_items_done: 53
 total_items_regressed: 0
 total_iterations_to_cap: 1000
-tauri_v2_migration_milestone: M4-partial
+tauri_v2_migration_milestone: M5
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 9983474
+tauri_v2_migration_last_commit: a5fd094
 ```
+
+> **Iter 69 WORK — Tauri v2 M5 DONE (worktree). PRD 3.1.12 closed.**
+>
+> Executed M5 on the `tauri-v2-migration` worktree. Dropped `'unsafe-inline'` from CSP `script-src`, closing PRD §3.1.12. Worktree commit `a5fd094`. Audit found two inline-JS sites that needed relocating before the tightening would land without breaking runtime:
+> - `src/index.html:10-37` — 27-line zoom-correction IIFE extracted to `src/zoom.js`, loaded via `<script src>`. Kept as the first script tag in `<head>` to preserve the pre-`<body>` viewport sizing behaviour.
+> - `src/mods.js:585` — dynamically-generated `onerror=""` attribute on catalog `<img>` tiles. Browser CSP treats attribute-based event handlers as inline scripts, so attribute-form blocks under strict policy. Refactored to `addEventListener('error', ..., { once: true })` attached after the `innerHTML` assignment.
+>
+> `tauri.conf.json::app.security.csp` — `'unsafe-inline'` removed from `script-src`. `style-src` retains it intentionally (out of 3.1.12 scope; tightening style-src would break inline `style=""` attributes the launcher renders and is a separate future item).
+>
+> Pin test `src-tauri/tests/csp_audit.rs` authored (4 tests): asserts `'unsafe-inline'` absent from script-src, `'self'` + cdnjs still present so bundled + vendored JS keeps loading, plus 2 unit tests on the directive-token helper (no prefix-match bugs, missing-directive returns None).
+>
+> Acceptance: `cargo test --release --test csp_audit` → 4/4. Full `cargo test --release` → 794/794 (764 unit + 3+4+4+3+4+4+2+2+4 integration; +4 from new csp_audit, zero regressions vs iter 67 790 baseline). `npm test` → 431/431 (router.test.js teardown warning is pre-existing, unrelated). Next iter (70) is M6 anti-reverse hardening. **N=70 also triggers a RESEARCH SWEEP per the cadence table** — iter 70 handles both: do M6 as the work, then run the research sweep as the second half of the iteration (dep version scan + upstream TCC/Shinra/tauri-plugin-updater diff via Context7, no network required for the local-pin check).
 
 > **Iter 68 WORK — Tauri v2 M4 partial (deploy-path v2-ready, worktree).**
 >
