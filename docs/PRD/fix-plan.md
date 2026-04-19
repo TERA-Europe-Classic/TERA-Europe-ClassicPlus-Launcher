@@ -7,17 +7,20 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 1
+iteration_counter: 2
 last_work_iteration: 1
 last_research_sweep: never
 last_revalidation: never
 last_revalidation_status: never
 last_retrospective: never
 last_blocked_retry: never
+last_investigation_iteration: 2
 total_items_done: 1
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
+
+> **Iter 2 note:** planning/investigation iteration on `fix.cargo-test-release-lto-link`. No item completed. Root-cause narrowed to teralib double-build during test mode; fix options documented on the item. Iter 3 will implement fix option (B).
 
 **Iteration type by counter:** `iteration_counter` = last completed iteration's number. For the iteration about to run, compute `N = iteration_counter + 1` and match:
 
@@ -46,7 +49,20 @@ total_iterations_to_cap: 1000
 
 ### Infrastructure (must exist before most P0 tests can be written)
 
-- [P0] **fix.cargo-test-release-lto-link** — `cargo test --release --test smoke` fails to link the bin with 32 unresolved `teralib::*` externals, even though `cargo build --release` succeeds. Not triggered by adding `--features custom-protocol`. Root cause suspected: LTO + cfg(test) + path-dep `teralib` interaction strips symbols during test-mode bin rebuild. Fix options: (a) `CARGO_PROFILE_RELEASE_LTO=false` override, (b) add `src/lib.rs` so integration tests link lib instead of bin, (c) `[[bin]] test = false` + refactor unit tests to lib. Acceptance: `cargo test --release --test smoke` exits 0. Pillar: Reliability. Required for PRD §11 clause 2.
+- [P0] **fix.cargo-test-release-lto-link** — `cargo test --release --test smoke` fails. Acceptance: `cargo test --release --test smoke` exits 0. Pillar: Reliability. Required for PRD §11 clause 2.
+
+  **Iter-2 investigation (unfinished):**
+  - Attempt 1 — `cargo test --release --test smoke`: 32 unresolved `teralib::*` externals at link.
+  - Attempt 2 — same with `--features custom-protocol`: same 32 symbols unresolved.
+  - Attempt 3 — `CARGO_PROFILE_RELEASE_LTO=false cargo test --release --test smoke`: filename-collision warning on `teralib.dll/.rlib/.pdb` (teralib lib target built twice); then compile errors about tokio-version mismatch (1.47.1 in teralib lib vs 1.49.0 in consumer).
+  - Control — `cargo build --release` (bin only, no tests): exit 0 in 1m26s.
+  - Root-cause hypothesis: teralib declares `crate-type = ["cdylib","rlib"]` AND has a `[[bin]] name = "tera_launcher"`. When the consumer (`src-tauri`) is in test mode, cargo traverses test-adjacent targets across path deps, triggering a double-build of teralib's lib (once as direct rlib for consumer, once as dep of teralib's bin) with divergent feature sets. LTO-on masks it as unresolved symbols; LTO-off surfaces it as filename collision + tokio version divergence. Notably teralib/Cargo.lock pins tokio 1.47.1 while src-tauri/Cargo.lock has 1.49.0.
+  - Candidate fixes (all require scope beyond single-iter discipline — pick as next iter's PICK):
+    - (A) Restructure teralib: remove `[[bin]] tera_launcher` target if unused, or split into `teralib-core` (lib only) + `teralib-bin` (bin consuming core). Affects teralib/Cargo.toml + any code referencing `tera_launcher`.
+    - (B) Unify tokio versions: delete `teralib/Cargo.lock` (advisory for path-dep), bump teralib's `tokio = "1.47.1"` to `tokio = "1.49"`, verify both lockfiles unify.
+    - (C) Separate target dirs: give teralib its own `CARGO_TARGET_DIR` when built standalone via `.cargo/config.toml`. Minimal but doesn't fix root dual-build.
+    - (D) Consumer lib split: add `src-tauri/src/lib.rs` + move modules, make `[[bin]] main.rs` a thin caller, `[[bin]] test = false`. Large refactor.
+  - Recommend (B) as iter-3 pick — lowest-risk, highest probability of unblocking. (A) as fallback if (B) doesn't close the bin-rebuild gap.
 - [P0] **infra.tcc-test-project** — Add `TCC.Tests/` xUnit project to TCC solution. Acceptance: `dotnet test TCC.sln -c Release` runs ≥ 1 passing test. Pillar: Reliability.
 - [P0] **infra.shinra-test-project** — Add `ShinraMeter.Tests/` xUnit project to Shinra solution. Acceptance: `dotnet test ShinraMeter.sln -c Release` runs ≥ 1 passing test. Pillar: Reliability.
 - [P0] **infra.catalog-ci** — Author `.github/workflows/catalog-ci.yml` for `external-mod-catalog`: JSON validity + schema + URL reachability gates. Acceptance: PR that breaks `catalog.json` fails CI. Pillar: Reliability (PRD §11 clause 9).
