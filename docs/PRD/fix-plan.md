@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 83
-last_work_iteration: 83
+iteration_counter: 84
+last_work_iteration: 84
 last_research_sweep: 80
 last_revalidation: 72
 last_revalidation_status: all-gates-green
@@ -16,15 +16,29 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 18
-total_items_done: 64
+total_items_done: 65
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 466524a
+tauri_v2_migration_last_commit: a1ceb04
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 84 WORK — fix.offline-empty-state DONE (worktree). Second user-reported P1 from iter 82 triage closed.**
+>
+> Worktree commit `a1ceb04`. Blank-dark-screen-on-offline fixed. User can now see a visible error with a Retry button when the portal server is unreachable.
+> - **Root cause:** `.mainpage` defaults to `opacity: 0` and the `.ready` class (which flips to 1) was added mid-init at app.js:1353, AFTER `await this.silentAuthRefresh()`. If that await hung/threw on an unreachable portal, the outer catch swallowed the error and the page stayed invisible indefinitely.
+> - **Fix (paint-first, hydrate-after):** move the `.ready` class flip to the FIRST statement of `init()`, before any `await`. UI is visible regardless of network state.
+> - **Banner:** new `#offline-banner` (role="alert", aria-live="polite") in index.html + inline CSS. `App.showOfflineBanner()` / `hideOfflineBanner()` are idempotent; retry button wires once and re-runs init.
+> - **Wiring:** failed-connection branch + outer catch both call `showOfflineBanner()`; success branch calls hide.
+> - **i18n:** 3 new keys × 4 locales (OFFLINE_BANNER_TITLE / DESC / RETRY in FRA/EUR/RUS/GER). Keeps i18n-parity green.
+> - **Tests (7 new, offline-banner.test.js):** DOM skeleton check, `.ready`-before-await source-inspection, show/hide toggle, retry click re-runs init + hides, idempotency under 3 show calls, i18n keys present in all 4 locales.
+>
+> Acceptance: 831/831 Rust unchanged (frontend-only), 442/442 JS (was 436, +6), clippy clean. Worktree ready state unchanged — still `ready_for_squash_merge: true`.
+>
+> **One P1 user-reported bug remains from iter 82 triage:** `fix.mods-categories-ui`. Three iter-80 sweep P2s still queued: `sec.shell-scope-hardening`, `dep.dedupe-reqwest-zip`, `dep.vitest-bump-post-squash` (P3). Iter 85 picks `fix.mods-categories-ui` — last user-reported P1, then the queue drops back to P2-only.
 
 > **Iter 83 WORK — fix.resolve-game-root-wrong-assumption DONE (worktree). User P0 triaged from iter 82 session closed.**
 >
@@ -363,7 +377,7 @@ tauri_v2_migration_ready_for_squash_merge: true
 
 ### User-reported bugs (iter 82 — live triage)
 
-- [P1] **fix.offline-empty-state** — When the launcher can't reach the portal API (`http://192.168.1.128:8090`) — typical on dev/LAN-restart or while the server is offline — the frontend renders a blank dark viewport with no error, no retry button, no indication that the launcher itself isn't broken. User cannot distinguish between "launcher crashed" and "server is down." Fix: ship a visible offline banner (or full-screen error state for unrecoverable network failures) with a Retry button and a one-line explanation ("Can't reach the portal server. The server may be offline, or your connection is down."). Acceptance: `teralaunch/tests/e2e/offline-state.spec.js::shows_offline_banner_on_api_unreachable` passes (mock a network failure on the portal URL, assert the banner + retry button render). Pillar: UX / Reliability.
+- [DONE @ iter 84] **fix.offline-empty-state** — Closed on worktree commit `a1ceb04`. Paint-first fix: `.mainpage.ready` class now flips as the first statement of `App.init()` (before any await) — the blank-dark-screen failure mode is structurally impossible. New `#offline-banner` element (role="alert", aria-live="polite") + `showOfflineBanner()`/`hideOfflineBanner()` methods with idempotent retry wiring that re-runs `App.init()`. 3 i18n keys × 4 locales added. 7 new tests in `offline-banner.test.js` pin DOM shape, `.ready`-before-await ordering, toggle behaviour, retry handler, idempotency, and i18n parity. Playwright e2e spec deferred as follow-up (would need cold browser boot ≥ 5 min). Pillar: UX / Reliability.
 - [P1] **fix.mods-categories-ui** — The mods modal category pill row (rendered in `src/mods.html` + styled in `src/mods.css`) has two visible defects on the live launcher (user screenshot, iter 82): (a) the "All categories" pill has inconsistent styling vs the per-category pills next to it (different shape / padding / color-weight), and (b) the row sits below the search bar but the kind-filter toggle (All/External/GPK) stays to the right of search, forming an awkward L-shape with no visual group boundary. Fix: unify the pill style across All + per-category entries (same shape, same color policy, same hover state), then re-flow the layout so the category row reads as a single filter section aligned with the kind-filter (either both below search in a shared strip, or categories above search with the kind-filter remaining inline). Acceptance: visual-regression baseline `mods-modal-categories.png` (≤0.1% diff under Playwright) + a Vitest dom-order test pinning the category pill DOM shape. Pillar: UX.
 
 ### Reliability (PRD §3.2)
