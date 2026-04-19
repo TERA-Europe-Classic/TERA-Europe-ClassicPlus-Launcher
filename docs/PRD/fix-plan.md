@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 103
-last_work_iteration: 103
+iteration_counter: 104
+last_work_iteration: 104
 last_research_sweep: 100
 last_revalidation: 100
 last_revalidation_status: all-gates-green
@@ -16,15 +16,27 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 84
+total_items_done: 85
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 81f82fe
+tauri_v2_migration_last_commit: baf156b
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 104 WORK — docs.crate-comment-guard DONE (worktree).**
+>
+> Worktree commit `baf156b`. Closes PRD §3.8.2 structural invariant: "Every `src/services/mods/*.rs` has crate-level `//!` comment." Until iter 104 this was enforced only by code-review convention; a new file added without the header would slip through silently.
+>
+> New `tests/crate_comment_guard.rs` (2 tests):
+> 1. `every_mods_source_file_has_crate_level_doc` — walks `src/services/mods/`, reads each `.rs` file's first non-empty line, asserts it starts with `//!`. Also pins expected file count (>=6) so accidental deletions surface too.
+> 2. `crate_comment_detector_self_test` — 4 synthetic bad shapes (regular `//` comment, code on first line, blank-only file, etc.) + empty-file sentinel.
+>
+> Current state verified: all 6 mods/*.rs files carry `//!` headers.
+>
+> Acceptance: 862/862 Rust (was 860, +2), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 103 WORK — docs.prd-drift-fix-catalog-parse + pin.registry-recovery-direct DONE (worktree).**
 >
