@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 207
-last_work_iteration: 207
+iteration_counter: 208
+last_work_iteration: 208
 last_research_sweep: 190
 last_revalidation: 200
 last_revalidation_status: all-gates-green
@@ -16,28 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 182
+total_items_done: 183
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 5fafbf1
+tauri_v2_migration_last_commit: bdbe5f8
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 207 WORK — pin.multi-client-guard-header+sysinfo-refresh-all+game-count-source+Terminate-gate+stop_process-case-mirror DONE (worktree). Oldest 11-count file reached (iter 158 → 207 span = 49 iters).**
+> **Iter 208 WORK — pin.portal-https-guard-header+csp-connect-src+tera-path-namespace+canonical-endpoint-names+LAN_DEV_HOST-alignment DONE (worktree).**
 >
-> Worktree commit `5fafbf1`. §3.2.11 multi-client-attach-once + §3.2.12 overlay-lifecycle; multi_client had 11 tests (iter 85 creation + iter 158 +5 + iter 97 fix.overlay-lifecycle-wiring); 49 iters untouched. Brings to 16.
+> Worktree commit `bdbe5f8`. §3.1.13 portal-HTTPS migration drift; portal_https_guard had 11 tests (iter 119 creation + iter 141 +1 + iter 142 +3 + iter 167 +4); 41 iters untouched. Brings to 16.
 >
-> Five new source-inspection pins (meta-guard + sysinfo usage + game-count + gate operator + stop-mirror):
-> 1. `guard_file_header_cites_prd_slugs` — header cites `PRD 3.2.11` + `multi-client-attach-once`; name-based grep is primary PRD↔guard cross-ref path
-> 2. `is_process_running_uses_sysinfo_refresh_all_pattern` — sysinfo `System::new()` + `refresh_processes(All, true)` + `processes().values()`; rejects lock-file/PID-file shortcut that misses hard-kills
-> 3. `game_rs_remaining_clients_comes_from_teralib_count` — `let remaining_clients = ...` in commands/game.rs must bind to `teralib::get_running_game_count()`; literal/private-counter decouples policy from reality
-> 4. `game_rs_stop_is_gated_by_terminate_branch` — stop call lives inside `if decide_overlay_action(...) == OverlayLifecycleAction::Terminate`; the `==` operator is load-bearing (existing wiring pin only checks ordering)
-> 5. `stop_process_by_name_is_case_insensitive_mirror` — stop_process must mirror is_process_running's `.to_ascii_lowercase()` on both sides; asymmetric case-folding leaks overlays (detection finds, stop can't kill)
+> Five new source-inspection pins (meta-guard + cross-config CSP alignment + path namespace + endpoint names + guard-constant alignment):
+> 1. `guard_file_header_cites_prd_3_1_13` — header cites `PRD 3.1.13` + `portal-HTTPS` slug; meta-guard contract
+> 2. `csp_connect_src_admits_current_api_base_host` — tauri.conf.json's CSP connect-src must include API_BASE_URL's origin; if config flips portal host but CSP doesn't, every login silently fails with CSP-block
+> 3. `action_urls_use_tera_path_namespace` — each action URL path starts with `/tera/` (Portal v100 API namespace); drift to `/api/` would pass existing prefix+port pins but 404
+> 4. `action_urls_carry_canonical_endpoint_names` — each action URL ends with canonical endpoint name (`LauncherLoginAction`, `LauncherSignupAction`, `GetAccountInfoByUserNo`, `LauncherMaintenanceStatus`, `ServerList`); typo silently 404s
+> 5. `lan_dev_host_constant_matches_api_base_host` — guard's `LAN_DEV_HOST` constant must equal API_BASE_URL host component (pre-cutover); drift breaks the LAN exception, turning every http:// URL into an offender
 >
-> multi_client: 11 → 16 tests. 1268 Rust (+5), clippy clean, vitest 449/449.
+> portal_https_guard: 11 → 16 tests. 1273 Rust (+5), clippy clean, vitest 449/449.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
