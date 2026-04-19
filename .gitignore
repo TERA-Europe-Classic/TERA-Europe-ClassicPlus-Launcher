@@ -22,3 +22,7 @@ teralaunch/src-tauri/src/TERA/Binaries/
 
 # Claude Code per-session scratch state
 .claude/
+
+# Visual Studio IDE scratch dir (contains DPAPI-encrypted per-machine
+# IIS Express cert bindings, content-index caches, solution state — not source).
+.vs/
