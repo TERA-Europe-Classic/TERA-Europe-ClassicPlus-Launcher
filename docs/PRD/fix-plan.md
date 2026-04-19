@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 133
-last_work_iteration: 133
+iteration_counter: 134
+last_work_iteration: 134
 last_research_sweep: 130
 last_revalidation: 120
 last_revalidation_status: all-gates-green
@@ -16,15 +16,29 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 113
+total_items_done: 114
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 7fd39be
+tauri_v2_migration_last_commit: 8e2cf78
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 134 WORK — pin.§3.3.4-e2e-playwright + JS-idiom-extension DONE (worktree).**
+>
+> Worktree commit `8e2cf78`. Citation sweep of PRD §3 JS-test references surfaced §3.3.4's Playwright-based e2e pin: `teralaunch/tests/e2e/mod-import-file.spec.js::user_imported_gpk_deploys` — the ONLY PRD-cited e2e spec that currently exists. (All other `mod-*.spec.js` citations are PRD-as-spec forward declarations.)
+>
+> Changes:
+> - §3.3.4 entry added to `JS_PINS`; complements the existing Rust-side pin (`add_mod_from_file_wiring.rs`).
+> - `every_js_pin_source_file_has_named_test` now accepts both idioms: Vitest `it('name',` and Playwright `test('name',` — single- or double-quoted. Needle search tries all 4 forms; one match is enough.
+>
+> Drift-guard pin total: 45 → 46 (38 Rust + 5 JS; 4 Vitest + 1 Playwright). Test-fn count unchanged at 6.
+>
+> JS-pin infrastructure is now complete for every PRD §3 citation that maps to a shipped JS/e2e test. The remaining PRD citations are either Rust-side (covered by the iter-97-to-133 Rust PINS), genuinely-unshipped forward declarations, or non-test assets (e.g. §3.4.6 scrollbar screenshot baseline).
+>
+> Acceptance: 959/959 Rust unchanged, clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 133 WORK — pin.§3.7.4-concrete-citation DONE (worktree).**
 >
