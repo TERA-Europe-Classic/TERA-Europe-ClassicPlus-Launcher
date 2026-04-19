@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 114
-last_work_iteration: 114
+iteration_counter: 115
+last_work_iteration: 115
 last_research_sweep: 110
 last_revalidation: 100
 last_revalidation_status: all-gates-green
@@ -16,15 +16,29 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 95
+total_items_done: 96
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 8d1ae3b
+tauri_v2_migration_last_commit: 481b070
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 115 WORK — pin.deploy-scope-infra-drift-guard DONE (worktree).**
+>
+> Worktree commit `481b070`. Closes PRD §3.1.14 wiring pin: the Node-side `teralaunch/tests/deploy_scope.spec.js` scanner already pinned the behavioural assertion (every upload URL stays under `/classicplus/`). What was unpinned: the WIRING — that `deploy.yml` actually invokes the script, and invokes it BEFORE any upload step. A scope-gate after upload is useless.
+>
+> New `tests/deploy_scope_infra_guard.rs` (4 tests):
+> 1. `scope_gate_test_file_exists` — file present + references `deploy.yml` + contains `/classicplus/` assertion.
+> 2. `deploy_workflow_invokes_scope_gate_step` — `deploy.yml` contains `node teralaunch/tests/deploy_scope.spec.js`.
+> 3. `scope_gate_step_precedes_upload` — scope-step index < upload-step index in deploy.yml source order. Upload markers: `lftp`, `curl --upload-file`, `ftps_upload`, `ftp://${SFTP_HOST}`.
+> 4. Detector self-test with 3 synthetic bad shapes.
+>
+> Companion to iter 114 `secret_scan_guard.rs`: both pin CI security infrastructure via integration tests so deletion, rename, or reordering fails fast at test time rather than silently passing production.
+>
+> Acceptance: 889/889 Rust (was 885, +4), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 114 WORK — pin.secret-scan-infra-drift-guard DONE (worktree).**
 >
