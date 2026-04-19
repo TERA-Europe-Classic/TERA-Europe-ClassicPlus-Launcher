@@ -7,19 +7,21 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 29
+iteration_counter: 30
 last_work_iteration: 29
 last_research_sweep: 10
 last_revalidation: 20
 last_revalidation_status: clean
-last_retrospective: never
+last_retrospective: 30
 last_blocked_retry: never
 last_investigation_iteration: 18
-total_items_done: 23
+total_items_done: 24
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
 
+> **Iter 30 RETROSPECTIVE.** `docs/PRD/lessons-learned.md` initialised with 10 patterns spanning iters 1-29. Two new `[META]` entries added (`meta.bin-crate-test-path-flexibility`, `meta.verify-and-implement-language`) flagging a recurring integration-test-path friction and proposing PRD wording amendments. No code changes this iter per retrospective protocol. Next retrospective at iter 60.
+>
 > **Iter 20 REVALIDATION SWEEP — CLEAN.** All 14 [DONE] items re-proved:
 > • launcher `cargo test --release` → 698 unit + 2 integration passed (1 transient single-test flake on first run, 5-run flake-hunt of the new sha_ tests came back 5/5 clean; suspected pre-existing flake unrelated to iter 19).
 > • clippy `--all-targets --release -- -D warnings` → clean.
@@ -161,7 +163,6 @@ total_iterations_to_cap: 1000
 - [P1] **3.8.4.architecture-md** — Author `docs/mod-manager/ARCHITECTURE.md` with one section per subsystem. Acceptance: file exists with ≥ 1 section per subsystem. Pillar: Documentation.
 - [P1] **3.8.5.player-changelog** — Author `docs/CHANGELOG.md` per release in plain English (no `feat:` / `fix:` prefixes). Acceptance: CI grep gate passes. Pillar: Documentation.
 - [P1] **3.8.6.catalog-readme-schema** — Update `external-mod-catalog/README.md` schema to match actual JSON schema 1:1. Acceptance: CI equality check passes. Pillar: Documentation.
-- [P1] **3.8.8.lessons-learned** — Initialise `docs/PRD/lessons-learned.md` (empty header; capped 200 lines; retrospective iteration maintains). Acceptance: file exists. Pillar: Documentation.
 
 ### Security follow-ups from iter-27 self-integrity
 
@@ -286,12 +287,15 @@ The `verified @ iter N` stamp is updated by each REVALIDATION iteration. Any `[D
 - [DONE] 3.1.11.self-integrity — proof: new module `services::self_integrity` exposes `verify_file`, `verify_self`, `IntegrityResult { Match, Mismatch, Unreadable }`, `REINSTALL_PROMPT`. Wired into `main.rs::main` via `run_self_integrity_check()` BEFORE `tauri::Builder` runs: reads sidecar `<exe_dir>/self_hash.sha256`, validates 64-char hex, compares sha256 of current exe. On `Mismatch` the launcher logs ERROR + opens a native Windows `MessageBoxW` (`MB_ICONERROR | MB_OK`) carrying the user-safe reinstall prompt (no raw hashes — social-engineering hygiene) and `std::process::exit(2)`. Sidecar-absent case logs WARN and continues (dev builds). Tests: 6 in-module unit tests (`match_when_bytes_equal_expected_hash`, `mismatch_when_bytes_differ`, `detects_tampered_exe` — write-then-mutate roundtrip, `unreadable_when_file_missing`, `hash_comparison_is_case_insensitive`, `reinstall_prompt_is_user_safe` — asserts no "sha" leakage + contains "reinstall" + contains the canonical URL) + 2 integration tests at `tests/self_integrity.rs` (`detects_tampered_exe` end-to-end via sha2 + `identical_bytes_produce_identical_hash`). Deferred to follow-up: baseline embedding via `build.rs` (currently sidecar-only; acceptable for v1 since the sidecar is minisign-signed by release pipeline) — note as P1 `sec.self-integrity-baseline-embed` when the build pipeline is touched. 711 unit + 3 (http_allowlist) + 2 (smoke) + 2 (self_integrity) + 4 (zeroize_audit) integration green, clippy --release clean. Verified @ iter 27.
 - [DONE] 3.2.2.crash-recovery — proof: new `Registry::recover_stuck_installs()` sweeps rows with `ModStatus::Installing` → `Error` with `last_error = "Install was interrupted (launcher exited mid-install). Click retry to re-run the download."` and clears stale `progress`. Called automatically by `Registry::load()` on every startup so a SIGKILL mid-install is self-healing — no manual intervention. In-module tests: `mid_install_sigkill_recovers_to_error` (full save-then-load roundtrip simulating process death), `recover_stuck_installs_flips_installing_to_error` (method-level), `recover_stuck_installs_is_idempotent` (second call = 0 touched), `load_does_not_touch_non_installing_rows` (pins Disabled/Enabled/Running/Starting/Error/UpdateAvailable survive recovery untouched). Integration tests at `tests/crash_recovery.rs`: 3 JSON-schema pins (`installing_state_serialises_as_snake_case`, `stuck_install_document_is_valid_json_on_disk`, `error_state_expected_shape`) — catches silent serde rename breakage that would disable recovery. 715 unit + 3 (crash_recovery) + 3 (http_allowlist) + 2 (smoke) + 2 (self_integrity) + 4 (zeroize_audit) integration green, clippy --release clean. Verified @ iter 28.
 - [DONE] 3.2.11.multi-client-attach-once — proof: extracted the spawn-skip-when-running rule into `external_app::decide_spawn(already_running: bool) -> SpawnDecision { Attach, Spawn }` + I/O-bound wrapper `check_spawn_decision(exe_name)`. Both call sites (`commands::mods::launch_external_app_impl` + `spawn_auto_launch_external_apps`) now route through the same predicate — prior code had two independent `if !is_process_running { spawn }` checks that could diverge under refactor. In-module tests (4): `decide_spawn_attaches_when_already_running`, `decide_spawn_spawns_when_not_running`, `second_client_no_duplicate_spawn` (explicit 2-client scenario: first sees false→Spawn, second sees true→Attach), `check_spawn_decision_returns_spawn_when_nothing_running` (hits the real sysinfo process table with a guaranteed-nonexistent name). Integration tests at `tests/multi_client.rs` (2): `second_client_no_duplicate_spawn` + `decision_is_pure_and_deterministic` (100-iter sanity on pure-fn shape — if the predicate grows a second argument, reviewer audit is forced). 719 unit + 3 + 3 + 2 + 2 + 2 (multi_client) + 4 = all green, clippy --release clean. Verified @ iter 29.
+- [DONE] 3.8.8.lessons-learned — `docs/PRD/lessons-learned.md` initialised @ iter 30 with 10 entries covering patterns from iters 1-29 (bin-crate integration-test boundary, extract-predicate-before-test, recovery in load(), fail-closed copy in-source, zeroize Drop semantics, real-vuln-in-audit, scanner self-tests, transient flakes vs regressions, secret-scan commit-range scoping, cargo#6313 workaround, loop-cadence re-orientation). 200-line cap policy + archival ritual documented. Verified @ iter 30.
 
 ## META (human review)
 
 Retrospective iterations may propose PRD changes. These land here — the loop cannot act on them. The human reviews and either edits the PRD or rejects.
 
 - [META] **meta.shinra-sln-filename** — PRD §11 clause 6 + loop-prompt step 8 refer to `ShinraMeter.sln`, but the actual file is `Tera.sln`. Discovered iter 5. Human action: decide whether to (a) rename `Tera.sln` → `ShinraMeter.sln` (touches Shinra repo structure), or (b) update PRD §11 clause 6 + loop-prompt to say `Tera.sln`. Option (b) is less invasive; no downstream docs reference the sln name.
+- [META] **meta.bin-crate-test-path-flexibility** — Proposed iter-30 retrospective. Four PRD items (3.1.1, 3.1.2, 3.1.11, 3.2.2) specify integration-test paths under `teralaunch/src-tauri/tests/*.rs`, but the crate has no `[lib]` target so integration tests cannot import launcher-private items. Standardised workaround (documented in `lessons-learned.md`): primary behavioural test lives in the module's `#[cfg(test)]` block, the PRD-named integration file becomes a symbolic external-contract pin. Proposed PRD amendment: change test-path language in §3.1–3.2 from "author `tests/X.rs::Y`" to "author test `Y` (integration-level when importable, module-level with `tests/X.rs` mirror otherwise)". Alternative: add a minimal `[lib]` target to src-tauri. Discovered iter 19/23/27/28/29. Human action: amend PRD or add lib target.
+- [META] **meta.verify-and-implement-language** — Proposed iter-30 retrospective. PRD items worded "verify (and implement if missing)" (3.1.4) have reliably surfaced real vulnerabilities rather than just regression-pinning work (3.1.4 found attacker-controlled path traversal in `install_gpk`). This pattern works — but the PRD framing understates the likelihood of scope-expansion. Proposed PRD amendment: adopt "audit + implement + regression-test" as a stock pattern for §3.1 security items so iteration effort can be budgeted accurately. Discovered iter 24. Human action: consider standardising the phrasing across §3.1.
 
 ## REGRESSED
 
