@@ -7,16 +7,16 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 159
+iteration_counter: 160
 last_work_iteration: 159
 last_research_sweep: 150
-last_revalidation: 140
+last_revalidation: 160
 last_revalidation_status: all-gates-green
 last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 137
+total_items_done: 138
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,23 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: dbb521d
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 160 REVALIDATION — formal cadence — all-gates-green.**
+>
+> Audit doc: `docs/PRD/audits/research/revalidation-iter-160.md`. Worktree commit at re-run: `dbb521d` (unchanged — revalidation doesn't touch the worktree).
+>
+> Gates:
+> - `cargo test -j 2 --no-fail-fast` → **1053/1053** (iter 140 baseline: 975, delta **+78**), 0 failed, 0 ignored.
+> - `cargo clippy -j 2 --all-targets -- -D warnings` → clean.
+> - `cargo audit --ignore RUSTSEC-2026-0097 --ignore RUSTSEC-2026-0007` → 19 allowed warnings (same upstream-locked set as iter 130/140/150). Both documented ignores unchanged.
+> - `npx vitest run --no-file-parallelism` → 449/449 passing (13 files).
+> - Playwright: not re-run (historical revalidation cadence omits e2e; last exercised @ iter 134, no frontend source changes since).
+> - Structural-guard inventory: 19 `*_guard.rs` files, unchanged since iter 135.
+> - Commits since divergence: 100 (was 90 @ iter 150). Regression-pattern grep on commit messages: **0 matches** (consistent with iter 150).
+>
+> Iter 141-159 summary: **+78 Rust tests across 19 existing integration tests / structural guards**, zero new guard files, every §3.1 security test deepened to ≥ 8 tests each. Net additive; no source-code changes that could regress production behaviour.
+>
+> `tauri_v2_migration_ready_for_squash_merge: true` confirmed. Squash merge remains user-gated per standing policy. Next formal revalidation: iter 180. Next research sweep: iter 170.
 
 > **Iter 159 WORK — pin.parallel-install-lock+try-claim DONE (worktree).**
 >
