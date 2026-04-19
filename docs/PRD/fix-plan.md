@@ -7,15 +7,15 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 45
-last_work_iteration: 45
+iteration_counter: 46
+last_work_iteration: 46
 last_research_sweep: 40
 last_revalidation: 40
 last_revalidation_status: clean
 last_retrospective: 30
 last_blocked_retry: never
 last_investigation_iteration: 18
-total_items_done: 39
+total_items_done: 40
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
@@ -135,7 +135,7 @@ total_iterations_to_cap: 1000
 - [P1] **3.4.4.tray-surgical-update** — Test `mods-dom-perf.test.js::tray_surgical_update`. Acceptance: ≤ 3 DOM mutations per progress tick. Pillar: UX.
 - [P1] **3.4.5.toggle-animation** — Test `mod-toggle-animation.spec.js`. Acceptance: ≥ 60 fps during 180 ms cubic-bezier. Pillar: UX.
 - [P1] **3.4.6.scrollbar-palette** — Visual baseline `mod-modal-scrollbar.png`. Acceptance: visual diff ≤ 0.1 %. Pillar: UX.
-- [P1] **3.4.7.no-jargon** — Test `i18n-jargon.test.js::no_jargon_in_translations` (blocklist: "composite", "mapper", "SHA", "TMM"). Acceptance: test passes. Pillar: UX.
+- [DONE] 3.4.7.no-jargon — proof: new test at `teralaunch/tests/i18n-jargon.test.js` (3 cases) loads `src/translations.json` (FRA/EUR/RUS/GER, 161 keys each) and scans every string value against the blocklist `['composite', 'mapper', 'sha', 'tmm']`. Current state: 0 leaks across all 644 values. Tests: `no_jargon_in_translations` (actual scan), `blocklist covers the four PRD-required terms` (guards against someone silently dropping a term), `detector flags a seeded leak in test input` (self-test so a broken detector can't rubber-stamp a regression — seeds a fixture containing "Patch the composite mapper using TMM" and asserts 3 hits). `npm test` → 7 files / 420 tests passed (417 pre-existing + 3 new). Detector doc references `SUBSTRING_ALLOWLIST` escape hatch for future false positives (empty today). Verified @ iter 46.
 - [P1] **3.4.8.error-recovery-ux** — Test `mod-error-recovery.spec.js` (4 sub-tests per failure mode: SHA mismatch, offline, disk-full, permission-denied). Acceptance: each error shows a human-readable reason + Retry. Pillar: UX.
 - [P1] **3.4.9.overflow-menu** — Test `mod-overflow-menu.spec.js` (outside-click closes). Acceptance: test passes. Pillar: UX.
 
