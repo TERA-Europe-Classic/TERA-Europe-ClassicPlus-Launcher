@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 181
-last_work_iteration: 181
+iteration_counter: 182
+last_work_iteration: 182
 last_research_sweep: 170
 last_revalidation: 180
 last_revalidation_status: all-gates-green
@@ -16,30 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 158
+total_items_done: 159
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: c822715
+tauri_v2_migration_last_commit: 3e537d0
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 181 WORK — pin.search-perf-production-import+timing+no-skip DONE (worktree).**
+> **Iter 182 WORK — pin.offline-banner-real-file-skeleton+i18n+app-js-order DONE (worktree).**
 >
-> Worktree commit `c822715`. First non-doc-layer guard extension after N=180 revalidation; rebalances coverage onto perf-test drift surface that hadn't been touched since iter 126 scanner-guard chain.
+> Worktree commit `3e537d0`. UX-pillar balance vs iter 181's perf-pillar add; continues the post-revalidation non-doc-layer sweep on the oldest untouched scanner guards.
 >
-> PRD §3.6.4 `search_perf_guard.rs` previously had 7 tests (baseline at creation): file self-identify + 16 ms budget + 300-entry fixture + median-of-7 + sanity controls + dual Tauri stub + detector self-test. Iter 181 widens to 5 more angles on the JS perf file.
+> fix.offline-empty-state `offline_banner_scanner_guard.rs` previously had 7 tests (iter 84 creation baseline): file self-identify + DOM skeleton + `.ready`-before-await + idempotent retry + i18n parity + reference files + detector self-test. Iter 182 widens to 5 more angles, adding a defense-in-depth layer that reads the real `src/index.html` + `src/translations.json` + `src/app.js` directly.
 >
-> Five new source-inspection pins on `teralaunch/tests/search-perf.test.js`:
-> 1. `perf_test_exercises_production_filter_matches` — must import from `../src/mods.js` and call `ModsView.filterMatches`; reject locally-defined stub (would measure a different function)
-> 2. `perf_timing_uses_performance_now_not_date_now` — `Date.now()` rounds sub-frame measurements to 0 and trivially passes the ≤16 ms budget
-> 3. `perf_test_has_at_least_three_it_blocks` — floor of 3 so sanity controls can't be deleted while keeping only `under_one_frame`
-> 4. `perf_test_carries_no_only_or_skip_markers` — reject `it.only` / `describe.only` / `it.skip` / `describe.skip` / `xit` / `xdescribe`; dev-local pins must never ship
-> 5. `perf_fixture_entries_have_full_field_shape` — `makeCatalogEntries` must populate id/kind/name/description/category so filterMatches branches aren't narrowed by a shallow fixture
+> Five new source-inspection pins:
+> 1. `offline_scanner_has_at_least_four_it_blocks` — floor of 4 so the 4 iter-84 invariants can't be deleted piecemeal
+> 2. `offline_scanner_carries_no_only_or_skip_markers` — reject `it.only` / `describe.only` / `it.skip` / `xit` / `xdescribe`
+> 3. `index_html_carries_full_offline_banner_skeleton` — real `src/index.html` must carry all 6 DOM pieces; catches scanner-fixture-vs-production drift
+> 4. `translations_json_has_offline_banner_keys_in_all_four_locales` — real `src/translations.json` checked per-locale for the full 3x4 key matrix
+> 5. `app_js_ready_flip_precedes_first_await_in_init` — real `src/app.js` post-comment-strip: `classList.add('ready')` offset < first `await ` offset inside `async init()`. `strip_js_comments` helper prevents prose `await` in iter-84 comment block from breaking the order check.
 >
-> search_perf_guard: 7 → 12 tests. 1148 Rust (+5), clippy clean, vitest 449/449.
+> offline_banner_scanner_guard: 7 → 12 tests. 1153 Rust (+5), clippy clean, vitest 449/449.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
