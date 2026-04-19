@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 128
-last_work_iteration: 128
+iteration_counter: 129
+last_work_iteration: 129
 last_research_sweep: 120
 last_revalidation: 120
 last_revalidation_status: all-gates-green
@@ -16,15 +16,32 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 109
+total_items_done: 110
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: eda0425
+tauri_v2_migration_last_commit: adaf2cc
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 129 WORK — pin.offline-banner-scanner DONE (worktree).**
+>
+> Worktree commit `adaf2cc`. `teralaunch/tests/offline-banner.test.js` is the drift-guard for the iter-84 `fix.offline-empty-state` blank-screen bug. The blank viewport was caused by `.mainpage.ready` being added mid-init after a network-touching await; if that await threw, the outer catch swallowed the error and the page never became visible. The fix was to flip `.ready` BEFORE the first await. The JS scanner pins this structural fix + DOM + i18n; nothing structurally pinned the scanner itself.
+>
+> New `tests/offline_banner_scanner_guard.rs` (7 tests):
+> 1. Scanner exists + cites `fix.offline-empty-state` + `iter 84`
+> 2. DOM-skeleton assertions retained (7 needles: banner id, hidden class, retry id, role="alert", 3 data-translate attrs)
+> 3. Source-order assertion retained: `classList.add('ready')` must appear before first `await` via `.toBeLessThan(firstAwait)` — ORDER check, not presence
+> 4. Idempotent-wiring test retained (`dataset.wired` marker; 3 shows then 1 click = 1 init call)
+> 5. All 4 locales (FRA/EUR/RUS/GER) checked for all 3 OFFLINE_BANNER_* keys
+> 6. Reference files (index.html, app.js, translations.json) exist with required markers
+> 7. Detector self-test on 4 synthetic bad shapes
+>
+> Sixth in the iter-124/125/126/127/128/129 JS-scanner-pin chain. Different flavour from the earlier five — this scanner tests DOM + source-order + i18n-parity rather than a regex pattern, so the pins cover different drift classes.
+>
+> Acceptance: 949/949 Rust (was 942, +7), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 128 WORK — pin.classicplus-disabled-features-scanner DONE (worktree).**
 >
