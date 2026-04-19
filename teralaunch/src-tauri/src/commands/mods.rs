@@ -502,10 +502,9 @@ async fn launch_external_app_impl(id: &str, set_auto_launch: bool) -> Result<Mod
     let exe_name = external_executable_name(id)
         .ok_or_else(|| format!("Cannot resolve executable name for {}", id))?;
 
-    // Skip the spawn if an instance is already running.
-    let already_running = external_app::is_process_running(&exe_name);
-
-    if !already_running {
+    // Attach-once semantics (PRD 3.2.11): if the process is already running
+    // we skip the spawn so a 2nd TERA.exe launch doesn't duplicate Shinra/TCC.
+    if external_app::check_spawn_decision(&exe_name) == external_app::SpawnDecision::Spawn {
         let install_root = get_external_apps_dir()
             .ok_or_else(|| "Could not resolve external apps dir".to_string())?;
         let dest = install_root.join(&entry.id);
@@ -601,7 +600,9 @@ pub fn spawn_auto_launch_external_apps() {
             Some(n) => n,
             None => continue,
         };
-        if external_app::is_process_running(&exe_name) {
+        // Attach-once: skip spawn when an instance is already running so a
+        // 2nd TERA.exe auto-launch doesn't duplicate Shinra/TCC (PRD 3.2.11).
+        if external_app::check_spawn_decision(&exe_name) == external_app::SpawnDecision::Attach {
             continue;
         }
         let dest = install_root.join(&entry.id);

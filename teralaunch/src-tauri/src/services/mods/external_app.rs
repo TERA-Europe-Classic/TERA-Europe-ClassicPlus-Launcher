@@ -262,6 +262,35 @@ fn spawn_app_shellexec(exe_path: &Path, args: &[String]) -> Result<u32, String> 
     Ok(pid)
 }
 
+/// Whether the launcher should start a new external-app process, or attach
+/// to (i.e. leave alone) an existing one. PRD 3.2.11: when a 2nd TERA.exe
+/// fires `spawn_auto_launch_external_apps`, Shinra/TCC must NOT double-spawn.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum SpawnDecision {
+    /// A process with this name is already running; attach (do nothing).
+    Attach,
+    /// No process found; the caller should start one.
+    Spawn,
+}
+
+/// Pure decision function — keep so both `launch_external_app_impl` and
+/// `spawn_auto_launch_external_apps` route through the same predicate.
+/// Called by `check_spawn_decision` for the I/O-bound variant.
+pub fn decide_spawn(already_running: bool) -> SpawnDecision {
+    if already_running {
+        SpawnDecision::Attach
+    } else {
+        SpawnDecision::Spawn
+    }
+}
+
+/// Convenience: queries the process table via `is_process_running` and
+/// returns the decision. Not pure (touches the OS); callers that want
+/// deterministic testing pass the bool to `decide_spawn` directly.
+pub fn check_spawn_decision(exe_name: &str) -> SpawnDecision {
+    decide_spawn(is_process_running(exe_name))
+}
+
 /// Returns true if any running process matches the given executable name
 /// (case-insensitive, matches the leaf filename, not the full path).
 ///
@@ -363,6 +392,51 @@ mod tests {
     fn is_process_running_returns_false_for_garbage_name() {
         // A process name we're sure doesn't exist on any sane system.
         assert!(!is_process_running("zzzz_nonexistent_binary_name_qqqq.exe"));
+    }
+
+    // --- PRD 3.2.11.multi-client-attach-once --------------------------------
+
+    #[test]
+    fn decide_spawn_attaches_when_already_running() {
+        assert_eq!(decide_spawn(true), SpawnDecision::Attach);
+    }
+
+    #[test]
+    fn decide_spawn_spawns_when_not_running() {
+        assert_eq!(decide_spawn(false), SpawnDecision::Spawn);
+    }
+
+    #[test]
+    fn second_client_no_duplicate_spawn() {
+        // Scenario: first TERA.exe client triggers auto-launch, sees Shinra
+        // not running, decides Spawn. Before the second client starts,
+        // Shinra is up. Second client's auto-launch queries the predicate
+        // again and must see Attach so it doesn't double-spawn.
+        //
+        // We model the OS state as a boolean instead of actually spawning
+        // a real process — `decide_spawn` is the single authority and both
+        // call sites route through it (see `check_spawn_decision` +
+        // launch_external_app_impl + spawn_auto_launch_external_apps).
+        let first_client_decision = decide_spawn(/* already_running = */ false);
+        assert_eq!(first_client_decision, SpawnDecision::Spawn);
+
+        // After the first spawn Shinra is running.
+        let already_running_after_first = true;
+
+        let second_client_decision = decide_spawn(already_running_after_first);
+        assert_eq!(
+            second_client_decision,
+            SpawnDecision::Attach,
+            "2nd TERA.exe must attach to the existing Shinra/TCC, not spawn a duplicate"
+        );
+    }
+
+    #[test]
+    fn check_spawn_decision_returns_spawn_when_nothing_running() {
+        // Integration-ish: query the real OS for a name guaranteed not to
+        // exist. Must return Spawn (no running process to attach to).
+        let d = check_spawn_decision("zzzz_nonexistent_binary_name_qqqq.exe");
+        assert_eq!(d, SpawnDecision::Spawn);
     }
 
     #[test]
