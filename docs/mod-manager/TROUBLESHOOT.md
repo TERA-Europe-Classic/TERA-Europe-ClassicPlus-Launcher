@@ -33,6 +33,7 @@ file is rejected before any byte touches disk.
 **Error text:**
 - `Failed to fetch catalog: <...>`
 - `Catalog fetch returned HTTP <status>`
+- `Failed to read catalog body: <...>`
 - `Failed to download from <url>: <...>`
 - `Download returned HTTP <status> from <url>`
 - `Download stream failed: <...>`
@@ -55,11 +56,20 @@ being down.
 
 ## 3. Catalog JSON is malformed
 
-**Error text:** `Catalog JSON is malformed: <...>`
+**Error text:**
+- `Catalog JSON is malformed: <...>`
+- `Catalog JSON envelope is malformed: <...>`
 
 **What's going on.** The catalog response parsed over HTTP but the
 structure doesn't match what the launcher expects. Usually means a
 bad mirror is serving a stale schema, or the response was intercepted.
+
+The `envelope is malformed` variant specifically points at the
+top-level shape — `version` / `updated_at` / `mods` — and is fatal
+because individual-entry tolerance kicks in one level below. If the
+envelope itself is broken, there's nothing to recover from. Individual
+bad entries are dropped silently at WARN level without surfacing this
+error to you.
 
 **Fix.**
 - Retry after a minute (transient CDN hiccup).
