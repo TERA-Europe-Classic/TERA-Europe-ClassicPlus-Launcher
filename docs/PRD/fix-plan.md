@@ -7,9 +7,9 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 9
+iteration_counter: 10
 last_work_iteration: 8
-last_research_sweep: never
+last_research_sweep: 10
 last_revalidation: never
 last_revalidation_status: never
 last_retrospective: never
@@ -20,7 +20,9 @@ total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
 
-> **Iter 9 note:** partial progress on `3.1.13.portal-https`. Audit draft committed at `docs/PRD/audits/security/portal-https-migration.md` (commit dc604d0). 1 of 3 acceptance artefacts authored. Remaining 2 (config flip + end-to-end login) gated on the production HTTPS endpoint, which requires human infra setup (FQDN + TLS cert + reverse proxy). Item stays P0 and will be re-attempted at every BLOCKED RE-TRY (every 50 iters). Iter 10 is RESEARCH SWEEP by counter rule.
+> **Iter 9 note:** partial progress on `3.1.13.portal-https`. Audit draft committed at `docs/PRD/audits/security/portal-https-migration.md` (commit dc604d0). Remaining acceptance gated on production HTTPS endpoint (human infra).
+>
+> **Iter 10 RESEARCH SWEEP findings** (see new items below): zip crate CVE-2025-29787, Tauri 1.x on maintenance-only since Tauri 2 stable (2024-10), tokio RUSTSEC-2025-0023, aes-gcm RUSTSEC-2023-0096 caller audit, xunit bump hygiene. TCC + Shinra upstreams stale — no cherry-picks. cargo#6313 still open, our cdylib-drop workaround stays.
 
 **Iteration type by counter:** `iteration_counter` = last completed iteration's number. For the iteration about to run, compute `N = iteration_counter + 1` and match:
 
@@ -52,6 +54,8 @@ total_iterations_to_cap: 1000
 
 ### Security (PRD §3.1)
 
+- [P0] **sec.zip-cve-2025-29787** — `teralaunch/src-tauri/Cargo.toml` pins `zip = "2.2"`. CVE-2025-29787 (symlink-based arbitrary file overwrite on extract) affects zip 1.3.0–2.2.x. Patched in 2.3.0. Bump `zip` to `"2.3"` (or latest) and run full Rust test suite. Acceptance: `Cargo.toml` has `zip >= 2.3`; `cargo test --release` passes; `cargo audit` no longer flags zip. Pillar: Security. Source: sentinelone CVE-2025-29787. Discovered iter 10 RESEARCH SWEEP.
+- [P0] **sec.tauri-v1-eol-plan** — Tauri 2.0 stable shipped 2024-10-02; 1.x is security-backport-only with all feature work on v2. CSP-per-window, capability ACLs, and updater-signature-v2 are v2-only — gates PRD items 3.1.8 (anti-reverse), 3.1.9 (updater-downgrade), 3.1.12 (CSP unsafe-inline). Action: author `docs/PRD/audits/security/tauri-v2-migration.md` with migration scope + risk assessment, then decide stay-on-1 vs migrate. Acceptance: audit doc signed off with a concrete plan (either: migrate, with milestones; or: stay with documented compensating controls). Pillar: Security. Discovered iter 10 RESEARCH SWEEP.
 - [P0] **3.1.13.portal-https** — Migrate `teralib/src/config/config.json` portal API URL from `http://192.168.1.128:8090` (current) to HTTPS endpoint before Classic+ public launch. Acceptance: config URL starts with `https://`; end-to-end login works against HTTPS endpoint; audit doc signed off. Pillar: Security. **Iter 9 status:** audit draft authored at `docs/PRD/audits/security/portal-https-migration.md` (commit dc604d0). Remaining acceptance gated on external human infra (production FQDN + TLS cert + reverse proxy). Re-attempt at BLOCKED RE-TRY every 50 iters or when human provides the endpoint.
 - [P0] **3.1.6.secret-leak-scan** — Run trufflehog + git-secrets across all 5 repos (`teralaunch`, `teralib`, `external-mod-catalog`, `TCC`, `ShinraMeter`). If any historical secret found, rewrite history (`git filter-repo`), rotate the secret, force-push (secret-leak remediation is the single exception in the destructive-freeze). Add `.github/workflows/secret-scan.yml` to each public repo. Author `docs/PRD/audits/security/secret-leak-scan.md` signed off. Acceptance: CI exits 0; audit doc lists all rotated secrets. Pillar: Security.
 - [P0] **3.1.8.anti-reverse-hardening** — Enable Rust release-profile LTO + strip + CFG + stack-canary; apply `cryptify`/`chamox` string obfuscation to all sensitive string literals (portal URLs, AuthKey-adjacent code, update-server URL, deploy paths). Author `docs/PRD/audits/security/anti-reverse.md` with build-output inspection (IDA/Ghidra screenshots showing obfuscated strings). Acceptance: audit doc signed off; release build flags verified in `Cargo.toml`. Pillar: Security.
@@ -90,6 +94,8 @@ total_iterations_to_cap: 1000
 
 ### Reliability (PRD §3.2)
 
+- [P1] **sec.tokio-rustsec-2025-0023** — RUSTSEC-2025-0023 (tokio broadcast-channel clone parallelism without `Sync` bound, 2025-04-07). Run `cargo audit` to confirm our pinned `tokio = "1.49"` is in affected range; bump to patched release. Acceptance: `cargo audit` clean on tokio; regression tests pass. Pillar: Security. Discovered iter 10 RESEARCH SWEEP.
+- [P1] **sec.aes-gcm-rustsec-2023-0096-audit** — RUSTSEC-2023-0096 (aes-gcm `decrypt_in_place_detached` leaks plaintext on tag-verify failure). Grep teralaunch + teralib for `decrypt_in_place_detached`; if no callers, close as N/A. If callers exist, bump aes-gcm and refactor. Acceptance: grep returns zero matches OR patched version in use + test coverage. Pillar: Security. Discovered iter 10 RESEARCH SWEEP.
 - [P1] **3.2.1.edge-cases-X1-X24** — Author 24 named tests across `teralaunch/tests/e2e/mod-*.spec.js` + `teralaunch/src-tauri/tests/mod_*.rs` covering edge cases X1–X24. Define X1–X24 in `docs/PRD/test-plan.md` (new file). Acceptance: 24/24 tests passing. Pillar: Reliability.
 - [P1] **3.2.3.clean-backup-not-overwritten** — Test `tmm.rs::tests::clean_backup_not_overwritten_on_second_install`. Acceptance: test passes. Pillar: Reliability.
 - [P1] **3.2.4.uninstall-all-restores-vanilla** — Test `full_cycle.rs::uninstall_all_restores_vanilla_bytes`. Acceptance: byte-for-byte equal via SHA-256. Pillar: Reliability.
@@ -199,6 +205,7 @@ total_iterations_to_cap: 1000
 - [P2] **lint.js-lint** — Add ESLint or Biome to `teralaunch/`. Acceptance: zero warnings. Pillar: Reliability.
 - [P2] **lint.rust-clippy-release** — Add `--release` clippy to CI. Acceptance: zero warnings in release mode. Pillar: Reliability.
 - [P2] **lint.csharp-warnaserror** — Enable `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` on TCC + Shinra release configs. Acceptance: zero warnings. Pillar: Reliability.
+- [P2] **hyg.xunit-bump** — TCC.Tests and ShinraMeter.Tests pin xunit 2.5.3 (dotnet-new template default). Current stable is 2.9.3 (v2 line) or 3.2.2 (v3). No known CVEs in 2.5.3 — hygiene only. Bump to 2.9.3 in both csproj files. Acceptance: `dotnet test` green on both solutions after bump. Pillar: Reliability. Discovered iter 10 RESEARCH SWEEP.
 
 ### Benchmarks
 
