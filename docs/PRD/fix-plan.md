@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 192
-last_work_iteration: 192
+iteration_counter: 193
+last_work_iteration: 193
 last_research_sweep: 190
 last_revalidation: 180
 last_revalidation_status: all-gates-green
@@ -16,28 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 168
+total_items_done: 169
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 8aa3b80
+tauri_v2_migration_last_commit: 3c8f3a0
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 192 WORK — pin.smoke-harness-deepening DONE (worktree).**
+> **Iter 193 WORK — pin.conflict-modal-purity+shape DONE (worktree). Crossed 1200.**
 >
-> Worktree commit `8aa3b80`. Test-harness deepening — smoke is the meta-guard every integration test depends on; its pins have the highest leverage. Baseline was 7 tests (iter-166 creation); brings it to 12 with defense-in-depth on structural-guard subset count + common-module import hygiene + stray-file sanity + per-file test-fn floor + harness traceability.
+> Worktree commit `3c8f3a0`. §3.2 UX-pillar; conflict_modal had 9 tests (iter 104 creation + iter 162 +4); brings to 14. Total Rust tests crossed the 1200 threshold at this commit (1198 → 1203).
 >
 > Five new source-inspection pins:
-> 1. `integration_tests_carry_expected_guard_file_subset_count` — floor ≥ 15 `*_guard.rs` files (currently 19+); separate from iter-166's broader floor so drift-guard subset deletion is caught
-> 2. `common_mod_rs_does_not_use_crate_sources` — `tests/common/mod.rs` must not reference `crate::` (integration binaries have no access to the lib crate through that path)
-> 3. `tests_dir_has_no_stray_cargo_toml_or_target_dir` — reject nested Cargo.toml / Cargo.lock / target/ that would confuse resolver
-> 4. `every_integration_test_file_carries_test_functions` — scan each `tests/*.rs` for ≥ 1 `#[test]` / `#[tokio::test]` / `#[rstest]` attr; whole-file comment-out during merge leaves file counting toward floor but zero assertions
-> 5. `smoke_guard_file_self_identifies_as_harness_contract` — header cites `harness` + `iter 166` so maintainers know this file pins infrastructure, not behaviour
+> 1. `guard_file_header_cites_fix_slot` — header cites `fix.conflict-modal-wiring`
+> 2. `preview_command_has_no_write_side_effects` — body rejects `mods_state::mutate` / `reg.upsert(` / `fs::write(` / `ensure_backup(` / `install_gpk(` / `try_deploy_gpk(`; preview is read-only
+> 3. `preview_command_short_circuits_for_non_gpk_entries` — `matches!(entry.kind, ModKind::Gpk)` check + `return Ok(Vec::new())` early-return before mapper-read
+> 4. `detect_conflicts_iterates_over_incoming_packages` — loop `for pkg in &incoming.packages`; reject loops over `current_map` / `vanilla_map`
+> 5. `mod_conflict_has_exactly_three_public_fields` — struct must carry exactly 3 `pub` fields; a 4th drifts IPC schema silently
 >
-> smoke: 7 → 12 tests. 1198 Rust (+5), clippy clean, vitest 449/449.
+> conflict_modal: 9 → 14 tests. 1203 Rust (+5), clippy clean, vitest 449/449.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
