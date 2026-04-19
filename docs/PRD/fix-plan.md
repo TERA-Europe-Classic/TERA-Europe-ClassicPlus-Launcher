@@ -7,15 +7,15 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 11
-last_work_iteration: 11
+iteration_counter: 12
+last_work_iteration: 12
 last_research_sweep: 10
 last_revalidation: never
 last_revalidation_status: never
 last_retrospective: never
 last_blocked_retry: never
 last_investigation_iteration: 9
-total_items_done: 8
+total_items_done: 9
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
@@ -54,7 +54,6 @@ total_iterations_to_cap: 1000
 
 ### Security (PRD §3.1)
 
-- [P0] **fix.mods-clippy-cleanup** — `cargo clippy --all-targets --release -- -D warnings` surfaces 6 pre-existing errors (discovered iter 11 when clippy was first run under the loop): `src/services/mods/external_app.rs:201` unneeded return; `src/services/mods/tmm.rs:60` manual slice copy; `tmm.rs:70,101` manual `div_ceil` reimpl; `tmm.rs:306,396` field assignment outside `Default::default()` initializer; `tmm.rs:626+690` items-after-test-module. Acceptance: PRD §11 clause 1 command exits 0. Pillar: Reliability. Gate for most of §11.
 - [P0] **sec.tauri-v1-eol-plan** — Tauri 2.0 stable shipped 2024-10-02; 1.x is security-backport-only with all feature work on v2. CSP-per-window, capability ACLs, and updater-signature-v2 are v2-only — gates PRD items 3.1.8 (anti-reverse), 3.1.9 (updater-downgrade), 3.1.12 (CSP unsafe-inline). Action: author `docs/PRD/audits/security/tauri-v2-migration.md` with migration scope + risk assessment, then decide stay-on-1 vs migrate. Acceptance: audit doc signed off with a concrete plan (either: migrate, with milestones; or: stay with documented compensating controls). Pillar: Security. Discovered iter 10 RESEARCH SWEEP.
 - [P0] **3.1.13.portal-https** — Migrate `teralib/src/config/config.json` portal API URL from `http://192.168.1.128:8090` (current) to HTTPS endpoint before Classic+ public launch. Acceptance: config URL starts with `https://`; end-to-end login works against HTTPS endpoint; audit doc signed off. Pillar: Security. **Iter 9 status:** audit draft authored at `docs/PRD/audits/security/portal-https-migration.md` (commit dc604d0). Remaining acceptance gated on external human infra (production FQDN + TLS cert + reverse proxy). Re-attempt at BLOCKED RE-TRY every 50 iters or when human provides the endpoint.
 - [P0] **3.1.6.secret-leak-scan** — Run trufflehog + git-secrets across all 5 repos (`teralaunch`, `teralib`, `external-mod-catalog`, `TCC`, `ShinraMeter`). If any historical secret found, rewrite history (`git filter-repo`), rotate the secret, force-push (secret-leak remediation is the single exception in the destructive-freeze). Add `.github/workflows/secret-scan.yml` to each public repo. Author `docs/PRD/audits/security/secret-leak-scan.md` signed off. Acceptance: CI exits 0; audit doc lists all rotated secrets. Pillar: Security.
@@ -260,6 +259,7 @@ The `verified @ iter N` stamp is updated by each REVALIDATION iteration. Any `[D
 - [DONE] fix.launcher-spec-syntax — commit ed1db9a, proof: `npx playwright test --list` → 70 tests enumerated, exit 0 (previously unparseable). Removed stray `1.7.0` literal at `teralaunch/tests/e2e/launcher.spec.js:37` injected by version-bump 1d788d3. Unblocks infra.playwright-split. Verified @ iter 7.
 - [DONE] infra.playwright-split — commit b920b10, proof: `npx playwright test --list` → 70 tests across 14 files (preserved from monolith), exit 0. Split `launcher.spec.js` (866 lines, 14 describe blocks) into one `*.spec.js` per describe + shared `helpers.js` (mockTauriAPIs, setAuthenticated, clearAuthentication). Each spec imports only the helpers it uses. Follow-up polish P2: shared `beforeEach` patterns still duplicated across ~13 files (3 shapes of setup: anon, authed-home, unauth'd) — deferrable per Playwright explicit-beforeEach idiom. Verified @ iter 8.
 - [DONE] sec.zip-cve-2025-29787 — commit 4896310, proof: `teralaunch/src-tauri/Cargo.toml` bumped `zip 2.2 -> 2.3` (floor); Cargo.lock already resolved to 2.4.2 via earlier churn (past CVE-2025-29787 patch at 2.3.0); `cargo test --release --test smoke` → 2/2 passed, exit 0, 14.72s. Policy-level defense against regression. Verified @ iter 11.
+- [DONE] fix.mods-clippy-cleanup — commit a91764e, proof: `cargo clippy --all-targets --release -- -D warnings` → exit 0; `cargo test --release` → 696 unit + 2 integration passed, exit 0. Cleared 6 pre-existing lints in `src/services/mods/{external_app,tmm}.rs` (unneeded return, manual slice copy, two manual div_ceil, two field-assignment-outside-Default, items-after-test-module) + added `#[allow(dead_code)]` on 2 ModPackage fields exposed by the struct-literal refactor (fields mirror TMM format for round-trip fidelity). Satisfies PRD §11 clause 1 for launcher Rust. Verified @ iter 12.
 
 ## META (human review)
 
