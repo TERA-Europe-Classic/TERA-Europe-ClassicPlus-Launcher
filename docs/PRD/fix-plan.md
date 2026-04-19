@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 104
-last_work_iteration: 104
+iteration_counter: 105
+last_work_iteration: 105
 last_research_sweep: 100
 last_revalidation: 100
 last_revalidation_status: all-gates-green
@@ -16,15 +16,27 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 85
+total_items_done: 86
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: baf156b
+tauri_v2_migration_last_commit: 8c31a5c
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 105 WORK — infra.troubleshoot-coverage-ci DONE (worktree).**
+>
+> Worktree commit `8c31a5c`. Closes PRD §3.8.3 gate wiring: `scripts/check-troubleshoot-coverage.mjs` existed + ran green locally (51 production error templates covered), but CI never invoked it. A future PR that adds a new user-facing error without a TROUBLESHOOT.md entry would have slipped through.
+>
+> Change: `.github/workflows/pr-validation.yml` now invokes the script as a gate step after Rust tests. Non-zero exit lists missing templates and fails the PR. Trigger filter extended to rerun on `docs/mod-manager/TROUBLESHOOT.md` + `scripts/check-troubleshoot-coverage.mjs` changes (source files already covered by `teralaunch/**`).
+>
+> Parallel to iter-101 `infra.cargo-audit-ci`: both iterations add ongoing CI coverage for invariants that had passive enforcement only.
+>
+> Local run: `check-troubleshoot-coverage: ok — 51 production error templates covered`.
+>
+> Acceptance: 862/862 Rust unchanged, 449/449 JS unchanged, clippy clean (workflow + no Rust/JS code touched). Coverage script local-run: ok (51/51). Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 104 WORK — docs.crate-comment-guard DONE (worktree).**
 >
