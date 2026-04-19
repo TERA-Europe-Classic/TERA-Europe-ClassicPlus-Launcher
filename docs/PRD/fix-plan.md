@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 56
-last_work_iteration: 56
+iteration_counter: 58
+last_work_iteration: 58
 last_research_sweep: 40
 last_revalidation: 40
 last_revalidation_status: clean
@@ -16,10 +16,12 @@ last_retrospective: 30
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 18
-total_items_done: 49
+total_items_done: 50
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
+
+> **Iter 57 no-op work iteration.** User context switched the loop into an interactive "unstick blockers" conversation. 3 side-commits landed: 0a0b5cf (CLAUDE.md portal IP sync + 3.1.13 reframe as DORMANT), 5e5b0fc (Playwright webServer timeout 120s → 600s). Blockers resolved this iter: Tauri v1→v2 migration APPROVED (to be staged as 7 milestones starting M1 frontend JS imports); 3.1.13.portal-https reframed as P0-DORMANT (no production target exists yet — user is building fully local); external-mod-catalog repo CLONED to `../external-mod-catalog` (unlocks 3.8.6 + catalog.* P2s); Playwright webServer cold-start budget raised (unlocks UX/A11y e2e); TCC Discord webhooks acknowledged as already-decided scope per PRD 3.3.7 (not a new decision).
 
 > **Iter 50 BLOCKED RE-TRY SWEEP — all still blocked.**
 > Gated items re-checked against current repo state:
@@ -178,7 +180,7 @@ total_iterations_to_cap: 1000
 
 ### Documentation (PRD §3.8)
 
-- [P1] **3.8.6.catalog-readme-schema** — Update `external-mod-catalog/README.md` schema to match actual JSON schema 1:1. Acceptance: CI equality check passes. Pillar: Documentation.
+- [DONE] 3.8.6.catalog-readme-schema — proof: `external-mod-catalog` commit dd451cb. Added a Schema section to `external-mod-catalog/README.md` that tables every `mods[]` field with type, required-ness, scope (external/gpk/both), notes. Table sits between machine-parseable `<!-- schema-table-begin -->` / `<!-- schema-table-end -->` markers. CI gate at `scripts/check-readme-schema.mjs` parses the table + collects the union of keys actually used across every entry in catalog.json (21 fields) + asserts equality in both directions. Self-test at `scripts/check-readme-schema.test.mjs` (9 cases: well-formed parse, missing markers, empty table, non-backticked rows tolerated, union across entries, empty catalog, diff both directions, match yields empty diff, seeded drift fires the detector). GitHub Actions workflow `.github/workflows/readme-schema.yml` runs on push-to-main + PRs touching README / catalog / scripts / the workflow; runs the self-test first so a broken detector can't rubber-stamp a silent regression. Local proof: `node scripts/check-readme-schema.test.mjs` → `ok (9 tests)`, `node scripts/check-readme-schema.mjs` → `documented=21 actual=21, OK — README table matches catalog.json 1:1`. Verified @ iter 58.
 
 ### Reliability follow-ups from iter-31
 
