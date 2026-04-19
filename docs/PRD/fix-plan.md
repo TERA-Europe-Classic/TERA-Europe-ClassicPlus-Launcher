@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 75
-last_work_iteration: 75
+iteration_counter: 76
+last_work_iteration: 76
 last_research_sweep: 70
 last_revalidation: 72
 last_revalidation_status: all-gates-green
@@ -16,15 +16,27 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 18
-total_items_done: 57
+total_items_done: 58
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 261b5f3
+tauri_v2_migration_last_commit: 5e46d71
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 76 WORK — fix.conflict-modal-wiring DONE (worktree).**
+>
+> Pre-squash filler work. Worktree commit `5e46d71`. Closes the P1 gap from iter 32: `tmm::detect_conflicts` was `#[allow(dead_code)]` — frontend had no path to preview slot overwrites before install, so users saw silent last-install-wins overwrites instead of PRD 3.3.3's modal disclaimer.
+> - `services/mods/tmm.rs`: `ModConflict` now derives `Serialize + Deserialize`. New bundle helper `preview_conflicts_from_bytes(game_root, source_gpk_bytes)` does the fs + decrypt + parse + detect chain in one unit so the Tauri command body stays thin.
+> - `commands/mods.rs`: `#[tauri::command] pub async fn preview_mod_install_conflicts(entry: CatalogEntry) -> Result<Vec<ModConflict>, String>`. Non-GPK kinds + un-downloaded GPKs short-circuit to `Ok([])` (best-effort preview; real install still runs `detect_conflicts` post-download as a safety gate).
+> - `main.rs::generate_handler!`: registered.
+> - `tests/conflict_modal.rs` (new, 4 wiring guards): attribute adjacency + delegate + return-type + registration + Serialize-derive pin + missing-backup early-return ordering.
+>
+> Existing Playwright spec `mod-conflict-warning.spec.js` (authored iter 32) now drives against a real backend.
+>
+> Acceptance: 821/821 (was 817, +4 new guards), clippy clean. Worktree ready state unchanged — `ready_for_squash_merge: true`. Three P1 wiring items shipped in iters 74-76 (overlay-lifecycle, clean-recovery, conflict-modal) — all follow the same pattern: thin Tauri command over existing pure predicate, source-inspection integration tests pin the wiring. Only P1 filler left from the pre-squash list is `fix.mods-hardcoded-i18n-strings` (higher blast radius, 4-locale parity). Iter 77 either tackles that (accepting the scope) or branches to a fresh P1 item from §3 of the PRD.
 
 > **Iter 75 WORK — fix.clean-recovery-wiring DONE (worktree).**
 >
@@ -328,7 +340,7 @@ tauri_v2_migration_ready_for_squash_merge: true
 ### Reliability follow-ups from iter-31
 
 - [DONE] fix.clean-recovery-wiring — wired on worktree commit `261b5f3` (iter 75). Tauri command `commands::mods::recover_clean_mapper` (thin async wrapper) resolves game root via the shared `resolve_game_root()` helper and delegates to `tmm::recover_missing_clean`; registered in `main.rs::generate_handler!`. Dropped the `#[allow(dead_code)]` gate on the underlying predicate. Acceptance met via new 3-test integration suite `tests/clean_recovery.rs` — source-inspection guards that (a) the fn is annotated `#[tauri::command]` (attribute within 200 chars of decl), (b) delegates to `tmm::recover_missing_clean` + uses `resolve_game_root`, (c) is registered in the generate_handler list, (d) the dead_code gate is gone. Frontend Settings-panel Recovery button is a follow-up UI item — the command itself is live and invoke-able now. 817/817 Rust tests, clippy clean. Pillar: Reliability. Verified @ iter 75.
-- [P1] **fix.conflict-modal-wiring** — `services::mods::tmm::detect_conflicts` is unit-tested but not yet wired. Add Tauri command `preview_mod_install_conflicts(id: String) -> Vec<ModConflict>` that loads vanilla (from `.clean`) and current mapper, parses the catalog's source GPK (if already downloaded) or returns the catalog-declared (composite, object) tuples, and returns conflicts. Frontend calls it before `install_mod`; on non-empty result, renders the modal with last-install-wins disclaimer + log entry. Acceptance: Playwright test in `mod-conflict-warning.spec.js` can drive the modal via a mocked `invoke()` return and assert the disclaimer text renders. Pillar: Functionality. Discovered iter 32.
+- [DONE] fix.conflict-modal-wiring — wired on worktree commit `5e46d71` (iter 76). Tauri command `commands::mods::preview_mod_install_conflicts(entry: CatalogEntry) -> Result<Vec<ModConflict>, String>` delegates to the new bundle helper `tmm::preview_conflicts_from_bytes` which reads + decrypts + parses vanilla (.clean) + current mapper, parses the mod file from on-disk bytes under `mods/gpk/<id>.gpk`, and runs `detect_conflicts`. Best-effort design: missing `.clean` returns `Ok([])` (silent no-op better than scary error for a preview; real install still refuses). Non-GPK kinds short-circuit to `Ok([])`. `ModConflict` now derives `Serialize + Deserialize` for IPC transport. Dropped `#[allow(dead_code)]` on both the struct and `detect_conflicts`. Registered in `main.rs::generate_handler!`. Acceptance met via new 4-test integration suite `tests/conflict_modal.rs` — guards (a) `#[tauri::command]` attribute adjacency, (b) delegate calls + `Vec<ModConflict>` return type, (c) registration, (d) `ModConflict` serde derive, (e) bundle helper's missing-backup early-return appears before any fallible I/O. Existing Playwright spec `mod-conflict-warning.spec.js` (iter 32) now drives against a real backend command. 821/821 Rust tests, clippy clean. Pillar: Functionality. Verified @ iter 76.
 - [DONE] fix.overlay-lifecycle-wiring — wired on worktree commit `7a7a9e0` (iter 74). `commands/game.rs` post-game-exit block now reads `teralib::get_running_game_count()`, calls `external_app::decide_overlay_action`, and only fires `stop_auto_launched_external_apps()` when the predicate returns `Terminate`. Previous code tore down overlays on EVERY close, which violated 3.2.12 on multi-client setups. Acceptance met via source-inspection guard `tests/multi_client.rs::game_rs_gates_overlay_stop_on_decide_overlay_action` — asserts the predicate call precedes the stop call in source order AND the stop call appears exactly once (catches a sibling-branch reintroduction). Pure-predicate tests `partial_close_keeps_overlays` + `last_close_terminates_overlays` already existed @ iter 31; the guard closes the gap between "predicate works" and "predicate is actually called." 814/814 green, clippy clean. Pillar: Reliability. Verified @ iter 74.
 - [P1-IN-PROGRESS] **tauri-v2-migration-plan** — Plan doc committed @ iter 62: `docs/PRD/audits/security/tauri-v2-migration-plan.md`. Context7 lookup surfaced `cargo tauri migrate` (automated migration tool) and `bundle.createUpdaterArtifacts: "v1Compatible"` (single-flag dual-format solution), collapsing the original hand-port plan from iter 57 into 10 tool-assisted milestones. Migration invariants locked: main never transits through broken state, existing users don't lose auto-update, no minisign key rotation, CI gates pass at every milestone, no test regression. Target: Tauri 2.x latest stable; launcher 0.2.0; indefinite dual-format window.
   - **M0 DONE @ iter 63**: worktree `../tauri-v2-migration` created from main @ 6860d86; baseline snapshot doc committed on worktree branch as cc33d92. Pinned: rustc 1.89.0, cargo 1.89.0, node v24.1.0, tauri 1.0 + 15 features, @tauri-apps/cli 1.6.3, 41 Tauri commands, 11 allowlist categories, 9 HTTP scope entries, 790 Rust + 431 JS = 1221 tests, v0.1.10 setup.exe 52.05 MB, 7 CI gates green, minisign pubkey fingerprint RWSEL+9/IIo3Gw3Vn1pXMl8p+ykWyKsZ/dzjmVrs0Ll2v1v9rE0yed2L.
