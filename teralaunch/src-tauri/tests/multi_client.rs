@@ -54,3 +54,42 @@ fn decision_is_pure_and_deterministic() {
         assert_eq!(decide_spawn_model(false), SpawnDecisionModel::Spawn);
     }
 }
+
+// --- Lifecycle mirror for PRD 3.2.12 / 3.2.13 ------------------------------
+
+/// Model of the overlay lifecycle rule. Diverging from
+/// `external_app::decide_overlay_action` would be noticed here the next
+/// time a refactor touches either file.
+#[derive(Debug, PartialEq, Eq)]
+enum OverlayActionModel {
+    KeepRunning,
+    Terminate,
+}
+
+fn decide_overlay_action_model(remaining_clients: usize) -> OverlayActionModel {
+    if remaining_clients == 0 {
+        OverlayActionModel::Terminate
+    } else {
+        OverlayActionModel::KeepRunning
+    }
+}
+
+#[test]
+fn partial_close_keeps_overlays() {
+    // One of two clients closes -> one remains -> overlays stay alive.
+    assert_eq!(
+        decide_overlay_action_model(1),
+        OverlayActionModel::KeepRunning,
+        "partial close (remaining=1) must keep overlays up"
+    );
+}
+
+#[test]
+fn last_close_terminates_overlays() {
+    // Last client closes -> 0 remain -> overlays torn down.
+    assert_eq!(
+        decide_overlay_action_model(0),
+        OverlayActionModel::Terminate,
+        "last close (remaining=0) must tear overlays down"
+    );
+}

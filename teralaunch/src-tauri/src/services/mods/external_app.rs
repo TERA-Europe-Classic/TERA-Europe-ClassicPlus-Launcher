@@ -291,6 +291,37 @@ pub fn check_spawn_decision(exe_name: &str) -> SpawnDecision {
     decide_spawn(is_process_running(exe_name))
 }
 
+/// Whether the overlay (Shinra / TCC) should stay alive or be torn down
+/// when a `TERA.exe` client exits. PRD 3.2.12 / 3.2.13.
+///
+/// The call-site wiring (listening to the teralib game-count watch channel
+/// and emitting stop events to the frontend) lands with the broader
+/// multi-client lifecycle work. For now the predicate is the tested
+/// contract and is exported pub so the future caller has a stable import.
+#[allow(dead_code)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum OverlayLifecycleAction {
+    /// At least one other TERA.exe client is still running — keep overlays.
+    KeepRunning,
+    /// Last client closed — tear overlays down with the game.
+    Terminate,
+}
+
+/// Pure decision function on the remaining-client count **after** a close
+/// event. `>= 1` → KeepRunning (partial close), `0` → Terminate (last close).
+///
+/// `remaining_clients` is the count of live `TERA.exe` processes measured
+/// AFTER the close event fires; `teralib::get_running_game_count()` is the
+/// production source. Passing it in explicitly keeps the function pure.
+#[allow(dead_code)]
+pub fn decide_overlay_action(remaining_clients: usize) -> OverlayLifecycleAction {
+    if remaining_clients == 0 {
+        OverlayLifecycleAction::Terminate
+    } else {
+        OverlayLifecycleAction::KeepRunning
+    }
+}
+
 /// Returns true if any running process matches the given executable name
 /// (case-insensitive, matches the leaf filename, not the full path).
 ///
@@ -437,6 +468,36 @@ mod tests {
         // exist. Must return Spawn (no running process to attach to).
         let d = check_spawn_decision("zzzz_nonexistent_binary_name_qqqq.exe");
         assert_eq!(d, SpawnDecision::Spawn);
+    }
+
+    // --- PRD 3.2.12.multi-client-partial-close / 3.2.13.multi-client-last-close
+
+    #[test]
+    fn partial_close_keeps_overlays() {
+        // Two clients launched, user closes one → remaining_clients == 1 →
+        // overlays must stay alive. PRD 3.2.12.
+        let action = decide_overlay_action(1);
+        assert_eq!(action, OverlayLifecycleAction::KeepRunning);
+    }
+
+    #[test]
+    fn three_clients_one_closes_keeps_overlays() {
+        // Boundary sanity: arbitrary multi-client counts keep overlays.
+        for n in 1..=10 {
+            assert_eq!(
+                decide_overlay_action(n),
+                OverlayLifecycleAction::KeepRunning,
+                "remaining={n} must KeepRunning"
+            );
+        }
+    }
+
+    #[test]
+    fn last_close_terminates_overlays() {
+        // Only client closes → remaining_clients == 0 → overlays torn down.
+        // PRD 3.2.13.
+        let action = decide_overlay_action(0);
+        assert_eq!(action, OverlayLifecycleAction::Terminate);
     }
 
     #[test]

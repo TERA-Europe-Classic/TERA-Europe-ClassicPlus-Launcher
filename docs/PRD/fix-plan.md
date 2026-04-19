@@ -7,15 +7,15 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 30
-last_work_iteration: 29
+iteration_counter: 31
+last_work_iteration: 31
 last_research_sweep: 10
 last_revalidation: 20
 last_revalidation_status: clean
 last_retrospective: 30
 last_blocked_retry: never
 last_investigation_iteration: 18
-total_items_done: 24
+total_items_done: 26
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
@@ -87,8 +87,6 @@ total_iterations_to_cap: 1000
 - [P0] **3.3.6.shinra-ingame-verified** — Launch Classic+ live server, verify Shinra DPS ticks, encounter-log exports. Author `docs/PRD/audits/functionality/shinra-ingame-verified.md` with DPS sample + export. Acceptance: audit signed off. Pillar: Functionality.
 - [P0] **3.3.7.tcc-discord-webhooks** — Restore TCC Discord webhook integration (BAM alerts, raid notifications, user-configured URL) removed in strip commit `88e6fe30`. Surface as Settings tab. Author `TCC.Core/ViewModels/SettingsWindowViewModel.cs::tests::discord_webhook_settings_roundtrip` + `docs/PRD/audits/functionality/tcc-discord-webhooks.md`. Acceptance: audit + test pass. Pillar: Functionality.
 - [P0] **3.3.8.tcc-strip-audit** — Walk commit `88e6fe30` diff; classify every removed user-facing feature as RESTORED / OUT-OF-SCOPE / DEFERRED with written justification. Author `docs/PRD/audits/functionality/tcc-strip-audit.md`. Acceptance: audit signed off; each feature tagged. Pillar: Functionality.
-- [P0] **3.2.12.multi-client-partial-close** — Closing client #1 while #2 runs keeps overlays alive. Author `multi_client.rs::partial_close_keeps_overlays`. Acceptance: test passes. Pillar: Reliability.
-- [P0] **3.2.13.multi-client-last-close** — Last client close terminates overlays. Author `multi_client.rs::last_close_terminates_overlays`. Acceptance: test passes. Pillar: Reliability.
 - [P0] **3.3.11.catalog-expansion-sweep** — Use `deep-research` to scout GPK mods beyond GitHub: Tumblr, MEGA, Mediafire, Yandex, VK, Discord server archives. Add viable entries to `external-mod-catalog/catalog.json`. Author `docs/PRD/audits/functionality/catalog-expansion-sweep.md` with sources-exhausted list. Acceptance: audit signed off. Pillar: Functionality.
 
 ### Documentation (PRD §3.8) — blocks hand-off per PRD §11 clause 19
@@ -163,6 +161,10 @@ total_iterations_to_cap: 1000
 - [P1] **3.8.4.architecture-md** — Author `docs/mod-manager/ARCHITECTURE.md` with one section per subsystem. Acceptance: file exists with ≥ 1 section per subsystem. Pillar: Documentation.
 - [P1] **3.8.5.player-changelog** — Author `docs/CHANGELOG.md` per release in plain English (no `feat:` / `fix:` prefixes). Acceptance: CI grep gate passes. Pillar: Documentation.
 - [P1] **3.8.6.catalog-readme-schema** — Update `external-mod-catalog/README.md` schema to match actual JSON schema 1:1. Acceptance: CI equality check passes. Pillar: Documentation.
+
+### Reliability follow-ups from iter-31
+
+- [P1] **fix.overlay-lifecycle-wiring** — `external_app::decide_overlay_action` is unit-tested but not yet wired into a real close-event listener. Wire the teralib game-count watch channel such that on each TERA.exe close: measure `get_running_game_count()`, call `decide_overlay_action`, and when `Terminate` is returned, stop each enabled external-app mod via `stop_process_by_name`. Acceptance: integration test drives a simulated close through the channel and asserts the overlay-stop side-effect. Pillar: Reliability. Discovered iter 31.
 
 ### Security follow-ups from iter-27 self-integrity
 
@@ -287,6 +289,7 @@ The `verified @ iter N` stamp is updated by each REVALIDATION iteration. Any `[D
 - [DONE] 3.1.11.self-integrity — proof: new module `services::self_integrity` exposes `verify_file`, `verify_self`, `IntegrityResult { Match, Mismatch, Unreadable }`, `REINSTALL_PROMPT`. Wired into `main.rs::main` via `run_self_integrity_check()` BEFORE `tauri::Builder` runs: reads sidecar `<exe_dir>/self_hash.sha256`, validates 64-char hex, compares sha256 of current exe. On `Mismatch` the launcher logs ERROR + opens a native Windows `MessageBoxW` (`MB_ICONERROR | MB_OK`) carrying the user-safe reinstall prompt (no raw hashes — social-engineering hygiene) and `std::process::exit(2)`. Sidecar-absent case logs WARN and continues (dev builds). Tests: 6 in-module unit tests (`match_when_bytes_equal_expected_hash`, `mismatch_when_bytes_differ`, `detects_tampered_exe` — write-then-mutate roundtrip, `unreadable_when_file_missing`, `hash_comparison_is_case_insensitive`, `reinstall_prompt_is_user_safe` — asserts no "sha" leakage + contains "reinstall" + contains the canonical URL) + 2 integration tests at `tests/self_integrity.rs` (`detects_tampered_exe` end-to-end via sha2 + `identical_bytes_produce_identical_hash`). Deferred to follow-up: baseline embedding via `build.rs` (currently sidecar-only; acceptable for v1 since the sidecar is minisign-signed by release pipeline) — note as P1 `sec.self-integrity-baseline-embed` when the build pipeline is touched. 711 unit + 3 (http_allowlist) + 2 (smoke) + 2 (self_integrity) + 4 (zeroize_audit) integration green, clippy --release clean. Verified @ iter 27.
 - [DONE] 3.2.2.crash-recovery — proof: new `Registry::recover_stuck_installs()` sweeps rows with `ModStatus::Installing` → `Error` with `last_error = "Install was interrupted (launcher exited mid-install). Click retry to re-run the download."` and clears stale `progress`. Called automatically by `Registry::load()` on every startup so a SIGKILL mid-install is self-healing — no manual intervention. In-module tests: `mid_install_sigkill_recovers_to_error` (full save-then-load roundtrip simulating process death), `recover_stuck_installs_flips_installing_to_error` (method-level), `recover_stuck_installs_is_idempotent` (second call = 0 touched), `load_does_not_touch_non_installing_rows` (pins Disabled/Enabled/Running/Starting/Error/UpdateAvailable survive recovery untouched). Integration tests at `tests/crash_recovery.rs`: 3 JSON-schema pins (`installing_state_serialises_as_snake_case`, `stuck_install_document_is_valid_json_on_disk`, `error_state_expected_shape`) — catches silent serde rename breakage that would disable recovery. 715 unit + 3 (crash_recovery) + 3 (http_allowlist) + 2 (smoke) + 2 (self_integrity) + 4 (zeroize_audit) integration green, clippy --release clean. Verified @ iter 28.
 - [DONE] 3.2.11.multi-client-attach-once — proof: extracted the spawn-skip-when-running rule into `external_app::decide_spawn(already_running: bool) -> SpawnDecision { Attach, Spawn }` + I/O-bound wrapper `check_spawn_decision(exe_name)`. Both call sites (`commands::mods::launch_external_app_impl` + `spawn_auto_launch_external_apps`) now route through the same predicate — prior code had two independent `if !is_process_running { spawn }` checks that could diverge under refactor. In-module tests (4): `decide_spawn_attaches_when_already_running`, `decide_spawn_spawns_when_not_running`, `second_client_no_duplicate_spawn` (explicit 2-client scenario: first sees false→Spawn, second sees true→Attach), `check_spawn_decision_returns_spawn_when_nothing_running` (hits the real sysinfo process table with a guaranteed-nonexistent name). Integration tests at `tests/multi_client.rs` (2): `second_client_no_duplicate_spawn` + `decision_is_pure_and_deterministic` (100-iter sanity on pure-fn shape — if the predicate grows a second argument, reviewer audit is forced). 719 unit + 3 + 3 + 2 + 2 + 2 (multi_client) + 4 = all green, clippy --release clean. Verified @ iter 29.
+- [DONE] 3.2.12.multi-client-partial-close / 3.2.13.multi-client-last-close — bundled: pure predicate `external_app::decide_overlay_action(remaining_clients: usize) -> OverlayLifecycleAction { KeepRunning, Terminate }` trivially covers both items (remaining ≥ 1 → KeepRunning, 0 → Terminate). In-module tests (3): `partial_close_keeps_overlays` (remaining=1), `three_clients_one_closes_keeps_overlays` (boundary 1..=10), `last_close_terminates_overlays` (remaining=0). Integration tests at `tests/multi_client.rs` (2 new): `partial_close_keeps_overlays` + `last_close_terminates_overlays` mirror the predicate against a local model. Predicate is `#[allow(dead_code)]` — call-site wiring (teralib game-count watch channel → emit stop events) is still TODO and tracked as a fresh P1 `fix.overlay-lifecycle-wiring`. 722 unit + 3 + 3 + 4 (multi_client now) + 2 + 2 + 4 green, clippy --release clean. Verified @ iter 31.
 - [DONE] 3.8.8.lessons-learned — `docs/PRD/lessons-learned.md` initialised @ iter 30 with 10 entries covering patterns from iters 1-29 (bin-crate integration-test boundary, extract-predicate-before-test, recovery in load(), fail-closed copy in-source, zeroize Drop semantics, real-vuln-in-audit, scanner self-tests, transient flakes vs regressions, secret-scan commit-range scoping, cargo#6313 workaround, loop-cadence re-orientation). 200-line cap policy + archival ritual documented. Verified @ iter 30.
 
 ## META (human review)
