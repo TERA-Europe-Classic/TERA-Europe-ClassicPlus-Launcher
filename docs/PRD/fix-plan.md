@@ -7,15 +7,15 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 4
-last_work_iteration: 4
+iteration_counter: 5
+last_work_iteration: 5
 last_research_sweep: never
 last_revalidation: never
 last_revalidation_status: never
 last_retrospective: never
 last_blocked_retry: never
 last_investigation_iteration: 2
-total_items_done: 3
+total_items_done: 4
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
@@ -47,7 +47,6 @@ total_iterations_to_cap: 1000
 
 ### Infrastructure (must exist before most P0 tests can be written)
 
-- [P0] **infra.shinra-test-project** — Add `ShinraMeter.Tests/` xUnit project to Shinra solution. Acceptance: `dotnet test ShinraMeter.sln -c Release` runs ≥ 1 passing test. Pillar: Reliability.
 - [P0] **infra.catalog-ci** — Author `.github/workflows/catalog-ci.yml` for `external-mod-catalog`: JSON validity + schema + URL reachability gates. Acceptance: PR that breaks `catalog.json` fails CI. Pillar: Reliability (PRD §11 clause 9).
 - [P0] **infra.playwright-split** — Split monolithic `teralaunch/tests/e2e/launcher.spec.js` (866 lines) into feature-scoped files matching §3 criterion layout. Acceptance: one file per `mod-*` feature; `npm run test:e2e` green. Pillar: Reliability.
 
@@ -248,12 +247,13 @@ The `verified @ iter N` stamp is updated by each REVALIDATION iteration. Any `[D
 - [DONE] infra.rust-integration-tests — commit b464c70, proof: `teralaunch/src-tauri/tests/smoke.rs` + `tests/common/mod.rs`, `cargo test --test smoke` → 2/2 passed in debug, verified @ iter 1. Release-mode also passes as of commit 16760b8 (see fix.cargo-test-release-lto-link DONE below).
 - [DONE] fix.cargo-test-release-lto-link — commit 16760b8, proof: `cargo test --release --test smoke` → 2/2 passed, 0 collisions; `cargo build --release` regression check → clean. Root cause: cargo#6313, `crate-type = ["cdylib","rlib"]` on path-dep teralib triggered double-build under test mode. Fix: drop unused cdylib + unify tokio across teralib/src-tauri + delete advisory teralib Cargo.lock + remove vestigial `[[bin]] tera_launcher` stub. Verified @ iter 3.
 - [DONE] infra.tcc-test-project — TCC commit 5204f2b0, proof: `dotnet test TCC.sln -c Release` → 1/1 passed, 0 warnings. Scaffold: `TCC/TCC.Tests/{TCC.Tests.csproj, SmokeTests.cs}` (xunit 2.5.3, net8.0). Known follow-up (new P1): upgrade TCC.Tests TFM to `net8.0-windows` when first ProjectReference to TCC.Core/TCC.Utils is added. Verified @ iter 4.
+- [DONE] infra.shinra-test-project — Shinra commit f0390eb1, proof: `dotnet test Tera.sln -c Release` → 1/1 passed, exit 0. Scaffold: `ShinraMeter/ShinraMeter.Tests/{ShinraMeter.Tests.csproj, SmokeTests.cs}` (xunit 2.5.3, net8.0, `LangVersion=latest` override to bypass Directory.Build.props LangVersion=8). Also: .gitignore negation pair added (`!ShinraMeter.Tests` + `!ShinraMeter.Tests/**`) because `ShinraMeter*` wildcard captured the test dir. Verified @ iter 5.
 
 ## META (human review)
 
 Retrospective iterations may propose PRD changes. These land here — the loop cannot act on them. The human reviews and either edits the PRD or rejects.
 
-(none yet)
+- [META] **meta.shinra-sln-filename** — PRD §11 clause 6 + loop-prompt step 8 refer to `ShinraMeter.sln`, but the actual file is `Tera.sln`. Discovered iter 5. Human action: decide whether to (a) rename `Tera.sln` → `ShinraMeter.sln` (touches Shinra repo structure), or (b) update PRD §11 clause 6 + loop-prompt to say `Tera.sln`. Option (b) is less invasive; no downstream docs reference the sln name.
 
 ## REGRESSED
 
