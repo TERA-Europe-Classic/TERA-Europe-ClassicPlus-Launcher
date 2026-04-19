@@ -7,9 +7,9 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 79
+iteration_counter: 80
 last_work_iteration: 79
-last_research_sweep: 70
+last_research_sweep: 80
 last_revalidation: 72
 last_revalidation_status: all-gates-green
 last_retrospective: 60
@@ -22,9 +22,25 @@ total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 39b09e4
+tauri_v2_migration_last_commit: 4421a97
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 80 RESEARCH SWEEP — findings landed on worktree.**
+>
+> Tenth research sweep since loop start; first since iter 70. Worktree commit `4421a97`. Artefact: `docs/PRD/audits/research/sweep-iter-80.md`. No code changes — pure intelligence gathering, as the research-sweep cadence spec prescribes.
+> - **Dep advisories flagged (all non-exploitable, all queued P2):** rustls-webpki 0.103.9 hits RUSTSEC-2026-0049 (CRL matching, not used by reqwest default), -0098 (URI name constraints, public Web PKI unaffected), -0099 (wildcard name constraint bypass, requires attacker CA). Single `cargo update -p rustls-webpki --precise 0.103.12` closes all three.
+> - **tauri-plugin-shell CVE-2025-31477:** already closed by our 2.3.5 pin (vulnerable range ≤2.2.0). Explicit scope pin `"shell": { "open": true }` in tauri.conf.json OR migration to `tauri-plugin-opener` is defence-in-depth, not a live exposure. Frontend call sites audited: 3 uses (app.js:2259, 2261, 5025), all pass localized constants or anchor `event.target.href`.
+> - **zip CVE-2025-29787 (symlink path traversal):** fixed pre-2.4.2 — we're clean on both resolved versions (2.4.2 direct + 4.6.1 transitive).
+> - **Tauri iFrame IPC bypass (CVE-2024-35222):** we don't embed iFrames — N/A.
+> - **Dep duplication:** reqwest 0.12.28+0.13.2, zip 2.4.2+4.6.1. Binary size / supply-chain surface concern; investigation item queued P2.
+> - **Vitest:** we run 2.1.8, latest is 4.x. No CVEs on 2.x line. Bump is cosmetic; queued P3 post-squash.
+> - **Playwright 1.58.2:** clean, no advisories.
+> - **Catalog currency:** Shinra v3.0.0-classicplus + TCC v2.0.1-classicplus in catalog both match upstream releases at catalog commit 33cf584 — no drift.
+>
+> Five new fix-plan action items appended under P2: `dep.rustls-webpki-bump`, `sec.shell-scope-hardening`, `sec.shell-open-call-sites-pinned`, `dep.dedupe-reqwest-zip`, `dep.vitest-bump-post-squash` (P3). None block squash; all are bundle-able into a single post-squash "dep sweep" iter. Next sweep: iter 90.
+>
+> Header: `last_research_sweep: 70 → 80`. `last_work_iteration` stays at 79 (research doesn't count as work). `total_items_done` unchanged at 61. `ready_for_squash_merge: true` unchanged.
 
 > **Iter 79 WORK — adv.bogus-gpk-footer DONE (worktree).**
 >
