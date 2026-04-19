@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 166
-last_work_iteration: 166
+iteration_counter: 167
+last_work_iteration: 167
 last_research_sweep: 150
 last_revalidation: 160
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 144
+total_items_done: 145
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 8a49601
+tauri_v2_migration_last_commit: a9d5006
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 167 WORK — pin.portal-https-draft-status+url-shape DONE (worktree).**
+>
+> Worktree commit `a9d5006`. PRD §3.1.13 `portal_https_guard.rs` previously had 6 tests (iter 119 + iter 142 extensions): URL scheme allowlist + audit doc presence + EXPECTED_KEYS set + shared prefix + empty updater URLs + detector self-test. Iter 167 targets 5 new angles the existing pins miss: the draft-status text that must flip on cutover, the seven migration-plan sections the audit doc carries, and three URL-shape invariants (trailing slash on base, port consistency across actions, no query string baked into SERVER_LIST).
+>
+> Five new pins on `teralib/src/config/config.json` + `docs/PRD/audits/security/portal-https-migration.md`:
+> 1. `audit_doc_carries_explicit_draft_status_line` — pins `**Status:** Draft — pending production HTTPS endpoint`; when cutover signs off, test fails and forces atomic guard tightening
+> 2. `audit_doc_has_all_seven_migration_plan_sections` — headings required (Current state / Threat model / Required before / Launcher-side migration / Rollback plan / Acceptance / Human input required); dropped section risks shipping cutover without a revert path
+> 3. `api_base_url_has_no_trailing_slash` — action URLs concatenate `BASE + "/tera/..."`; trailing slash produces `//tera/` (reverse-proxy-inconsistent)
+> 4. `all_portal_action_urls_share_base_port` — extracts `host:port` from base and asserts every action URL carries it; port drift silently mis-routes
+> 5. `server_list_url_carries_no_query_string` — `?lang=en` is caller-supplied per CLAUDE.md §v100 API; baking it hardcodes one language
+>
+> portal_https_guard: 6 → 11 tests.
+>
+> Acceptance: 1088/1088 Rust (was 1083, +5), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 166 WORK — pin.smoke-test-harness-contract DONE (worktree).**
 >
