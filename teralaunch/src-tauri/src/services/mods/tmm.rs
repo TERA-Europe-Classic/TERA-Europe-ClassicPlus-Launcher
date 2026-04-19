@@ -890,6 +890,60 @@ mod tests {
         }
     }
 
+    // --- PRD 3.2.3.clean-backup-not-overwritten ----------------------------
+
+    #[test]
+    fn clean_backup_not_overwritten_on_second_install() {
+        // ensure_backup copies <game>/S1Game/CookedPC/CompositePackageMapper.dat
+        // to .clean on first touch, then must be a no-op if the .clean is
+        // already present. If a subsequent install overwrites .clean with a
+        // MOD-POLLUTED current mapper, uninstall can't restore vanilla.
+        let tmp = TempDir::new().unwrap();
+        let cooked = tmp.path().join(COOKED_PC_DIR);
+        fs::create_dir_all(&cooked).unwrap();
+
+        let mapper = cooked.join(MAPPER_FILE);
+        let vanilla_bytes: &[u8] = b"VANILLA-MAPPER-BYTES";
+        fs::write(&mapper, vanilla_bytes).unwrap();
+
+        // First ensure_backup: .clean doesn't exist yet -> copies vanilla.
+        ensure_backup(tmp.path()).unwrap();
+        let backup = cooked.join(BACKUP_FILE);
+        assert!(backup.exists(), ".clean must exist after first ensure_backup");
+        assert_eq!(
+            fs::read(&backup).unwrap(),
+            vanilla_bytes,
+            ".clean must contain the vanilla mapper bytes"
+        );
+
+        // Simulate an install that modified the current mapper.
+        let polluted_bytes: &[u8] = b"MOD-POLLUTED-MAPPER-BYTES-DIFFERENT-LEN";
+        fs::write(&mapper, polluted_bytes).unwrap();
+
+        // Second ensure_backup: .clean already exists -> must be a no-op.
+        // Most importantly, must NOT re-copy the (now polluted) current
+        // mapper over the .clean — that would permanently destroy the
+        // vanilla baseline uninstall relies on.
+        ensure_backup(tmp.path()).unwrap();
+        assert_eq!(
+            fs::read(&backup).unwrap(),
+            vanilla_bytes,
+            ".clean must still contain vanilla after second ensure_backup"
+        );
+        assert_ne!(
+            fs::read(&backup).unwrap(),
+            polluted_bytes,
+            ".clean must not have been overwritten with the polluted current"
+        );
+    }
+
+    #[test]
+    fn ensure_backup_errors_when_mapper_missing() {
+        let tmp = TempDir::new().unwrap();
+        let err = ensure_backup(tmp.path()).unwrap_err();
+        assert!(err.contains("not found"), "got {err}");
+    }
+
     // --- PRD 3.3.2.per-object-gpk-merge ------------------------------------
 
     #[test]
