@@ -32,7 +32,7 @@ pwsh ./builder.ps1
 
 ## v100 API (Classic+ Server)
 
-Base URL: `http://88.99.102.67:8090` (Portal API)
+Base URL: `http://192.168.1.128:8090` (Portal API — LAN dev endpoint; no production yet)
 
 ### Authentication
 
@@ -88,7 +88,7 @@ Response: {"Return": true, ..., "CharacterCount": "...", "Permission": 0, "Privi
 
 Same Tauri three-layer architecture as Classic. Key config file:
 
-- `teralib/src/config/config.json` - All API URLs (points to 88.99.102.67:8090)
+- `teralib/src/config/config.json` - All API URLs (points to 192.168.1.128:8090 — LAN dev endpoint; production FQDN + HTTPS required before public launch, tracked by 3.1.13.portal-https)
 
 ### Disabled Features
 
