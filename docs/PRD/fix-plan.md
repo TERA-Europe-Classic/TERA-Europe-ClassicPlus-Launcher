@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 116
-last_work_iteration: 116
+iteration_counter: 117
+last_work_iteration: 117
 last_research_sweep: 110
 last_revalidation: 100
 last_revalidation_status: all-gates-green
@@ -16,15 +16,29 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 97
+total_items_done: 98
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 22f9150
+tauri_v2_migration_last_commit: 465fd5c
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 117 WORK — pin.merger-goldens-in-drift-guard DONE (worktree).**
+>
+> Worktree commit `465fd5c`. Completes the golden-quadruple (parser + cipher + merger + extract) under the drift-guard umbrella. Iter 116 brought parser/cipher/extract in; iter 117 adds the iter-93 merger goldens to §3.3.2:
+> - `golden_merger_commutes_on_disjoint_slots` (2-mod commutativity)
+> - `golden_merger_three_disjoint_mods_all_orders_agree` (6-permutation convergence — catches path-dependence that could hide at n=2)
+>
+> `golden_merger_last_install_wins_on_overlap` was already pinned under §3.3.3 at iter 102; `golden_merger_identity_on_empty_modfile` is a no-op edge case (not duplicated). Two representative pins per criterion is enough.
+>
+> PRD §3.3.2 cell now cites behavioural (`per_object_merge_both_apply`) + both merger goldens.
+>
+> Drift-guard: 33 → 35 pins. All four §5.4 golden test suites (parser / cipher / merger / extract) now represented in the drift-guard umbrella under the criteria they protect.
+>
+> Acceptance: 889/889 Rust unchanged, clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 116 WORK — pin.§5.4-goldens-in-drift-guard DONE (worktree).**
 >
