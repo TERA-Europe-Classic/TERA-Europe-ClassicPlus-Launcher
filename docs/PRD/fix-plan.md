@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 225
-last_work_iteration: 225
+iteration_counter: 226
+last_work_iteration: 226
 last_research_sweep: 220
 last_revalidation: 220
 last_revalidation_status: all-gates-green
@@ -16,15 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 198
+total_items_done: 199
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 0806f62
+tauri_v2_migration_last_commit: 8cc8460
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 226 WORK — pin.tampered-catalog-4-path-constants+9-shape-self-test+fn-uniqueness+header-fn-enumeration+install_mod-ModKind-dispatch DONE (worktree).**
+>
+> Worktree commit `8cc8460`. PRD 5.3 adv.tampered-catalog wiring guard; tampered_catalog had 13 tests (iter 148 creation + iter 149 +3 + iter 189 +5); 37 iters untouched. Brings to 18.
+>
+> Five new source-inspection pins (path-constants + era-shape coverage + fn structural uniqueness + header-fn enumeration + dispatch invariant):
+> 1. `guard_path_constants_are_canonical` — EXTERNAL_APP_RS + COMMANDS_MODS_RS + TYPES_RS + GUARD_SOURCE pinned verbatim
+> 2. `detector_self_test_covers_all_nine_era_shapes` — shapes A–F (pre-iter-189) + `Iter 189 — additional bad shapes` divider + G–I (md5-weak / no-emit / err-dropped)
+> 3. `finalize_error_and_install_fns_are_structurally_unique` — each of 3 fns appears exactly once; duplicate would silently push sibling fn_pos windows onto wrong body
+> 4. `guard_header_enumerates_three_wiring_links_by_fn_name` — header names download_and_extract + download_file + install_external_mod + install_gpk_mod + finalize_error + ModStatus::Error
+> 5. `install_mod_dispatches_to_both_installers_via_modkind_match` — `match entry.kind` with both `ModKind::External => install_external_mod` and `ModKind::Gpk => install_gpk_mod` arms
+>
+> tampered_catalog: 13 → 18 tests. 1353 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 225 WORK — pin.mods-categories-ui-scanner-guard-header+4-path-constants+3000-byte-floor+6-forbidden-markers+both-era-self-test DONE (worktree).**
 >
