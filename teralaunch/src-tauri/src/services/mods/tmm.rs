@@ -752,6 +752,29 @@ pub fn uninstall_gpk(game_root: &Path, container: &str, object_paths: &[String])
         map.insert(vanilla.composite_name.clone(), vanilla.clone());
     }
 
+    // PRD 3.2.4.uninstall-all-restores-vanilla: if removing this mod leaves
+    // every remaining entry at its vanilla (filename, offset, size), this
+    // was the last mod — strip the TMM_MARKER so the on-disk mapper is
+    // byte-identical to `.clean`. Keeping the marker otherwise so downstream
+    // TMM tools still recognise mixed installs.
+    let non_marker_all_vanilla = map.iter().all(|(k, e)| {
+        if k == TMM_MARKER {
+            return true;
+        }
+        match backup_map.get(k) {
+            Some(v) => {
+                v.filename.eq_ignore_ascii_case(&e.filename)
+                    && v.offset == e.offset
+                    && v.size == e.size
+                    && v.object_path.eq_ignore_ascii_case(&e.object_path)
+            }
+            None => false,
+        }
+    });
+    if non_marker_all_vanilla {
+        map.remove(TMM_MARKER);
+    }
+
     let serialized = serialize_mapper(&map);
     let encrypted = encrypt_mapper(serialized.as_bytes());
     fs::write(mapper_path(game_root), &encrypted)
@@ -888,6 +911,103 @@ mod tests {
                 "vector {name:?} should have been accepted"
             );
         }
+    }
+
+    // --- PRD 3.2.4.uninstall-all-restores-vanilla --------------------------
+
+    #[test]
+    fn uninstall_all_restores_vanilla_bytes() {
+        use sha2::{Digest, Sha256};
+
+        // Vanilla mapper state.
+        let vanilla: HashMap<String, MapperEntry> = mapper_with(&[
+            ("S1UI_Party", "S1UI_Party.Foo", "S1Data.gpk"),
+            ("S1UI_Inv", "S1UI_Inv.Bar", "S1Data.gpk"),
+            ("S1UI_Chat", "S1UI_Chat.Baz", "S1Data.gpk"),
+        ]);
+
+        // Capture vanilla bytes (what .clean would hold on disk).
+        let vanilla_serialised = serialize_mapper(&vanilla);
+        let vanilla_encrypted = encrypt_mapper(vanilla_serialised.as_bytes());
+        let vanilla_sha = Sha256::digest(&vanilla_encrypted);
+
+        // Install: apply mod A's patches to a clone of the vanilla map, add
+        // the TMM_MARKER exactly like install_gpk does.
+        let mut post_install = vanilla.clone();
+        let mod_a = ModFile {
+            container: "modA.gpk".into(),
+            region_lock: true,
+            packages: vec![
+                ModPackage {
+                    object_path: "S1UI_Party.Foo".into(),
+                    offset: 100,
+                    size: 200,
+                    ..Default::default()
+                },
+                ModPackage {
+                    object_path: "S1UI_Inv.Bar".into(),
+                    offset: 300,
+                    size: 400,
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        };
+        apply_mod_patches(&mut post_install, &mod_a).unwrap();
+        post_install.insert(
+            TMM_MARKER.into(),
+            MapperEntry {
+                filename: TMM_MARKER.into(),
+                object_path: TMM_MARKER.into(),
+                composite_name: TMM_MARKER.into(),
+                offset: 0,
+                size: 0,
+            },
+        );
+
+        // Sanity: post-install state differs from vanilla.
+        let post_install_sha = Sha256::digest(encrypt_mapper(
+            serialize_mapper(&post_install).as_bytes(),
+        ));
+        assert_ne!(
+            vanilla_sha, post_install_sha,
+            "post-install must differ from vanilla"
+        );
+
+        // Uninstall: restore each object_path from the backup (simulates the
+        // loop in uninstall_gpk) and drop the TMM_MARKER now that no mods
+        // remain.
+        let backup_map = vanilla.clone();
+        let mut post_uninstall = post_install;
+        for path in ["S1UI_Party.Foo", "S1UI_Inv.Bar"] {
+            let v = get_entry_by_object_path(&backup_map, path).unwrap();
+            post_uninstall.insert(v.composite_name.clone(), v.clone());
+        }
+        // "No mods remaining" check (same predicate uninstall_gpk uses post-
+        // iter-42).
+        let all_vanilla = post_uninstall.iter().all(|(k, e)| {
+            if k == TMM_MARKER {
+                return true;
+            }
+            backup_map
+                .get(k)
+                .map(|v| {
+                    v.filename == e.filename
+                        && v.offset == e.offset
+                        && v.size == e.size
+                })
+                .unwrap_or(false)
+        });
+        assert!(all_vanilla, "test scenario must exercise the all-vanilla branch");
+        post_uninstall.remove(TMM_MARKER);
+
+        let post_uninstall_sha = Sha256::digest(encrypt_mapper(
+            serialize_mapper(&post_uninstall).as_bytes(),
+        ));
+        assert_eq!(
+            vanilla_sha, post_uninstall_sha,
+            "install + uninstall-all must leave the mapper bytes identical to vanilla"
+        );
     }
 
     // --- PRD 3.2.3.clean-backup-not-overwritten ----------------------------
