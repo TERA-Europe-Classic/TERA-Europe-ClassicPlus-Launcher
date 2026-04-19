@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 130
-last_work_iteration: 129
+iteration_counter: 131
+last_work_iteration: 131
 last_research_sweep: 130
 last_revalidation: 120
 last_revalidation_status: all-gates-green
@@ -16,15 +16,33 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 110
+total_items_done: 111
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: adc190a
+tauri_v2_migration_last_commit: dd668da
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 131 WORK — pin.mods-categories-ui-scanner DONE (worktree).**
+>
+> Worktree commit `dd668da`. `teralaunch/tests/mods-categories-ui.test.js` is the drift-guard for the iter-85 `fix.mods-categories-ui` UX fix: kind chips (All/External/GPK) and category chips were unified into `.mods-filter-chip` pill geometry inside `.mods-filters-row`, separated by a divider. Before iter 85 the two chip types had different geometry creating an "L-shape" inconsistency.
+>
+> New `tests/mods_categories_ui_scanner_guard.rs` (8 tests):
+> 1. Scanner cites fix.mods-categories-ui + iter 85
+> 2. kind-group → divider → category-row DOM ORDER (≥2 `.toBeLessThan` assertions, not presence-only)
+> 3. Legacy `.mods-category-chip` class absent from all three source types (HTML + JS + CSS) — prevents two-class world creeping back
+> 4. Scoped click handler `.mods-filter-group .mods-filter-chip` — prevents global selector double-binding category chips
+> 5. Unified CSS retained: 999px border-radius, 4px/10px padding, 11px font, rgba(34,211,238) teal active-border
+> 6. Exactly 1 kind + 1 category chip start active (no multi-active seed bug); 3 kind chips fixed
+> 7. Reference files carry unified class + lack legacy class
+> 8. Detector self-test on 4 synthetic bad shapes
+>
+> Seventh in the iter-124-to-131 JS-scanner-pin chain. Each pins a different fix/criterion: no-hardcoded-english / jargon+parity / shell-callsite / search-perf / classicplus-disabled / offline-banner / mods-categories-ui.
+>
+> Acceptance: 957/957 Rust (was 949, +8), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 130 RESEARCH SWEEP — all-gates-green.**
 >
