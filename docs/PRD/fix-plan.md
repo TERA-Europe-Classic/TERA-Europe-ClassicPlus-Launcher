@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 77
-last_work_iteration: 77
+iteration_counter: 78
+last_work_iteration: 78
 last_research_sweep: 70
 last_revalidation: 72
 last_revalidation_status: all-gates-green
@@ -16,15 +16,26 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 18
-total_items_done: 59
+total_items_done: 60
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: b05bf16
+tauri_v2_migration_last_commit: 17db09a
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 78 WORK — adv.http-redirect-offlist DONE (worktree).**
+>
+> Pre-squash filler work on the ready-for-squash worktree. Worktree commit `17db09a`. Closes the P1 adversarial corpus gap: `capabilities/migrated.json` pins the launcher to an HTTP allowlist, but reqwest's default `Policy::limited(10)` would let a compromised allowlisted mirror bounce a download or catalog fetch to an off-list origin via a 3xx. Policy::none() makes the 302 surface as a 302 status, which the existing `!response.status().is_success()` branch already rejects with "Download returned HTTP 302" / "Catalog fetch returned HTTP 302" — so the redirect gate is structural, not behavioural.
+> - `services/mods/external_app.rs::fetch_bytes_streaming` Client::builder → `.redirect(reqwest::redirect::Policy::none())` added.
+> - `services/mods/catalog.rs::fetch_remote` Client::builder → same line added.
+> - `tests/http_redirect_offlist.rs` (new, 3 guards): source-inspects both builders for the `.redirect(Policy::none())` chain + detector self-test (2 positive + 2 negative fixtures) to prevent the scanner from silently regressing to always-true/always-false.
+>
+> The wiring-guard pattern (inspect source, not runtime) fits the scope: the reqwest redirect behaviour is exhaustively covered upstream; what we need to prevent is a future refactor that drops the policy line. Source-inspection catches that at commit time.
+>
+> Acceptance: 824/824 (was 821, +3 new guards), clippy clean. Worktree ready state unchanged — still `ready_for_squash_merge: true`, awaiting user authorisation. Five P1 filler items shipped since the M8 validation gate (iters 74-78: overlay-lifecycle, clean-recovery, conflict-modal, hardcoded-i18n, http-redirect-offlist). Next iter (79) picks another P1 filler — candidates: `adv.tampered-catalog`, `adv.sigkill-mid-download`, `adv.bogus-gpk-footer`, `pin.tmm.*` trio, `infra.gitleaks-allowlist`.
 
 > **Iter 77 WORK — fix.mods-hardcoded-i18n-strings DONE (worktree).**
 >
@@ -372,7 +383,7 @@ tauri_v2_migration_ready_for_squash_merge: true
 - [P1] **adv.zip-slip** — Adversarial test: zip-slip path rejected. Covered by 3.1.3.
 - [P1] **adv.gpk-deploy-escape** — Covered by 3.1.4.
 - [P1] **adv.tampered-catalog** — Author adversarial test: catalog entry with wrong SHA returns Err + 0 bytes + registry Error. Acceptance: test passes. Pillar: Security.
-- [P1] **adv.http-redirect-offlist** — Author test: HTTP redirect to non-allowlisted host is rejected by reqwest. Acceptance: test passes. Pillar: Security.
+- [DONE @ iter 78] **adv.http-redirect-offlist** — Both HTTP client builders (`external_app.rs::fetch_bytes_streaming`, `catalog.rs::fetch_remote`) now set `reqwest::redirect::Policy::none()`. A 3xx from a compromised allowlisted mirror surfaces as an HTTP-302 error at the existing `is_success()` gate, so it can't bounce to an off-list host. Guarded by `tests/http_redirect_offlist.rs` (source-inspection, 3 tests). Worktree commit `17db09a`. Pillar: Security.
 - [P1] **adv.replay-latest-json** — Covered by 3.1.9.
 - [P1] **adv.tampered-exe** — Covered by 3.1.11.
 - [P1] **adv.bogus-gpk-footer** — Already passing (parse_mod_file_rejects_non_tmm_gpks). Verify survives any tmm.rs refactor.
