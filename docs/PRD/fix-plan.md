@@ -7,15 +7,15 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 14
-last_work_iteration: 14
+iteration_counter: 15
+last_work_iteration: 15
 last_research_sweep: 10
 last_revalidation: never
 last_revalidation_status: never
 last_retrospective: never
 last_blocked_retry: never
 last_investigation_iteration: 9
-total_items_done: 10
+total_items_done: 11
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 ```
@@ -59,7 +59,6 @@ total_iterations_to_cap: 1000
 - [P0] **sec.tauri-v1-eol-plan** — Tauri 2.0 stable shipped 2024-10-02; 1.x is security-backport-only with all feature work on v2. CSP-per-window, capability ACLs, and updater-signature-v2 are v2-only — gates PRD items 3.1.8 (anti-reverse), 3.1.9 (updater-downgrade), 3.1.12 (CSP unsafe-inline). Action: author `docs/PRD/audits/security/tauri-v2-migration.md` with migration scope + risk assessment, then decide stay-on-1 vs migrate. Acceptance: audit doc signed off with a concrete plan (either: migrate, with milestones; or: stay with documented compensating controls). Pillar: Security. Discovered iter 10 RESEARCH SWEEP.
 - [P0] **3.1.13.portal-https** — Migrate `teralib/src/config/config.json` portal API URL from `http://192.168.1.128:8090` (current) to HTTPS endpoint before Classic+ public launch. Acceptance: config URL starts with `https://`; end-to-end login works against HTTPS endpoint; audit doc signed off. Pillar: Security. **Iter 9 status:** audit draft authored at `docs/PRD/audits/security/portal-https-migration.md` (commit dc604d0). Remaining acceptance gated on external human infra (production FQDN + TLS cert + reverse proxy). Re-attempt at BLOCKED RE-TRY every 50 iters or when human provides the endpoint.
 - [P0] **3.1.6.secret-leak-scan** — Run gitleaks + trufflehog across all 5 repos; rotate + CI + audit doc. Acceptance: CI exits 0 on every repo; audit doc lists all rotated secrets. Pillar: Security. **Iter 13 status:** gitleaks scan complete; audit committed 01064c9. 4 follow-up items queued (fix.shinra-teradps-token, fix.launcher-vs-dir-tracked, infra.gitleaks-allowlist, infra.secret-scan-ci). Item stays P0 until all 4 close + CI gates are green.
-- [P0] **fix.shinra-teradps-token** — True positive from iter-13 secret scan: `Data/WindowData.cs:84` hard-codes `TeraDpsToken` + `TeraDpsUser` defaults (upstream-era, predates Classic+ fork). Blank to `""`. No history rewrite (token is in every historical clone of upstream; forward-only fix is sufficient). Acceptance: defaults are empty strings; Shinra build still clean. Pillar: Security.
 - [P0] **infra.secret-scan-ci** — Author `.github/workflows/secret-scan.yml` for each public repo (external-mod-catalog, TCC, ShinraMeter): run gitleaks against PR diff, fail on unallowed hits. Launcher + teralib (private) get the same workflow for defense in depth. Acceptance: CI exits 0 on clean tree; new secret in a PR fails the job. Pillar: Security.
 - [P0] **3.1.8.anti-reverse-hardening** — Enable Rust release-profile LTO + strip + CFG + stack-canary; apply `cryptify`/`chamox` string obfuscation to all sensitive string literals (portal URLs, AuthKey-adjacent code, update-server URL, deploy paths). Author `docs/PRD/audits/security/anti-reverse.md` with build-output inspection (IDA/Ghidra screenshots showing obfuscated strings). Acceptance: audit doc signed off; release build flags verified in `Cargo.toml`. Pillar: Security.
 - [P0] **3.1.10.tcc-shinra-binary-hardening** — Strip TCC + Shinra release-mode debug symbols; evaluate ConfuserEx / Obfuscar for IL-obfuscation on sensitive types (e.g. sniffer keys, session-decryption code). Author `docs/PRD/audits/security/tcc-shinra-binary-hardening.md`. Acceptance: release binaries show no `.pdb`-adjacent symbols; audit doc signed off. Pillar: Security.
@@ -269,6 +268,7 @@ The `verified @ iter N` stamp is updated by each REVALIDATION iteration. Any `[D
 - [DONE] sec.zip-cve-2025-29787 — commit 4896310, proof: `teralaunch/src-tauri/Cargo.toml` bumped `zip 2.2 -> 2.3` (floor); Cargo.lock already resolved to 2.4.2 via earlier churn (past CVE-2025-29787 patch at 2.3.0); `cargo test --release --test smoke` → 2/2 passed, exit 0, 14.72s. Policy-level defense against regression. Verified @ iter 11.
 - [DONE] fix.mods-clippy-cleanup — commit a91764e, proof: `cargo clippy --all-targets --release -- -D warnings` → exit 0; `cargo test --release` → 696 unit + 2 integration passed, exit 0. Cleared 6 pre-existing lints in `src/services/mods/{external_app,tmm}.rs` (unneeded return, manual slice copy, two manual div_ceil, two field-assignment-outside-Default, items-after-test-module) + added `#[allow(dead_code)]` on 2 ModPackage fields exposed by the struct-literal refactor (fields mirror TMM format for round-trip fidelity). Satisfies PRD §11 clause 1 for launcher Rust. Verified @ iter 12.
 - [DONE] fix.launcher-vs-dir-tracked — commit 978d5b0, proof: `git ls-files | grep .vs/` → 0 entries. Added `.vs/` to `.gitignore`; `git rm --cached -r teralaunch/.vs/` untracked 14 files (1450 lines deleted incl. DPAPI-encrypted applicationhost.config at lines 126-127 that iter-13 gitleaks flagged). No history rewrite (DPAPI is per-machine). Verified @ iter 14.
+- [DONE] fix.shinra-teradps-token — no commit needed (already resolved by upstream before the Classic+ fork took commits), proof: `grep -rnE '(TeraDpsToken|TeraDpsUser|H0XJ9RGZO8|KxjWQFyQJp)' --include='*.cs' --include='*.xml' --include='*.json'` in Shinra working tree → 0 hits. Token exists only in historical commits `ea5a3af8` + `fd47e078` (upstream-era). Rewriting fork history gains zero security benefit because the token is in every public clone of upstream. Item closes as a no-op forward fix. Verified @ iter 15.
 
 ## META (human review)
 
