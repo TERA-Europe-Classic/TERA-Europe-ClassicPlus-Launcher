@@ -48,9 +48,55 @@ pub async fn download_and_extract(
     fs::create_dir_all(dest_dir)
         .map_err(|e| format!("Failed to create {}: {}", dest_dir.display(), e))?;
 
-    extract_zip(&bytes, dest_dir)?;
+    // PRD 3.2.8.disk-full-revert: if zip extraction fails partway — classic
+    // trigger is ENOSPC on Windows, where half the files are on disk and
+    // the rest error out — remove the entire dest dir so the user's
+    // next retry starts from a clean slate. Without this, Play would try
+    // to spawn an executable that's missing its dependent DLLs.
+    if let Err(e) = extract_zip(&bytes, dest_dir) {
+        revert_partial_install_dir(dest_dir);
+        return Err(e);
+    }
 
     Ok(dest_dir.to_path_buf())
+}
+
+/// Best-effort cleanup of a partially-populated install dir after a
+/// download/extract failure. Logs but never propagates — the primary
+/// error the caller is returning is what matters; cleanup failure just
+/// means the user retry will take slightly longer.
+pub(crate) fn revert_partial_install_dir(dest_dir: &Path) {
+    match fs::remove_dir_all(dest_dir) {
+        Ok(_) => log::info!(
+            "Reverted partial install at {} after extract failure",
+            dest_dir.display()
+        ),
+        Err(e) => log::warn!(
+            "Could not fully revert partial install at {}: {}",
+            dest_dir.display(),
+            e
+        ),
+    }
+}
+
+/// Best-effort cleanup of a partially-written file (e.g. a GPK the OS
+/// truncated after ENOSPC mid-write). Symmetric to
+/// `revert_partial_install_dir` for the single-file path.
+pub(crate) fn revert_partial_install_file(dest_file: &Path) {
+    if !dest_file.exists() {
+        return;
+    }
+    match fs::remove_file(dest_file) {
+        Ok(_) => log::info!(
+            "Reverted partial file at {} after write failure",
+            dest_file.display()
+        ),
+        Err(e) => log::warn!(
+            "Could not remove partial file at {}: {}",
+            dest_file.display(),
+            e
+        ),
+    }
 }
 
 /// Downloads any URL, verifies its SHA-256, and writes it to `dest_file`.
@@ -76,8 +122,14 @@ pub async fn download_file(
         fs::create_dir_all(parent)
             .map_err(|e| format!("Failed to create {}: {}", parent.display(), e))?;
     }
-    fs::write(dest_file, &bytes)
-        .map_err(|e| format!("Failed to write {}: {}", dest_file.display(), e))?;
+    // PRD 3.2.8.disk-full-revert: if fs::write fails mid-stream (ENOSPC is
+    // the common cause on the Windows install path), the OS may have
+    // truncated the dest file — remove the partial so next retry doesn't
+    // feed a zero-byte GPK to the mapper patcher.
+    if let Err(e) = fs::write(dest_file, &bytes) {
+        revert_partial_install_file(dest_file);
+        return Err(format!("Failed to write {}: {}", dest_file.display(), e));
+    }
     Ok(dest_file.to_path_buf())
 }
 
@@ -705,5 +757,79 @@ mod tests {
             leaked.is_empty(),
             "GPK dir got polluted on SHA mismatch: {leaked:?}"
         );
+    }
+
+    /// PRD 3.2.8.disk-full-revert: if zip extraction fails partway through
+    /// (classic trigger is ENOSPC — disk fills up, half the DLLs land on
+    /// disk, the rest error out), the dest dir must be removed so the
+    /// user's next retry starts clean. Without this, Play would try to
+    /// spawn an executable that's missing its dependent DLLs.
+    ///
+    /// We simulate the "partial install state" directly because we can't
+    /// portably trigger real ENOSPC in a test. The helper is pure over
+    /// `&Path` — given a populated dir, revert removes it; given a missing
+    /// dir, revert is a best-effort no-op.
+    #[test]
+    fn revert_on_enospc() {
+        let tmp = TempDir::new().unwrap();
+        let dest = tmp.path().join("mod_root");
+
+        // Simulate: download OK, SHA OK, dest dir created, extraction
+        // wrote some files before disk filled. Seed a half-written state.
+        fs::create_dir_all(&dest).unwrap();
+        fs::create_dir_all(dest.join("bin")).unwrap();
+        fs::write(dest.join("app.exe"), b"partial executable").unwrap();
+        fs::write(dest.join("bin").join("plugin.dll"), b"partial dll").unwrap();
+
+        // Extract failed with ENOSPC — call the production cleanup helper.
+        revert_partial_install_dir(&dest);
+
+        assert!(
+            !dest.exists(),
+            "dest dir must be removed after failed extract; got {}",
+            dest.display()
+        );
+    }
+
+    /// Revert on a directory that never existed is a no-op that doesn't
+    /// panic — covers the "download failed before dest was created" branch.
+    #[test]
+    fn revert_on_missing_dest_is_noop() {
+        let tmp = TempDir::new().unwrap();
+        let dest = tmp.path().join("never_created");
+        assert!(!dest.exists());
+        revert_partial_install_dir(&dest);
+        assert!(!dest.exists(), "still missing after revert");
+    }
+
+    /// Revert on a partial GPK file removes it so next retry doesn't see
+    /// a zero-byte (or truncated) GPK and feed garbage to the mapper.
+    #[test]
+    fn revert_partial_gpk_file_removes_it() {
+        let tmp = TempDir::new().unwrap();
+        let dest = tmp.path().join("classicplus.minimap.gpk");
+
+        // Simulate: fs::write opened + truncated + wrote some bytes, then
+        // ENOSPC cut it off. The file is on disk but incomplete.
+        fs::write(&dest, b"partial GPK bytes, truncated at ENOSPC").unwrap();
+        assert!(dest.exists());
+
+        revert_partial_install_file(&dest);
+
+        assert!(
+            !dest.exists(),
+            "partial GPK must be removed after write failure; got {}",
+            dest.display()
+        );
+    }
+
+    /// Revert on a missing file is a no-op — covers the case where the OS
+    /// never created the file before erroring out.
+    #[test]
+    fn revert_missing_file_is_noop() {
+        let tmp = TempDir::new().unwrap();
+        let dest = tmp.path().join("missing.gpk");
+        revert_partial_install_file(&dest);
+        assert!(!dest.exists());
     }
 }
