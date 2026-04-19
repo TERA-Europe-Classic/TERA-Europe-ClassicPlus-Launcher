@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 97
-last_work_iteration: 97
+iteration_counter: 98
+last_work_iteration: 98
 last_research_sweep: 90
 last_revalidation: 72
 last_revalidation_status: all-gates-green
@@ -16,15 +16,27 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 78
+total_items_done: 79
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 1ced792
+tauri_v2_migration_last_commit: bdbdb8e
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 98 WORK — docs.prd-drift-guard-extend DONE (worktree).**
+>
+> Worktree commit `bdbdb8e`. Iter 97's drift-guard started at 7 curated pins; iter 98 extends to 20 by adding §3.1.5/.7/.9/.11/.12, §3.2.3/.7/.8/.11/.12/.13, §3.3.12/.15. The `cell_for()` helper was refactored to branch on `source_path` prefix — inline pins use `::tests::` module path, bin-crate integration-test pins use flat fn names (no `::tests::`). Previous hardcoded `::tests::` only worked for inline pins and would have mis-cited every `tests/*.rs` integration test.
+>
+> Found and fixed a 5th drift while extending: §3.1.7 cited `all_sensitive_strings_zeroize` (which never existed in `tests/zeroize_audit.rs`). Updated to cite `zeroize_derives_compose_with_skip_attribute` — the representative fn that pins the derive-plus-skip pattern `GlobalAuthInfo` / `LaunchParams` actually use.
+>
+> Drift-guard pin coverage now spans 20 §3 criteria vs the ~40 total rows in the PRD §3 table (the other half either cite audit docs, frontend tests, or are genuinely unshipped functionality). This is the practical ceiling for the Rust-only drift-guard.
+>
+> Acceptance: 860/860 Rust (unchanged — pins extend existing test bodies, no new fns), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
+>
+> Next iter (99) still WORK. **Iter 100 is double-duty** (N%10=0 RESEARCH SWEEP + N%20=0 REVALIDATION).
 
 > **Iter 97 WORK — docs.prd-path-drift-fix DONE (worktree).**
 >
