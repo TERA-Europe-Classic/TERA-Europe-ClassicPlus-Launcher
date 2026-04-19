@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 66
-last_work_iteration: 66
+iteration_counter: 67
+last_work_iteration: 67
 last_research_sweep: 60
 last_revalidation: 60
 last_revalidation_status: regression-resolved-next-iter
@@ -19,11 +19,26 @@ last_investigation_iteration: 18
 total_items_done: 52
 total_items_regressed: 0
 total_iterations_to_cap: 1000
-tauri_v2_migration_milestone: M2
+tauri_v2_migration_milestone: M3
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 65cd30c
+tauri_v2_migration_last_commit: 576f44e
 ```
+
+> **Iter 67 WORK — Tauri v2 M3 DONE (worktree).**
+>
+> Executed M3 on the `tauri-v2-migration` worktree: custom command-surface review. Worktree commit `576f44e`. Two v2-drift fixes hit:
+> - `tests/http_allowlist.rs::load_scopes()` — v1 read `tauri.conf.json::tauri.allowlist.http.scope`; v2 moved the allowlist into `capabilities/migrated.json::permissions[http:default].allow[].url`. Rewrote the parser; all 9 production URL literals still covered by scope entries.
+> - `src/app.js` — v1 exported `appWindow` as a bound constant; v2 uses `getCurrent()` on the window module. Added defensive resolver (`appWindow` || `getCurrent()` || `webviewWindow.getCurrentWebviewWindow()`) so the four minimize/startDragging/close call sites keep working. Dropped dead `WebviewWindow` destructure (imported in v1, unused).
+>
+> Invoke-surface audit: 35 frontend `invoke('x', ...)` call sites all match a `#[tauri::command]` registered in `main.rs::generate_handler![...]`. Zero drift on the command naming surface.
+>
+> Acceptance (all three suites fired clean, no regressions vs pre-migration baseline at iter 62):
+> - `cargo clippy --all-targets --release -- -D warnings` → clean (zero warnings, up from 3 `unused_imports` after M1b).
+> - `cargo test --release` → 764 unit + 3 (crash_recovery) + 4 (disk_full) + 3 (http_allowlist) + 4 (multi_client) + 4 (parallel_install) + 2 (self_integrity) + 2 (smoke) + 4 (zeroize_audit) = **790 tests pass**. Matches M0 baseline exactly.
+> - `npm test` (vitest) → 10 files / 431 tests pass.
+>
+> Out of M3 scope, carried to later milestones: plugin runtime calls (`.dialog`, `.shell`, `.updater`, `.app.getVersion`) that v2 needs per-plugin globalTauri opt-in for — the unit tests mock them, but live launches will need the shapes fixed (settings-page folder picker, external-link `shell.open`, legacy `updater.checkUpdate`). M4 (updater dual-format) handles the updater shape; dialog/shell/getVersion land when they next break a user surface. Next iter (68) executes M4.
 
 > **Iter 66 WORK — Tauri v2 M2 DONE (worktree).**
 >
