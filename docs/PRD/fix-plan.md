@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 123
-last_work_iteration: 123
+iteration_counter: 124
+last_work_iteration: 124
 last_research_sweep: 120
 last_revalidation: 120
 last_revalidation_status: all-gates-green
@@ -16,15 +16,33 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 104
+total_items_done: 105
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 757a4d0
+tauri_v2_migration_last_commit: 60980c5
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 124 WORK — pin.i18n-no-hardcoded-scanner DONE (worktree).**
+>
+> Worktree commit `60980c5`. PRD §3.7.4 is enforced by the Vitest scanner `teralaunch/tests/i18n-no-hardcoded.test.js` (TARGETS = mods.js + mods.html; ALLOWLIST strict-zero after iter 77 burn-down; 3 attribute rules for aria-label/title/placeholder). Nothing structurally pinned the scanner itself — a refactor could drop a rule, re-add an allowlist row, or remove a TARGETS entry and the Vitest suite would still go green against a weakened detector.
+>
+> New `tests/i18n_no_hardcoded_guard.rs` (8 tests):
+> 1. `i18n_scanner_file_exists_and_is_non_trivial` — file present, >2000 bytes, self-identifies as PRD 3.7.4
+> 2. `scanner_targets_both_mods_js_and_mods_html` — TARGETS covers both surfaces
+> 3. `scanner_allowlist_is_strict_zero` — `const ALLOWLIST = [];` literal preserved
+> 4. `scanner_carries_three_attribute_rules` — aria-label/title/placeholder regex literals intact
+> 5. `scanner_looks_english_heuristic_is_tight` — both `/[a-z]{2,}/` and `/\s/` checks retained
+> 6. `scanned_target_files_exist` — mods.js + mods.html non-empty (scanner not vacuous)
+> 7. `scanner_carries_its_own_self_test` — `detector flags a seeded leak` + synthetic fixture retained
+> 8. Detector self-test on 4 synthetic bad shapes (allowlist row, dropped rules, missing TARGET, loosened heuristic)
+>
+> Parallel pattern to iter 114 `secret_scan_guard` + iter 115 `deploy_scope_infra_guard`: Rust test asserting JS-file structure.
+>
+> Acceptance: 911/911 Rust (was 903, +8), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 123 WORK — drift-guard inventory sweep DONE (worktree).**
 >
