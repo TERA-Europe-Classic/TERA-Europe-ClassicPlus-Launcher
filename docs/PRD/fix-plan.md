@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 200
-last_work_iteration: 199
+iteration_counter: 201
+last_work_iteration: 201
 last_research_sweep: 190
 last_revalidation: 200
 last_revalidation_status: all-gates-green
@@ -16,25 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 175
+total_items_done: 176
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 490c33b
+tauri_v2_migration_last_commit: 89144af
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 200 REVALIDATION — 200-iter milestone; all-gates-green (docs/PRD/audits/research/revalidation-iter-200.md).**
+> **Iter 201 WORK — pin.http-allowlist-path+identifier+prod-scopes+regex DONE (worktree). First WORK after 200-iter milestone.**
 >
-> N%20=0 formal cadence + 200-iter major milestone. All gates re-run on worktree `490c33b`. Rust 1233/1233 (+90 vs iter 180 baseline 1143; same pattern as iter 160→180's +90), clippy clean, cargo audit 19 allowed unchanged, vitest 449/449, guard file count 19 unchanged, commit-count since main 136 (+18 since iter 180), regression-pattern grep 2 (both false positives — `revert_partial_install_dir` helper name in iter-165/iter-194 commit messages).
+> Worktree commit `89144af`. §3.1.5 security-pillar pair (with iter-199 http_redirect_offlist); http_allowlist had 9 tests (iter 104 creation + iter 156 +5); 45 iters untouched. Brings to 14.
 >
-> 5/5 recent DONE items (iter 195-199) re-verified green.
+> Five new source-inspection pins:
+> 1. `guard_file_header_cites_prd_3_1_5` — header cites §3.1.5 + `http allowlist` nomenclature
+> 2. `capability_file_path_is_migrated_json_verbatim` — guard reads `capabilities/migrated.json` verbatim; rename caught here, not only via panic-at-test-time
+> 3. `load_scopes_filters_by_http_default_identifier_only` — `if id != "http:default" { continue; }` filter must be present; a future `http:*` capability's allow list would otherwise union in
+> 4. `capability_contains_required_production_scopes` — pin `*.tera-europe.net` + `tera-europe-classic.com` + `raw.githubusercontent.com` scopes; absence breaks specific launcher features
+> 5. `url_extraction_regex_handles_common_literal_shapes` — self-test URL regex + trim on quoted / trailing-punctuation / format-string shapes
 >
-> Milestones achieved iter 181-199: scanner sweep complete (iter 181-187), §3.2 recovery-pillar trio complete (iter 194-196), CVE-defence chain deepened (iter 188-189), audit-driven small-baseline revisit (iter 197-199 raised csp_audit/self_integrity/http_redirect_offlist from 8 → 13 each). **Every guard / integration test in `tests/` now carries ≥ 10 pins.**
->
-> `ready_for_squash_merge: true` unchanged since iter 94. Next revalidation iter 220; next research sweep iter 210.
+> http_allowlist: 9 → 14 tests. 1238 Rust (+5), clippy clean, vitest 449/449.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
