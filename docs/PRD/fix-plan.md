@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 160
-last_work_iteration: 159
+iteration_counter: 161
+last_work_iteration: 161
 last_research_sweep: 150
 last_revalidation: 160
 last_revalidation_status: all-gates-green
@@ -16,15 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 138
+total_items_done: 139
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: dbb521d
+tauri_v2_migration_last_commit: f56fd79
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 161 WORK — pin.crash-recovery-registry-wiring DONE (worktree).**
+>
+> Worktree commit `f56fd79`. PRD §3.2.2 `crash_recovery.rs` previously had 6 tests: JSON shape of stuck registries + filesystem cleanup (external extract-path + GPK fs::write truncation) + detector self-test. The Rust side of the recovery contract — `Registry::load` calling `recover_stuck_installs` before return, the predicate matching only `Installing`, progress field clearing, the last_error message, and atomic save — was unprotected. A refactor that drops the recover call, widens the status match, forgets to clear progress, or replaces the atomic rename with a direct write would pass every existing test while silently breaking boot-time recovery.
+>
+> Five new source-inspection pins on `src/services/mods/registry.rs`:
+> 1. `load_calls_recover_stuck_installs_before_return` — the recover call must precede `Ok(reg)`; otherwise stranded rows survive every boot
+> 2. `recover_stuck_installs_matches_only_installing_variant` — pins `m.status == ModStatus::Installing` exactly; widening kills idempotence, narrowing corrupts everything
+> 3. `recover_stuck_installs_clears_progress_field` — `m.progress = None` required; leftover progress number keeps UI rendering a progress bar on recovered rows
+> 4. `recover_stuck_installs_last_error_says_interrupted` — cross-layer contract pin (JSON in iter 95's `error_state_expected_shape` + Rust in this new pin must move together)
+> 5. `save_is_atomic_tmp_plus_rename_not_direct_write` — `fs::write(&tmp)` then `fs::rename(&tmp, path)`; direct write corrupts the registry on SIGKILL mid-write and the next boot fails `serde_json::from_str`, losing every mod row
+>
+> crash_recovery: 6 → 11 tests.
+>
+> Acceptance: 1058/1058 Rust (was 1053, +5), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 160 REVALIDATION — formal cadence — all-gates-green.**
 >
