@@ -33,14 +33,43 @@ impl Registry {
     /// Load registry from disk; fall back to an empty registry if the file
     /// is absent. Corrupted files are an error — we'd rather surface the
     /// problem than silently discard the user's mod list.
+    ///
+    /// PRD 3.2.2.crash-recovery: if the launcher was SIGKILLed (or the host
+    /// crashed) mid-install, a row can be stranded in `ModStatus::Installing`
+    /// forever. On every load we sweep those rows to `Error` with a
+    /// last_error note so the UI shows a recoverable state and the user can
+    /// retry or remove.
     pub fn load(path: &Path) -> Result<Self, String> {
         if !path.exists() {
             return Ok(Self::default());
         }
         let body = fs::read_to_string(path)
             .map_err(|e| format!("Failed to read mod registry at {}: {}", path.display(), e))?;
-        serde_json::from_str(&body)
-            .map_err(|e| format!("Mod registry at {} is corrupted: {}", path.display(), e))
+        let mut reg: Self = serde_json::from_str(&body)
+            .map_err(|e| format!("Mod registry at {} is corrupted: {}", path.display(), e))?;
+        reg.recover_stuck_installs();
+        Ok(reg)
+    }
+
+    /// Flips every row still marked `Installing` to `Error` with a last_error
+    /// note, returning the count of rows touched. Idempotent — a second call
+    /// on the recovered registry is a no-op.
+    pub fn recover_stuck_installs(&mut self) -> usize {
+        use super::types::ModStatus;
+        let mut touched = 0;
+        for m in self.mods.iter_mut() {
+            if m.status == ModStatus::Installing {
+                m.status = ModStatus::Error;
+                m.last_error = Some(
+                    "Install was interrupted (launcher exited mid-install). \
+                     Click retry to re-run the download."
+                        .to_string(),
+                );
+                m.progress = None;
+                touched += 1;
+            }
+        }
+        touched
     }
 
     /// Atomically persist the registry. Writes to `<path>.tmp` first, then
@@ -192,5 +221,113 @@ mod tests {
         fs::write(&path, b"{ not json").unwrap();
         let err = Registry::load(&path).unwrap_err();
         assert!(err.contains("corrupted"));
+    }
+
+    // --- PRD 3.2.2.crash-recovery -------------------------------------------
+
+    #[test]
+    fn recover_stuck_installs_flips_installing_to_error() {
+        let mut reg = Registry::default();
+        let mut stuck = sample_entry("shinra", ModKind::External);
+        stuck.status = ModStatus::Installing;
+        stuck.progress = Some(42);
+        reg.upsert(stuck);
+
+        let mut healthy = sample_entry("minimap", ModKind::Gpk);
+        healthy.status = ModStatus::Enabled;
+        reg.upsert(healthy);
+
+        let touched = reg.recover_stuck_installs();
+        assert_eq!(touched, 1);
+        assert_eq!(reg.find("shinra").unwrap().status, ModStatus::Error);
+        let last_err = reg.find("shinra").unwrap().last_error.as_deref().unwrap();
+        assert!(last_err.contains("interrupted"), "got {last_err:?}");
+        assert!(reg.find("shinra").unwrap().progress.is_none());
+        // Healthy row untouched.
+        assert_eq!(reg.find("minimap").unwrap().status, ModStatus::Enabled);
+    }
+
+    #[test]
+    fn recover_stuck_installs_is_idempotent() {
+        let mut reg = Registry::default();
+        let mut stuck = sample_entry("shinra", ModKind::External);
+        stuck.status = ModStatus::Installing;
+        reg.upsert(stuck);
+
+        assert_eq!(reg.recover_stuck_installs(), 1);
+        // Second call: no rows remain in Installing, nothing to do.
+        assert_eq!(reg.recover_stuck_installs(), 0);
+    }
+
+    #[test]
+    fn mid_install_sigkill_recovers_to_error() {
+        // Full scenario: launcher persists a row in Installing state, then
+        // dies. On next boot Registry::load() should flip it to Error.
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("registry.json");
+
+        let mut pre_crash = Registry::default();
+        let mut stuck = sample_entry("shinra", ModKind::External);
+        stuck.status = ModStatus::Installing;
+        stuck.progress = Some(73);
+        pre_crash.upsert(stuck);
+        pre_crash.save(&path).unwrap();
+
+        // Simulate the process being SIGKILLed by just... not calling save
+        // again. The on-disk state is what we'd find on next boot.
+
+        let post_boot = Registry::load(&path).unwrap();
+        let recovered = post_boot.find("shinra").unwrap();
+        assert_eq!(recovered.status, ModStatus::Error);
+        assert!(
+            recovered
+                .last_error
+                .as_deref()
+                .unwrap_or("")
+                .contains("interrupted"),
+            "last_error should describe the interruption, got {:?}",
+            recovered.last_error
+        );
+        assert!(
+            recovered.progress.is_none(),
+            "stale progress must be cleared after recovery"
+        );
+    }
+
+    #[test]
+    fn load_does_not_touch_non_installing_rows() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("registry.json");
+
+        let mut reg = Registry::default();
+        for (id, s) in [
+            ("disabled", ModStatus::Disabled),
+            ("enabled", ModStatus::Enabled),
+            ("running", ModStatus::Running),
+            ("error", ModStatus::Error),
+            ("update_available", ModStatus::UpdateAvailable),
+            ("starting", ModStatus::Starting),
+        ] {
+            let mut e = sample_entry(id, ModKind::External);
+            e.status = s;
+            reg.upsert(e);
+        }
+        reg.save(&path).unwrap();
+
+        let loaded = Registry::load(&path).unwrap();
+        for (id, expected) in [
+            ("disabled", ModStatus::Disabled),
+            ("enabled", ModStatus::Enabled),
+            ("running", ModStatus::Running),
+            ("error", ModStatus::Error),
+            ("update_available", ModStatus::UpdateAvailable),
+            ("starting", ModStatus::Starting),
+        ] {
+            assert_eq!(
+                loaded.find(id).unwrap().status,
+                expected,
+                "row {id} must be untouched by recovery"
+            );
+        }
     }
 }
