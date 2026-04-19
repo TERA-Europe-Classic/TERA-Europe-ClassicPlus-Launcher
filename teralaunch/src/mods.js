@@ -167,15 +167,32 @@ const ModsView = {
 
         const importBtn = document.getElementById('mods-import-btn');
         if (importBtn) {
-            // GPK import requires the mapper patcher (Phase C). Until that
-            // ships, disable the button and show a neutral coming-soon toast
-            // instead of the previous red "error" toast.
-            importBtn.disabled = true;
-            importBtn.title = 'Coming soon — local GPK import requires the mapper patcher (Phase C).';
-            importBtn.classList.add('is-disabled');
-            importBtn.addEventListener('click', () => {
-                // Safety: in case the disabled attribute is ever removed by theming.
-                showModsError('Add mod from file', 'Coming soon — GPK import will land with the mapper patcher in a later update.');
+            // PRD 3.3.4.add-mod-from-file-wire: pick a .gpk, hand the path
+            // to the Rust command, refresh the installed list on success.
+            importBtn.addEventListener('click', async () => {
+                try {
+                    const { open } = window.__TAURI__?.dialog || {};
+                    const { invoke } = window.__TAURI__?.tauri || window.__TAURI__?.core || {};
+                    if (!open || !invoke) {
+                        showModsError('Add mod from file', 'Tauri dialog API unavailable.');
+                        return;
+                    }
+                    const selected = await open({
+                        multiple: false,
+                        filters: [{ name: 'TERA mod package', extensions: ['gpk'] }],
+                    });
+                    if (!selected || Array.isArray(selected)) return;
+                    const entry = await invoke('add_mod_from_file', { path: selected });
+                    if (typeof this.loadInstalled === 'function') {
+                        await this.loadInstalled();
+                    }
+                    if (typeof this.render === 'function') {
+                        this.render();
+                    }
+                    return entry;
+                } catch (e) {
+                    showModsError('Add mod from file', String(e?.message || e));
+                }
             });
         }
 

@@ -18,6 +18,7 @@ use crate::services::mods::{
     catalog::{self, CachedCatalog},
     external_app,
     registry::{get_external_apps_dir, get_gpk_dir, get_registry_path},
+    tmm,
     types::{Catalog, CatalogEntry, ModEntry, ModKind, ModStatus},
 };
 use crate::state::mods_state;
@@ -366,6 +367,84 @@ fn finalize_error(
         serde_json::json!({ "id": id, "progress": 0, "state": "error", "error": err }),
     );
     Err(err)
+}
+
+/// PRD 3.3.4.add-mod-from-file-wire: user picks a local `.gpk`; we parse it,
+/// compute its sha256, copy it into `mods/gpk/<id>.gpk`, attempt the TMM
+/// mapper patch (best-effort), and upsert into the registry. Returns the
+/// new registry entry.
+///
+/// The `id` is `local.<sha12>` so the same bytes always produce the same id
+/// (re-importing the same file is idempotent — registry upsert handles it).
+#[tauri::command]
+#[cfg(not(tarpaulin_include))]
+pub async fn add_mod_from_file(path: String) -> Result<ModEntry, String> {
+    use sha2::{Digest, Sha256};
+
+    let src = PathBuf::from(&path);
+    let bytes = std::fs::read(&src)
+        .map_err(|e| format!("Failed to read {}: {e}", src.display()))?;
+
+    let modfile = tmm::parse_mod_file(&bytes)?;
+    if modfile.container.is_empty() {
+        return Err(
+            "Imported file isn't a TMM-compatible .gpk (no container name in footer)."
+                .into(),
+        );
+    }
+    // Reuse the deploy-sandbox predicate so an imported file with a hostile
+    // container can't be deployed (PRD 3.1.4).
+    if !tmm::is_safe_gpk_container_filename(&modfile.container) {
+        return Err(format!(
+            "Imported .gpk has an unsafe container filename '{}' — refusing to import.",
+            modfile.container
+        ));
+    }
+
+    let sha = {
+        let digest = Sha256::digest(&bytes);
+        let mut hex = String::with_capacity(64);
+        for b in digest {
+            hex.push_str(&format!("{b:02x}"));
+        }
+        hex
+    };
+
+    let mut entry = ModEntry::from_local_gpk(&sha, &modfile);
+
+    // Copy into our gpk slot so uninstall can find it.
+    let gpk_dir = get_gpk_dir()
+        .ok_or_else(|| "Could not resolve GPK mods dir".to_string())?;
+    std::fs::create_dir_all(&gpk_dir)
+        .map_err(|e| format!("Failed to create {}: {e}", gpk_dir.display()))?;
+    let dest = gpk_dir.join(format!("{}.gpk", entry.id.replace('/', "_")));
+    std::fs::write(&dest, &bytes)
+        .map_err(|e| format!("Failed to copy to {}: {e}", dest.display()))?;
+
+    // Best-effort mapper deploy. If the game root isn't configured we still
+    // persist the import so the user can see it; the deploy happens next
+    // time they hit enable.
+    let deploy_note = try_deploy_gpk(&entry.id, &dest);
+    if deploy_note.is_some() {
+        entry.enabled = true;
+        entry.auto_launch = true;
+        entry.status = ModStatus::Enabled;
+    } else {
+        entry.status = ModStatus::Disabled;
+    }
+
+    mods_state::mutate(|reg| {
+        reg.upsert(entry.clone());
+        Ok(())
+    })?;
+
+    info!(
+        "add_mod_from_file: imported {} (sha={}) status={:?}",
+        entry.id,
+        &sha[..12],
+        entry.status
+    );
+    Ok(entry)
 }
 
 /// Uninstalls a mod: stops process if running, removes files, removes from registry.

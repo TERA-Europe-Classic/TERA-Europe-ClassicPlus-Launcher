@@ -357,6 +357,7 @@ fn main() {
             commands::mods::list_installed_mods,
             commands::mods::get_mods_catalog,
             commands::mods::install_mod,
+            commands::mods::add_mod_from_file,
             commands::mods::uninstall_mod,
             commands::mods::enable_mod,
             commands::mods::disable_mod,
