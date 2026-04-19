@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 203
-last_work_iteration: 203
+iteration_counter: 204
+last_work_iteration: 204
 last_research_sweep: 190
 last_revalidation: 200
 last_revalidation_status: all-gates-green
@@ -16,30 +16,30 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 178
+total_items_done: 179
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 83c65e2
+tauri_v2_migration_last_commit: b1c1ff0
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 203 WORK — pin.bogus-gpk-PACKAGE_MAGIC-const+sandbox-branches+uninstall-sandbox+fs-read-binary+corpus-small-fixtures DONE (worktree). Final 9-count file — every integration test in tests/ now ≥ 10 pins.**
+> **Iter 204 WORK — pin.crate-comment-guard-header+MODS_DIR-path+rs-extension-filter+doc-floor-constants+forbidden-markers DONE (worktree). crate_comment_guard was the last < 10-count file in tests/ (found at 8 during iter 204 sweep).**
 >
-> Worktree commit `83c65e2`. §5.3 adv.bogus-gpk-footer + §3.1.4 gpk-deploy-sandbox; bogus_gpk_footer had 9 tests (iter 163 +5 over iter 87 baseline); 40 iters untouched. Brings to 14.
+> Worktree commit `b1c1ff0`. §3.8.2 — `src/services/mods/*.rs` crate-level doc comments; crate_comment_guard had 8 tests (iter 104 creation + iter 143 +1 + iter 179 +4); 25 iters untouched. Brings to 13.
 >
-> Five new source-inspection pins:
-> 1. `package_magic_constant_has_canonical_value` — `const PACKAGE_MAGIC: u32 = 0x9E2A83C1;` verbatim; silent rename would leave corpus tests vacuously passing
-> 2. `sandbox_predicate_retains_all_rejection_branches` — 7 branches inside `is_safe_gpk_container_filename` (empty / `/` / `\\` / `\0` / `.` / `..` / embedded `..` / drive-letter); each maps to a distinct adversary class
-> 3. `uninstall_gpk_calls_sandbox_predicate_first` — symmetric gate on the uninstall path; prevents tampered-registry → traversal rollback
-> 4. `install_gpk_reads_source_as_raw_bytes` — `fs::read(source_gpk)` not `fs::read_to_string`; UTF-8 validation would swap out the surgical footer-parse error surface the corpus pins depend on
-> 5. `adversarial_corpus_retains_small_buffer_fixtures` — the `&[]` + `&[0,0,0]` fixtures are the ONLY inputs exercising the `end < 4` underflow branch; dropping them would let the guard regress silently
+> Five new source-inspection pins (meta-guard layer — previous 8 walk the filesystem, these pin the guard file itself):
+> 1. `guard_file_header_cites_prd_3_8_2_and_self_name` — header cites `PRD 3.8.2` + `crate-level` nomenclature
+> 2. `mods_dir_constant_is_services_mods_path` — `const MODS_DIR: &str = "src/services/mods";` verbatim; off-by-one typos silently read empty listings
+> 3. `rs_file_extension_filter_is_lowercase_rs` — `Some("rs")` verbatim; typo to `"rust"` would filter everything out with a root-cause-obscuring error
+> 4. `doc_floor_constants_remain_positive` — `MIN_DOC_BODY_CHARS = 100` + `MIN_DOC_LINES = 2` both pinned; regression to 0 silently no-ops both floors
+> 5. `forbidden_wip_markers_include_all_four` — MARKERS slice contains TODO, FIXME, XXX, HACK verbatim; each maps to a distinct WIP convention
 >
-> bogus_gpk_footer: 9 → 14 tests. 1248 Rust (+5), clippy clean, vitest 449/449.
+> crate_comment_guard: 8 → 13 tests. 1253 Rust (+5), clippy clean, vitest 449/449.
 >
-> **Milestone**: every integration test in `teralaunch/src-tauri/tests/` now carries ≥ 10 structural pins. No lowest-baseline file remains.
+> **Milestone (corrected)**: every test file in `teralaunch/src-tauri/tests/` now carries ≥ 10 pins. Prior iter-203 note missed crate_comment_guard (at 8) — iter 204 closed that gap.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
