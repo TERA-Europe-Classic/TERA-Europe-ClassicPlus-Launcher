@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 198
-last_work_iteration: 198
+iteration_counter: 199
+last_work_iteration: 199
 last_research_sweep: 190
 last_revalidation: 180
 last_revalidation_status: all-gates-green
@@ -16,28 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 174
+total_items_done: 175
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 4bf35eb
+tauri_v2_migration_last_commit: 490c33b
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 198 WORK — pin.self-integrity-header+nonzero-exit+unreadable-advisory+bailout+import DONE (worktree).**
+> **Iter 199 WORK — pin.http-redirect-header+no-invalid-cert+UA+walker-floor+known-weakness DONE (worktree). Last WORK before N=200 REVALIDATION.**
 >
-> Worktree commit `4bf35eb`. §3.1.11 security-pillar anti-tamper; self_integrity had 8 tests (iter 31 creation + iter 153 +5); last extended 45 iters ago — pairs with iter 197 csp_audit on the "lowest-baseline, most-stale" audit track. Brings to 13.
+> Worktree commit `490c33b`. §3.1.5 security-pillar redirect-gate; http_redirect_offlist had 8 tests (iter 104 creation + iter 157 +5); 42 iters untouched. Brings to 13.
 >
 > Five new source-inspection pins:
-> 1. `guard_file_header_cites_prd_3_1_11` — header cites `PRD 3.1.11` + `self-integrity`
-> 2. `mismatch_branch_exits_with_nonzero_code` — must call `std::process::exit(2)`; reject `exit(0)` (zero signals success to wrapping scripts, defeats tamper signal)
-> 3. `unreadable_result_arm_warns_and_continues` — Unreadable arm must `log::warn!` and NOT `process::exit` — transient conditions (file lock, AV quarantine) aren't tampering signals
-> 4. `sidecar_bailouts_warn_and_return_early` — ≥3 early `return;` before `match verify_self`, one per bailout (no parent dir / missing sidecar / malformed hex)
-> 5. `verify_self_is_imported_from_services_module` — must `use services::self_integrity::{verify_self, IntegrityResult, REINSTALL_PROMPT}`; silent stub swap guarded
+> 1. `guard_file_header_cites_prd_and_adv_slot` — header cites `adv.http-redirect-offlist` + `§3.1.5`
+> 2. `no_mods_client_accepts_invalid_certs` — reject `.danger_accept_invalid_certs(true)` / `.danger_accept_invalid_hostnames(true)` globally under `src/services/mods/*.rs`; MITM defeats the allowlist + redirect gate
+> 3. `every_mods_builder_sets_user_agent` — every `reqwest::Client::builder()` chain must include `.user_agent(...)`; default UA gives operators no actionable server-log signal
+> 4. `mods_rs_files_walker_meets_count_floor` — `mods_rs_files()` must find ≥ 5 files (complements iter-157's name-based self-test with a count floor)
+> 5. `builder_detector_rejects_commented_redirect_calls` — tombstones the naive-substring-match's known weakness against `//`-commented redirect calls as acceptable (caught at code review); future hardening flips the assertion
 >
-> self_integrity: 8 → 13 tests. 1228 Rust (+5), clippy clean, vitest 449/449.
+> http_redirect_offlist: 8 → 13 tests. 1233 Rust (+5), clippy clean, vitest 449/449.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
