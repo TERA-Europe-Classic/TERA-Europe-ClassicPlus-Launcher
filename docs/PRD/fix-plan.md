@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 177
-last_work_iteration: 177
+iteration_counter: 178
+last_work_iteration: 178
 last_research_sweep: 170
 last_revalidation: 160
 last_revalidation_status: all-gates-green
@@ -16,28 +16,28 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 155
+total_items_done: 156
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 3d61823
+tauri_v2_migration_last_commit: 1226c4e
 tauri_v2_migration_ready_for_squash_merge: true
 ```
 
-> **Iter 177 WORK — pin.lessons-archive-header+iter-order+dedup DONE (worktree).**
+> **Iter 178 WORK — pin.prd-path-drift-table-invariants DONE (worktree).**
 >
-> Worktree commit `3d61823`. PRD §3.8.8 `lessons_learned_guard.rs` previously had 7 tests (iter 108+139): cap + archive existence + cap advertisement + H3 date-iter format + Pattern/When-to-apply + newest-at-top + detector self-test. Iter 177 widens to 5 more angles.
+> Worktree commit `1226c4e`. PRD §3.0 `prd_path_drift_guard.rs` previously had 6 tests (iter 97+132-134): per-entry drift + JS variants + fixed-paths regression + detector self-test. Iter 178 widens to 5 more angles on the pin table itself and the PRD-line floor.
 >
-> Five new source-inspection pins on `docs/PRD/lessons-learned.md` + `lessons-learned.archive.md`:
-> 1. `archive_file_header_documents_archival_purpose` — archive's own header must reference `lessons-learned.md` + the cap; without self-documentation, contributors might edit the archive directly and the cap policy drifts
-> 2. `active_file_entries_are_ordered_newest_iter_first` — extracts `iter N` from each H3 and asserts strictly descending; complements iter 139's `newest at top` advertisement with actual enforcement
-> 3. `every_h3_entry_has_nonempty_title_after_em_dash` — parallel to iter 173's changelog pin
-> 4. `total_entry_count_across_active_and_archive_meets_floor` — combined H3 count ≥ 10; the retrospective corpus is cumulative, bulk-delete drops below floor
-> 5. `active_and_archive_do_not_duplicate_entries` — no H3 heading in both files; archiving is a MOVE, duplicates indicate copy-paste regression
+> Five new source-inspection pins on the guard's `PINS` + `JS_PINS` tables and `docs/PRD/mod-manager-perfection.md`:
+> 1. `pins_table_has_no_duplicate_triples` — HashSet check on `(criterion, source_path, test_name)` for both tables; copy-paste doubles can't silently inflate coverage
+> 2. `pin_count_meets_minimum_floor` — `MIN_RUST_PINS=30`, `MIN_JS_PINS=3` floors so the drift-guard itself can't be gutted by deletion
+> 3. `every_pin_source_path_exists_on_disk` — explicit `fs::exists` check with clear failure message; catches renames the field-drift pin misses when the PRD row is also deleted
+> 4. `prd_file_meets_minimum_line_count` — `MIN_PRD_LINES=300` (PRD is 437); truncated PRD can't pass with a shrunk cite table
+> 5. `pins_span_multiple_prd_sections` — BTreeSet of `§X.Y` prefixes must include 3.1, 3.2, 3.3 on Rust side plus at least one JS entry under 3.4-3.8; whole sections can't disappear
 >
-> lessons_learned_guard: 7 → 12 tests.
+> prd_path_drift_guard: 6 → 11 tests. 1138 Rust (+5), clippy clean, vitest 449/449.
 >
 > Mid-iter: hit a `format! positional argument` compile error on the duplicates-message (used `{}` without arg while using `{duplicates:?}` as named). Switched to a `dup_count` named binding; fixed before running full gates.
 >
