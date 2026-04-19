@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 122
-last_work_iteration: 122
+iteration_counter: 123
+last_work_iteration: 123
 last_research_sweep: 120
 last_revalidation: 120
 last_revalidation_status: all-gates-green
@@ -16,15 +16,29 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 103
+total_items_done: 104
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 4bb851b
+tauri_v2_migration_last_commit: 757a4d0
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 123 WORK — drift-guard inventory sweep DONE (worktree).**
+>
+> Worktree commit `757a4d0`. Surveyed `tests/` directory against the drift-guard PINS array. Surfaced 4 integration tests shipped in earlier iters that hadn't been folded in: all running in CI and passing, but a rename or refactor would have silently bypassed the PRD-cross-reference check.
+>
+> Pin additions (37 → 41):
+> - §3.1.5 + `http_redirect_offlist::external_app_download_client_disables_redirects` (iter 77 `adv.http-redirect-offlist` — redirect-off-list is the complement to allowlist coverage)
+> - §3.2.9 + `clean_recovery::recover_clean_mapper_is_a_tauri_command_and_delegates_to_tmm` (Tauri-command wiring — complements the inline predicate tests)
+> - §3.2.10 + `bogus_gpk_footer::parse_mod_file_retains_magic_check_fallback` (iter 79 structural guard that the magic-check branch stays in source)
+> - §3.3.3 + `conflict_modal::preview_mod_install_conflicts_is_a_tauri_command_and_delegates_to_tmm` (Tauri-command wiring — complements the detect_conflicts inline tests)
+>
+> PRD §3.1.5 / §3.2.9 / §3.2.10 / §3.3.3 rows updated to cite these additional tests.
+>
+> Acceptance: 903/903 Rust unchanged, clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 122 WORK — pin.tauri-v2-migration-audit-quartet DONE (worktree).**
 >
