@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 121
-last_work_iteration: 121
+iteration_counter: 122
+last_work_iteration: 122
 last_research_sweep: 120
 last_revalidation: 120
 last_revalidation_status: all-gates-green
@@ -16,15 +16,35 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 102
+total_items_done: 103
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: 798a3bb
+tauri_v2_migration_last_commit: 4bb851b
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 122 WORK — pin.tauri-v2-migration-audit-quartet DONE (worktree).**
+>
+> Worktree commit `4bb851b`. The tauri-v2 migration shipped through M0-M8 and produced a 4-doc audit trail under `docs/PRD/audits/security/`:
+> - `tauri-v2-migration-baseline.md` (M0)
+> - `tauri-v2-migration-plan.md`
+> - `tauri-v2-migration.md` (umbrella)
+> - `tauri-v2-migration-validation.md` (M8)
+>
+> Together they back this fix-plan's `tauri_v2_migration_milestone: M8-validated` header + `ready_for_squash_merge: true` status. Silent deletion of any one would leave the post-squash review with an incomplete picture.
+>
+> New `tests/tauri_v2_migration_audit_guard.rs` (4 tests):
+> 1. `every_tauri_v2_audit_doc_exists_and_carries_required_content` — all 4 files present + surface-sanity keywords (Baseline/M0 in baseline, M8 in validation, etc.)
+> 2. `umbrella_doc_cites_prd_criteria` — references §3.1 so future rename of criterion numbers surfaces a required doc update
+> 3. `validation_doc_documents_m8_state` — explicit M8 + worktree reference so the fix-plan header field traces back
+> 4. Detector self-test with 3 synthetic bad shapes
+>
+> Parallel to iter 106 `architecture_doc_guard` + iter 118 `anti_reverse_guard`: third audit-doc structural pin in the iter-106-to-122 doc-invariant batch.
+>
+> Acceptance: 903/903 Rust (was 899, +4), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
 
 > **Iter 121 WORK — pin.§3.2.7+§3.2.10-extensions DONE (worktree).**
 >
