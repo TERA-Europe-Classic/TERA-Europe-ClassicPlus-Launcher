@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 95
-last_work_iteration: 95
+iteration_counter: 96
+last_work_iteration: 96
 last_research_sweep: 90
 last_revalidation: 72
 last_revalidation_status: all-gates-green
@@ -16,15 +16,31 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 76
+total_items_done: 77
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
 tauri_v2_migration_worktree: ../tauri-v2-migration
 tauri_v2_migration_branch: tauri-v2-migration
-tauri_v2_migration_last_commit: b9712c6
+tauri_v2_migration_last_commit: 0990473
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 96 WORK — adv.tampered-catalog DONE (worktree).**
+>
+> Worktree commit `0990473`. Closes another PRD §5.3 adversarial-corpus item. Behavioural half ("SHA mismatch returns Err + 0 bytes on disk") was already covered by 3 inline tests in `external_app.rs` (`sha_mismatch_aborts_before_write`, `sha_mismatch_aborts_before_write_gpk`, `sha_match_writes_file`). Iter 96 pins the REGISTRY-flip half — the "and the row ends up as Error with a reason" part — via a new integration test file `tests/tampered_catalog.rs` with 5 source-inspection wiring guards:
+>
+> 1. `downloader_surfaces_hash_mismatch_error_text` — both `download_file` and `download_and_extract` surface SHA mismatch with the stable "hash mismatch" error text that `finalize_error` stashes into `last_error`.
+> 2. `install_external_mod_routes_err_through_finalize_error` — external install's Err branch calls `finalize_error`, not a bare `return Err`.
+> 3. `install_gpk_mod_routes_err_through_finalize_error` — same wire, GPK path.
+> 4. `finalize_error_flips_status_progress_and_last_error` — `finalize_error` sets `status = ModStatus::Error`, clears `progress`, populates `last_error`.
+> 5. Detector self-test with 3 synthetic bad shapes.
+>
+> Rationale: without this chain, a refactor that swallows downloader Errs would leave the registry row stuck at Installing until the next boot's `recover_stuck_installs` pass — but by then the user sees an unresolving spinner. This complements iter 95's filesystem-side SIGKILL pin to cover the full install-failure recovery surface.
+>
+> Acceptance: 856/856 Rust (was 851, +5), clippy clean, 449/449 JS unchanged. Worktree ready state unchanged — `ready_for_squash_merge: true`.
+>
+> **PRD §5.3 adversarial-corpus status:** `adv.tampered-exe` (covered by 3.1.11), `adv.bogus-gpk-footer` [DONE @ iter 79], `adv.composite-object-collision` (covered by 3.3.3), `adv.sigkill-mid-download` [DONE @ iter 95], `adv.tampered-catalog` [DONE @ iter 96], `adv.disk-full` (covered by 3.2.8). **All §5.3 items closed or cross-referenced.** Next iter picks from §3 items or remaining P1 non-pin backlog.
 
 > **Iter 95 WORK — adv.sigkill-mid-download DONE (worktree).**
 >
@@ -589,7 +605,7 @@ tauri_v2_migration_ready_for_squash_merge: true
 
 - [P1] **adv.zip-slip** — Adversarial test: zip-slip path rejected. Covered by 3.1.3.
 - [P1] **adv.gpk-deploy-escape** — Covered by 3.1.4.
-- [P1] **adv.tampered-catalog** — Author adversarial test: catalog entry with wrong SHA returns Err + 0 bytes + registry Error. Acceptance: test passes. Pillar: Security.
+- [DONE @ iter 96] **adv.tampered-catalog** — Closed on worktree commit `0990473`. Behavioural half (Err + 0 bytes) already covered by 3 inline tests in `external_app.rs` (`sha_mismatch_aborts_before_write`, `sha_mismatch_aborts_before_write_gpk`, `sha_match_writes_file`). Registry-flip half pinned via new `tests/tampered_catalog.rs` (5 wiring guards): downloader surfaces stable "hash mismatch" text; `install_external_mod` + `install_gpk_mod` Err branches route through `finalize_error` (not swallowed); `finalize_error` flips status=Error, clears progress, populates last_error; detector self-test. A refactor that swallows Errs would leave the registry stuck Installing until boot-recovery — this pins the three-wire chain. Pillar: Security.
 - [DONE @ iter 78] **adv.http-redirect-offlist** — Both HTTP client builders (`external_app.rs::fetch_bytes_streaming`, `catalog.rs::fetch_remote`) now set `reqwest::redirect::Policy::none()`. A 3xx from a compromised allowlisted mirror surfaces as an HTTP-302 error at the existing `is_success()` gate, so it can't bounce to an off-list host. Guarded by `tests/http_redirect_offlist.rs` (source-inspection, 3 tests). Worktree commit `17db09a`. Pillar: Security.
 - [P1] **adv.replay-latest-json** — Covered by 3.1.9.
 - [P1] **adv.tampered-exe** — Covered by 3.1.11.
