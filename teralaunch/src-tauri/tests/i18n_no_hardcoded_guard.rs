@@ -480,3 +480,107 @@ fn scanner_attribute_regex_minimum_char_length_is_two() {
         );
     }
 }
+
+// --------------------------------------------------------------------
+// Iter 264 structural pins — scanner byte bounds + guard byte bounds
+// + mods.js i18n helper usage + allowlist strict-empty literal +
+// scanner cites PRD 3.7.4.
+// --------------------------------------------------------------------
+
+/// Iter 264: scanner file byte bounds.
+#[test]
+fn scanner_file_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 2000;
+    const MAX_BYTES: usize = 50_000;
+    let bytes = fs::metadata(SCANNER)
+        .expect("scanner must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "PRD 3.7.4 (iter 264): {SCANNER} is {bytes} bytes; expected \
+         [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+/// Iter 264: guard source byte bounds.
+#[test]
+fn guard_source_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 5000;
+    const MAX_BYTES: usize = 80_000;
+    let bytes = fs::metadata("tests/i18n_no_hardcoded_guard.rs")
+        .expect("guard must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "PRD 3.7.4 (iter 264): guard is {bytes} bytes; expected \
+         [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+/// Iter 264: `src/mods.js` must call `this.t(` or `t(` for i18n
+/// routing — the canonical translation helper. Without any `this.t`
+/// call sites, the scanner might pass (all strings avoiding the
+/// scanned patterns) while the production code just hardcodes
+/// English via other channels.
+#[test]
+fn mods_js_uses_translation_helper() {
+    let src = fs::read_to_string(TARGET_MODS_JS)
+        .expect("mods.js must exist");
+    let t_count = src.matches("this.t(").count() + src.matches("t('").count() + src.matches("t(\"").count();
+    assert!(
+        t_count >= 5,
+        "PRD 3.7.4 (iter 264): {TARGET_MODS_JS} must use translation \
+         helper `this.t(` / `t('` / `t(\"` at least 5 times. Found \
+         {t_count}. Zero or near-zero means the production code \
+         isn't actually routing through i18n — scanner passes \
+         vacuously."
+    );
+}
+
+/// Iter 264: ALLOWLIST must appear in scanner source AND must NOT
+/// be reassigned / mutated anywhere after its initial empty-literal
+/// declaration. A pattern like `const ALLOWLIST = [];` followed by
+/// `ALLOWLIST.push(...)` would pass the iter-77 literal pin but
+/// defeat the strict-zero contract at runtime.
+#[test]
+fn scanner_allowlist_is_never_mutated_after_declaration() {
+    let body = read(SCANNER);
+    assert!(
+        body.contains("const ALLOWLIST = [];"),
+        "ALLOWLIST empty literal must exist (iter-77 pin)"
+    );
+    // Reject mutation patterns (the declaration `const ALLOWLIST = [];`
+    // intentionally contains `ALLOWLIST = [` so we can't reject that
+    // substring directly; instead check for mutation methods + for
+    // reassignment forms that don't use `const`).
+    for forbidden in [
+        "ALLOWLIST.push(",
+        "ALLOWLIST.splice(",
+        "ALLOWLIST.unshift(",
+        "let ALLOWLIST",
+        "var ALLOWLIST",
+    ] {
+        assert!(
+            !body.contains(forbidden),
+            "PRD 3.7.4 (iter 264): {SCANNER} must not contain \
+             `{forbidden}` — mutating ALLOWLIST (or declaring with \
+             `let`/`var` instead of `const`) defeats the iter-77 \
+             strict-zero contract at runtime even if the initial \
+             declaration stays empty."
+        );
+    }
+}
+
+/// Iter 264: scanner file must cite PRD 3.7.4 in its own header for
+/// cross-reference parity with the Rust guard.
+#[test]
+fn scanner_source_cites_prd_3_7_4() {
+    let body = read(SCANNER);
+    let header = &body[..body.len().min(1500)];
+    assert!(
+        header.contains("PRD 3.7.4") || header.contains("3.7.4"),
+        "PRD 3.7.4 (iter 264): {SCANNER} header must cite `PRD 3.7.4` \
+         or `3.7.4` so a reader grepping for the PRD criterion can \
+         land on the scanner too (not just the guard).\nHeader:\n{header}"
+    );
+}

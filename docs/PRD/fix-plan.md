@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 263
-last_work_iteration: 263
+iteration_counter: 264
+last_work_iteration: 264
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 239
+total_items_done: 240
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 264 WORK — pin.i18n-no-hardcoded-scanner-bounds+guard-bounds+translate-helper-usage+allowlist-never-mutated+scanner-prd-3-7-4-cite DONE.**
+>
+> PRD 3.7.4 (i18n no-hardcoded); i18n_no_hardcoded_guard had 18 tests. Brings to 23.
+>
+> Five new pins:
+> 1. `scanner_file_byte_size_has_sane_bounds` — 2000-50000 bytes
+> 2. `guard_source_byte_size_has_sane_bounds` — 5000-80000 bytes
+> 3. `mods_js_uses_translation_helper` — ≥5 `this.t(`/`t('`/`t("` call sites
+> 4. `scanner_allowlist_is_never_mutated_after_declaration` — reject `.push(`/`.splice(`/`.unshift(`/let/var patterns
+> 5. `scanner_source_cites_prd_3_7_4` — scanner's own header must cite PRD for cross-reference
+>
+> i18n_no_hardcoded_guard: 18 → 23 tests. 1564 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 263 WORK — pin.http-redirect-reqwest-json-stream-features+policy-none-canonical+tmm-no-http+guard-bounds+timeout-duration-sanity DONE.**
 >
