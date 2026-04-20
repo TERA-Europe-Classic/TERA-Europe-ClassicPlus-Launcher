@@ -732,3 +732,77 @@ fn stuck_registry_fixture_contains_installing_row() {
          designed to flip.\nFixture window:\n{window}"
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 279 structural pins — external_app/registry/guard bounds +
+// PRD 3.2.2 cite + STUCK_REGISTRY_JSON is valid JSON.
+// --------------------------------------------------------------------
+
+#[test]
+fn external_app_rs_byte_bounds() {
+    const MIN: usize = 3000;
+    const MAX: usize = 200_000;
+    let bytes = std::fs::metadata(EXTERNAL_APP_RS)
+        .expect("external_app.rs must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "PRD 3.2.2 (iter 279): {EXTERNAL_APP_RS} is {bytes} bytes; \
+         expected [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn registry_rs_byte_bounds() {
+    const MIN: usize = 3000;
+    const MAX: usize = 100_000;
+    let bytes = std::fs::metadata(REGISTRY_RS)
+        .expect("registry.rs must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "PRD 3.2.2 (iter 279): {REGISTRY_RS} is {bytes} bytes; \
+         expected [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn guard_source_byte_bounds() {
+    const MIN: usize = 5000;
+    const MAX: usize = 80_000;
+    let bytes = std::fs::metadata(GUARD_SOURCE)
+        .expect("guard must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "PRD 3.2.2 (iter 279): guard is {bytes} bytes; expected \
+         [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn guard_source_cites_prd_3_2_2_explicitly() {
+    let body = std::fs::read_to_string(GUARD_SOURCE)
+        .expect("guard must exist");
+    let header = &body[..body.len().min(500)];
+    assert!(
+        header.contains("PRD 3.2.2"),
+        "PRD 3.2.2 (iter 279): guard header must cite `PRD 3.2.2`.\n\
+         Header:\n{header}"
+    );
+}
+
+#[test]
+fn stuck_registry_fixture_parses_as_valid_json() {
+    let parsed: Result<serde_json::Value, _> =
+        serde_json::from_str(STUCK_REGISTRY_JSON);
+    let v = parsed.unwrap_or_else(|e| panic!(
+        "PRD 3.2.2 (iter 279): STUCK_REGISTRY_JSON fixture must parse \
+         as valid JSON. Parse error: {e}"
+    ));
+    assert!(
+        v.is_object(),
+        "PRD 3.2.2 (iter 279): STUCK_REGISTRY_JSON must parse as a \
+         JSON object (Registry root). Got: {v:?}"
+    );
+}
