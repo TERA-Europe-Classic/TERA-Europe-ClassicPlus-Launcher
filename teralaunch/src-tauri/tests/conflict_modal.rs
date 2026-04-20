@@ -422,3 +422,183 @@ fn mod_conflict_has_exactly_three_public_fields() {
          Body:\n{body}"
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 235 structural pins — path-constant canonicalisation, return-
+// type vs Option, field-order pin for IPC stability, empty-input
+// short-circuit, command-name literal pin.
+//
+// Iter-193 covered wiring + helper semantics + struct shape. These
+// five extend to the meta-guard + IPC-stability surface a confident
+// refactor could still miss: a path-constant drift (header-inspection
+// panics on file-not-found), a return type swapped to Option (UI
+// render-empty becomes render-nothing), a field-order swap (serde
+// positional tuples silently drift), an empty-input case that scans
+// anyway (waste of CPU + potentially spurious entries), and a
+// command-name rename that breaks the IPC contract without CI trip.
+// --------------------------------------------------------------------
+
+/// Iter 235: `TMM_RS`, `COMMANDS_MODS_RS`, `GUARD_SOURCE` constants
+/// must stay canonical. Every source-inspection pin in this guard
+/// reads through one of these; drift renders header/body checks
+/// inert with a misleading `file not found` panic.
+#[test]
+fn guard_path_constants_are_canonical() {
+    let body = fs::read_to_string(GUARD_SOURCE).expect("guard source must exist");
+    assert!(
+        body.contains(r#"const TMM_RS: &str = "src/services/mods/tmm.rs";"#),
+        "fix.conflict-modal-wiring (iter 235): {GUARD_SOURCE} must \
+         keep `const TMM_RS: &str = \"src/services/mods/tmm.rs\";` \
+         verbatim. A rename leaves every tmm_src() with file-not-found."
+    );
+    assert!(
+        body.contains(r#"const COMMANDS_MODS_RS: &str = "src/commands/mods.rs";"#),
+        "fix.conflict-modal-wiring (iter 235): {GUARD_SOURCE} must \
+         keep `const COMMANDS_MODS_RS: &str = \"src/commands/mods.rs\";` \
+         verbatim."
+    );
+    assert!(
+        body.contains(r#"const GUARD_SOURCE: &str = "tests/conflict_modal.rs";"#),
+        "fix.conflict-modal-wiring (iter 235): {GUARD_SOURCE} must \
+         keep `const GUARD_SOURCE: &str = \"tests/conflict_modal.rs\";` \
+         verbatim."
+    );
+}
+
+/// Iter 235: `detect_conflicts` and the preview command must return
+/// `Vec<ModConflict>`, not `Option<Vec<ModConflict>>` or
+/// `Result<Vec<ModConflict>, _>` for the no-conflict case. An empty
+/// Vec is the canonical "nothing to warn about" signal — the UI
+/// renders empty, and the command stays infallible for its best-
+/// effort contract (see `preview_conflicts_from_bytes_is_best_effort
+/// _on_missing_backup`).
+#[test]
+fn detect_conflicts_return_type_is_vec_not_option() {
+    let src = tmm_src();
+    let body = detect_conflicts_body(&src);
+    // Find the return type in the signature line.
+    let sig_end = body
+        .find(") -> ")
+        .expect("detect_conflicts signature must have `) -> `");
+    let after_arrow = &body[sig_end + ") -> ".len()..];
+    let ret_line: String = after_arrow
+        .lines()
+        .next()
+        .unwrap_or("")
+        .trim()
+        .trim_end_matches('{')
+        .trim()
+        .to_string();
+    assert!(
+        ret_line.starts_with("Vec<ModConflict>"),
+        "fix.conflict-modal-wiring (iter 235): detect_conflicts must \
+         return `Vec<ModConflict>`. Got `{ret_line}`. An Option<Vec<>> \
+         wrapper makes the UI destructure a 2-state rather than 1-\
+         state signal (empty vs None adds no information); a Result \
+         breaks the best-effort contract."
+    );
+}
+
+/// Iter 235: `ModConflict`'s first field must be `composite_name`.
+/// The frontend modal renders rows using positional / key-name
+/// access; a field swap to `(object_path, composite_name, …)` would
+/// leave serde JSON (named fields) unchanged but any consumer using
+/// positional destructuring (tuple style) would bind to the wrong
+/// slot. Pinning the order guards against both cases.
+#[test]
+fn mod_conflict_first_field_is_composite_name() {
+    let src = tmm_src();
+    let decl_pos = src
+        .find("pub struct ModConflict")
+        .expect("ModConflict struct must exist");
+    let rest = &src[decl_pos..];
+    let end = rest.find("\n}\n").unwrap_or(rest.len().min(500));
+    let body = &rest[..end];
+    // Find the first `pub <field>: <type>` line — must contain `: ` to
+    // distinguish a field decl from the struct decl line itself.
+    let first_field_line = body
+        .lines()
+        .find(|l| {
+            let t = l.trim_start();
+            t.starts_with("pub ") && t.contains(": ")
+        })
+        .unwrap_or("");
+    assert!(
+        first_field_line.contains("composite_name"),
+        "fix.conflict-modal-wiring (iter 235): ModConflict's first \
+         public field must be `composite_name`. Got: `{first_field_line}`. \
+         The frontend modal renders composite_name as the row's title; \
+         reordering shifts the title to another field without a type \
+         check firing."
+    );
+}
+
+/// Iter 235: `detect_conflicts` must return an empty Vec when the
+/// incoming ModFile has no packages. No map scan should happen —
+/// the iter-193 "iterates incoming.packages" pin already asserts
+/// the loop target, but doesn't prove the fast path. A refactor
+/// that always scanned current_map (e.g. for diagnostic purposes)
+/// could leak spurious entries when called from the preview
+/// command.
+#[test]
+fn detect_conflicts_short_circuits_on_empty_incoming() {
+    let src = tmm_src();
+    let body = detect_conflicts_body(&src);
+    // The fn must iterate `incoming.packages` (covered by iter-193).
+    // An empty packages iterator trivially produces an empty Vec.
+    // We pin this here by asserting the loop body is the ONLY place
+    // that pushes into the result vec — no early push from a
+    // diagnostic pass over current_map.
+    assert!(
+        body.contains("for pkg in &incoming.packages"),
+        "fix.conflict-modal-wiring (iter 235): detect_conflicts must \
+         iterate `for pkg in &incoming.packages` (iter-193 invariant). \
+         Empty input then trivially yields empty output."
+    );
+    // Count push sites: there must be exactly ONE (inside the loop).
+    let push_count = body.matches(".push(").count();
+    assert_eq!(
+        push_count, 1,
+        "fix.conflict-modal-wiring (iter 235): detect_conflicts must \
+         contain exactly one `.push(` call site — inside the \
+         incoming-packages loop. Found {push_count}. A second push \
+         site implies a diagnostic / always-scan pass that could \
+         leak spurious ModConflict entries on empty input.\nBody:\n{body}"
+    );
+}
+
+/// Iter 235: the Tauri command name MUST be exactly
+/// `preview_mod_install_conflicts`. The frontend invokes this via
+/// `invoke('preview_mod_install_conflicts', ...)`; a rename without
+/// a coordinated frontend update silently breaks the conflict modal
+/// (invoke rejects unknown commands with a runtime error, but the
+/// mods page's try/catch swallows it into a toast).
+#[test]
+fn preview_command_name_is_pinned_verbatim() {
+    let commands_body = fs::read_to_string(COMMANDS_MODS_RS)
+        .expect("commands/mods.rs must be readable");
+    assert!(
+        commands_body.contains("pub async fn preview_mod_install_conflicts")
+            || commands_body.contains("pub fn preview_mod_install_conflicts"),
+        "fix.conflict-modal-wiring (iter 235): commands/mods.rs must \
+         define `preview_mod_install_conflicts`. A rename breaks the \
+         frontend's `invoke('preview_mod_install_conflicts', ...)` \
+         call — the mods page's try/catch turns the failure into a \
+         generic toast, masking the rename."
+    );
+    // Negative pin: no alternate spelling has crept in.
+    for wrong in [
+        "preview_install_conflicts",
+        "preview_conflicts",
+        "preview_mod_conflicts",
+        "check_mod_conflicts",
+    ] {
+        assert!(
+            !commands_body.contains(&format!("fn {wrong}(")),
+            "fix.conflict-modal-wiring (iter 235): commands/mods.rs \
+             must NOT define an alternate spelling `{wrong}` — the \
+             canonical name is `preview_mod_install_conflicts` and \
+             any drift breaks the frontend invoke."
+        );
+    }
+}

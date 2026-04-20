@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 235
-last_work_iteration: 235
+iteration_counter: 236
+last_work_iteration: 236
 last_research_sweep: 230
 last_revalidation: 220
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 212
+total_items_done: 213
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 236 WORK — pin.conflict-modal-path-consts+return-vec-not-option+first-field-composite-name+empty-incoming-short-circuit+command-name-verbatim DONE.**
+>
+> fix.conflict-modal-wiring; conflict_modal had 14 tests (iter 193 +5). 42 iters untouched. Brings to 19.
+>
+> Five new pins:
+> 1. `guard_path_constants_are_canonical` — TMM_RS + COMMANDS_MODS_RS + GUARD_SOURCE verbatim
+> 2. `detect_conflicts_return_type_is_vec_not_option` — pin `Vec<ModConflict>` return shape (empty = no conflict; Option adds a redundant 2nd state)
+> 3. `mod_conflict_first_field_is_composite_name` — field order pin for positional destructure stability
+> 4. `detect_conflicts_short_circuits_on_empty_incoming` — pin exactly one `.push(` call site, inside the incoming-packages loop (no always-scan leakage)
+> 5. `preview_command_name_is_pinned_verbatim` — pin `preview_mod_install_conflicts` command name; reject alternative spellings that would pass CI but break the frontend invoke
+>
+> conflict_modal: 14 → 19 tests. 1429 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 235 WORK — pin.disk-full-GUARD_SOURCE-const+helper-co-location+sync-fs-only+no-cross-call+error-preserved + CRLF normalization fix DONE.**
 >
