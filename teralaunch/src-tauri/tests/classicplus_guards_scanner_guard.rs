@@ -604,3 +604,144 @@ fn allowed_hosts_list_count_is_three() {
          re-enabled, so update this count atomically with an audit."
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 253 structural pins — scanner header slug + size ceiling +
+// config-JSON validity + app.js marker floor + scanner describe wrapper.
+// --------------------------------------------------------------------
+//
+// The seventeen pins above cover scanner file presence, URLs fixture
+// completeness, stub + URL guard enumeration, .only/.skip rejection,
+// allowed-host list, app.js early-return + no-live-call, config empty-
+// URL + no-residue. They do NOT pin:
+// (a) the scanner's own JS header self-identifies with the
+//     disabled-features phrase — a refactor that strips the header
+//     comment would still pass presence/size pins;
+// (b) the scanner file has a sane upper-byte ceiling — bloat to 50 KB+
+//     signals garbage in the fixture or unrelated tests piled into
+//     the same file;
+// (c) teralib_config.json parses as valid JSON — a syntax error in
+//     the config would fail at Rust load time but our string-contains
+//     checks would pass until the launcher actually boots;
+// (d) app.js carries at least 7 `Classic+` marker comments — one per
+//     stub. The iter-183 pin only checks that each stub has a marker,
+//     but a silent deletion + re-addition cycle could drop total
+//     count while still satisfying the per-stub scan;
+// (e) the scanner carries a top-level `describe(` wrapper — Vitest
+//     idiom; tests without a describe block are flat and can't be
+//     grep-scoped when debugging a regression.
+
+/// The scanner file's own JS header comment must self-identify as the
+/// Classic+ disabled-features contract test. The guard-file header
+/// pin (iter 218) only checks the Rust side; this pin pins the JS
+/// scanner's own header so a refactor that strips the scanner's
+/// self-identification (leaving a raw test file) still fails.
+#[test]
+fn scanner_header_cites_disabled_features_phrase() {
+    let body = read(SCANNER);
+    let header = &body[..body.len().min(1500)];
+    // Accept either the canonical phrase or an unambiguous synonym.
+    let cites = header.contains("disabled")
+        || header.contains("Classic+ contract")
+        || header.contains("stub");
+    assert!(
+        cites,
+        "Classic+ contract (iter 253): {SCANNER} header must cite \
+         `disabled` / `Classic+ contract` / `stub` so a refactor \
+         stripping the self-identification still fails. The scanner \
+         is the ONLY automated guard against re-enabling a Classic \
+         feature; anonymous test files are easier to delete by \
+         accident.\nHeader:\n{header}"
+    );
+}
+
+/// The scanner file must not exceed a sane upper byte ceiling. The
+/// iter-128 floor catches truncation; the ceiling catches bloat —
+/// garbage piled into the fixture, unrelated tests merged into the
+/// scanner file, or a runaway generator that duplicated content.
+/// Current state: ~15 KB. A ceiling of 50 KB gives ~3× margin.
+#[test]
+fn scanner_file_size_has_upper_ceiling() {
+    const MAX_BYTES: usize = 50_000;
+    let bytes = fs::metadata(SCANNER)
+        .unwrap_or_else(|e| panic!("{SCANNER}: {e}"))
+        .len() as usize;
+    assert!(
+        bytes <= MAX_BYTES,
+        "Classic+ contract (iter 253): {SCANNER} is {bytes} bytes; \
+         ceiling is {MAX_BYTES}. Bloat past the ceiling signals \
+         garbage in the fixture or unrelated tests piled into this \
+         file — the scanner's focus on disabled-feature enumeration \
+         becomes diluted."
+    );
+}
+
+/// `teralib/src/config/config.json` must parse as a valid JSON
+/// object. The iter-183 string-contains pin on `"HASH_FILE_URL": ""`
+/// passes even if the file has an unterminated quote or trailing
+/// comma earlier — the launcher would fail at boot-time JSON parse
+/// with a message that doesn't trace back to this guard. Pinning
+/// validity here catches the syntax regression at test time.
+#[test]
+fn teralib_config_is_valid_json() {
+    let body = read(TERALIB_CONFIG);
+    let parsed: Result<serde_json::Value, _> = serde_json::from_str(&body);
+    let value = parsed.unwrap_or_else(|e| {
+        panic!(
+            "Classic+ contract (iter 253): {TERALIB_CONFIG} must parse \
+             as valid JSON. Parse error: {e}. The iter-183 \
+             string-contains pin would pass on a broken JSON (matching \
+             the literal key-value before a syntax error), but the \
+             launcher would fail at boot."
+        )
+    });
+    assert!(
+        value.is_object(),
+        "Classic+ contract (iter 253): {TERALIB_CONFIG} must parse as \
+         a JSON object (not array or scalar). Got: {value:?}"
+    );
+}
+
+/// `src/app.js` must carry at least 7 `Classic+` marker comments,
+/// one per disabled stub. The iter-183 pin confirms each stub
+/// individually has a marker via a window scan, but a silent
+/// delete-and-readd cycle (someone removes a stub's body including
+/// its marker, then adds it back without) could drop the total count
+/// while still satisfying the per-stub scan (since the marker
+/// appears somewhere else in the larger window). This pin enforces
+/// the aggregate count.
+#[test]
+fn app_js_carries_classicplus_markers_floor() {
+    const MIN_MARKERS: usize = 7;
+    let src = read(APP_JS);
+    let count = src.matches("Classic+").count();
+    assert!(
+        count >= MIN_MARKERS,
+        "Classic+ contract (iter 253): {APP_JS} carries {count} \
+         `Classic+` marker comments; floor is {MIN_MARKERS} (one per \
+         disabled stub). Below the floor means one or more stubs had \
+         their self-documenting marker dropped during a refactor — \
+         future readers lose the signal that the function is a \
+         deliberate stub."
+    );
+}
+
+/// The scanner must carry at least one top-level `describe(` wrapper
+/// block. Vitest supports flat tests without a describe, but the
+/// scanner's 14+ `it(` blocks need a describe wrapper to give the
+/// suite a name in test output — without it, the only context for a
+/// failure is `classicplus-guards.test.js:<line>` rather than the
+/// semantic group the failure belongs to.
+#[test]
+fn scanner_carries_describe_wrapper_block() {
+    let body = read(SCANNER);
+    let describe_count = body.matches("describe(").count();
+    assert!(
+        describe_count >= 1,
+        "Classic+ contract (iter 253): {SCANNER} has {describe_count} \
+         `describe(` block(s); floor is 1. A flat test file gives \
+         readers no semantic grouping when a failure lands — the \
+         only context is file:line, not the disabled-feature category \
+         the failure belongs to."
+    );
+}

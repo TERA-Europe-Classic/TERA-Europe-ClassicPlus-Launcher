@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 252
-last_work_iteration: 252
+iteration_counter: 253
+last_work_iteration: 253
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 228
+total_items_done: 229
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 253 WORK — pin.classicplus-scanner-header-slug+size-ceiling+config-json-valid+appjs-markers-floor+describe-wrapper DONE.**
+>
+> Classic+ disabled-features contract; classicplus_guards_scanner_guard had 17 tests. Brings to 22.
+>
+> Five new pins:
+> 1. `scanner_header_cites_disabled_features_phrase` — JS scanner's own header must cite `disabled`/`Classic+ contract`/`stub` (anonymous test files easier to delete accidentally)
+> 2. `scanner_file_size_has_upper_ceiling` — MAX_BYTES 50000 (catches bloat from garbage piled in, unrelated tests merged)
+> 3. `teralib_config_is_valid_json` — serde_json parse check (string-contains pins pass on broken JSON; launcher would fail at boot)
+> 4. `app_js_carries_classicplus_markers_floor` — MIN_MARKERS 7 (one per stub; silent delete-readd cycle could drop aggregate count)
+> 5. `scanner_carries_describe_wrapper_block` — ≥ 1 `describe(` for semantic grouping in test output
+>
+> classicplus_guards_scanner_guard: 17 → 22 tests. 1509 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 252 WORK — pin.claude-md-section-heading-const+sections-ceiling+size-floor+v100-api-table-rows+feature-state-shipped-blocked DONE.**
 >
