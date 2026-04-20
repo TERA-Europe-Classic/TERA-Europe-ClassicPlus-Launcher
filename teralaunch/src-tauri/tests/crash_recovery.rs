@@ -563,3 +563,172 @@ fn registry_load_returns_default_on_missing_path() {
          missing file still hits the read and errors out."
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 242 structural pins — path-constant canonicalisation,
+// recover_stuck_installs idempotence, error-branch logging, Default-
+// implementation on Registry, stuck-registry fixture shape pin.
+//
+// Prior iters covered Registry::load missing-path, recover_stuck_
+// installs presence, and fixture JSON. These five extend to the
+// meta-guard + idempotence surface a confident refactor could miss:
+// a path-constant drift, a recover-that-doesn't-idempotent-run on
+// the next startup (would re-flip Error → Error logging noise), a
+// silent-error path that eats the JSON parse failure, a Default impl
+// that's not where Self::default() is called, and a fixture-shape
+// drift that would leave recover_stuck_installs untested on its
+// canonical input.
+// --------------------------------------------------------------------
+
+/// Iter 242: all 4 path constants must stay canonical. Every
+/// registry_src() / external_app_src() / guard-header read resolves
+/// through these; a rename panics tests with "file not found"
+/// instead of pointing at the constant drift.
+#[test]
+fn guard_path_constants_are_canonical() {
+    let body = fs::read_to_string(GUARD_SOURCE).expect("guard source must exist");
+    for (name, expected) in [
+        ("EXTERNAL_APP_RS", "src/services/mods/external_app.rs"),
+        ("REGISTRY_RS", "src/services/mods/registry.rs"),
+        ("GUARD_SOURCE", "tests/crash_recovery.rs"),
+    ] {
+        let line = format!("const {name}: &str = \"{expected}\";");
+        assert!(
+            body.contains(&line),
+            "PRD 3.2.2 (iter 242): tests/crash_recovery.rs must keep \
+             `{line}` verbatim. A rename without updating the \
+             constant leaves every pin that reads through it with \
+             file-not-found panics."
+        );
+    }
+}
+
+/// Iter 242: `recover_stuck_installs` must be idempotent — a
+/// second call on an already-recovered registry must be a no-op.
+/// The fn flips `Installing` → `Error`; the second call sees only
+/// `Error` rows and shouldn't touch them. Pin that the iteration
+/// condition is `status == Installing` specifically, not a broader
+/// match that would re-flip on every startup.
+#[test]
+fn recover_stuck_installs_targets_installing_status_only() {
+    let body = registry_src();
+    let fn_pos = body
+        .find("pub fn recover_stuck_installs")
+        .expect("recover_stuck_installs must exist");
+    let rest = &body[fn_pos..];
+    let end = rest.find("\n    }\n").unwrap_or(rest.len().min(1200));
+    let fn_body = &rest[..end];
+    // Must match on Installing specifically.
+    assert!(
+        fn_body.contains("ModStatus::Installing"),
+        "PRD 3.2.2 (iter 242): recover_stuck_installs must reference \
+         `ModStatus::Installing` — the target for recovery. Without \
+         it, the iteration body would touch other statuses and \
+         break idempotence on subsequent startups.\nBody:\n{fn_body}"
+    );
+    // Must NOT match on Error (would re-flip on every startup).
+    let matches_error_in_filter = fn_body.contains("ModStatus::Error =>")
+        || fn_body.contains("| ModStatus::Error");
+    assert!(
+        !matches_error_in_filter,
+        "PRD 3.2.2 (iter 242): recover_stuck_installs must NOT \
+         include `ModStatus::Error` in its filter — doing so would \
+         re-flip Error rows on every startup, adding log noise and \
+         masking the original Installing → Error transition."
+    );
+}
+
+/// Iter 242: `Registry::load` must carry a `.map_err(...)` that
+/// propagates a descriptive error message for JSON parse failures.
+/// A bare `.unwrap()` / `.expect()` panics the launcher at startup
+/// on a corrupted registry.json — the user can't get past the
+/// splash screen.
+#[test]
+fn registry_load_json_parse_error_is_propagated_not_unwrapped() {
+    let body = registry_src();
+    let fn_pos = body
+        .find("pub fn load(path: &Path) -> Result<Self, String>")
+        .expect("Registry::load must exist");
+    let rest = &body[fn_pos..];
+    let end = rest.find("\n    }\n").unwrap_or(rest.len().min(1200));
+    let fn_body = &rest[..end];
+    assert!(
+        fn_body.contains("serde_json::from_str"),
+        "PRD 3.2.2 (iter 242): Registry::load must call \
+         `serde_json::from_str` — the parse surface we're pinning.\n\
+         Body:\n{fn_body}"
+    );
+    // The serde_json call's Err must be mapped, not unwrapped.
+    // Look for `serde_json::from_str(...)` followed (within 200 chars)
+    // by `.map_err(` — not `.unwrap()` / `.expect(`.
+    let parse_idx = fn_body.find("serde_json::from_str").unwrap();
+    let parse_window = &fn_body[parse_idx..parse_idx.saturating_add(300)];
+    assert!(
+        parse_window.contains(".map_err("),
+        "PRD 3.2.2 (iter 242): Registry::load's \
+         `serde_json::from_str` call must be followed by \
+         `.map_err(...)` to propagate a descriptive String error — \
+         `.unwrap()` / `.expect()` panics the launcher at startup \
+         on corrupted registry.json, preventing the user from even \
+         getting past the splash screen.\nParse window:\n{parse_window}"
+    );
+    assert!(
+        !parse_window.contains(".unwrap()") && !parse_window.contains(".expect("),
+        "PRD 3.2.2 (iter 242): Registry::load's \
+         `serde_json::from_str` must NOT chain `.unwrap()` / \
+         `.expect(` — a corrupted JSON would panic the launcher \
+         at startup.\nParse window:\n{parse_window}"
+    );
+}
+
+/// Iter 242: `Registry` must derive or manually impl `Default`.
+/// `Self::default()` is called in the missing-path branch of load()
+/// (iter-194 pin) — if the Default impl ever disappears, that
+/// branch stops compiling. Pin the Default source so the dependency
+/// is explicit (compiler-checked, yes, but also meta-documented).
+#[test]
+fn registry_has_default_implementation() {
+    let body = registry_src();
+    // Either a `#[derive(... Default ...)]` on the struct or a
+    // manual `impl Default for Registry`.
+    let has_derive_default = body.contains("#[derive(Default")
+        || body.contains("#[derive(Debug, Default")
+        || body.contains("Default, Debug")
+        || body.contains(", Default)")
+        || body.contains(", Default,");
+    let has_manual_impl = body.contains("impl Default for Registry");
+    assert!(
+        has_derive_default || has_manual_impl,
+        "PRD 3.2.2 (iter 242): Registry must derive or manually \
+         implement `Default`. The `Self::default()` call in the \
+         missing-path branch of `Registry::load` (iter-194 pin) \
+         depends on it. The compiler would catch the absence, but \
+         pinning it in a test traces the dependency explicitly."
+    );
+}
+
+/// Iter 242: the `STUCK_REGISTRY_JSON` fixture must carry a row
+/// with `"status": "Installing"` — that's the canonical input for
+/// `recover_stuck_installs`. A fixture that accidentally used
+/// `"Installed"` or another variant would leave the recover fn
+/// untested on the one status it's designed to flip.
+#[test]
+fn stuck_registry_fixture_contains_installing_row() {
+    let body = fs::read_to_string(GUARD_SOURCE).expect("guard source must exist");
+    let fixture_pos = body
+        .find("const STUCK_REGISTRY_JSON: &str")
+        .expect("STUCK_REGISTRY_JSON fixture must exist");
+    // Window the raw-string fixture up to 1500 chars (generous).
+    let window = &body[fixture_pos..fixture_pos.saturating_add(1500)];
+    assert!(
+        window.contains(r#""status": "installing""#)
+            || window.contains(r#""status":"installing""#),
+        "PRD 3.2.2 (iter 242): STUCK_REGISTRY_JSON fixture must \
+         carry a row with `\"status\": \"installing\"` (snake_case \
+         — serde serialisation matches the `installing_state_\
+         serialises_as_snake_case` test above). The canonical input \
+         for recover_stuck_installs. A typo (e.g. \"installed\") \
+         would leave the recover fn untested on the status it's \
+         designed to flip.\nFixture window:\n{window}"
+    );
+}

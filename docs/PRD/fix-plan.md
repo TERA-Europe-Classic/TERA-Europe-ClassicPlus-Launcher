@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 242
-last_work_iteration: 242
+iteration_counter: 243
+last_work_iteration: 243
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 218
+total_items_done: 219
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 243 WORK — pin.crash-recovery-path-consts+recover-installing-only+json-err-propagated+registry-has-default+fixture-snake-case-installing DONE.**
+>
+> PRD 3.2.2.crash-recovery-logic; crash_recovery had 16 tests (iter 194 +N). Brings to 21. First 16-count file extended this session.
+>
+> Five new pins:
+> 1. `guard_path_constants_are_canonical` — EXTERNAL_APP_RS + REGISTRY_RS + GUARD_SOURCE verbatim
+> 2. `recover_stuck_installs_targets_installing_status_only` — pin filter targets `ModStatus::Installing` specifically (reject `Error` match; would re-flip Error rows on every startup = log noise)
+> 3. `registry_load_json_parse_error_is_propagated_not_unwrapped` — pin `serde_json::from_str(...).map_err(...)`; forbid `.unwrap()` / `.expect(` (corrupted registry.json would panic launcher at startup)
+> 4. `registry_has_default_implementation` — pin `#[derive(Default)]` OR `impl Default for Registry` (missing-path branch in load() depends on Self::default())
+> 5. `stuck_registry_fixture_contains_installing_row` — pin fixture uses snake_case `"installing"` (matches serde serialisation pinned by iter-194 sibling test)
+>
+> crash_recovery: 16 → 21 tests. 1459 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 242 WORK — pin.i18n-scanner-guard-path-consts+blocklist-four-terms+locale-set-cardinality+per-locale-mods-floor+scanner-per-entry-iteration DONE.**
 >
