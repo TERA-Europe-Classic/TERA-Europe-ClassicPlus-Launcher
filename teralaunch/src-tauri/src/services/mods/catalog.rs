@@ -67,6 +67,7 @@ pub async fn fetch_remote(url: &str) -> Result<Catalog, String> {
     let client = reqwest::Client::builder()
         .user_agent("TERA-Europe-ClassicPlus-Launcher")
         .redirect(reqwest::redirect::Policy::none())
+        .timeout(std::time::Duration::from_secs(30))
         .build()
         .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
 

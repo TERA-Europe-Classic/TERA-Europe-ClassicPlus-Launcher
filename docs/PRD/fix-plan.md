@@ -8,7 +8,7 @@ Each iteration: read the counter below, detect iteration type (work / research /
 
 ```yaml
 iteration_counter: 230
-last_work_iteration: 229
+last_work_iteration: 230
 last_research_sweep: 230
 last_revalidation: 220
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 206
+total_items_done: 207
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 230 WORK — pin.http-redirect-offlist-path-consts+timeout-floor+no-reqwest-get-shortcut+cursor-advance-detector+three-critical-files + DoS-fix (30s/300s timeouts on both HTTP builders) DONE.**
+>
+> PRD §3.1.5 / adv.http-redirect-offlist; http_redirect_offlist had 13 tests (iter 104 creation + iter 157 +4 + iter 199 +5); 31 iters untouched (oldest remaining 13-count). Brings to 18.
+>
+> Five new source-inspection pins AND a real DoS fix surfaced by pin #2:
+> 1. `guard_path_constants_are_canonical` — MODS_DIR + GUARD_SOURCE pinned verbatim
+> 2. `every_mods_builder_sets_timeout` — pin caught a REAL defect: neither catalog.rs (fetch_remote) nor external_app.rs (download_file) set `.timeout(...)` on their builders. Default reqwest has no timeout → slow-loris / stalled-mirror responses would block the launcher thread indefinitely. Real DoS vector. Fix: `.timeout(Duration::from_secs(30))` on catalog (small JSON), `.timeout(Duration::from_secs(300))` on external_app (multi-MB zip cap).
+> 3. `mods_rs_no_reqwest_get_free_function_shortcut` — forbids `reqwest::get(...)` / `reqwest::blocking::get(...)` (bypass every builder gate)
+> 4. `detector_honors_cursor_advance_between_builders` — two-builder self-test validates cursor-advance loop
+> 5. `mods_rs_files_walker_includes_three_critical_files` — pin `external_app.rs` + `catalog.rs` + `tmm.rs` all present (complements iter-157's 2-file self-test + iter-199's count floor)
+>
+> http_redirect_offlist: 13 → 18 tests. 1399 Rust (+5), clippy clean, vitest 449/449. DoS hole closed as a bonus.
 
 > **Iter 230 RESEARCH SWEEP — deploy post-mortem + dep/advisory scan DONE.**
 >

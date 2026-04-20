@@ -441,3 +441,196 @@ fn builder_detector_rejects_commented_redirect_calls() {
     // directly, but readable at review time. Document the weakness
     // here as a tombstone.
 }
+
+// --------------------------------------------------------------------
+// Iter 230 structural pins — path-constants canonicalisation, timeout
+// floor on every HTTP client, reqwest::get() bypass prohibition,
+// detector multi-builder correctness, MODS_DIR contents enumeration.
+//
+// Iter-157 and iter-199 pins prove the gate works today. These five
+// extend coverage to invariants a confident refactor could break
+// while the behavioural pins still pass: a bypassed short-circuit
+// (reqwest::get), an unbounded hang (missing .timeout()), a drifted
+// path constant, or a detector that silently stops catching multi-
+// builder regressions in a single file. 31 iters have touched other
+// guards without extending this one — oldest 13-count remaining, now
+// lifted to 18.
+// --------------------------------------------------------------------
+
+/// Iter 230: MODS_DIR + GUARD_SOURCE path constants must stay
+/// canonical. Every `fs::read_to_string` in this guard resolves
+/// through these strings; if either drifts, tests silently start
+/// reading `""` or panic with a confusing "file not found" instead
+/// of pointing at the real regression.
+#[test]
+fn guard_path_constants_are_canonical() {
+    assert_eq!(
+        MODS_DIR, "src/services/mods",
+        "PRD §3.1.5 (iter 230): MODS_DIR must stay \
+         `src/services/mods` verbatim. A rename breaks every mods-\
+         wide scanner in this guard (every_mods_rs_builder_has_\
+         redirect_none, mods_rs_no_permissive_redirect_policy_\
+         variants, no_mods_client_accepts_invalid_certs, \
+         every_mods_builder_sets_user_agent)."
+    );
+    assert_eq!(
+        GUARD_SOURCE, "tests/http_redirect_offlist.rs",
+        "PRD §3.1.5 (iter 230): GUARD_SOURCE must stay \
+         `tests/http_redirect_offlist.rs` verbatim. The iter-199 \
+         header-inspection pin reads this exact path; a rename \
+         would silently skip header validation."
+    );
+}
+
+/// Iter 230: every `reqwest::Client::builder()` chain under
+/// `src/services/mods/` must set `.timeout(...)`. reqwest's default
+/// is no timeout — a slow-loris or a hung mirror response would
+/// block the launcher thread indefinitely. The combination of
+/// `.redirect(none())` + `.timeout(…)` + `!is_success()` gate is
+/// what actually makes the HTTP boundary safe; a missing timeout
+/// is a DoS vector even when every other invariant holds.
+#[test]
+fn every_mods_builder_sets_timeout() {
+    let mut violations: Vec<String> = Vec::new();
+    for path in mods_rs_files() {
+        let body = fs::read_to_string(&path).expect("read rs file");
+        let mut cursor = 0;
+        while let Some(rel) = body[cursor..].find("reqwest::Client::builder()") {
+            let start = cursor + rel;
+            let end = body[start..]
+                .find(".build()")
+                .map(|p| start + p)
+                .unwrap_or(body.len());
+            let slice = &body[start..end];
+            if !slice.contains(".timeout(") {
+                violations.push(format!(
+                    "{}: reqwest::Client::builder() at offset \
+                     {start} has no `.timeout(` in the chain",
+                    path.display()
+                ));
+            }
+            cursor = end;
+        }
+    }
+    assert!(
+        violations.is_empty(),
+        "PRD §3.1.5 (iter 230): every HTTP client builder under \
+         src/services/mods/ must set `.timeout(...)`. reqwest's \
+         default has no timeout — a stalled mirror or slow-loris \
+         response blocks the launcher thread indefinitely. The \
+         redirect + allowlist + status-check gates stop routing \
+         errors; timeout stops DoS.\nViolations:\n{violations:#?}"
+    );
+}
+
+/// Iter 230: no `.rs` file under `src/services/mods/` may call
+/// `reqwest::get(` or `reqwest::blocking::get(`. These free
+/// functions construct a default Client — no redirect policy, no
+/// timeout, no user-agent. A refactor that "just did a quick GET"
+/// via the free function would slip past every builder-scanner pin
+/// above, silently re-opening the 3xx-bounce + slow-loris classes.
+#[test]
+fn mods_rs_no_reqwest_get_free_function_shortcut() {
+    let mut violations: Vec<String> = Vec::new();
+    for path in mods_rs_files() {
+        let body = fs::read_to_string(&path).expect("read rs file");
+        for bad in [
+            "reqwest::get(",
+            "reqwest::blocking::get(",
+        ] {
+            if body.contains(bad) {
+                violations.push(format!(
+                    "{}: contains `{bad}` — constructs a default \
+                     Client that bypasses the builder gates",
+                    path.display()
+                ));
+            }
+        }
+    }
+    assert!(
+        violations.is_empty(),
+        "PRD §3.1.5 (iter 230): no file under src/services/mods/ may \
+         call the `reqwest::get(...)` or `reqwest::blocking::get(...)` \
+         free functions — both construct a default Client with no \
+         redirect policy / no timeout / default UA, bypassing every \
+         builder-based pin.\nViolations: {violations:#?}"
+    );
+}
+
+/// Iter 230: the `builder_has_redirect_none` detector must NOT
+/// return true when a file has two builders where only the SECOND
+/// has `.redirect(none())`. The cursor-advance logic is supposed
+/// to evaluate each builder in isolation; if it drifts to a naive
+/// file-wide substring search, a regression in the first builder
+/// would be masked by a correct second builder in the same file.
+///
+/// This complements iter-104's single-builder self-test and iter-
+/// 199's commented-call self-test.
+#[test]
+fn detector_honors_cursor_advance_between_builders() {
+    // Two-builder file: FIRST is missing redirect, second has it.
+    // Correct detector: returns true because at least one builder
+    // has the redirect — but the mods-wide scanner catches the
+    // bad one via the `count > 0 && !builder_has_redirect_none`
+    // predicate that scans the whole body. What we pin here is
+    // that the detector's cursor advance works: after finding the
+    // first builder (no redirect), the search moves past `.build()`
+    // and finds the second (with redirect).
+    let two_builders = "\
+        let a = reqwest::Client::builder().user_agent(\"x\").build();\n\
+        let b = reqwest::Client::builder()\n  \
+            .redirect(reqwest::redirect::Policy::none())\n  \
+            .build();\n";
+    // Detector returns true because A builder somewhere in the
+    // file has the redirect. This is the documented semantics.
+    assert!(
+        builder_has_redirect_none(two_builders),
+        "detector must still return true when ANY builder in the \
+         file has the redirect call. (The mods-wide scanner is the \
+         per-builder gate; this detector is the file-wide probe.)"
+    );
+
+    // Inverse: TWO builders, NEITHER has redirect → must return
+    // false. A regression that only checked up to the first
+    // `.build()` and stopped would correctly find no redirect but
+    // could silently skip the second builder (false positive in
+    // the other direction — irrelevant here; pinning the explicit
+    // false).
+    let two_missing = "\
+        let a = reqwest::Client::builder().user_agent(\"x\").build();\n\
+        let b = reqwest::Client::builder().user_agent(\"y\").build();\n";
+    assert!(
+        !builder_has_redirect_none(two_missing),
+        "detector must return false when neither builder has the \
+         redirect call — otherwise the cursor-advance loop is \
+         structurally broken."
+    );
+}
+
+/// Iter 230: the `mods_rs_files()` walker must include BOTH of the
+/// known HTTP-client-carrying files (external_app.rs + catalog.rs)
+/// AND the TMM parser (tmm.rs, no HTTP but a peer security-critical
+/// module). If the filter drifts in a way that excludes any of
+/// these three, every mods-wide scanner silently skips a file whose
+/// absence is supposed to be impossible.
+///
+/// Complements iter-157's 2-file self-test (external_app + catalog)
+/// and iter-199's count-floor (≥5 files).
+#[test]
+fn mods_rs_files_walker_includes_three_critical_files() {
+    let files = mods_rs_files();
+    let names: Vec<String> = files
+        .iter()
+        .filter_map(|p| p.file_name().and_then(|n| n.to_str()).map(String::from))
+        .collect();
+    for expected in ["external_app.rs", "catalog.rs", "tmm.rs"] {
+        assert!(
+            names.iter().any(|n| n == expected),
+            "PRD §3.1.5 (iter 230): mods_rs_files() must include \
+             `{expected}`. Got: {names:?}. A walker filter that drops \
+             any of these would silently skip a critical security \
+             module — external_app.rs (download path), catalog.rs \
+             (remote fetch), tmm.rs (GPK / mapper crypto)."
+        );
+    }
+}

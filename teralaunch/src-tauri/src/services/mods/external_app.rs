@@ -152,6 +152,7 @@ async fn fetch_bytes_streaming(
     let client = reqwest::Client::builder()
         .user_agent("TERA-Europe-ClassicPlus-Launcher")
         .redirect(reqwest::redirect::Policy::none())
+        .timeout(std::time::Duration::from_secs(300))
         .build()
         .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
 
