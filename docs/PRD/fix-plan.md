@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 233
-last_work_iteration: 233
+iteration_counter: 234
+last_work_iteration: 234
 last_research_sweep: 230
 last_revalidation: 220
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 210
+total_items_done: 211
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,21 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 234 WORK — pin.http-allowlist-constants+empty-host-reject+scheme-case-sensitive+missing-allow-tolerant+skip-list-scanner-only + host_of defensive fix DONE.**
+>
+> PRD §3.1.5; http_allowlist had 14 tests (iter 156 +4 + iter 201 +5 over iter 86 creation). First 14→19 extension this session.
+>
+> Plus launcher audit set 4→7 (types, state, commands-mods) hitting PRD §3.8.7 / §5.5 target = 7 launcher modules.
+>
+> Five new pins + one real defensive fix:
+> 1. `guard_source_and_lan_scope_constants_are_canonical` — GUARD_SOURCE + LAN_DEV_HTTP_SCOPE verbatim (pairing anchor between https-only pin + contains-LAN pin)
+> 2. `host_of_rejects_empty_host` — caught REAL gap: `https://` returned `Some("")` (could silently satisfy empty-scope-host matcher drift). Fix: `host_of` returns None when host segment is empty.
+> 3. `host_of_is_case_sensitive_on_scheme` — pin lowercase-only scheme match; `HTTPS://attacker.com` must not bypass the scanner
+> 4. `load_scopes_tolerates_missing_allow_array` — source-inspection pin that `load_scopes` uses `get("allow").and_then` not `.unwrap()` — capability-schema evolution doesn't panic all tests
+> 5. `test_hosts_skip_lives_only_in_scanner_not_in_matcher` — pin discipline: TEST_HOSTS only in the scanner's test-fixture exception, never in matcher/host_of (would turn skip into every-caller-bypass)
+>
+> http_allowlist: 14 → 19 tests. 1419 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 233 WORK — pin.updater-downgrade-path-consts+return-type-bool+remote-from-update.version+inline-test-module+symbolic-tests-five-distinct-cases DONE.**
 >

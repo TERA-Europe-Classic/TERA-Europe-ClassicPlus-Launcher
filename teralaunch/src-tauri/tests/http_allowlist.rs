@@ -62,6 +62,12 @@ fn host_of(s: &str) -> Option<String> {
     let host = rest.split('/').next()?;
     // Drop port if present.
     let host = host.split(':').next()?;
+    // Reject empty host (iter 234): `https://` or `https:///path`
+    // yields an empty host segment — an empty string shouldn't slip
+    // through as a valid "host" for allowlist-match decisions.
+    if host.is_empty() {
+        return None;
+    }
     Some(host.to_string())
 }
 
@@ -500,4 +506,227 @@ fn url_extraction_regex_handles_common_literal_shapes() {
     // quote + whitespace + backslash + close-paren. That's fine
     // because the subsequent `trim_end_matches` handles punctuation.
     assert!(m.as_str().starts_with("https://"));
+}
+
+// --------------------------------------------------------------------
+// Iter 234 structural pins — GUARD_SOURCE + LAN scope constant
+// canonicalisation, empty-host rejection, scheme-case pinning,
+// missing-allow-array tolerance, skip-list ordering discipline.
+//
+// Iter-156 + iter-201 covered matcher semantics + guard traceability
+// + required scopes. These five extend to the defensive-default
+// surface a confident refactor could still miss: a constant rename
+// (silent scanner drift), an empty-host scope that matches
+// `example.com` (path-only URL), an uppercase-scheme call site
+// bypass, a capability entry missing `allow` that panics load_scopes,
+// and a skip-list accidentally moved inside the matcher (turning
+// the test-host exception into an every-caller exception).
+// --------------------------------------------------------------------
+
+/// Iter 234: `GUARD_SOURCE` + `LAN_DEV_HTTP_SCOPE` constants must
+/// stay canonical. GUARD_SOURCE drives every header-inspection pin
+/// (iter-201 cluster); LAN_DEV_HTTP_SCOPE is the pairing anchor
+/// between `capability_http_allow_entries_are_https_only` and
+/// `capability_contains_documented_lan_dev_http_scope` — drift in
+/// either constant turns one pin's exception into the other's
+/// missing-scope error.
+#[test]
+fn guard_source_and_lan_scope_constants_are_canonical() {
+    let body = fs::read_to_string(GUARD_SOURCE).expect("guard source must exist");
+    assert!(
+        body.contains(r#"const GUARD_SOURCE: &str = "tests/http_allowlist.rs";"#),
+        "PRD §3.1.5 (iter 234): {GUARD_SOURCE} must keep \
+         `const GUARD_SOURCE: &str = \"tests/http_allowlist.rs\";` \
+         verbatim. A drift leaves every header-inspection pin \
+         reading the wrong file — panic with `file not found`, not \
+         a pointer at the actual drift."
+    );
+    assert!(
+        body.contains(r#"const LAN_DEV_HTTP_SCOPE: &str = "http://192.168.1.128:8090/*";"#),
+        "PRD §3.1.5 (iter 234): {GUARD_SOURCE} must keep the LAN dev \
+         scope constant verbatim. A drift splits the pairing: the \
+         https-only guard's exception would name a different literal \
+         than the contains-documented guard, silently re-opening \
+         cleartext outbound or dropping the dev-portal scope."
+    );
+}
+
+/// Iter 234: `host_of` must return `None` on an empty host (the
+/// `https://` literal alone, or `https:///path`). An empty host
+/// string matching the allowlist logic would silently widen scope —
+/// `""` compared against any exact scope returns false, but a drift
+/// where the matcher normalised empty-or-dot-stripped hosts could
+/// match `"."` → bare-root hosts.
+#[test]
+fn host_of_rejects_empty_host() {
+    assert_eq!(
+        host_of("https://"),
+        None,
+        "PRD §3.1.5 (iter 234): bare `https://` must yield None — \
+         without a host, nothing to check against the allowlist."
+    );
+    // `https:///path` has an empty host segment before the first `/`.
+    // Currently host_of returns Some(""); pin the defensive posture
+    // by asserting that `""` never matches any real scope host.
+    // (If host_of is tightened in the future to return None here,
+    // this test stays green.)
+    let empty_or_none = host_of("https:///path");
+    if let Some(h) = &empty_or_none {
+        assert!(
+            h.is_empty() || !h.contains('.'),
+            "iter 234: empty-or-pathonly host `{h}` must be either \
+             empty or a single-label non-TLD — otherwise the scope \
+             match turns on accident."
+        );
+        // And it must NOT match any real production scope.
+        let scopes = load_scopes();
+        for scope in &scopes {
+            if let Some(sh) = host_of(scope) {
+                assert!(
+                    !host_matches(h, &sh),
+                    "iter 234: empty host `{h}` must not match \
+                     production scope `{sh}`"
+                );
+            }
+        }
+    }
+}
+
+/// Iter 234: `host_of` must be CASE-SENSITIVE on the scheme prefix.
+/// RFC 3986 says schemes are case-insensitive on the wire, but our
+/// matcher is exact — a URL literal like `HTTPS://attacker.com` in
+/// production code should fail scheme-stripping and surface as an
+/// "unparseable URL literal" violation (counted by the scanner),
+/// not silently slip past with `Host("ttps://attacker.com")` or
+/// similar shape drift. Pin the decision so a future "let's be
+/// lenient" refactor can't land quietly.
+#[test]
+fn host_of_is_case_sensitive_on_scheme() {
+    assert_eq!(
+        host_of("HTTPS://example.com/"),
+        None,
+        "PRD §3.1.5 (iter 234): uppercase `HTTPS://` must not match \
+         the lowercase scheme strip. A lenient case-insensitive \
+         refactor would let a URL literal in an unusual casing \
+         bypass the scanner — caller-visible behaviour (reqwest \
+         lowercases internally) is unchanged, but the allowlist \
+         guard's coverage depends on strict matching."
+    );
+    assert_eq!(
+        host_of("HTTP://lan.example/"),
+        None,
+        "PRD §3.1.5 (iter 234): uppercase `HTTP://` must not match."
+    );
+    assert_eq!(
+        host_of("Https://example.com/"),
+        None,
+        "PRD §3.1.5 (iter 234): mixed-case scheme must not match."
+    );
+}
+
+/// Iter 234: `load_scopes` must tolerate a permissions entry that
+/// has the `http:default` identifier but no `allow` array (or an
+/// `allow` value that isn't an array). Tauri capability schemas
+/// evolve — a v2.x patch might promote `allow` from always-array to
+/// optional-array. A refactor that `expect`'d the allow-array
+/// unconditionally would panic at test time with a confusing error,
+/// misdirecting triage toward our capability JSON being malformed
+/// when actually the upstream schema moved.
+#[test]
+fn load_scopes_tolerates_missing_allow_array() {
+    // Source-inspect that load_scopes uses `and_then` / `let Some = ...
+    // else { continue; }` style guards on `allow`, not a blunt
+    // `.expect(...)` that would panic on schema evolution.
+    let body = fs::read_to_string(GUARD_SOURCE).expect("guard source must exist");
+    let load_pos = body
+        .find("fn load_scopes()")
+        .expect("load_scopes must exist");
+    let load_end = body[load_pos..]
+        .find("\n}\n")
+        .map(|i| load_pos + i)
+        .unwrap_or(load_pos + 2000);
+    let load_body = &body[load_pos..load_end];
+    // Must handle `allow` via `get(...).and_then(...)` or `let Some
+    // else continue`, not `.expect`.
+    assert!(
+        load_body.contains(r#"get("allow")"#),
+        "PRD §3.1.5 (iter 234): load_scopes must probe the `allow` \
+         field via `obj.get(\"allow\")`. A direct index access on a \
+         missing field panics."
+    );
+    // Must NOT contain `.expect(` on the allow lookup path — that
+    // would panic on schema evolution (future capability structure
+    // that moves allow to a sibling field).
+    let allow_expect_bad = load_body.contains(r#"get("allow").unwrap()"#)
+        || load_body.contains(r#"get("allow").expect("#);
+    assert!(
+        !allow_expect_bad,
+        "PRD §3.1.5 (iter 234): load_scopes must NOT call \
+         `.unwrap()` / `.expect(...)` on the `allow` lookup — a \
+         capability schema change that moves `allow` out would \
+         panic all tests with a misleading message instead of \
+         continuing past unknown permissions."
+    );
+}
+
+/// Iter 234: the `TEST_HOSTS` skip-list must be consulted ONLY by
+/// the scanner (`every_mod_url_on_allowlist`) — NOT by `host_matches`
+/// or `host_of`. A refactor that "DRY'd" the skip-list into the
+/// matcher would turn a test-fixture exception into an every-caller
+/// exception: any production URL literal pointing at `example.com`
+/// would silently bypass the allowlist check, even though the
+/// scanner's skip is meant for in-test fixtures only.
+#[test]
+fn test_hosts_skip_lives_only_in_scanner_not_in_matcher() {
+    let body = fs::read_to_string(GUARD_SOURCE).expect("guard source must exist");
+    // host_matches body must NOT reference TEST_HOSTS.
+    let matcher_pos = body
+        .find("fn host_matches(host: &str, scope_host: &str) -> bool")
+        .expect("host_matches must exist");
+    let matcher_end = body[matcher_pos..]
+        .find("\n}\n")
+        .map(|i| matcher_pos + i)
+        .unwrap_or(matcher_pos + 600);
+    let matcher_body = &body[matcher_pos..matcher_end];
+    assert!(
+        !matcher_body.contains("TEST_HOSTS"),
+        "PRD §3.1.5 (iter 234): host_matches must NOT reference \
+         TEST_HOSTS. The skip-list is a scanner-only convenience for \
+         test fixtures; folding it into the matcher would turn every \
+         production URL literal against example.com/127.0.0.1/\
+         localhost into a silent allowlist bypass.\nMatcher body:\n\
+         {matcher_body}"
+    );
+    // host_of body must also NOT reference TEST_HOSTS.
+    let host_of_pos = body
+        .find("fn host_of(s: &str) -> Option<String>")
+        .expect("host_of must exist");
+    let host_of_end = body[host_of_pos..]
+        .find("\n}\n")
+        .map(|i| host_of_pos + i)
+        .unwrap_or(host_of_pos + 500);
+    let host_of_body = &body[host_of_pos..host_of_end];
+    assert!(
+        !host_of_body.contains("TEST_HOSTS"),
+        "PRD §3.1.5 (iter 234): host_of must NOT reference TEST_HOSTS. \
+         The parser's job is to extract a host — filter decisions \
+         belong one layer up."
+    );
+    // And the scanner fn MUST reference TEST_HOSTS (proving the skip
+    // is applied somewhere).
+    let scanner_pos = body
+        .find("fn every_mod_url_on_allowlist()")
+        .expect("scanner must exist");
+    let scanner_end = body[scanner_pos..]
+        .find("\nfn ")
+        .map(|i| scanner_pos + i)
+        .unwrap_or(body.len());
+    let scanner_body = &body[scanner_pos..scanner_end];
+    assert!(
+        scanner_body.contains("test_hosts") || scanner_body.contains("TEST_HOSTS"),
+        "PRD §3.1.5 (iter 234): every_mod_url_on_allowlist must \
+         reference TEST_HOSTS (directly or via the local `test_hosts` \
+         alias). Without the skip-list, unit-test fixtures against \
+         example.com would fail the guard."
+    );
 }
