@@ -667,3 +667,84 @@ fn finalize_error_emits_state_error_event_to_window() {
          on `state` to decide how to render the row."
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 267 structural pins — 3 source bounds + guard bounds + adv-
+// slot cite.
+// --------------------------------------------------------------------
+
+/// Iter 267: external_app.rs byte bounds.
+#[test]
+fn external_app_rs_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 3000;
+    const MAX_BYTES: usize = 200_000;
+    let bytes = fs::metadata(EXTERNAL_APP_RS)
+        .expect("external_app.rs must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "tampered-catalog (iter 267): {EXTERNAL_APP_RS} is {bytes} \
+         bytes; expected [{MIN_BYTES}, {MAX_BYTES}]. A gutting drops \
+         the hash-mismatch path entirely."
+    );
+}
+
+/// Iter 267: commands/mods.rs byte bounds.
+#[test]
+fn commands_mods_rs_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 3000;
+    const MAX_BYTES: usize = 200_000;
+    let bytes = fs::metadata(COMMANDS_MODS_RS)
+        .expect("commands/mods.rs must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "tampered-catalog (iter 267): {COMMANDS_MODS_RS} is {bytes} \
+         bytes; expected [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+/// Iter 267: types.rs byte bounds.
+#[test]
+fn types_rs_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 1000;
+    const MAX_BYTES: usize = 80_000;
+    let bytes = fs::metadata(TYPES_RS)
+        .expect("types.rs must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "tampered-catalog (iter 267): {TYPES_RS} is {bytes} bytes; \
+         expected [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+/// Iter 267: guard byte bounds.
+#[test]
+fn guard_source_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 5000;
+    const MAX_BYTES: usize = 80_000;
+    let bytes = fs::metadata(GUARD_SOURCE)
+        .expect("guard must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "tampered-catalog (iter 267): guard is {bytes} bytes; expected \
+         [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+/// Iter 267: guard header must cite `adv.tampered-catalog` for slot-
+/// grep discoverability.
+#[test]
+fn guard_source_cites_adv_tampered_catalog_slot() {
+    let body = fs::read_to_string(GUARD_SOURCE)
+        .expect("guard must exist");
+    let header = &body[..body.len().min(500)];
+    assert!(
+        header.contains("adv.tampered-catalog") || header.contains("tampered-catalog"),
+        "tampered-catalog (iter 267): guard header must cite \
+         `adv.tampered-catalog` or `tampered-catalog` for slot-grep \
+         discoverability.\nHeader:\n{header}"
+    );
+}

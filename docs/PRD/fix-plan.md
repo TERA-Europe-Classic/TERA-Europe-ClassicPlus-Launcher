@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 266
-last_work_iteration: 266
+iteration_counter: 267
+last_work_iteration: 267
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 242
+total_items_done: 243
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 267 WORK — pin.tampered-catalog-external-app-bounds+commands-bounds+types-bounds+guard-bounds+adv-slot-cite DONE.**
+>
+> adv.tampered-catalog; tampered_catalog had 18 tests. Brings to 23.
+>
+> Five new pins:
+> 1. `external_app_rs_byte_size_has_sane_bounds` — 3000-200000
+> 2. `commands_mods_rs_byte_size_has_sane_bounds` — 3000-200000
+> 3. `types_rs_byte_size_has_sane_bounds` — 1000-80000
+> 4. `guard_source_byte_size_has_sane_bounds` — 5000-80000
+> 5. `guard_source_cites_adv_tampered_catalog_slot` — slot-grep cite
+>
+> tampered_catalog: 18 → 23 tests. 1579 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 266 WORK — pin.secret-scan-workflow-bounds+config-bounds+guard-bounds+audit-doc-exists+prd-3-1-6-cite DONE.**
 >
