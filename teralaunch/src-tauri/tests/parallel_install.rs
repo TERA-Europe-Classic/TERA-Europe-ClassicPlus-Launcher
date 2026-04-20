@@ -629,3 +629,80 @@ fn try_claim_call_sites_assign_installing_status_first() {
          install path: external + GPK). Found {claim_sites}."
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 274 structural pins — mods_state/registry/guard bounds +
+// PRD 3.2.7 cite + RwLock canonical primitive.
+// --------------------------------------------------------------------
+
+#[test]
+fn mods_state_rs_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 200;
+    const MAX_BYTES: usize = 20_000;
+    let bytes = std::fs::metadata(MODS_STATE_RS)
+        .expect("mods_state.rs must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "PRD 3.2.7 (iter 274): {MODS_STATE_RS} is {bytes} bytes; \
+         expected [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+#[test]
+fn registry_rs_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 3000;
+    const MAX_BYTES: usize = 100_000;
+    let bytes = std::fs::metadata(REGISTRY_RS)
+        .expect("registry.rs must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "PRD 3.2.7 (iter 274): {REGISTRY_RS} is {bytes} bytes; \
+         expected [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+#[test]
+fn guard_source_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 5000;
+    const MAX_BYTES: usize = 80_000;
+    let bytes = std::fs::metadata(GUARD_SOURCE)
+        .expect("guard must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "PRD 3.2.7 (iter 274): guard is {bytes} bytes; expected \
+         [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+#[test]
+fn guard_source_cites_prd_3_2_7_explicitly() {
+    let body = std::fs::read_to_string(GUARD_SOURCE)
+        .expect("guard must exist");
+    let header = &body[..body.len().min(500)];
+    assert!(
+        header.contains("PRD 3.2.7"),
+        "PRD 3.2.7 (iter 274): guard header must cite `PRD 3.2.7`.\n\
+         Header:\n{header}"
+    );
+}
+
+#[test]
+fn mods_state_uses_std_sync_rwlock_canonical_primitive() {
+    let src = std::fs::read_to_string(MODS_STATE_RS)
+        .expect("mods_state.rs must exist");
+    assert!(
+        src.contains("std::sync::RwLock") || src.contains("use std::sync::{") || src.contains("sync::RwLock"),
+        "PRD 3.2.7 (iter 274): {MODS_STATE_RS} must use `std::sync::RwLock` \
+         — the canonical primitive for serialisation. A swap to \
+         `tokio::sync::RwLock` would change the blocking semantics and \
+         break the mods_state::mutate closure contract in callers."
+    );
+    assert!(
+        !src.contains("tokio::sync::RwLock"),
+        "PRD 3.2.7 (iter 274): {MODS_STATE_RS} must NOT use \
+         `tokio::sync::RwLock` — std::sync is the canonical primitive."
+    );
+}
