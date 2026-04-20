@@ -1,4 +1,4 @@
-//! fix.clean-recovery-wiring — wiring guard for
+//! fix.clean-recovery-wiring (PRD 3.2.9) — wiring guard for
 //! `commands::mods::recover_clean_mapper`.
 //!
 //! The behavioural test of the underlying predicate lives inline in
@@ -511,6 +511,124 @@ fn backup_functions_source_paths_via_shared_helpers() {
              `backup_path(game_root)` — same rationale.\nBody:\n{body}"
         );
     }
+}
+
+// --------------------------------------------------------------------
+// Iter 261 structural pins — guard source PRD cite + guard byte bounds
+// + tmm.rs inline test module presence + recover_clean_mapper in
+// invoke_handler list + fix-plan-slot cross-ref in guard header.
+// --------------------------------------------------------------------
+
+/// Iter 261: the guard's module header must cite the fix-plan slot
+/// `fix.clean-recovery-wiring` explicitly (already done in iter 164
+/// but re-pinned here against drift). Without the explicit cite,
+/// a reader chasing the fix-plan slot wouldn't land here.
+#[test]
+fn guard_source_cites_fix_clean_recovery_wiring_slot() {
+    let body = fs::read_to_string("tests/clean_recovery.rs")
+        .expect("tests/clean_recovery.rs must exist");
+    let header = &body[..body.len().min(500)];
+    assert!(
+        header.contains("fix.clean-recovery-wiring"),
+        "fix.clean-recovery-wiring (iter 261): guard header must cite \
+         the fix-plan slot `fix.clean-recovery-wiring`. A reader \
+         chasing the slot via fix-plan.md grep should land here \
+         directly.\nHeader:\n{header}"
+    );
+}
+
+/// Iter 261: the guard file must have sane byte bounds. Floor 3000
+/// catches gutting; ceiling 50_000 catches scope creep.
+#[test]
+fn guard_source_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 3000;
+    const MAX_BYTES: usize = 50_000;
+    let bytes = fs::metadata("tests/clean_recovery.rs")
+        .expect("guard source must exist")
+        .len() as usize;
+    assert!(
+        bytes >= MIN_BYTES,
+        "fix.clean-recovery-wiring (iter 261): tests/clean_recovery.rs \
+         is {bytes} bytes; floor is {MIN_BYTES}. A gutting would \
+         leave the wiring-only check without the iter-164 refactor-\
+         hazard pins."
+    );
+    assert!(
+        bytes <= MAX_BYTES,
+        "fix.clean-recovery-wiring (iter 261): tests/clean_recovery.rs \
+         is {bytes} bytes; ceiling is {MAX_BYTES}. Past the ceiling \
+         the file likely accumulated tests that belong in the inline \
+         tmm.rs test module."
+    );
+}
+
+/// Iter 261: `src/services/mods/tmm.rs` must carry an inline
+/// `#[cfg(test)] mod tests` block. The guard's header points to
+/// four behavioural cases that live there; without the inline test
+/// module, those cases aren't tested at all.
+#[test]
+fn tmm_carries_inline_test_module() {
+    let src = fs::read_to_string("src/services/mods/tmm.rs")
+        .expect("tmm.rs must exist");
+    assert!(
+        src.contains("#[cfg(test)]"),
+        "fix.clean-recovery-wiring (iter 261): src/services/mods/tmm.rs \
+         must carry an inline `#[cfg(test)] mod tests` block. The \
+         guard's header references four behavioural cases that live \
+         there (nop-when-backup-exists / creates-backup-from-vanilla \
+         / refuses-when-current-modded / missing-mapper-returns-err) \
+         — without the inline module, those cases aren't tested."
+    );
+    assert!(
+        src.contains("mod tests"),
+        "fix.clean-recovery-wiring (iter 261): tmm.rs inline module \
+         must be named `tests`."
+    );
+}
+
+/// Iter 261: `recover_clean_mapper` must appear in main.rs's
+/// `generate_handler!` / `invoke_handler` invocation. The iter-164
+/// registration pin covers presence; this pin explicitly checks
+/// the invoke-handler list wiring.
+#[test]
+fn recover_clean_mapper_is_in_invoke_handler_list() {
+    let main = fs::read_to_string("src/main.rs").expect("main.rs must exist");
+    assert!(
+        main.contains("recover_clean_mapper"),
+        "fix.clean-recovery-wiring (iter 261): src/main.rs must \
+         register `recover_clean_mapper` in the Tauri \
+         `generate_handler!` / `invoke_handler` list. Without the \
+         registration, the frontend invoke() call errors with \
+         `command not found`."
+    );
+    // Also confirm it's in a handler-like context.
+    let handler_pos = main.find("generate_handler!")
+        .or_else(|| main.find("invoke_handler"));
+    assert!(
+        handler_pos.is_some(),
+        "fix.clean-recovery-wiring (iter 261): main.rs must carry \
+         either `generate_handler!` or `invoke_handler` — the \
+         Tauri command-registration macro."
+    );
+}
+
+/// Iter 261: guard source must cite `PRD 3.2.9` explicitly — the
+/// clean-recovery criterion. The iter-164 `guard_file_header_cites_
+/// prd_and_fix_slot` check accepts any PRD reference in the header;
+/// this pin requires the specific criterion section for discoverability.
+#[test]
+fn guard_source_cites_prd_3_2_9_explicitly() {
+    let body = fs::read_to_string("tests/clean_recovery.rs")
+        .expect("tests/clean_recovery.rs must exist");
+    let header_plus = &body[..body.len().min(2000)];
+    assert!(
+        header_plus.contains("3.2.9") || header_plus.contains("PRD 3.2.9"),
+        "fix.clean-recovery-wiring (iter 261): guard source must cite \
+         `PRD 3.2.9` (clean-recovery criterion) within the first 2000 \
+         chars. A reader chasing the PRD criterion via section-grep \
+         should land here. Note: the iter-164 pin accepts any PRD cite; \
+         this pin requires the specific section.\nHeader preview:\n{header_plus}"
+    );
 }
 
 /// Iter 227: the module-level comment block introducing the iter-164

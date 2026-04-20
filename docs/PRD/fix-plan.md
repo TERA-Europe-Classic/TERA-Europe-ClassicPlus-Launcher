@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 260
-last_work_iteration: 260
+iteration_counter: 261
+last_work_iteration: 261
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 236
+total_items_done: 237
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 261 WORK — pin.clean-recovery-fix-slot-cite+byte-bounds+tmm-inline-test-module+invoke-handler-registration+prd-3-2-9-cite DONE.**
+>
+> fix.clean-recovery-wiring (PRD 3.2.9); clean_recovery had 18 tests. Brings to 23. Also added `(PRD 3.2.9)` to guard header for discoverability.
+>
+> Five new pins:
+> 1. `guard_source_cites_fix_clean_recovery_wiring_slot` — fix-plan slot must appear in header
+> 2. `guard_source_byte_size_has_sane_bounds` — 3000-50000 bytes
+> 3. `tmm_carries_inline_test_module` — `#[cfg(test)] mod tests` in tmm.rs (where 4 behavioural cases live)
+> 4. `recover_clean_mapper_is_in_invoke_handler_list` — main.rs registration pin + handler macro presence
+> 5. `guard_source_cites_prd_3_2_9_explicitly` — specific section number (stricter than iter-164 generic PRD cite; required header update)
+>
+> clean_recovery: 18 → 23 tests. 1549 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 260 WORK — pin.updater-gate-source-prd-cite+byte-size-bounds+semver-cargo-dep+guard-prd-explicit-cite+gate-single-pub-fn DONE.**
 >
