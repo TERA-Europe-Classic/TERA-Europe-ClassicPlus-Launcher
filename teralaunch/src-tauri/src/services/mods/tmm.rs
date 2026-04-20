@@ -747,6 +747,132 @@ pub(crate) fn is_safe_gpk_container_filename(name: &str) -> bool {
     true
 }
 
+/// Reads the UE3 package FolderName (a.k.a. PackageName) from a .gpk
+/// header. Used as the drop-in filename for legacy mods that lack a
+/// TMM footer. Returns None if the header is malformed or non-UE3.
+///
+/// Layout per TeraCoreLib FStructs.cpp `operator<<(FStream&, FPackageSummary&)`:
+/// - offset 0: u32 magic = 0x9E2A83C1
+/// - offset 4: u32 FileVersion
+/// - offset 8: i32 HeaderSize
+/// - offset 12: FString FolderName (i32 len + bytes; +ASCII / -UTF16, incl null)
+pub fn extract_package_folder_name(bytes: &[u8]) -> Option<String> {
+    if bytes.len() < 16 {
+        return None;
+    }
+    let magic = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+    if magic != PACKAGE_MAGIC {
+        return None;
+    }
+    let len = i32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]);
+    if len == 0 {
+        return None;
+    }
+    if len > 0 {
+        // ASCII: `len` chars including trailing null. Sanity-cap to 256.
+        let n = len as usize;
+        if n > 256 || 16 + n > bytes.len() {
+            return None;
+        }
+        let slice = &bytes[16..16 + n];
+        // Drop trailing null(s).
+        let trimmed: &[u8] = if slice.last() == Some(&0) {
+            &slice[..slice.len() - 1]
+        } else {
+            slice
+        };
+        let s = std::str::from_utf8(trimmed).ok()?.to_string();
+        if s.is_empty() { None } else { Some(s) }
+    } else {
+        // UTF-16 LE: (-len) chars including trailing null. Sanity-cap to 256.
+        let n = (-len) as usize;
+        if n > 256 || 16 + n * 2 > bytes.len() {
+            return None;
+        }
+        let mut u16s = Vec::with_capacity(n);
+        for i in 0..n {
+            u16s.push(u16::from_le_bytes([bytes[16 + i * 2], bytes[16 + i * 2 + 1]]));
+        }
+        if u16s.last() == Some(&0) {
+            u16s.pop();
+        }
+        let s = String::from_utf16(&u16s).ok()?;
+        if s.is_empty() { None } else { Some(s) }
+    }
+}
+
+/// Drop-in install for legacy (non-TMM) .gpk mods. Copies the source
+/// .gpk into `<game>/CookedPC/<package-name>.gpk`. If a file with that
+/// name already exists, backs it up as `<package-name>.gpk.vanilla-bak`
+/// so uninstall can restore it.
+///
+/// The package name is read directly from the GPK's UE3 header. This
+/// matches pre-TMM community-mod convention where users drop mods in
+/// by hand using the filename the mapper expects.
+pub fn install_legacy_gpk(
+    game_root: &Path,
+    source_gpk: &Path,
+) -> Result<String, String> {
+    let bytes = fs::read(source_gpk)
+        .map_err(|e| format!("Failed to read mod file: {}", e))?;
+    let folder_name = extract_package_folder_name(&bytes)
+        .ok_or_else(|| "Mod file has no readable UE3 package header — not a TERA-compatible .gpk.".to_string())?;
+
+    // Sanity-gate the filename so a malformed header can't escape CookedPC.
+    let target_filename = format!("{folder_name}.gpk");
+    if !is_safe_gpk_container_filename(&target_filename) {
+        return Err(format!(
+            "Package name '{folder_name}' would produce an unsafe CookedPC filename — refusing to deploy."
+        ));
+    }
+
+    let cooked_pc = game_root.join(COOKED_PC_DIR);
+    fs::create_dir_all(&cooked_pc)
+        .map_err(|e| format!("Failed to create CookedPC dir: {}", e))?;
+    let dest = cooked_pc.join(&target_filename);
+
+    // Back up existing vanilla .gpk if present and no backup exists yet.
+    let backup = cooked_pc.join(format!("{target_filename}.vanilla-bak"));
+    if dest.exists() && !backup.exists() {
+        fs::copy(&dest, &backup)
+            .map_err(|e| format!("Failed to back up vanilla .gpk: {}", e))?;
+    }
+
+    fs::copy(source_gpk, &dest)
+        .map_err(|e| format!("Failed to install .gpk into CookedPC: {}", e))?;
+
+    Ok(target_filename)
+}
+
+/// Restores the vanilla .gpk for a legacy drop-in install. Removes
+/// the modded .gpk and copies the .vanilla-bak back over if present.
+/// If no backup exists (meaning the vanilla slot was empty before the
+/// install), the modded .gpk is simply removed.
+pub fn uninstall_legacy_gpk(
+    game_root: &Path,
+    target_filename: &str,
+) -> Result<(), String> {
+    if !is_safe_gpk_container_filename(target_filename) {
+        return Err(format!(
+            "Refusing to uninstall — '{target_filename}' is not a safe filename."
+        ));
+    }
+    let cooked_pc = game_root.join(COOKED_PC_DIR);
+    let dest = cooked_pc.join(target_filename);
+    let backup = cooked_pc.join(format!("{target_filename}.vanilla-bak"));
+
+    if backup.exists() {
+        fs::copy(&backup, &dest)
+            .map_err(|e| format!("Failed to restore vanilla .gpk: {}", e))?;
+        fs::remove_file(&backup)
+            .map_err(|e| format!("Failed to remove backup after restore: {}", e))?;
+    } else if dest.exists() {
+        fs::remove_file(&dest)
+            .map_err(|e| format!("Failed to remove modded .gpk: {}", e))?;
+    }
+    Ok(())
+}
+
 /// Installs a mod by:
 ///   1. Reading the vanilla mapper from `.clean` (or the current mapper
 ///      as a fallback — first install will hit this path).

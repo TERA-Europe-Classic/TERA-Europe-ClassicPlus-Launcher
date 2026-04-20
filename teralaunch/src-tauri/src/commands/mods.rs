@@ -309,6 +309,15 @@ async fn install_gpk_mod(entry: CatalogEntry, window: tauri::Window) -> Result<M
 /// returns None (no message to surface). On any failure returns a
 /// human-readable explanation that the caller stashes in `last_error`
 /// so the user can see why the mod won't apply in-game yet.
+///
+/// Two install paths:
+///   1. **TMM** — `.gpk` carries a TMM footer → patch
+///      CompositePackageMapper.dat to route composites at the new file.
+///   2. **Legacy drop-in** — no TMM footer → read the UE3 package
+///      FolderName from the GPK header and drop the file into
+///      `<game>/CookedPC/<name>.gpk`, backing up any existing vanilla
+///      file as `<name>.gpk.vanilla-bak`. Matches the pre-TMM community
+///      convention where users manually dropped mods in by filename.
 fn try_deploy_gpk(_mod_id: &str, source_gpk: &std::path::Path) -> Option<String> {
     use crate::services::mods::tmm;
     let game_root = match resolve_game_root() {
@@ -322,11 +331,25 @@ fn try_deploy_gpk(_mod_id: &str, source_gpk: &std::path::Path) -> Option<String>
     };
     match tmm::install_gpk(&game_root, source_gpk) {
         Ok(_) => None,
-        Err(e) => Some(format!(
-            "Downloaded, but mapper patch failed: {}. Mod file is at {}",
-            e,
-            source_gpk.display()
-        )),
+        Err(tmm_err) => {
+            // TMM parse rejected the mod. Fall back to legacy drop-in
+            // if the .gpk has a readable UE3 package header. Most pre-
+            // TMM community mods land here.
+            match tmm::install_legacy_gpk(&game_root, source_gpk) {
+                Ok(installed_name) => {
+                    log::info!(
+                        "legacy drop-in install succeeded for {} as {}",
+                        source_gpk.display(),
+                        installed_name
+                    );
+                    None
+                }
+                Err(legacy_err) => Some(format!(
+                    "Downloaded, but deploy failed — TMM: {tmm_err}; legacy drop-in: {legacy_err}. Mod file is at {}",
+                    source_gpk.display()
+                )),
+            }
+        }
     }
 }
 
@@ -505,7 +528,24 @@ pub async fn uninstall_mod(id: String, delete_settings: Option<bool>) -> Result<
                                 &modfile.container,
                                 &paths,
                             );
+                        } else if let Some(folder_name) =
+                            crate::services::mods::tmm::extract_package_folder_name(&bytes)
+                        {
+                            // Legacy drop-in install — restore the vanilla .gpk
+                            // from the .vanilla-bak backup (or remove if no backup).
+                            let target = format!("{folder_name}.gpk");
+                            let _ = crate::services::mods::tmm::uninstall_legacy_gpk(
+                                &game_root, &target,
+                            );
                         }
+                    } else if let Some(folder_name) =
+                        crate::services::mods::tmm::extract_package_folder_name(&bytes)
+                    {
+                        // Same as above, but when parse_mod_file itself errored.
+                        let target = format!("{folder_name}.gpk");
+                        let _ = crate::services::mods::tmm::uninstall_legacy_gpk(
+                            &game_root, &target,
+                        );
                     }
                 }
             }

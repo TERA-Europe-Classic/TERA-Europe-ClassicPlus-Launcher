@@ -590,22 +590,28 @@ async function handleCheckLauncherUpdate() {
       console.warn('Could not get version:', e);
     }
 
-    if (window.__TAURI__ && window.__TAURI__.updater) {
-      const { checkUpdate } = window.__TAURI__.updater;
-      if (checkUpdate) {
-        const { shouldUpdate, manifest } = await checkUpdate();
-        if (shouldUpdate) {
-          showUpdateNotification('upToDate', 'Update available: ' + (manifest?.version || 'new version'), 'Current version: ' + currentVersion);
+    const updater = window.__TAURI__?.updater;
+    if (!updater) {
+      showUpdateNotification('upToDate', 'Launcher v' + currentVersion, 'Updater not available');
+    } else {
+      // Tauri v2 API: check() returns null if up to date, or an Update object.
+      // Fall back to v1's checkUpdate() if the plugin was pinned to v1.
+      const result = updater.check
+        ? await updater.check()
+        : (updater.checkUpdate ? await updater.checkUpdate() : null);
+      if (result == null) {
+        showUpdateNotification('upToDate', 'Launcher is up to date (v' + currentVersion + ')', 'No updates available');
+      } else if ('shouldUpdate' in result) {
+        // v1 shape
+        if (result.shouldUpdate) {
+          showUpdateNotification('upToDate', 'Update available: ' + (result.manifest?.version || 'new version'), 'Current version: ' + currentVersion);
         } else {
           showUpdateNotification('upToDate', 'Launcher is up to date (v' + currentVersion + ')', 'No updates available');
         }
       } else {
-        // checkUpdate not available
-        showUpdateNotification('upToDate', 'Launcher v' + currentVersion, 'Update check not available');
+        // v2 shape — non-null result means an update is available.
+        showUpdateNotification('upToDate', 'Update available: v' + (result.version || 'new'), 'Current version: ' + currentVersion);
       }
-    } else {
-      // Fallback if Tauri updater not available
-      showUpdateNotification('upToDate', 'Launcher v' + currentVersion, 'Updater not available');
     }
   } catch (error) {
     console.error('Error checking for updates:', error);
@@ -2420,9 +2426,14 @@ const App = {
             this.showCustomNotification("Update check not available.", "error");
             return;
           }
-          // Tauri's built-in dialog (dialog: true) shows automatically if update available
-          const { shouldUpdate } = await updater.checkUpdate();
-          if (!shouldUpdate) {
+          // Tauri v2: check() returns null when no update. v1 shim kept.
+          const result = updater.check
+            ? await updater.check()
+            : (updater.checkUpdate ? await updater.checkUpdate() : null);
+          const hasUpdate = result != null && (
+            'shouldUpdate' in result ? result.shouldUpdate : true
+          );
+          if (!hasUpdate) {
             const version = await window.__TAURI__?.app?.getVersion?.() || "unknown";
             this.showCustomNotification(
               `You are on the latest launcher (v${version}).`,
@@ -5446,14 +5457,21 @@ const App = {
     }
 
     try {
-      // Tauri updater handles this via dialog:true in tauri.conf.json
-      // This is just for manual trigger from menu
-      const { checkUpdate } = window.__TAURI__.updater;
-      if (checkUpdate) {
-        const { shouldUpdate, manifest } = await checkUpdate();
-        if (shouldUpdate) {
+      // Tauri v2 updater plugin. check() returns null if up to date, or an
+      // Update object with `version` if there is an update. v1's checkUpdate
+      // returned { shouldUpdate, manifest } — shim kept for pinned v1 installs.
+      const updater = window.__TAURI__?.updater || {};
+      const result = updater.check
+        ? await updater.check()
+        : (updater.checkUpdate ? await updater.checkUpdate() : null);
+      if (result == null) {
+        if (typeof window.showUpdateNotification === 'function') {
+          window.showUpdateNotification('Launcher is up to date', true);
+        }
+      } else if ('shouldUpdate' in result) {
+        if (result.shouldUpdate) {
           if (typeof window.showUpdateNotification === 'function') {
-            window.showUpdateNotification(`Update available: ${manifest?.version}`, true);
+            window.showUpdateNotification(`Update available: ${result.manifest?.version}`, true);
           }
         } else {
           if (typeof window.showUpdateNotification === 'function') {
@@ -5462,7 +5480,7 @@ const App = {
         }
       } else {
         if (typeof window.showUpdateNotification === 'function') {
-          window.showUpdateNotification('Launcher is up to date', true);
+          window.showUpdateNotification(`Update available: ${result.version}`, true);
         }
       }
     } catch (error) {
