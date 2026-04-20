@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 257
-last_work_iteration: 257
+iteration_counter: 258
+last_work_iteration: 258
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 233
+total_items_done: 234
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 258 WORK — pin.smoke-harness-integration-floor-ratchet-35+guard-floor-ratchet-18+serde-json-dep+common-mod-size-range+no-stub-files DONE.**
+>
+> Smoke/harness contract; smoke had 17 tests. Brings to 22. Completes 17-count tier — all 17-count guards now at 22.
+>
+> Five new pins:
+> 1. `integration_tests_floor_ratcheted_to_thirty_five` — MIN 30→35 (current 38; 3-file margin)
+> 2. `guard_files_floor_ratcheted_to_eighteen` — MIN 15→18 (current 19; 1-file margin, catches structural drift-guard deletion)
+> 3. `cargo_toml_declares_serde_json_dependency` — pin serde_json as dep (iters 253, 255, 257 use it for JSON parsing)
+> 4. `common_mod_rs_size_is_within_sane_range` — 100≤size≤5000 (current 417; floor catches gutting, ceiling catches accumulation)
+> 5. `no_integration_test_file_is_shorter_than_200_bytes` — rejects stub files that pass iter-192 test-fn-presence but contribute no real assertions
+>
+> smoke: 17 → 22 tests. 1534 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 257 WORK — pin.shell-open-callsite-scanner-size-ceiling+capabilities-json-valid+safe-ids-ceiling+callsite-ceiling+describe-wrapper DONE.**
 >

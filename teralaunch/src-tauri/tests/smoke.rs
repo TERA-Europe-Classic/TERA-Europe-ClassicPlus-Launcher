@@ -448,6 +448,154 @@ fn cargo_toml_has_no_explicit_bin_stanza() {
     );
 }
 
+// --------------------------------------------------------------------
+// Iter 258 structural pins — file-count ratchets + serde_json dep +
+// common/mod.rs size bound + no-stub integration-test files.
+// --------------------------------------------------------------------
+//
+// The seventeen pins above cover file-count floors, subdir set,
+// fixture exports, bin-crate shape, dev-deps, guard-subset floor,
+// no-crate-refs, no-stray-artefacts, per-file test-fn presence, self-
+// identification, path/threshold constants, tempfile import, no-bin-
+// stanza, and sort discipline. They do NOT pin:
+// (a) the INTEGRATION_TESTS_FLOOR (30 from iter 166) and GUARD_FILES_
+//     FLOOR (15 from iter 192) have been ratcheted to reflect current
+//     state (38 total, 19 guards) with a small margin;
+// (b) `serde_json` is declared as a dependency — multiple guards
+//     (classicplus_guards_scanner_guard iter 253, offline_banner iter
+//     255, shell_open_callsite iter 257) parse JSON via serde_json;
+//     dropping it as a dep would break their compilation;
+// (c) `tests/common/mod.rs` has a sane size range — too small means
+//     it's been gutted; too large means it's accumulated helpers that
+//     belong in individual tests;
+// (d) every `tests/*.rs` file meets a minimum byte floor — the iter-
+//     192 test-fn-presence pin catches files with zero `#[test]`
+//     attributes, but a file with ONE `#[test]` attribute and an
+//     empty body passes while contributing nothing.
+
+/// Ratchet `integration_tests_dir_meets_minimum_file_count` — bump
+/// `INTEGRATION_TESTS_FLOOR` from 30 (iter 166) to 35. Current state:
+/// 38 files. A floor of 35 gives a 3-file margin while catching a
+/// multi-file bulk-delete as a visible event.
+#[test]
+fn integration_tests_floor_ratcheted_to_thirty_five() {
+    const MIN_IT258: usize = 35;
+    let files = integration_test_files();
+    assert!(
+        files.len() >= MIN_IT258,
+        "harness (iter 258): tests/ has {} top-level `.rs` files; \
+         ratcheted floor is {MIN_IT258} (was 30 in iter 166). A \
+         multi-file bulk-delete past the ratchet signals a bad rebase \
+         or accidental wholesale removal.",
+        files.len()
+    );
+}
+
+/// Ratchet `integration_tests_carry_expected_guard_file_subset_count`
+/// — bump `GUARD_FILES_FLOOR` from 15 (iter 192) to 18. Current state:
+/// 19 guard files. A floor of 18 gives a 1-file margin while catching
+/// deletion of a structural drift-guard as a visible event.
+#[test]
+fn guard_files_floor_ratcheted_to_eighteen() {
+    const MIN_IT258: usize = 18;
+    let files = integration_test_files();
+    let guards: Vec<_> = files
+        .iter()
+        .filter(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .map(|n| n.ends_with("_guard.rs"))
+                .unwrap_or(false)
+        })
+        .collect();
+    assert!(
+        guards.len() >= MIN_IT258,
+        "harness (iter 258): tests/ has {} `*_guard.rs` files; \
+         ratcheted floor is {MIN_IT258} (was 15 in iter 192). \
+         Deletion of a structural drift-guard past the ratchet signals \
+         an intentional removal that must be justified in the commit.",
+        guards.len()
+    );
+}
+
+/// `Cargo.toml` must declare `serde_json` as a dependency. Multiple
+/// guard tests (iters 253, 255, 257) use `serde_json::from_str` /
+/// `serde_json::Value` to parse JSON fixtures. Dropping the dep would
+/// break compilation of those guards before the `cargo test` command
+/// even started running them — the error would be cryptic without
+/// this pin.
+#[test]
+fn cargo_toml_declares_serde_json_dependency() {
+    let toml = fs::read_to_string(CARGO_TOML).expect("Cargo.toml must exist");
+    assert!(
+        toml.contains("serde_json"),
+        "harness (iter 258): Cargo.toml must declare `serde_json` as \
+         a dependency (or dev-dependency). Multiple guard tests \
+         (classicplus_guards_scanner iter 253, offline_banner iter \
+         255, shell_open_callsite iter 257) use serde_json to parse \
+         JSON fixtures; dropping the dep breaks their compilation \
+         with a cryptic `unresolved import` error."
+    );
+}
+
+/// `tests/common/mod.rs` must have a sane size range. A floor of 100
+/// bytes catches gutting (e.g. to an empty file + imports); a ceiling
+/// of 5000 bytes catches accumulation of helpers that belong in
+/// individual tests (common/mod.rs is intentionally minimal —
+/// `two_plus_two` + `scratch_dir` — per the iter-166 design).
+#[test]
+fn common_mod_rs_size_is_within_sane_range() {
+    const MIN_BYTES: usize = 100;
+    const MAX_BYTES: usize = 5_000;
+    let bytes = fs::metadata(COMMON_MOD_RS)
+        .unwrap_or_else(|e| panic!("{COMMON_MOD_RS}: {e}"))
+        .len() as usize;
+    assert!(
+        bytes >= MIN_BYTES,
+        "harness (iter 258): {COMMON_MOD_RS} is only {bytes} bytes; \
+         floor is {MIN_BYTES}. Gutting the fixture module leaves \
+         every `mod common;`-using test broken."
+    );
+    assert!(
+        bytes <= MAX_BYTES,
+        "harness (iter 258): {COMMON_MOD_RS} is {bytes} bytes; \
+         ceiling is {MAX_BYTES}. Accumulation past the ceiling signals \
+         helpers have been piled in that belong in individual tests. \
+         common/mod.rs is intentionally minimal: two_plus_two + \
+         scratch_dir only."
+    );
+}
+
+/// No integration-test file may be shorter than 200 bytes. The iter-
+/// 192 `every_integration_test_file_carries_test_functions` pin
+/// catches files with zero `#[test]` attributes, but a file with one
+/// `#[test]` attribute over an empty body passes while contributing
+/// nothing. 200 bytes is roughly the minimum size for a real test
+/// (imports + one `#[test]` fn with one assertion).
+#[test]
+fn no_integration_test_file_is_shorter_than_200_bytes() {
+    const MIN_BYTES: usize = 200;
+    let files = integration_test_files();
+    let mut stubs: Vec<String> = Vec::new();
+    for path in &files {
+        let len = fs::metadata(path)
+            .unwrap_or_else(|e| panic!("metadata {}: {e}", path.display()))
+            .len() as usize;
+        if len < MIN_BYTES {
+            stubs.push(format!("{} ({len} bytes)", path.display()));
+        }
+    }
+    assert!(
+        stubs.is_empty(),
+        "harness (iter 258): {} integration-test file(s) are shorter \
+         than {MIN_BYTES} bytes — likely stubs that satisfy the \
+         iter-192 test-fn-presence pin without contributing real \
+         assertions. Files:\n  {}",
+        stubs.len(),
+        stubs.join("\n  ")
+    );
+}
+
 /// The `integration_test_files` helper must call `.sort()` on its
 /// output. Without a stable sort, failure messages would list files
 /// in filesystem-dir-entry order (non-deterministic on some
