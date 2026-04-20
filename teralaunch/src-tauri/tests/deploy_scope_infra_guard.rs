@@ -564,3 +564,99 @@ fn deploy_scope_guard_detector_self_test() {
          CDN prefix must be flagged"
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 262 structural pins — PRD 3.1.14 explicit cite + deploy.yml
+// byte bounds + scope-script byte bounds + guard byte bounds +
+// workflow_dispatch inputs declared.
+// --------------------------------------------------------------------
+
+#[test]
+fn guard_source_cites_prd_3_1_14_explicitly() {
+    let body = fs::read_to_string("tests/deploy_scope_infra_guard.rs")
+        .expect("guard source must exist");
+    let header = &body[..body.len().min(500)];
+    assert!(
+        header.contains("PRD 3.1.14"),
+        "PRD 3.1.14 (iter 262): tests/deploy_scope_infra_guard.rs \
+         header must cite `PRD 3.1.14` explicitly. A reader chasing \
+         the deploy-scope criterion via section-grep should land \
+         here.\nHeader:\n{header}"
+    );
+}
+
+#[test]
+fn deploy_yml_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 2000;
+    const MAX_BYTES: usize = 30_000;
+    let bytes = fs::metadata("../../.github/workflows/deploy.yml")
+        .expect("deploy.yml must exist")
+        .len() as usize;
+    assert!(
+        bytes >= MIN_BYTES,
+        "PRD 3.1.14 (iter 262): deploy.yml is {bytes} bytes; floor \
+         is {MIN_BYTES}. A gutted workflow wouldn't be able to carry \
+         the scope-gate step + upload steps."
+    );
+    assert!(
+        bytes <= MAX_BYTES,
+        "PRD 3.1.14 (iter 262): deploy.yml is {bytes} bytes; ceiling \
+         is {MAX_BYTES}. Bloat past the ceiling signals scope creep \
+         or unrelated steps piled into the workflow."
+    );
+}
+
+#[test]
+fn scope_script_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 1500;
+    const MAX_BYTES: usize = 20_000;
+    let bytes = fs::metadata("../../teralaunch/tests/deploy_scope.spec.js")
+        .expect("deploy_scope.spec.js must exist")
+        .len() as usize;
+    assert!(
+        bytes >= MIN_BYTES,
+        "PRD 3.1.14 (iter 262): deploy_scope.spec.js is {bytes} \
+         bytes; floor is {MIN_BYTES}. A gutted scope script would \
+         pass presence pins but do no real work."
+    );
+    assert!(
+        bytes <= MAX_BYTES,
+        "PRD 3.1.14 (iter 262): deploy_scope.spec.js is {bytes} \
+         bytes; ceiling is {MAX_BYTES}. Bloat signals unrelated \
+         tests piled into the scope scanner."
+    );
+}
+
+#[test]
+fn guard_source_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 5000;
+    const MAX_BYTES: usize = 80_000;
+    let bytes = fs::metadata("tests/deploy_scope_infra_guard.rs")
+        .expect("guard must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "PRD 3.1.14 (iter 262): deploy_scope_infra_guard.rs is \
+         {bytes} bytes; expected [{MIN_BYTES}, {MAX_BYTES}]. Outside \
+         the range means either gutting or uncontrolled growth."
+    );
+}
+
+#[test]
+fn deploy_yml_workflow_dispatch_declares_inputs() {
+    let body = fs::read_to_string("../../.github/workflows/deploy.yml")
+        .expect("deploy.yml must exist");
+    assert!(
+        body.contains("workflow_dispatch:"),
+        "PRD 3.1.14 (iter 262): deploy.yml must keep \
+         `workflow_dispatch:` (iter-145 pin)."
+    );
+    assert!(
+        body.contains("inputs:"),
+        "PRD 3.1.14 (iter 262): deploy.yml `workflow_dispatch:` must \
+         declare `inputs:` so manual runs can pick the bump type \
+         (patch/minor/major) without editing the workflow. Without \
+         inputs, every release requires a code change to switch bump \
+         type."
+    );
+}

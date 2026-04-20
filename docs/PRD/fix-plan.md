@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 261
-last_work_iteration: 261
+iteration_counter: 262
+last_work_iteration: 262
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 237
+total_items_done: 238
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 262 WORK — pin.deploy-scope-prd-3-1-14-cite+deploy-yml-bounds+scope-script-bounds+guard-bounds+workflow-dispatch-inputs DONE.**
+>
+> PRD 3.1.14.deploy-scope; deploy_scope_infra_guard had 18 tests. Brings to 23.
+>
+> Five new pins:
+> 1. `guard_source_cites_prd_3_1_14_explicitly` — specific section cite
+> 2. `deploy_yml_byte_size_has_sane_bounds` — 2000-30000 bytes
+> 3. `scope_script_byte_size_has_sane_bounds` — 1500-20000 bytes
+> 4. `guard_source_byte_size_has_sane_bounds` — 5000-80000 bytes
+> 5. `deploy_yml_workflow_dispatch_declares_inputs` — `inputs:` required for manual bump-type choice
+>
+> deploy_scope_infra_guard: 18 → 23 tests. 1554 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 261 WORK — pin.clean-recovery-fix-slot-cite+byte-bounds+tmm-inline-test-module+invoke-handler-registration+prd-3-2-9-cite DONE.**
 >
