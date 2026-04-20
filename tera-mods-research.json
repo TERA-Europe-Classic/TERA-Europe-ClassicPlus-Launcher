@@ -1,8 +1,0 @@
-Status: completed
-
---- Result Preview ---
-# Advanced Methodologies in MMORPG Client-Server Protocol Modification: A Comprehensive Retrospective of TERA Online (2015-2025)
-
-**Key Points:**
-*   **Network Modification via Proxy Architecture:** The dominant modding method for *TERA Online* shifted from client-side file modification to dynamic packet interception via tools like `tera-proxy` and `tera-toolbox`.
-*   **Latency Mitigation vs. Exploit Debates:** Mods addressing "ping tax" (e.g., skill predictors) fundamentally altered combat bala...
