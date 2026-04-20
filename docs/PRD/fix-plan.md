@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 241
-last_work_iteration: 241
+iteration_counter: 242
+last_work_iteration: 242
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 217
+total_items_done: 218
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,20 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 242 WORK — pin.i18n-scanner-guard-path-consts+blocklist-four-terms+locale-set-cardinality+per-locale-mods-floor+scanner-per-entry-iteration DONE.**
+>
+> PRD 3.4.7 (no-jargon) + 3.7.1 (key-parity); i18n_scanner_guard had 15 tests (iter 124 creation + iter 187 +7). 55 iters untouched. Brings to 20.
+>
+> Five new pins. **Last 15-count file extended** — no 15-count guards remain in the tests/ tree as of iter 242.
+>
+> 1. `guard_path_constants_are_canonical` — JARGON_SCANNER + PARITY_SCANNER + TRANSLATIONS verbatim
+> 2. `jargon_blocklist_enumerates_all_four_canonical_terms` — pin each of composite/mapper/sha/tmm as a distinct jargon class (dropping any one lets that class leak)
+> 3. `translations_json_carries_exactly_four_canonical_locales` — set-cardinality pin {EUR, FRA, GER, RUS} using actual region codes; iter-187 pinned presence, this pins the exact set
+> 4. `every_locale_carries_mods_keyset_floor` — per-locale ≥10 MODS_* keys (iter-187 aggregate floor 40 would survive one locale zeroing out; this catches asymmetric drift)
+> 5. `jargon_scanner_iterates_entries_not_stringifies_aggregate` — pin Object.entries/values iteration; forbid JSON.stringify(translations) (conflates keys and values, false-positives on legitimate key names like MODS_COMPOSITE_LABEL)
+>
+> i18n_scanner_guard: 15 → 20 tests. 1454 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 241 WORK — pin.shell-scope-pinned-path-consts+unsafe-hashes-reject+default-src-opaque-schemes+capabilities-count-bounded+header-cites-fix-slot-and-CVE DONE.**
 >

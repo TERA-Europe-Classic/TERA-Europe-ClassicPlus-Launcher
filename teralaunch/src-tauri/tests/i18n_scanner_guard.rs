@@ -382,3 +382,164 @@ fn jargon_scanner_matches_case_insensitively() {
          only blocklist."
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 241 structural pins — path-constant canonicalisation,
+// blocklist terms verbatim, four-locale-set pinning, mods-key floor
+// per-locale check, and locales-subset sanity helper.
+//
+// Iter-187 covered self-identification + scanner structure + locale
+// key existence + aggregate mods-key floor + case-insensitivity.
+// These five extend to the meta-guard + per-locale discipline
+// surface a confident refactor could still miss: a path-constant
+// drift, a blocklist term silently dropped (composite/mapper/sha/
+// tmm — each maps to a distinct jargon class), a locale count drift
+// at the top level, a mods-key count that drops below 10 in any
+// single locale (meaning one locale's i18n got gutted while others
+// stayed), and a locale-set that grew unexpectedly (new locale
+// added without PRD note).
+// --------------------------------------------------------------------
+
+/// Iter 241: `JARGON_SCANNER`, `PARITY_SCANNER`, `TRANSLATIONS`
+/// constants must stay canonical. Every `read(...)` call resolves
+/// through one of these; a rename panics all tests with "file not
+/// found" instead of pointing at the drift.
+#[test]
+fn guard_path_constants_are_canonical() {
+    let body = read("tests/i18n_scanner_guard.rs");
+    for (name, expected) in [
+        ("JARGON_SCANNER", "../tests/i18n-jargon.test.js"),
+        ("PARITY_SCANNER", "../tests/i18n-parity.test.js"),
+        ("TRANSLATIONS", "../src/translations.json"),
+    ] {
+        let line = format!("const {name}: &str = \"{expected}\";");
+        assert!(
+            body.contains(&line),
+            "PRD 3.4.7/3.7.1 (iter 241): i18n_scanner_guard.rs must \
+             keep `{line}` verbatim. A path drift leaves every \
+             read() with file-not-found and silently disables every \
+             pin."
+        );
+    }
+}
+
+/// Iter 241: the jargon scanner's blocklist must enumerate all four
+/// canonical terms: `composite`, `mapper`, `sha`, `tmm`. Each
+/// targets a distinct jargon class:
+///
+///   - `composite` — TMM composite-package internal term
+///   - `mapper` — CompositePackageMapper internal term
+///   - `sha` — hash-pipeline internal term
+///   - `tmm` — mod format name users shouldn't need to know
+///
+/// Dropping any one silently lets that term leak into user-facing copy.
+#[test]
+fn jargon_blocklist_enumerates_all_four_canonical_terms() {
+    let body = read(JARGON_SCANNER);
+    for term in ["\"composite\"", "\"mapper\"", "\"sha\"", "\"tmm\""] {
+        assert!(
+            body.contains(term),
+            "PRD 3.4.7 (iter 241): {JARGON_SCANNER} must include \
+             {term} in its JARGON_BLOCKLIST. Each blocklist term \
+             targets a distinct jargon class — dropping one \
+             silently lets that term leak into user-facing copy. \
+             (composite/mapper/sha/tmm are non-interchangeable; \
+             each is a distinct internal-vocabulary token.)"
+        );
+    }
+}
+
+/// Iter 241: `translations.json` root must carry EXACTLY the four
+/// canonical locale keys: `EUR`, `FRA`, `GER`, `RUS`. Iter-187
+/// pinned each key is PRESENT but didn't pin the SET (an extra `ITA`
+/// or `ESP` would slip through the existence check). A new locale
+/// without PRD note means translations were added without the full
+/// l10n + a11y review.
+#[test]
+fn translations_json_carries_exactly_four_canonical_locales() {
+    let body = read(TRANSLATIONS);
+    let v: serde_json::Value = serde_json::from_str(&body)
+        .expect("translations.json must be valid JSON");
+    let obj = v.as_object().expect("translations.json root must be an object");
+    let actual_strings: std::collections::BTreeSet<String> =
+        obj.keys().cloned().collect();
+    let expected: std::collections::BTreeSet<String> =
+        ["EUR", "FRA", "GER", "RUS"].iter().map(|s| s.to_string()).collect();
+    assert_eq!(
+        actual_strings, expected,
+        "PRD 3.7.1 (iter 241): {TRANSLATIONS} root must carry \
+         exactly the four canonical locales (EUR, FRA, GER, RUS — \
+         the game-server region codes this launcher supports). \
+         Found: {actual_strings:?}. Adding a new locale without a \
+         PRD note bypasses the l10n + a11y review — every new \
+         locale needs a pass over the jargon blocklist, string \
+         length, and pluralisation review."
+    );
+}
+
+/// Iter 241: every locale in `translations.json` must carry at
+/// least 10 `MODS_*` keys. Iter-187 pinned the AGGREGATE floor at
+/// 40 (10 × 4 locales); a regression that zeroed out ONE locale's
+/// mods section while the other three stayed intact would still
+/// satisfy the aggregate floor (30 keys survive across 3 intact
+/// locales). Per-locale floor catches asymmetric drift.
+#[test]
+fn every_locale_carries_mods_keyset_floor() {
+    let body = read(TRANSLATIONS);
+    let v: serde_json::Value = serde_json::from_str(&body)
+        .expect("translations.json must be valid JSON");
+    let obj = v.as_object().expect("root must be an object");
+    for (locale, entries) in obj {
+        let entries_obj = entries
+            .as_object()
+            .unwrap_or_else(|| panic!("{locale} locale must be an object"));
+        let mods_count = entries_obj
+            .keys()
+            .filter(|k| k.starts_with("MODS_"))
+            .count();
+        assert!(
+            mods_count >= 10,
+            "PRD 3.7.1 (iter 241): locale `{locale}` has only \
+             {mods_count} `MODS_*` keys (floor: 10). The aggregate \
+             floor (iter 187) would still hold with one locale \
+             zeroed out; this per-locale floor catches that \
+             asymmetric drift. If `{locale}` is deliberately not \
+             localised yet, document it as a PRD exception."
+        );
+    }
+}
+
+/// Iter 241: the jargon scanner must explicitly iterate `Object.entries`
+/// of each locale's translation object — not just the aggregate
+/// `JSON.stringify(translations)`. A JSON.stringify-based scanner
+/// would match string VALUES but also the KEY names themselves —
+/// keys like `MODS_COMPOSITE_LABEL` would false-positive. The
+/// per-entry iteration lets the scanner distinguish keys (ignored)
+/// from values (checked).
+#[test]
+fn jargon_scanner_iterates_entries_not_stringifies_aggregate() {
+    let body = read(JARGON_SCANNER);
+    // Positive: the scanner uses Object.entries / Object.values or
+    // similar per-entry iteration.
+    let per_entry = body.contains("Object.values")
+        || body.contains("Object.entries")
+        || body.contains(".values(");
+    assert!(
+        per_entry,
+        "PRD 3.4.7 (iter 241): {JARGON_SCANNER} must iterate per-\
+         entry (`Object.entries` / `Object.values`) — not \
+         JSON.stringify the whole tree. Stringify matches key names \
+         too, producing false positives on keys like \
+         `MODS_COMPOSITE_LABEL`."
+    );
+    // Negative: no naive JSON.stringify-then-indexOf pattern that
+    // would conflate keys and values.
+    assert!(
+        !body.contains("JSON.stringify(translations)"),
+        "PRD 3.4.7 (iter 241): {JARGON_SCANNER} must NOT call \
+         `JSON.stringify(translations)` as its search surface — \
+         that conflates keys and values and produces false \
+         positives on legitimate key names (e.g. \
+         MODS_COMPOSITE_LABEL)."
+    );
+}
