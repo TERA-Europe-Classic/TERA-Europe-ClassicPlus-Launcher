@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 202
+total_items_done: 204
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -1997,6 +1997,8 @@ tauri_v2_migration_ready_for_squash_merge: true
 ### User-reported bugs (iter 82 — live triage)
 
 - [DONE @ iter 83] **fix.resolve-game-root-wrong-assumption** — Closed on worktree commit `466524a`. Extracted `validate_game_root(PathBuf) -> Result<PathBuf, String>` as a pure predicate; `resolve_game_root()` now just calls `load_config()` + delegates. Three inline tests pin the contract: valid-install round-trip, missing-S1Game error message, and a source-inspection regression guard (`validate_game_root_source_has_no_parent_walk`) that rejects any future `.parent()` call on the same code path. GPK install now works on a correctly-configured install layout. Pillar: Functionality.
+- [DONE @ iter 229] **fix.csp-base-uri-form-action-hardening** — Closed on commit `5cbce8e`. CSP at `teralaunch/src-tauri/tauri.conf.json` now declares 8 canonical directives (the original default/script/style/font/img/connect six plus `base-uri 'self'` and `form-action 'self'`). Defeats both `<base href="evil">` URL re-rooting and `<form action="evil">` exfiltration. csp_audit.rs gained two Given-When-Then tests (`csp_base_uri_is_self`, `csp_form_action_is_self`) both asserting `'self'` only and rejecting any non-self scheme; the six-directive set-equality pin from iter 228 was widened to eight. Discovered iter 228 during csp_audit review. Pillar: Security.
+- [DONE @ iter 229] **fix.tcc-csproj-data-source-glob** — Closed in TERA-Europe-Classic/TCC commit `2755409a`. Root cause: iter 228's Content-Include ItemGroup in TCC.Core.csproj used `Data\**\*.*` to copy runtime data, but TCC.Core/Data/ is a SOURCE folder (.cs files) — `dotnet publish` captured every .cs file and added ~300 KB of source-code noise to the release zip. Fix: dropped the Data glob (TCC has no runtime `Data/` folder; database-hashes.json + messages.json + version live at repo root and are Linked individually); also fixed `Resources` → `resources` case to match the actual folder name. Keeps Module/client/gpk/, resources/, and the three linked root JSON/version files. Discovered iter 229 while verifying the v2.0.2-classicplus release zip contents. Pillar: Infrastructure / build hygiene.
 
 ### Functionality correctness (PRD §3.3)
 
