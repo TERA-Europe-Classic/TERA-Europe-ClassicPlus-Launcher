@@ -110,8 +110,12 @@ fn revert_is_idempotent() {
 const EXTERNAL_APP_RS: &str = "src/services/mods/external_app.rs";
 
 fn external_app_src() -> String {
+    // Normalize CRLF -> LF so fn-body extractors that search for `\n}\n`
+    // work correctly on Windows checkouts (iter 234: caught this when
+    // new pins saw 1200-char fallback windows instead of fn-scoped bodies).
     fs::read_to_string(EXTERNAL_APP_RS)
         .unwrap_or_else(|e| panic!("{EXTERNAL_APP_RS} must be readable: {e}"))
+        .replace("\r\n", "\n")
 }
 
 /// `revert_partial_install_dir` must be best-effort: it returns `()` (no
@@ -390,5 +394,159 @@ fn revert_helpers_take_path_ref_not_pathbuf_by_value() {
         "PRD 3.2.8 (iter 196): revert_partial_install_file must \
          keep `dest_file: &Path` signature. Same rationale as \
          revert_partial_install_dir."
+    );
+}
+
+// --------------------------------------------------------------------
+// Iter 234 structural pins — GUARD_SOURCE canonical, helper
+// co-location, no tokio::fs creep, no cross-call coupling between
+// the two revert helpers, and original-error preservation in
+// download_file's Err arm.
+//
+// Iter-156 + iter-170-ish + iter-196 covered signatures + ordering +
+// visibility + warn-not-panic + short-circuit. These five extend to
+// the structural invariants a confident refactor could still miss:
+// a constant drift (header-inspection silently reads wrong path), a
+// helper moved to a utility module (call-site discoverability
+// breaks), a tokio::fs migration (async-cleanup semantics diverge
+// from best-effort), cross-calling helpers (couples two install
+// paths into one failure class), and an error-message rewrite that
+// hides ENOSPC signals from operators.
+// --------------------------------------------------------------------
+
+/// Iter 234: `GUARD_SOURCE` constant must stay canonical. Every
+/// header-inspection pin in this guard reads through it; a rename
+/// of `disk_full.rs` would panic at test time with "guard source
+/// must exist" — misrouting triage toward a missing file instead
+/// of a constant drift.
+#[test]
+fn guard_source_constant_is_canonical() {
+    let body = fs::read_to_string(GUARD_SOURCE).expect("guard source must exist");
+    assert!(
+        body.contains(r#"const GUARD_SOURCE: &str = "tests/disk_full.rs";"#),
+        "PRD 3.2.8 (iter 234): {GUARD_SOURCE} must keep \
+         `const GUARD_SOURCE: &str = \"tests/disk_full.rs\";` \
+         verbatim. A rename of the test file without updating the \
+         constant produces `file not found` panics that misroute \
+         triage."
+    );
+}
+
+/// Iter 234: both revert helpers must live in
+/// `src/services/mods/external_app.rs`. A refactor that moved them
+/// to `src/utils/revert.rs` or `src/services/mods/revert.rs` would
+/// leave every source-inspection pin in this guard reading the
+/// wrong file. The helpers are tightly coupled to the download /
+/// extract call sites (they undo the exact IO those fns perform)
+/// and belong where the IO lives.
+#[test]
+fn revert_helpers_co_located_with_install_call_sites() {
+    let src = external_app_src();
+    assert!(
+        src.contains("pub(crate) fn revert_partial_install_dir("),
+        "PRD 3.2.8 (iter 234): revert_partial_install_dir must be \
+         defined in src/services/mods/external_app.rs. A move to \
+         utils/revert.rs couples the download path to a remote \
+         file — every future reviewer looking at download_and_extract \
+         has to cross-reference."
+    );
+    assert!(
+        src.contains("pub(crate) fn revert_partial_install_file("),
+        "PRD 3.2.8 (iter 234): revert_partial_install_file must be \
+         defined in src/services/mods/external_app.rs."
+    );
+}
+
+/// Iter 234: revert helpers must use sync `std::fs`, NOT `tokio::fs`.
+/// The helpers run from the error path of async fns, but they must
+/// NOT themselves be async: a `tokio::fs::remove_dir_all` returns a
+/// Future that must be awaited, adding an .await point inside the
+/// error recovery path. An .await there means cancellation / panic
+/// during cleanup can leave the dest half-cleaned. Best-effort sync
+/// cleanup is atomic at the OS level.
+#[test]
+fn revert_helpers_use_sync_fs_not_tokio_fs() {
+    let src = external_app_src();
+    let dir_body = external_app_fn_body(&src, "pub(crate) fn revert_partial_install_dir");
+    let file_body = external_app_fn_body(&src, "pub(crate) fn revert_partial_install_file");
+    for (name, body) in [("revert_partial_install_dir", dir_body), ("revert_partial_install_file", file_body)] {
+        assert!(
+            !body.contains("tokio::fs"),
+            "PRD 3.2.8 (iter 234): {name} must NOT use `tokio::fs::...`. \
+             An async cleanup introduces an .await inside the error-\
+             recovery path; cancellation there leaves the dest \
+             half-cleaned. Best-effort sync cleanup is atomic at the \
+             OS level.\nBody:\n{body}"
+        );
+        assert!(
+            !body.contains(".await"),
+            "PRD 3.2.8 (iter 234): {name} must NOT contain `.await`. \
+             Same reason: async cleanup is not best-effort."
+        );
+    }
+}
+
+/// Iter 234: the two revert helpers must not call each other. Each
+/// undoes exactly one kind of install (external dir vs GPK single
+/// file); coupling them into a shared helper or cross-calling would
+/// mean a failure during GPK revert could spuriously touch an
+/// external-mod slot (or vice versa).
+#[test]
+fn revert_helpers_do_not_cross_call() {
+    let src = external_app_src();
+    let dir_body = external_app_fn_body(&src, "pub(crate) fn revert_partial_install_dir");
+    let file_body = external_app_fn_body(&src, "pub(crate) fn revert_partial_install_file");
+    assert!(
+        !dir_body.contains("revert_partial_install_file"),
+        "PRD 3.2.8 (iter 234): revert_partial_install_dir must NOT \
+         call revert_partial_install_file. The two helpers are \
+         single-responsibility — crossing them couples external-mod \
+         and GPK error paths into a shared failure class.\nBody:\n{dir_body}"
+    );
+    assert!(
+        !file_body.contains("revert_partial_install_dir"),
+        "PRD 3.2.8 (iter 234): revert_partial_install_file must NOT \
+         call revert_partial_install_dir. Same reason.\nBody:\n{file_body}"
+    );
+}
+
+/// Iter 234: the `return Err(...)` in `download_file`'s
+/// fs::write-error branch must forward the original IO error as
+/// part of the message (via the `{}` / `{e}` formatter). A rewrite
+/// to a generic `"download failed"` string hides the underlying
+/// cause — operators reading the user's support-bundle log can't
+/// distinguish ENOSPC from permission-denied from a truncated
+/// download. The fix is load-bearing on incident response.
+#[test]
+fn download_file_err_arm_preserves_original_io_error() {
+    let src = external_app_src();
+    let fn_pos = src
+        .find("pub async fn download_file")
+        .expect("download_file must exist");
+    let rest = &src[fn_pos..];
+    let end = rest.find("\n}\n").unwrap_or(rest.len().min(3000));
+    let body = &rest[..end];
+    // Find the fs::write-error branch.
+    let err_idx = body
+        .find("if let Err(e) = fs::write(dest_file")
+        .expect("download_file must guard fs::write with `if let Err(e)`");
+    let err_block = &body[err_idx..body.len().min(err_idx + 600)];
+    // The return Err(...) inside the branch must forward the original
+    // `e` into the returned message — via `{e}` interpolation, `{}`
+    // positional with `e` as argument, or `e.to_string()`. A bare
+    // string without `e` hides ENOSPC from operators.
+    let has_e_interpolated = err_block.contains("{e}");
+    let has_e_to_string = err_block.contains("e.to_string()");
+    // Positional: `format!("... {} ...", e)` — look for `, e)` or `, e,`
+    // near a format! call.
+    let has_e_positional = err_block.contains(", e)") || err_block.contains(", e,");
+    assert!(
+        has_e_interpolated || has_e_to_string || has_e_positional,
+        "PRD 3.2.8 (iter 234): download_file's fs::write-Err branch \
+         must forward the original `e` into the returned Err \
+         message (via `{{e}}` interpolation, `e.to_string()`, or \
+         `format!(\"... {{}} ...\", e)` positional). A generic \
+         message hides ENOSPC from operators reading support \
+         bundles.\nBranch:\n{err_block}"
     );
 }

@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 234
-last_work_iteration: 234
+iteration_counter: 235
+last_work_iteration: 235
 last_research_sweep: 230
 last_revalidation: 220
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 211
+total_items_done: 212
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,21 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 235 WORK — pin.disk-full-GUARD_SOURCE-const+helper-co-location+sync-fs-only+no-cross-call+error-preserved + CRLF normalization fix DONE.**
+>
+> PRD 3.2.8.disk-full-revert; disk_full had 14 tests (iter 156-170-era creation + iter 196 +5); 39 iters untouched. Brings to 19.
+>
+> Five new pins + one real test-infra fix:
+> 1. `guard_source_constant_is_canonical` — GUARD_SOURCE literal pinned verbatim
+> 2. `revert_helpers_co_located_with_install_call_sites` — pin helpers stay in external_app.rs (not moved to utils/)
+> 3. `revert_helpers_use_sync_fs_not_tokio_fs` — forbid tokio::fs / .await inside cleanup helpers (async cancellation breaks atomicity)
+> 4. `revert_helpers_do_not_cross_call` — pin single-responsibility; dir helper doesn't call file helper and vice versa
+> 5. `download_file_err_arm_preserves_original_io_error` — pin `{e}` / `e.to_string()` / `format!(..., e)` in the fs::write-Err branch
+>
+> **Real test-infra fix:** `external_app_src()` now normalizes CRLF → LF before fn-body extraction. Windows checkouts of external_app.rs carry CRLF, which made iter-196's `\n}\n` fn-end heuristic fall through to the 1200-char fallback. Existing tests passed vacuously (positive-contains checks found the expected string anywhere in the over-extended window); new negative pins (`!body.contains(".await")`) surfaced the gap because over-extension includes neighbouring async fn bodies.
+>
+> disk_full: 14 → 19 tests. 1424 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 234 WORK — pin.http-allowlist-constants+empty-host-reject+scheme-case-sensitive+missing-allow-tolerant+skip-list-scanner-only + host_of defensive fix DONE.**
 >
