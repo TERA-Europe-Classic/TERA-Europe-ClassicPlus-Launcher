@@ -637,3 +637,81 @@ fn build_rs_guards_cf_flag_on_release_profile() {
          runtime.\nbuild.rs body:\n{body}"
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 282 structural pins — cargo/build.rs/audit/guard bounds +
+// LTO + strip directives.
+// --------------------------------------------------------------------
+
+#[test]
+fn cargo_toml_byte_bounds_iter_282() {
+    const MIN: usize = 500;
+    const MAX: usize = 20_000;
+    let bytes = std::fs::metadata(CARGO_TOML)
+        .expect("Cargo.toml must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "PRD 3.1.8 (iter 282): {CARGO_TOML} is {bytes} bytes; \
+         expected [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn build_rs_byte_bounds_iter_282() {
+    const MIN: usize = 100;
+    const MAX: usize = 20_000;
+    let bytes = std::fs::metadata(BUILD_RS)
+        .expect("build.rs must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "PRD 3.1.8 (iter 282): {BUILD_RS} is {bytes} bytes; expected \
+         [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn audit_doc_byte_bounds_iter_282() {
+    const MIN: usize = 500;
+    const MAX: usize = 50_000;
+    let bytes = std::fs::metadata(AUDIT_DOC)
+        .expect("audit doc must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "PRD 3.1.8 (iter 282): {AUDIT_DOC} is {bytes} bytes; expected \
+         [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn cargo_toml_declares_lto_and_strip_for_release() {
+    let toml = std::fs::read_to_string(CARGO_TOML)
+        .expect("Cargo.toml must exist");
+    assert!(
+        toml.contains("lto"),
+        "PRD 3.1.8 (iter 282): Cargo.toml must declare `lto` in \
+         [profile.release] — the criterion names LTO as one of the \
+         hardening requirements."
+    );
+    assert!(
+        toml.contains("strip"),
+        "PRD 3.1.8 (iter 282): Cargo.toml must declare `strip` in \
+         [profile.release] — criterion names strip as required."
+    );
+}
+
+#[test]
+fn guard_source_byte_bounds_iter_282() {
+    const MIN: usize = 5000;
+    const MAX: usize = 80_000;
+    let bytes = std::fs::metadata("tests/anti_reverse_guard.rs")
+        .expect("guard must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "PRD 3.1.8 (iter 282): guard is {bytes} bytes; expected \
+         [{MIN}, {MAX}]."
+    );
+}
