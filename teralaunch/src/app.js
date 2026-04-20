@@ -9,9 +9,6 @@ import {
 } from "./utils/updateState.js";
 import { localizeForumUrl } from "./utils/forumLinks.js";
 import * as AccountManager from './accountManager.js';
-import { ask, message } from '@tauri-apps/plugin-dialog';
-import { relaunch } from '@tauri-apps/plugin-process';
-import { check as checkAppUpdate } from '@tauri-apps/plugin-updater';
 
 const { invoke } = window.__TAURI__.core || window.__TAURI__.tauri;
 const { listen } = window.__TAURI__.event;
@@ -20,6 +17,7 @@ const { listen } = window.__TAURI__.event;
 const appWindow = window.__TAURI__.window?.appWindow
   || window.__TAURI__.window?.getCurrent?.()
   || window.__TAURI__.webviewWindow?.getCurrentWebviewWindow?.();
+const { message, ask } = window.__TAURI__?.dialog || {};
 
 /**
  * Application URL configuration.
@@ -560,6 +558,15 @@ function hideUpdateNotification() {
 window.hideUpdateNotification = hideUpdateNotification;
 
 /**
+ * Wraps the global updater check method.
+ */
+async function checkAppUpdate() {
+  const updater = window.__TAURI__?.updater;
+  if (!updater) throw new Error('Updater plugin not available');
+  return updater.check ? await updater.check() : await updater.checkUpdate();
+}
+
+/**
  * Normalizes the updater check result across the Tauri v1/v2/global API shapes.
  *
  * In this launcher we access the plugin through `window.__TAURI__` globals.
@@ -597,6 +604,7 @@ function normalizeUpdaterResult(result) {
 }
 
 async function promptLauncherUpdate(update, currentVersion, title = 'Launcher Update') {
+  const ask = window.__TAURI__?.dialog?.ask;
   if (typeof ask !== 'function') {
     throw new Error('Dialog ask API is unavailable.');
   }
