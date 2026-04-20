@@ -304,3 +304,166 @@ fn main_rs_refusal_branch_logs_and_skips_install() {
          refusal branch, the gate is decorative.\nRefusal arm:\n{refusal_arm}"
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 232 structural pins — guard path-constants canonicalisation,
+// predicate return-type pin, remote-arg provenance, inline-test-module
+// presence, symbolic-test case-class distinctness.
+//
+// Iter-86 built the behavioural + wiring spec; iter-154 added six
+// structural pins on the predicate SHAPE. These five extend to the
+// meta-guard + callsite-provenance surface a confident refactor
+// could still miss: path-constant drift (silent FS-not-found), a
+// `-> bool` → `-> Result<bool, ...>` migration that pushes error
+// handling to callers, a `remote` arg sourced from a stale literal,
+// a missing inline test module (predicate unexercised at unit
+// level), and symbolic tests collapsing to duplicates of the same
+// case class. 78 iters have touched other guards in the meantime.
+// --------------------------------------------------------------------
+
+/// Iter 232: `GATE_RS` + `MAIN_RS` constants must stay canonical.
+/// Every `gate_src()` / `main_src()` call resolves through these;
+/// drift to a different file path (e.g. splitting the gate into
+/// `updater/gate.rs`) would panic the test with "file not found"
+/// pointing at the FS, not at the constant.
+#[test]
+fn guard_path_constants_are_canonical() {
+    let guard_body = fs::read_to_string("tests/updater_downgrade.rs")
+        .expect("guard source must exist");
+    assert!(
+        guard_body.contains("const GATE_RS: &str = \"src/services/updater_gate.rs\";"),
+        "Iter 232: tests/updater_downgrade.rs must keep \
+         `const GATE_RS: &str = \"src/services/updater_gate.rs\";` \
+         verbatim. A path drift (e.g. splitting into \
+         `services/updater/gate.rs`) leaves every `gate_src()` read \
+         with a FS-not-found, misrouting triage."
+    );
+    assert!(
+        guard_body.contains("const MAIN_RS: &str = \"src/main.rs\";"),
+        "Iter 232: tests/updater_downgrade.rs must keep \
+         `const MAIN_RS: &str = \"src/main.rs\";` verbatim. A refactor \
+         that split main.rs into multiple files would need coordinated \
+         constant + test updates here."
+    );
+}
+
+/// Iter 232: the predicate return type must stay `-> bool`, not a
+/// `Result<bool, ...>` or `Option<bool>`. A Result return pushes
+/// error-handling responsibility to callers; a caller that uses
+/// `.unwrap_or(true)` re-opens the malformed-manifest bypass the
+/// iter-154 parse-error pin closes. Keeping the return `bool` with
+/// internal refuse-on-Err forces the defensive default to live
+/// INSIDE the gate where every caller inherits it.
+#[test]
+fn predicate_return_type_is_strictly_bool() {
+    let body = gate_src();
+    // Signature must end in `-> bool` (not `-> Result<bool`).
+    assert!(
+        body.contains("-> bool {"),
+        "PRD 3.1.9 (iter 232): updater_gate.rs must declare \
+         `-> bool {{` as the return shape. A `-> Result<bool, ...>` \
+         migration pushes defensive handling to callers — a single \
+         `.unwrap_or(true)` in a caller then re-opens every attack \
+         class the internal refuse-on-Err closes."
+    );
+    assert!(
+        !body.contains("-> Result<bool") && !body.contains("-> Option<bool>"),
+        "PRD 3.1.9 (iter 232): updater_gate.rs must NOT declare \
+         `-> Result<bool, ...>` or `-> Option<bool>` on \
+         should_accept_update. Either weakens the fail-closed \
+         default by moving error handling across the module boundary."
+    );
+}
+
+/// Iter 232: the `remote` argument at the main.rs call site must be
+/// sourced from the update manifest's `version` field, not a literal.
+/// Iter-154 pinned `current = env!(CARGO_PKG_VERSION)` so the build-
+/// time symbol covers the running-binary side; this pin covers the
+/// symmetric attack on the remote side, where a caller that passed
+/// `"99.99.99"` would always satisfy the strict-greater check and
+/// make the gate cosmetic.
+#[test]
+fn main_rs_sources_remote_from_update_version() {
+    let body = main_src();
+    // Find the `remote` binding that feeds the gate. Two acceptable
+    // shapes, both sourced from the Tauri v2 Update struct's `version`
+    // field:
+    //   `let remote = update.version.as_str();`
+    //   `let remote = &update.version;`
+    // A hardcoded literal (e.g. `let remote = "99.99.99";`) would
+    // always satisfy strict-greater and make the gate cosmetic.
+    let has_version_binding = body.contains("let remote = update.version.as_str()")
+        || body.contains("let remote = &update.version")
+        || body.contains("let remote = update.version.to_string()");
+    assert!(
+        has_version_binding,
+        "PRD 3.1.9 (iter 232): main.rs must source the `remote` \
+         argument from the Tauri v2 Update struct's `version` field — \
+         `let remote = update.version.as_str();` or equivalent. A \
+         hardcoded literal binding would always satisfy the strict-\
+         greater check and make the gate cosmetic. grep for \
+         `update.version` to locate the canonical site."
+    );
+    // Sanity: reject obvious literal patterns at the same binding.
+    assert!(
+        !body.contains("let remote = \""),
+        "PRD 3.1.9 (iter 232): main.rs must NOT bind `remote` to a \
+         string literal — always source from update.version."
+    );
+}
+
+/// Iter 232: the production `updater_gate.rs` module must carry
+/// inline unit tests (`#[cfg(test)] mod tests`). The integration
+/// tests in this file prove the EXTERNAL contract via the symbolic
+/// mirror + wiring guards, but the production predicate's own unit
+/// coverage is what the module header calls out ("its own unit tests
+/// (inline)"). Without the inline module, the "high-confidence on
+/// the predicate semantics" claim in the header is decorative.
+#[test]
+fn updater_gate_module_carries_inline_test_module() {
+    let body = gate_src();
+    assert!(
+        body.contains("#[cfg(test)]"),
+        "PRD 3.1.9 (iter 232): updater_gate.rs must carry a \
+         `#[cfg(test)]` attribute marking an inline test module. The \
+         integration tests in tests/updater_downgrade.rs depend on the \
+         inline tests for predicate-semantics coverage; without them, \
+         a refactor that breaks (say) prerelease-ordering inside the \
+         predicate would surface only at the integration-symbolic \
+         layer, where the diagnostic signal is weaker."
+    );
+    assert!(
+        body.contains("mod tests"),
+        "PRD 3.1.9 (iter 232): updater_gate.rs must carry an inline \
+         `mod tests {{ ... }}` module so the predicate is unit-tested \
+         against the same crate it lives in."
+    );
+}
+
+/// Iter 232: the five symbolic predicate tests must each cover a
+/// DISTINCT case class — refuses-older, replay-same-version, accepts-
+/// newer, prerelease-ordering, invalid-version-string. A refactor
+/// that collapsed two tests (e.g. dropping the prerelease test and
+/// merging its body into accepts_strictly_newer_versions) would
+/// leave only four case classes under test without tripping a count
+/// floor. Pin each by name so a rename / deletion trips CI.
+#[test]
+fn symbolic_predicate_tests_enumerate_five_distinct_case_classes() {
+    let guard_body = fs::read_to_string("tests/updater_downgrade.rs")
+        .expect("guard source must exist");
+    for fn_name in [
+        "fn refuses_older_latest_json()",
+        "fn refuses_replay_of_same_version()",
+        "fn accepts_strictly_newer_versions()",
+        "fn prerelease_semantics_block_downgrade()",
+        "fn invalid_version_strings_refused()",
+    ] {
+        assert!(
+            guard_body.contains(fn_name),
+            "PRD 3.1.9 (iter 232): tests/updater_downgrade.rs must \
+             carry `{fn_name}` — each names a distinct case class. \
+             Collapsing two into one would narrow symbolic coverage \
+             without tripping a count-based floor."
+        );
+    }
+}

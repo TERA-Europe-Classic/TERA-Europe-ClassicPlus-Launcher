@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 232
-last_work_iteration: 232
+iteration_counter: 233
+last_work_iteration: 233
 last_research_sweep: 230
 last_revalidation: 220
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 209
+total_items_done: 210
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 233 WORK — pin.updater-downgrade-path-consts+return-type-bool+remote-from-update.version+inline-test-module+symbolic-tests-five-distinct-cases DONE.**
+>
+> PRD 3.1.9 updater-downgrade; updater_downgrade had 13 tests (iter 86 creation + iter 154 +6); 78 iters untouched. Brings to 18. **No 13-count files remain in the tests/ tree after this iter.**
+>
+> Five new meta-guard + case-class pins:
+> 1. `guard_path_constants_are_canonical` — GATE_RS + MAIN_RS constants verbatim
+> 2. `predicate_return_type_is_strictly_bool` — pin `-> bool`; forbid `Result<bool>` / `Option<bool>` (moves defensive default out of gate)
+> 3. `main_rs_sources_remote_from_update_version` — pin that the `remote` binding sources from `update.version` (Tauri v2 Update struct), not a hardcoded literal
+> 4. `updater_gate_module_carries_inline_test_module` — pin `#[cfg(test)] mod tests` present in updater_gate.rs (module header claims inline unit coverage; this enforces it)
+> 5. `symbolic_predicate_tests_enumerate_five_distinct_case_classes` — pin each of the five iter-86 case classes by fn-name (refuses-older / replay / accepts-newer / prerelease / invalid)
+>
+> updater_downgrade: 13 → 18 tests. 1414 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 232 WORK — pin.tauri-v2-migration-audit-guard-AUDIT_DIR-canonical+DOCS-cardinality-4+MIN_LINES-100-literal+plan-rollback-strategy-pairing+filename-prefix-invariant DONE.**
 >
