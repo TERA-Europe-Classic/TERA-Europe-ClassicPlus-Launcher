@@ -789,3 +789,77 @@ fn guard_file_header_cites_fix_slot_and_cve() {
          relax a pin thinking the defensive posture is theoretical."
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 277 structural pins — tauri.conf/cargo/capabilities/guard bounds
+// + iter-86 provenance.
+// --------------------------------------------------------------------
+
+#[test]
+fn tauri_conf_byte_bounds() {
+    const MIN: usize = 500;
+    const MAX: usize = 30_000;
+    let bytes = std::fs::metadata(TAURI_CONF)
+        .expect("tauri.conf.json must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "sec.shell-scope-hardening (iter 277): {TAURI_CONF} is {bytes} \
+         bytes; expected [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn cargo_toml_byte_bounds() {
+    const MIN: usize = 500;
+    const MAX: usize = 20_000;
+    let bytes = std::fs::metadata(CARGO_TOML)
+        .expect("Cargo.toml must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "sec.shell-scope-hardening (iter 277): {CARGO_TOML} is {bytes} \
+         bytes; expected [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn capabilities_json_byte_bounds() {
+    const MIN: usize = 200;
+    const MAX: usize = 20_000;
+    let bytes = std::fs::metadata(CAPABILITIES_JSON)
+        .expect("capabilities/migrated.json must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "sec.shell-scope-hardening (iter 277): {CAPABILITIES_JSON} is \
+         {bytes} bytes; expected [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn guard_source_byte_bounds() {
+    const MIN: usize = 5000;
+    const MAX: usize = 80_000;
+    let bytes = std::fs::metadata(GUARD_SOURCE)
+        .expect("guard must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "sec.shell-scope-hardening (iter 277): guard is {bytes} bytes; \
+         expected [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn guard_header_cites_iter_86_provenance() {
+    let body = std::fs::read_to_string(GUARD_SOURCE)
+        .expect("guard must exist");
+    let header = &body[..body.len().min(500)];
+    assert!(
+        header.contains("iter 86"),
+        "sec.shell-scope-hardening (iter 277): guard header must cite \
+         `iter 86` as the iteration that shipped the hardening.\n\
+         Header:\n{header}"
+    );
+}

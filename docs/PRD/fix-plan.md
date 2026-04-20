@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 276
-last_work_iteration: 276
+iteration_counter: 277
+last_work_iteration: 277
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 252
+total_items_done: 253
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,12 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 277 WORK — pin.shell-scope-tauri-conf-bounds+cargo-bounds+capabilities-bounds+guard-bounds+iter-86-provenance DONE.**
+>
+> sec.shell-scope-hardening; shell_scope_pinned had 20 tests. Brings to 25.
+>
+> shell_scope_pinned: 20 → 25 tests. 1629 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 276 WORK — pin.i18n-scanner-jargon-bounds+parity-bounds+translations-bounds+both-prd-cites+translations-json-valid DONE.**
 >
