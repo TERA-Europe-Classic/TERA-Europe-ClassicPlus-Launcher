@@ -618,3 +618,97 @@ fn integration_test_files_helper_sorts_output() {
          regressions hard to reproduce.\nWindow:\n{window}"
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 288 structural pins — Cargo edition + deps count + common
+// tempdir fixture signature + src/main.rs existence + release profile
+// strip attribute.
+// --------------------------------------------------------------------
+
+#[test]
+fn cargo_toml_declares_edition_2021_or_later() {
+    let toml = fs::read_to_string(CARGO_TOML).expect("Cargo.toml must exist");
+    assert!(
+        toml.contains("edition = \"2021\"") || toml.contains("edition = \"2024\""),
+        "harness (iter 288): Cargo.toml must declare \
+         `edition = \"2021\"` or later. Older editions lack features \
+         the launcher depends on."
+    );
+}
+
+#[test]
+fn cargo_toml_has_reasonable_deps_count() {
+    let toml = fs::read_to_string(CARGO_TOML).expect("Cargo.toml must exist");
+    // Count lines that start a dependency declaration (very rough).
+    let deps_section = toml
+        .split("[dependencies]")
+        .nth(1)
+        .expect("Cargo.toml must have [dependencies]");
+    let deps_end = deps_section
+        .find("\n[")
+        .unwrap_or(deps_section.len());
+    let deps_block = &deps_section[..deps_end];
+    let dep_lines = deps_block
+        .lines()
+        .filter(|l| {
+            let t = l.trim_start();
+            !t.is_empty()
+                && !t.starts_with('#')
+                && t.contains('=')
+        })
+        .count();
+    assert!(
+        dep_lines >= 10,
+        "harness (iter 288): [dependencies] has {dep_lines} entries; \
+         floor is 10. A launcher of this scope needs at least a \
+         dozen crates (tauri, serde, reqwest, etc.)."
+    );
+    assert!(
+        dep_lines <= 200,
+        "harness (iter 288): [dependencies] has {dep_lines} entries; \
+         ceiling is 200. Past the ceiling, the crate is accumulating \
+         deps faster than is healthy."
+    );
+}
+
+#[test]
+fn common_scratch_dir_returns_tempfile_tempdir() {
+    let body = fs::read_to_string(COMMON_MOD_RS).expect("common/mod.rs must exist");
+    assert!(
+        body.contains("TempDir"),
+        "harness (iter 288): common/mod.rs `scratch_dir` must return \
+         `TempDir` (tempfile crate). Swap to a different type would \
+         lose auto-cleanup."
+    );
+    assert!(
+        body.contains("tempdir()") || body.contains("TempDir::new"),
+        "harness (iter 288): common/mod.rs must create the scratch \
+         via `tempfile::tempdir()` or `TempDir::new()`."
+    );
+}
+
+#[test]
+fn src_main_rs_exists_as_entry_point() {
+    assert!(
+        std::path::Path::new("src/main.rs").exists(),
+        "harness (iter 288): src/main.rs must exist — the default \
+         bin entry point. Without it, the crate doesn't build as a \
+         bin and integration tests can't run."
+    );
+    let body = fs::read_to_string("src/main.rs").expect("main.rs readable");
+    assert!(
+        body.contains("fn main()"),
+        "harness (iter 288): src/main.rs must define `fn main()`."
+    );
+}
+
+#[test]
+fn cargo_toml_release_profile_has_strip_attribute() {
+    let toml = fs::read_to_string(CARGO_TOML).expect("Cargo.toml must exist");
+    assert!(
+        toml.contains("strip"),
+        "harness (iter 288): Cargo.toml release profile must include \
+         `strip = ...` — reduces binary size + removes debug \
+         symbols. Criterion-aligned with PRD 3.1.8 anti-reverse."
+    );
+}
