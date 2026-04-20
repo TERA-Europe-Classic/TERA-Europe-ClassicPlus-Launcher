@@ -160,9 +160,10 @@
     gap: 12px;
     align-items: center;
     flex-wrap: wrap;
-    /* Match the .mods-tab left inset (tab text sits at 18px; input text
-       sits at input.padding-left = 14px, so 4px here brings it to 18). */
-    padding: 0 4px;
+    /* Align the search-input BOX's left edge at x=18 so it lines up
+       with the .mods-tab text inset (tabs have padding 12px 18px) and
+       the .mods-filter-chip border edge below. */
+    padding: 0 18px;
     position: relative;
 }
 
@@ -238,11 +239,11 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 6px;
-    /* 8px horizontal inset so the first chip's TEXT starts at 18px
-       (row-pad 8 + chip-pad 10), matching the .mods-tab text inset
-       (tab-pad 18). Without this the chips drifted left of the tabs
-       and read as a broken column. */
-    padding: 0 8px 6px;
+    /* 18px horizontal inset so the first chip's BORDER edge lines up
+       with the .mods-tab text (tab-pad 18) and the .mods-search BOX
+       left edge (toolbar-pad 18). The visible left edges of the tab
+       labels, search box, and chip pills all share the same x. */
+    padding: 0 18px 6px;
     margin-top: -6px;
 }
 
