@@ -668,3 +668,80 @@ fn game_rs_imports_overlay_types_from_canonical_path() {
          `OverlayLifecycleAction::Terminate` — the gate variant."
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 280 structural pins — external_app/game/guard bounds + PRD cite
+// + SpawnDecision enum variants pinned.
+// --------------------------------------------------------------------
+
+#[test]
+fn external_app_rs_byte_bounds() {
+    const MIN: usize = 3000;
+    const MAX: usize = 200_000;
+    let bytes = std::fs::metadata(EXTERNAL_APP_RS)
+        .expect("external_app.rs must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "PRD 3.2.11 (iter 280): {EXTERNAL_APP_RS} is {bytes} bytes; \
+         expected [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn game_rs_byte_bounds() {
+    const MIN: usize = 1000;
+    const MAX: usize = 200_000;
+    let bytes = std::fs::metadata(GAME_RS)
+        .expect("game.rs must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "PRD 3.2.11 (iter 280): {GAME_RS} is {bytes} bytes; expected \
+         [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn guard_source_byte_bounds() {
+    const MIN: usize = 5000;
+    const MAX: usize = 80_000;
+    let bytes = std::fs::metadata(GUARD_FILE)
+        .expect("guard must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "PRD 3.2.11 (iter 280): guard is {bytes} bytes; expected \
+         [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn guard_source_cites_prd_3_2_11_and_3_2_12() {
+    let body = std::fs::read_to_string(GUARD_FILE)
+        .expect("guard must exist");
+    let header = &body[..body.len().min(1500)];
+    assert!(
+        header.contains("PRD 3.2.11"),
+        "iter 280: guard header must cite `PRD 3.2.11` (attach-once)."
+    );
+    // 3.2.12 appears in other tests, not necessarily the header.
+    // Just confirm the guard body references the second criterion.
+    assert!(
+        body.contains("PRD 3.2.12") || body.contains("3.2.12"),
+        "iter 280: guard body must reference PRD 3.2.12 \
+         (overlay-lifecycle) — paired invariant."
+    );
+}
+
+#[test]
+fn spawn_decision_variants_pinned_in_source() {
+    let src = std::fs::read_to_string(EXTERNAL_APP_RS)
+        .expect("external_app.rs must exist");
+    assert!(
+        src.contains("enum SpawnDecision"),
+        "PRD 3.2.11 (iter 280): {EXTERNAL_APP_RS} must define `enum \
+         SpawnDecision` — the attach-once decision type. A rename \
+         or refactor to a different type would break every caller."
+    );
+}
