@@ -1,0 +1,61 @@
+mod_name,author,source_url,download_url,category,description,tmm_vs_legacy
+fast-fire,meishuu,https://meishuu.github.io/tera-proxy-test-pages/modules,https://github.com/meishuu/fast-fire,Performance,Just Rapid Fire Burning Heart and Burst Fire,legacy
+lockons,meishuu,https://meishuu.github.io/tera-proxy-test-pages/modules,https://github.com/meishuu/lockons,Performance,Just lockons Exactly what it says on the tin,legacy
+autovanguard,meishuu,https://meishuu.github.io/tera-proxy-test-pages/modules,https://github.com/meishuu/autovanguard,Other,Automatically turns in Vanguard quests upon completion,legacy
+skill-prediction,pinkipi / Wallycx / terarian,https://github.com/terarian/skill-prediction,https://github.com/terarian/skill-prediction,Performance,Simulates skills client-side to evade ping tax,tmm
+battle-notify,wuaw,https://meishuu.github.io/tera-proxy-test-pages/modules,https://github.com/wuaw/battle-notify,UI,Shows text notifications on configurable in-game events,legacy
+hide-players,wuaw,https://meishuu.github.io/tera-proxy-test-pages/modules,https://github.com/wuaw/hide-players,Performance,Hide players via chat command,legacy
+camera-distance,teralove,https://meishuu.github.io/tera-proxy-test-pages/modules,https://github.com/teralove/camera-distance,Other,Removes limit on the cameras max range,legacy
+channel-command,teralove,https://meishuu.github.io/tera-proxy-test-pages/modules,https://github.com/teralove/channel-command,Other,Switch channels via chat command,legacy
+disable-ghillieglade-scroll,teralove,https://meishuu.github.io/tera-proxy-test-pages/modules,https://github.com/teralove/disable-ghillieglade-scroll,Other,Makes clicking on the scroll do nothing,legacy
+exit-command,teralove,https://meishuu.github.io/tera-proxy-test-pages/modules,https://github.com/teralove/exit-command,Other,Exit the game via chat command,legacy
+exit-instantly,teralove,https://meishuu.github.io/tera-proxy-test-pages/modules,https://github.com/teralove/exit-instantly,Other,Exit the game without having to wait 10 seconds,legacy
+healer-debuffs,teralove,https://meishuu.github.io/tera-proxy-test-pages/modules,https://github.com/teralove/healer-debuffs,UI,Sends notifications when Hurricane and Contagion applied,legacy
+hurricane-cooldown,teralove,https://meishuu.github.io/tera-proxy-test-pages/modules,https://github.com/teralove/hurricane-cooldown,UI,Sends notifications on hurricane proc and cooldown,legacy
+lobby-command,teralove,https://meishuu.github.io/tera-proxy-test-pages/modules,https://github.com/teralove/lobby-command,Other,Return to lobby via chat command,legacy
+AFKer,TeraProxy,https://meishuu.github.io/tera-proxy-test-pages/modules,https://github.com/TeraProxy/AFKer,Other,Prevents the client from going back to character selection,legacy
+emo,TeraProxy,https://meishuu.github.io/tera-proxy-test-pages/modules,https://github.com/TeraProxy/emo,FUN,Reuses your last used emote when it gets interrupted,legacy
+EnrageNotifier,TeraProxy,https://meishuu.github.io/tera-proxy-test-pages/modules,https://github.com/TeraProxy/EnrageNotifier,UI,Shows private party notices for enrage and next enrage,legacy
+ManaPotter,TeraProxy,https://meishuu.github.io/tera-proxy-test-pages/modules,https://github.com/TeraProxy/ManaPotter,Other,Automatically uses a Prime Replenishment Potable when under 50% MP,legacy
+Teabagger,TeraProxy,https://meishuu.github.io/tera-proxy-test-pages/modules,https://github.com/TeraProxy/Teabagger,FUN,but rly tho?,legacy
+fly-more,Saegusae,https://meishuu.github.io/tera-proxy-test-pages/modules,https://github.com/Saegusae/fly-more,Other,Ignores flying mount stamina for infinite flying,legacy
+fps-utils,Saegusae / SaltyMonkey / Risenio,https://github.com/codeagon/fps-utils,https://github.com/tera-classic-mods/fps-utils,Performance,Alternative to Bernkastels ZFPS for ingame fps tweaks,tmm
+zfps-standard,Bernkastel-0,https://meishuu.github.io/tera-proxy-test-pages/modules,https://github.com/Bernkastel-0/zfps-standard,Performance,Allows toggling off other players and abilities to improve FPS,legacy
+generic-box-opener-item-user,Owyn,https://github.com/Owyn/generic-box-opener-item-user,https://github.com/Owyn/generic-box-opener-item-user,Other,Mass-opens boxes or mass-uses items like potions,legacy
+party_death_marker_pointers,Owyn,https://github.com/Owyn/party_death_marker_pointers,https://github.com/Owyn/party_death_marker_pointers,UI,Spawns colored pointy arrows on top of dead party members,legacy
+fps-pack,Owyn,https://github.com/Owyn/fps-pack,https://github.com/Owyn/fps-pack,Effects,Full pack of effect minimizing and disabling gpk mods to increase FPS,tmm
+EP-Tracker,TeraProxy (fork of Owyn),https://github.com/TeraProxy/EP-Tracker,https://github.com/TeraProxy/EP-Tracker,UI,Shows information about Enhancement Points experience,legacy
+let-me-fish,Lambda11,https://github.com/Lambda11/let-me-fish,https://github.com/Lambda11/let-me-fish,Other,Mass-auto-fishes auto-crafts bait and auto-dismantles,legacy
+tera-notifier,SerenTera,https://github.com/SerenTera/tera-notifier,https://github.com/SerenTera/tera-notifier,UI,Allows modules to use windows Toasts Balloons for notifications,legacy
+auto-bank,Seraphinush / Risenio,https://github.com/tera-toolbox/tera-mods/blob/master/modulelist.json,https://github.com/Risenio/Auto-Bank,Other,Automatically store gold and whitelisted items to bank,tmm
+npc-replacer,SerenTera,https://github.com/SerenTera/npc-replacer,https://github.com/SerenTera/npc-replacer,Cosmetic,Replace Npc or summons with custom shape,legacy
+bahaar-wave-practice,Kasea,https://github.com/Kasea,https://github.com/Kasea/bahaar-wave-practice,Other,Tera bahaar wave practice tool,legacy
+boss-ping-remover,Kasea,https://github.com/Kasea,https://github.com/Kasea/boss-ping-remover,Performance,Makes the bosses attacks match up with servers,legacy
+no-more-boss-desyncs,Kasea,https://github.com/Kasea,https://github.com/Kasea/no-more-boss-desyncs,Performance,Stops bosses desyncing a skill,legacy
+tera-guide,Kasea / michengs,https://github.com/tera-toolbox-mods/tera-guide,https://github.com/michengs/Dungeon-guide,UI,A generic guide module for Tera dungeons,tmm
+Tera-Settings-Saver,Kasea,https://github.com/Kasea,https://github.com/Kasea/Tera-Settings-Saver,Other,Remembers settings for UI glyphs item sets keybinds,legacy
+library,Kasea,https://github.com/tera-classic-toolbox/library,https://github.com/tera-classic-toolbox/library,Other,Extended generic library for Tera-Proxy,legacy
+loot,Saegusae / terarian,https://github.com/terarian,https://github.com/terarian/loot,Other,Revised auto looting utility for TERA,legacy
+drop,Saegusae / terarian,https://github.com/terarian,https://github.com/terarian/drop,Other,ye drop that hp bass,legacy
+auto-negotiate,JoilsonOliveira / terarian,https://github.com/terarian,https://github.com/terarian/auto-negotiate,Other,Automatically accepts or declines broker negotiations,legacy
+bugfix,tera-classic-toolbox,https://github.com/tera-classic-toolbox,https://github.com/tera-private-toolbox/bugfix,Performance,A mod that fixes the most severe client bugs,tmm
+Arborean Apparel,Owyn,https://github.com/tera-lab/tera-proxy,https://github.com/Owyn/Arborean-Apparel,Cosmetic,Allows wearing anything client-sided through UI selection,legacy
+True Everful Nostrum,Owyn,https://github.com/tera-lab/tera-proxy,https://github.com/tera-private-mods/true-everful-nostrum-menma,Other,Ensures that your Everful Nostrum buffs are up,tmm
+Ghillieglade Auto-Reset,Owyn,https://github.com/tera-lab/tera-proxy,https://github.com/Owyn/Ghillieglade-Auto-Reset,Other,Automates resets for the Ghillieglade instance,legacy
+No Custom Loading Screens,Owyn,https://github.com/tera-lab/tera-proxy,https://github.com/Owyn/No-Custom-Loading-Screens,UI,Removes or replaces custom loading screen images,legacy
+Dress Up Your Friends,Owyn,https://github.com/tera-lab/tera-proxy,https://github.com/Owyn/Dress-Up-Your-Friends,Cosmetic,Wear anything anywhere clientside applied to friends,legacy
+Monster Marker,Owyn,https://github.com/tera-lab/tera-proxy,https://github.com/Owyn/Monster-Marker,UI,Adds markers to specific monsters or boss mechanics,legacy
+No More Motes,Owyn,https://github.com/tera-lab/tera-proxy,https://github.com/Owyn/No-More-Motes,Effects,Disables mote visual effects to save performance,legacy
+Harrowhold P4 firewall markers,Owyn,https://github.com/tera-lab/tera-proxy,https://github.com/Owyn/Harrowhold-P4-firewall-markers,UI,Adds clear visual markers for Phase 4 firewall in HH,legacy
+No More Crazy Capes,Owyn,https://github.com/tera-lab/tera-proxy,https://github.com/Owyn/No-More-Crazy-Capes,Cosmetic,Disables or fixes broken cape physics and models,legacy
+Auto-Pet,CatAnnaDev,https://github.com/tera-private-mods,https://github.com/tera-private-mods/auto-pet,Other,Automatically summons and feeds your pet,tmm
+unicast,tera-private-mods,https://github.com/tera-private-mods,https://github.com/tera-private-mods/unicast,Cosmetic,Costume and appareance changer with in-game UI,tmm
+TeraDataTools,Gothos,https://github.com/gothos-folly/TeraDataTools,https://github.com/gothos-folly/TeraDataTools,Other,Tool to parse the Tera Data Center,legacy
+TeraDamageMeter,Gothos,https://github.com/gothos-folly/TeraDamageMeter,https://github.com/gothos-folly/TeraDamageMeter,Meter,TeraSniffer and Damage Meter by Gothos,legacy
+external-interface,foglio1024,https://github.com/tera-private-toolbox,https://github.com/tera-private-toolbox/external-interface,Other,Generic interface to feed TERA packets to external apps,tmm
+tera-proxy-game,neowutran,https://github.com/neowutran/tera-proxy-game,https://github.com/neowutran/tera-proxy-game,Other,Modular event handling through a TERA proxy server,legacy
+tera-network-proxy,tera-toolbox,https://github.com/tera-toolbox/tera-network-proxy,https://github.com/tera-toolbox/tera-network-proxy,Other,Hosts a TCP proxy server to inject network data,tmm
+tera-data,terarian,https://github.com/terarian,https://github.com/terarian/tera-data,Other,Repository for TERA protocol definitions,legacy
+command,tera-toolbox,https://github.com/tera-toolbox/command,https://github.com/tera-toolbox/command,UI,Provides an ingame chat command interface for network mods,tmm
+tera-game-state,tera-toolbox,https://github.com/tera-toolbox/tera-game-state,https://github.com/tera-toolbox/tera-game-state,Other,Core module implementing a game state tracking library,tmm
+tera-network-crypto,tera-toolbox,https://github.com/tera-toolbox/tera-network-crypto,https://github.com/tera-toolbox/tera-network-crypto,Other,Encryption and decryption of TERA protocol streams,tmm
