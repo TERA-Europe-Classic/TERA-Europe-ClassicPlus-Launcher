@@ -497,3 +497,91 @@ fn csp_has_no_object_or_frame_src_widening() {
         }
     }
 }
+
+// --------------------------------------------------------------------
+// Iter 275 structural pins — guard bounds + tauri.conf bounds + PRD
+// cite + script-src rejects wildcard + CSP non-empty.
+// --------------------------------------------------------------------
+
+#[test]
+fn guard_source_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 5000;
+    const MAX_BYTES: usize = 80_000;
+    let bytes = std::fs::metadata(GUARD_SOURCE)
+        .expect("guard must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "PRD 3.1.12 (iter 275): guard is {bytes} bytes; expected \
+         [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+#[test]
+fn tauri_conf_json_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 500;
+    const MAX_BYTES: usize = 30_000;
+    let bytes = std::fs::metadata("tauri.conf.json")
+        .expect("tauri.conf.json must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "PRD 3.1.12 (iter 275): tauri.conf.json is {bytes} bytes; \
+         expected [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+#[test]
+fn guard_source_cites_prd_3_1_12_explicitly() {
+    let body = std::fs::read_to_string(GUARD_SOURCE)
+        .expect("guard must exist");
+    let header = &body[..body.len().min(500)];
+    assert!(
+        header.contains("PRD 3.1.12"),
+        "PRD 3.1.12 (iter 275): guard header must cite `PRD 3.1.12`.\n\
+         Header:\n{header}"
+    );
+}
+
+#[test]
+fn script_src_rejects_wildcard_and_data_uris() {
+    let conf = std::fs::read_to_string("tauri.conf.json")
+        .expect("tauri.conf.json must exist");
+    let v: serde_json::Value = serde_json::from_str(&conf)
+        .expect("tauri.conf.json must parse");
+    let csp = v
+        .pointer("/app/security/csp")
+        .and_then(|x| x.as_str())
+        .expect("csp must exist");
+    if let Some(tokens) = directive_tokens(csp, "script-src") {
+        for bad in ["*", "data:", "blob:"] {
+            assert!(
+                !tokens.contains(&bad),
+                "PRD 3.1.12 (iter 275): script-src must reject `{bad}` \
+                 — enables arbitrary script sources. Got: {tokens:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn csp_string_is_non_empty_and_structured() {
+    let conf = std::fs::read_to_string("tauri.conf.json")
+        .expect("tauri.conf.json must exist");
+    let v: serde_json::Value = serde_json::from_str(&conf)
+        .expect("tauri.conf.json must parse");
+    let csp = v
+        .pointer("/app/security/csp")
+        .and_then(|x| x.as_str())
+        .expect("csp must exist");
+    assert!(
+        csp.len() > 20,
+        "PRD 3.1.12 (iter 275): CSP string must be > 20 chars (real \
+         policy, not just `default-src 'self'`). Got: {csp:?}"
+    );
+    assert!(
+        csp.contains("default-src"),
+        "PRD 3.1.12 (iter 275): CSP must declare `default-src` — the \
+         baseline that other directives inherit from."
+    );
+}

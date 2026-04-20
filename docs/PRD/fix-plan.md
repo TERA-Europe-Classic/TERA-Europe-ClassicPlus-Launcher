@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 274
-last_work_iteration: 274
+iteration_counter: 275
+last_work_iteration: 275
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 250
+total_items_done: 251
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,12 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 275 WORK — pin.csp-audit-guard-bounds+tauri-conf-bounds+prd-3-1-12-cite+script-src-wildcard-reject+csp-non-empty DONE. 20-count tier begins.**
+>
+> PRD 3.1.12 (CSP); csp_audit had 20 tests. Brings to 25.
+>
+> csp_audit: 20 → 25 tests. 1619 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 274 WORK — pin.parallel-install-mods-state-bounds+registry-bounds+guard-bounds+prd-3-2-7-cite+std-sync-rwlock DONE. 19-count tier complete.**
 >
