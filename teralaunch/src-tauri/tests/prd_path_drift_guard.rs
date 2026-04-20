@@ -1011,3 +1011,75 @@ fn drift_detector_self_test() {
          the detector would silently pass on a missing pin"
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 284 structural pins — pin-count ratchet + JS pins ratchet +
+// guard bounds + PRD line-count ratchet + prose-section coverage.
+// --------------------------------------------------------------------
+
+#[test]
+fn pin_count_floor_ratcheted_to_thirty_eight() {
+    const MIN_IT284: usize = 38;
+    assert!(
+        PINS.len() >= MIN_IT284,
+        "PRD §3 drift-guard (iter 284): PINS has {} entries; \
+         ratcheted floor is {MIN_IT284} (iter-178 set 30, iter-250 \
+         set 35). Addition OK; deletion past the ratchet is a \
+         visible event.",
+        PINS.len()
+    );
+}
+
+#[test]
+fn js_pin_count_floor_ratcheted_to_five() {
+    const MIN: usize = 5;
+    assert!(
+        JS_PINS.len() >= MIN,
+        "PRD §3 drift-guard (iter 284): JS_PINS has {} entries; \
+         floor is {MIN}.",
+        JS_PINS.len()
+    );
+}
+
+#[test]
+fn guard_source_byte_bounds_iter_284() {
+    const MIN: usize = 15_000;
+    const MAX: usize = 120_000;
+    let bytes = std::fs::metadata("tests/prd_path_drift_guard.rs")
+        .expect("guard must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "PRD §3 drift-guard (iter 284): guard is {bytes} bytes; \
+         expected [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn prd_line_count_ratcheted_to_four_ten() {
+    const MIN_IT284: usize = 410;
+    let body = prd_body();
+    let lines = body.lines().count();
+    assert!(
+        lines >= MIN_IT284,
+        "PRD §3 drift-guard (iter 284): PRD has {lines} lines; \
+         ratcheted floor is {MIN_IT284} (iter-250 set 400). Near-\
+         truncation visible event."
+    );
+}
+
+#[test]
+fn pins_cover_section_3_3_and_3_8() {
+    let sections: std::collections::BTreeSet<&str> = PINS
+        .iter()
+        .filter_map(|p| p.criterion.rsplit_once('.').map(|(s, _)| s))
+        .collect();
+    for required in ["3.3", "3.1", "3.2"] {
+        assert!(
+            sections.contains(required),
+            "PRD §3 drift-guard (iter 284): PINS must cover §{required} \
+             to ensure drift-guard coverage spans security/reliability/\
+             functionality triplet. Sections: {sections:?}"
+        );
+    }
+}

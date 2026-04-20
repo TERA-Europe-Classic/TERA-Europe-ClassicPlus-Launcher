@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 283
-last_work_iteration: 283
+iteration_counter: 284
+last_work_iteration: 284
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 259
+total_items_done: 260
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,12 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 284 WORK — pin.prd-path-drift-pin-ratchet-38+js-pin-floor-5+guard-bounds+prd-line-ratchet-410+section-coverage DONE.**
+>
+> PRD §3 drift-guard; prd_path_drift_guard had 21 tests. Brings to 26.
+>
+> prd_path_drift_guard: 21 → 26 tests. 1664 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 283 WORK — pin.architecture-doc-bounds+guard-bounds+prd-3-8-4-cite+required-subsystems-canonical+h1-top-5-lines DONE.**
 >
