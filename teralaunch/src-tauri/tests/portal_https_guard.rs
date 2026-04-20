@@ -656,3 +656,180 @@ fn portal_https_detector_self_test() {
          string check"
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 244 structural pins — path-constant canonicalisation, LAN
+// port locked, EXPECTED_KEYS cardinality, audit doc documents
+// dormant-until production, and config file root shape.
+// --------------------------------------------------------------------
+
+/// Iter 244: all 3 path constants and LAN host must stay canonical.
+/// Every file read / host comparison resolves through one of these;
+/// drift silently breaks multiple pins.
+#[test]
+fn guard_path_and_host_constants_are_canonical() {
+    let body = fs::read_to_string("tests/portal_https_guard.rs")
+        .expect("guard source must exist");
+    for (name, expected) in [
+        ("CONFIG_JSON", "../../teralib/src/config/config.json"),
+        ("AUDIT_DOC", "../../docs/PRD/audits/security/portal-https-migration.md"),
+        ("LAN_DEV_HOST", "192.168.1.128"),
+    ] {
+        let line = format!("const {name}: &str = \"{expected}\";");
+        assert!(
+            body.contains(&line),
+            "PRD 3.1.13 (iter 244): tests/portal_https_guard.rs must \
+             keep `{line}` verbatim. A drift leaves every pin reading \
+             through it in an inconsistent state."
+        );
+    }
+}
+
+/// Iter 244: the LAN dev portal port must stay 8090. A port
+/// migration (to 443 or 8443) without PRD sign-off would be the
+/// cutover this guard is watching for — and the test-name itself
+/// becomes an audit-trail artifact.
+#[test]
+fn lan_dev_port_is_eight_zero_nine_zero() {
+    let body = read(CONFIG_JSON);
+    let config: serde_json::Value =
+        serde_json::from_str(&body).expect("config.json must parse");
+    let obj = config.as_object().expect("config must be an object");
+    // Find any URL value mentioning the LAN host; the port after `:`
+    // must be `8090`.
+    for (_k, v) in obj {
+        if let Some(s) = v.as_str() {
+            if s.contains(LAN_DEV_HOST) {
+                // Extract port.
+                let after_host = s
+                    .split(LAN_DEV_HOST)
+                    .nth(1)
+                    .unwrap_or("");
+                if let Some(port_str) = after_host.strip_prefix(':') {
+                    let port: String = port_str
+                        .chars()
+                        .take_while(|c| c.is_ascii_digit())
+                        .collect();
+                    if !port.is_empty() {
+                        assert_eq!(
+                            port, "8090",
+                            "PRD 3.1.13 (iter 244): LAN dev portal \
+                             URL must use port 8090. A drift to 443 \
+                             or 8443 signals the portal-https \
+                             cutover — coordinate with the PRD \
+                             3.1.13 sign-off. Offending URL: {s}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Iter 244: `EXPECTED_KEYS` must stay bounded. The set defines
+/// which config keys the launcher expects; silent growth means
+/// new URLs landed without a PRD audit; silent shrinkage means
+/// a critical URL was dropped.
+#[test]
+fn expected_keys_count_stays_bounded() {
+    let n = EXPECTED_KEYS.len();
+    assert!(
+        n >= 5,
+        "PRD 3.1.13 (iter 244): EXPECTED_KEYS has shrunk to {n} \
+         entries — below the floor of 5. Critical URL categories \
+         appear deleted; this is a cutover red-flag."
+    );
+    assert!(
+        n <= 40,
+        "PRD 3.1.13 (iter 244): EXPECTED_KEYS has grown to {n} \
+         entries — above the ceiling of 40. New URL categories \
+         should land with a coordinated audit update; raising the \
+         ceiling requires a deliberate test update."
+    );
+    // Every entry must be upper-snake-case (convention for env-style
+    // keys). A lowercase or kebab entry signals accidental
+    // divergence.
+    for k in EXPECTED_KEYS {
+        assert!(
+            !k.is_empty() && k.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_'),
+            "PRD 3.1.13 (iter 244): EXPECTED_KEYS entry `{k}` must \
+             be UPPER_SNAKE_CASE. Lowercase or kebab-case signals a \
+             convention drift."
+        );
+    }
+}
+
+/// Iter 244: the audit doc must explicitly document the dormant-
+/// until-production status. Iter-57 confirmed there's no Classic+
+/// production yet; the audit doc is the record that the 3.1.13
+/// item is DORMANT pending a production FQDN. If the doc drops
+/// this wording, a reader might assume the item should be fixed
+/// now and try to flip the config to an unreachable HTTPS URL,
+/// breaking dev.
+#[test]
+fn audit_doc_documents_dormant_status_and_preconditions() {
+    let body = fs::read_to_string(AUDIT_DOC)
+        .unwrap_or_else(|e| panic!("{AUDIT_DOC} must be readable: {e}"));
+    // Must cite dormancy or the LAN-until-production status.
+    let lc = body.to_lowercase();
+    let mentions_dormancy = lc.contains("dormant")
+        || lc.contains("lan dev")
+        || lc.contains("until production")
+        || lc.contains("pending production")
+        || lc.contains("dev-only")
+        || lc.contains("developer's lan")
+        || lc.contains("developers lan");
+    assert!(
+        mentions_dormancy,
+        "PRD 3.1.13 (iter 244): {AUDIT_DOC} must document the \
+         dormant-until-production status. Iter-57 established there \
+         is no Classic+ production FQDN yet; the audit doc is the \
+         record. Without the wording, a reader might try to flip \
+         the config to an unreachable HTTPS URL."
+    );
+    // Must cite the three preconditions for waking: FQDN + TLS cert
+    // + reverse proxy.
+    let mentions_preconditions = lc.contains("fqdn")
+        || lc.contains("tls cert")
+        || lc.contains("reverse proxy")
+        || lc.contains("tls certificate")
+        || lc.contains("let's encrypt");
+    assert!(
+        mentions_preconditions,
+        "PRD 3.1.13 (iter 244): {AUDIT_DOC} must enumerate the \
+         preconditions for waking the item (FQDN + TLS cert + \
+         reverse proxy) — same three gates cited in fix-plan.md's \
+         P0-DORMANT entry."
+    );
+}
+
+/// Iter 244: the config JSON root must be an object with at least
+/// one URL-valued entry. An empty root or root-array would break
+/// every pin that iterates `config.as_object()`.
+#[test]
+fn config_root_is_an_object_with_url_valued_entries() {
+    let body = read(CONFIG_JSON);
+    let config: serde_json::Value =
+        serde_json::from_str(&body).expect("config.json must parse");
+    let obj = config
+        .as_object()
+        .expect("PRD 3.1.13 (iter 244): config.json root must be an \
+                 object (not an array or primitive)");
+    assert!(
+        !obj.is_empty(),
+        "PRD 3.1.13 (iter 244): config.json root object must not be \
+         empty. At least one URL entry must exist."
+    );
+    // At least one entry must look like an http/https URL (proof
+    // the config actually carries URLs, not just metadata).
+    let url_count = obj
+        .values()
+        .filter_map(|v| v.as_str())
+        .filter(|s| s.starts_with("http://") || s.starts_with("https://"))
+        .count();
+    assert!(
+        url_count >= 1,
+        "PRD 3.1.13 (iter 244): config.json must carry at least one \
+         http(s) URL. Found 0 — config appears to have been gutted."
+    );
+}

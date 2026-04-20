@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 244
-last_work_iteration: 244
+iteration_counter: 245
+last_work_iteration: 245
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 220
+total_items_done: 221
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 245 WORK — pin.portal-https-guard-path-host-consts+lan-port-8090+expected-keys-bounded+audit-doc-dormant-preconditions+config-root-shape DONE.**
+>
+> PRD 3.1.13.portal-https (P0-DORMANT); portal_https_guard had 16 tests. Brings to 21.
+>
+> Five new pins:
+> 1. `guard_path_and_host_constants_are_canonical` — CONFIG_JSON + AUDIT_DOC + LAN_DEV_HOST verbatim (3 constants in one pin)
+> 2. `lan_dev_port_is_eight_zero_nine_zero` — pin port 8090; migration to 443/8443 signals cutover
+> 3. `expected_keys_count_stays_bounded` — EXPECTED_KEYS floor 5, ceiling 40; entries must be UPPER_SNAKE_CASE
+> 4. `audit_doc_documents_dormant_status_and_preconditions` — audit doc must cite dormancy/LAN-dev + the FQDN/TLS cert/reverse proxy triad
+> 5. `config_root_is_an_object_with_url_valued_entries` — JSON root object + at least one http(s) URL (guts-check)
+>
+> portal_https_guard: 16 → 21 tests. 1469 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 244 WORK — pin.multi-client-path-consts+overlay-enum-two-variants+no-pid-zero-target+spawn-decision-enum-return+game-rs-canonical-import + CRLF normalize fix DONE.**
 >
