@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 236
-last_work_iteration: 236
+iteration_counter: 237
+last_work_iteration: 237
 last_research_sweep: 230
 last_revalidation: 220
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 213
+total_items_done: 214
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 237 WORK — pin.parallel-install-path-consts+std-sync-rwlock-not-tokio+save-after-closure+refuse-no-upsert+call-sites-assign-installing-first DONE.**
+>
+> PRD 3.2.7.parallel-install-serialised; parallel_install had 14 tests (iter 202 +5). 35 iters untouched. Brings to 19.
+>
+> Five new pins on §3.2.7 surface:
+> 1. `guard_path_constants_are_canonical` — MODS_STATE_RS + REGISTRY_RS + GUARD_SOURCE verbatim
+> 2. `mods_state_uses_std_sync_rwlock_not_tokio` — forbid tokio::sync::RwLock (async lock in sync API = deadlock vector)
+> 3. `mutate_save_comes_after_closure_call` — pin closure-before-save ordering (save-first persists pre-mutation state, drops caller's change)
+> 4. `try_claim_installing_refuse_path_does_not_upsert` — pin refuse branch doesn't replace in-flight slot (would reset progress, both callers think they own)
+> 5. `try_claim_call_sites_assign_installing_status_first` — pin every `try_claim_installing(row.clone())` call site in commands/mods.rs is preceded (within 500 chars) by `row.status = ModStatus::Installing;`. Caller contract shifts responsibility outside the registry method; this test encodes that contract.
+>
+> parallel_install: 14 → 19 tests. 1434 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 236 WORK — pin.conflict-modal-path-consts+return-vec-not-option+first-field-composite-name+empty-incoming-short-circuit+command-name-verbatim DONE.**
 >

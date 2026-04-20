@@ -442,3 +442,190 @@ fn mutate_surfaces_poisoned_lock_error_explicitly() {
          the condition to the user.\nBody:\n{fn_body}"
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 236 structural pins — path-constant canonicalisation, sync
+// RwLock (not tokio), registry-save ordering constraint, claim-refuse
+// preserves existing row, and claim-success sets status=Installing.
+//
+// Iter-202 covered guard traceability + save-on-success + closure-
+// short-circuit + ensure_loaded ordering + poisoned-lock signal.
+// These five extend to the structural-integrity surface a confident
+// refactor could still miss: a path-constant drift (silent FS
+// redirect), a tokio::sync::RwLock migration (async-lock in a sync-
+// appearing API creates deadlock vectors), a save-BEFORE-closure
+// ordering reversal (would persist pre-mutation state), a claim-
+// refuse path that upserts anyway (defeats serialisation), and a
+// claim-success that doesn't set Installing status (lets a later
+// caller think nothing's running).
+// --------------------------------------------------------------------
+
+/// Iter 236: `MODS_STATE_RS`, `REGISTRY_RS`, `GUARD_SOURCE` constants
+/// must stay canonical. Every header / body / fn-inspection pin in
+/// this guard reads through one of these; drift renders the header
+/// check inert with a misleading "file not found" panic.
+#[test]
+fn guard_path_constants_are_canonical() {
+    let body = fs::read_to_string(GUARD_SOURCE).expect("guard source must exist");
+    assert!(
+        body.contains(r#"const MODS_STATE_RS: &str = "src/state/mods_state.rs";"#),
+        "PRD 3.2.7 (iter 236): {GUARD_SOURCE} must keep \
+         `const MODS_STATE_RS: &str = \"src/state/mods_state.rs\";` \
+         verbatim. A rename leaves every mods_state_src() with \
+         file-not-found."
+    );
+    assert!(
+        body.contains(r#"const REGISTRY_RS: &str = "src/services/mods/registry.rs";"#),
+        "PRD 3.2.7 (iter 236): {GUARD_SOURCE} must keep \
+         `const REGISTRY_RS: &str = \"src/services/mods/registry.rs\";` \
+         verbatim."
+    );
+    assert!(
+        body.contains(r#"const GUARD_SOURCE: &str = "tests/parallel_install.rs";"#),
+        "PRD 3.2.7 (iter 236): {GUARD_SOURCE} must keep \
+         `const GUARD_SOURCE: &str = \"tests/parallel_install.rs\";` \
+         verbatim."
+    );
+}
+
+/// Iter 236: `MODS_STATE` must use `std::sync::RwLock`, NOT
+/// `tokio::sync::RwLock`. Tokio's async RwLock returns a Future on
+/// `.write()` that must be awaited; the existing `mutate()` API is
+/// synchronous. A migration to tokio's RwLock without making mutate
+/// async would deadlock (blocking_lock across Tokio boundaries) or
+/// require every caller to `.await`.
+#[test]
+fn mods_state_uses_std_sync_rwlock_not_tokio() {
+    let body = mods_state_src();
+    assert!(
+        !body.contains("tokio::sync::RwLock"),
+        "PRD 3.2.7 (iter 236): mods_state.rs must NOT use \
+         `tokio::sync::RwLock`. Async RwLock returns a Future on \
+         `.write()`; a migration without making `mutate` async \
+         either deadlocks (blocking_lock across Tokio boundaries) \
+         or forces every caller to `.await` — either breaks the \
+         sync-API contract the launcher depends on."
+    );
+    // Positive: the file must use std::sync::RwLock — either by
+    // explicit path or via a `use std::sync::RwLock` import.
+    let uses_std = body.contains("std::sync::RwLock")
+        || body.contains("use std::sync::{")
+        || body.contains("use std::sync::RwLock");
+    assert!(
+        uses_std,
+        "PRD 3.2.7 (iter 236): mods_state.rs must use \
+         `std::sync::RwLock` (directly or via `use`). The sync lock \
+         is load-bearing on the sync `mutate` API.\nBody excerpt:\n\
+         {}",
+        &body[..body.len().min(400)]
+    );
+}
+
+/// Iter 236: `save()` must come AFTER the `f(&mut state.registry)?`
+/// closure call in `mutate`. A reversal — save-before-mutate — would
+/// persist the pre-mutation state (no-op) and drop the caller's
+/// mutation on the floor (in-memory only, never written). The
+/// write-through contract depends on this ordering.
+#[test]
+fn mutate_save_comes_after_closure_call() {
+    let body = mods_state_src();
+    let fn_pos = body
+        .find("pub fn mutate<F, T>")
+        .expect("mutate must exist");
+    let rest = &body[fn_pos..];
+    let end = rest.find("\n}\n").unwrap_or(rest.len().min(1200));
+    let fn_body = &rest[..end];
+    let closure_pos = fn_body
+        .find("f(&mut state.registry)")
+        .expect("mutate must invoke the closure on &mut state.registry");
+    let save_pos = fn_body
+        .find("state.registry.save(")
+        .expect("mutate must call state.registry.save");
+    assert!(
+        closure_pos < save_pos,
+        "PRD 3.2.7 (iter 236): `f(&mut state.registry)` must run \
+         BEFORE `state.registry.save(...)`. Save-before-mutate \
+         persists the pre-mutation state and drops the caller's \
+         change (in-memory only). closure_pos={closure_pos} \
+         save_pos={save_pos}.\nBody:\n{fn_body}"
+    );
+}
+
+/// Iter 236: `try_claim_installing`'s refusal branch must NOT call
+/// `upsert(...)` or otherwise mutate the slot. A refusal that
+/// tripped the upsert path would replace the in-flight Installing
+/// slot with a fresh one, defeating the serialisation invariant
+/// (the first installer's progress bar resets to 0, and both
+/// concurrent installers now believe they own the slot).
+#[test]
+fn try_claim_installing_refuse_path_does_not_upsert() {
+    let body = registry_src();
+    let fn_pos = body
+        .find("pub fn try_claim_installing(")
+        .expect("try_claim_installing must exist");
+    let rest = &body[fn_pos..];
+    let end = rest.find("\n    }\n").unwrap_or(rest.len().min(1200));
+    let fn_body = &rest[..end];
+    // Find the "already in progress" Err path — it's the refuse
+    // branch. Slice the body from the matches!(...Installing) guard
+    // up to the `return Err(...)`, and assert no upsert() call
+    // appears inside it.
+    let refuse_start = fn_body
+        .find("matches!(slot.status, ModStatus::Installing)")
+        .expect("refuse gate must exist");
+    let refuse_end = fn_body[refuse_start..]
+        .find("return Err(")
+        .map(|i| refuse_start + i)
+        .expect("refuse branch must return Err");
+    let refuse_window = &fn_body[refuse_start..refuse_end];
+    assert!(
+        !refuse_window.contains(".upsert(") && !refuse_window.contains("self.upsert"),
+        "PRD 3.2.7 (iter 236): try_claim_installing's refuse branch \
+         must NOT call `.upsert(...)`. A refuse-and-upsert would \
+         replace the in-flight Installing slot with a fresh one, \
+         defeating serialisation — both callers now think they own \
+         the slot.\nRefuse window:\n{refuse_window}"
+    );
+}
+
+/// Iter 236: every `try_claim_installing(row.clone())` call site in
+/// `commands/mods.rs` must be preceded by `row.status =
+/// ModStatus::Installing;`. The production contract: callers set the
+/// status on the row BEFORE claiming, so when `try_claim_installing`
+/// upserts, the slot's status matches the serialisation predicate.
+/// If a caller forgot the assignment, the upserted row would land
+/// with whatever status the row was initialised with (e.g.
+/// `Available` from the catalog) — the next concurrent claim would
+/// see "not Installing" and proceed, defeating §3.2.7.
+#[test]
+fn try_claim_call_sites_assign_installing_status_first() {
+    let body = fs::read_to_string("src/commands/mods.rs")
+        .expect("src/commands/mods.rs must be readable")
+        .replace("\r\n", "\n");
+    let mut cursor = 0;
+    let mut claim_sites = 0;
+    while let Some(rel) = body[cursor..].find("try_claim_installing(row.clone())") {
+        let start = cursor + rel;
+        claim_sites += 1;
+        // Look backwards up to 500 chars for the status assignment.
+        let lookback_start = start.saturating_sub(500);
+        let lookback = &body[lookback_start..start];
+        assert!(
+            lookback.contains("row.status = ModStatus::Installing;"),
+            "PRD 3.2.7 (iter 236): every `try_claim_installing(row.clone())` \
+             call site in commands/mods.rs must be preceded (within 500 \
+             chars) by `row.status = ModStatus::Installing;`. Call site \
+             at offset {start} is missing the assignment — the upserted \
+             row lands with a non-Installing status, and a second \
+             concurrent claim sees `not Installing` and proceeds.\n\
+             Lookback window:\n{lookback}"
+        );
+        cursor = start + "try_claim_installing(row.clone())".len();
+    }
+    assert!(
+        claim_sites >= 2,
+        "PRD 3.2.7 (iter 236): commands/mods.rs should have at least 2 \
+         `try_claim_installing(row.clone())` call sites (one per \
+         install path: external + GPK). Found {claim_sites}."
+    );
+}
