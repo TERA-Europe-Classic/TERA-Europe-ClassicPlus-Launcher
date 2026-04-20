@@ -2314,4 +2314,156 @@ mod tests {
             "decoder must strip ONLY the single trailing null"
         );
     }
+
+    // --------------------------------------------------------------------
+    // install_legacy_gpk / uninstall_legacy_gpk integration tests.
+    // Covers the full path: parse UE3 header → copy into CookedPC →
+    // patch mapper → (uninstall: restore from backup). These functions
+    // shipped in iter-228 to fix the user-reported flight-gauge bug —
+    // drop-in copy alone left the mapper pointing at the vanilla bytes,
+    // so mods silently did nothing. Without integration coverage, a
+    // refactor that broke the mapper-rewrite step would re-introduce
+    // that bug.
+    // --------------------------------------------------------------------
+
+    /// Writes a fake .gpk (UE3 header with folder_name) plus some extra
+    /// bytes so the file has realistic size. Returns path to the file.
+    fn write_fake_gpk(dir: &Path, filename: &str, folder_name: &str) -> std::path::PathBuf {
+        let mut fstr = Vec::new();
+        let len = (folder_name.len() + 1) as i32; // +null
+        fstr.extend_from_slice(&len.to_le_bytes());
+        fstr.extend_from_slice(folder_name.as_bytes());
+        fstr.push(0);
+        let mut bytes = fake_header(&fstr);
+        // Pad to 1 KiB so the file has a non-trivial size.
+        bytes.extend_from_slice(&vec![0xCDu8; 1024 - bytes.len()]);
+        let p = dir.join(filename);
+        fs::write(&p, &bytes).unwrap();
+        p
+    }
+
+    #[test]
+    fn install_legacy_gpk_rewrites_matching_mapper_entries() {
+        let tmp = TempDir::new().unwrap();
+        let game_root = tmp.path();
+
+        // Seed the game with a mapper that has:
+        //   entry1 — object_path = "SomePackage.S1UI_Gauge" (matches suffix .S1UI_Gauge)
+        //   entry2 — object_path = "Other.Foo"              (does NOT match)
+        let vanilla_map = mapper_with(&[
+            ("S1UI_Gauge", "SomePackage.S1UI_Gauge", "S1Data1.gpk"),
+            ("Other",      "Other.Foo",              "S1Data2.gpk"),
+        ]);
+        write_mapper_at(game_root, &vanilla_map);
+
+        // Write the mod file outside CookedPC/ so the install path copies
+        // it in explicitly (mirrors production add-from-file flow).
+        let source_gpk = write_fake_gpk(game_root, "mod-flight-gauge.gpk", "S1UI_Gauge");
+
+        let target_name = install_legacy_gpk(game_root, &source_gpk)
+            .expect("install must succeed on matching mapper entry");
+        assert_eq!(target_name, "S1UI_Gauge.gpk");
+
+        // Mod file is in CookedPC under the target name.
+        let cooked = game_root.join(COOKED_PC_DIR);
+        assert!(cooked.join("S1UI_Gauge.gpk").exists());
+
+        // Mapper must now point the matching entry at the new file;
+        // the non-matching entry must be untouched.
+        let patched_enc = fs::read(cooked.join(MAPPER_FILE)).unwrap();
+        let patched_plain = decrypt_mapper(&patched_enc);
+        let patched_map = parse_mapper(&String::from_utf8_lossy(&patched_plain));
+
+        let matched = patched_map
+            .get("S1UI_Gauge")
+            .expect("matched entry must still exist by composite key");
+        assert_eq!(matched.filename, "S1UI_Gauge.gpk", "filename must be rewritten");
+        assert_eq!(matched.offset, 0, "offset must be zeroed");
+        assert!(matched.size > 0, "size must match the installed file");
+
+        let unmatched = patched_map
+            .get("Other")
+            .expect("non-matching entry must remain");
+        assert_eq!(unmatched.filename, "S1Data2.gpk", "non-matching entry must be untouched");
+    }
+
+    #[test]
+    fn install_legacy_gpk_errors_when_no_matching_mapper_entry() {
+        let tmp = TempDir::new().unwrap();
+        let game_root = tmp.path();
+
+        // Mapper has no entry ending in `.UnknownPkg` — install should
+        // refuse rather than silently drop a .gpk nothing will load.
+        let map = mapper_with(&[
+            ("Other", "Other.Foo", "S1Data.gpk"),
+        ]);
+        write_mapper_at(game_root, &map);
+
+        let source_gpk = write_fake_gpk(game_root, "mod-orphan.gpk", "UnknownPkg");
+        let err = install_legacy_gpk(game_root, &source_gpk)
+            .expect_err("install must fail when no mapper entry matches");
+        assert!(
+            err.contains("UnknownPkg"),
+            "error message must name the unmatched folder_name; got: {err}"
+        );
+    }
+
+    #[test]
+    fn uninstall_legacy_gpk_restores_vanilla_from_backup() {
+        let tmp = TempDir::new().unwrap();
+        let game_root = tmp.path();
+        let cooked = game_root.join(COOKED_PC_DIR);
+        fs::create_dir_all(&cooked).unwrap();
+
+        // Seed: vanilla .gpk in CookedPC/, plus a .vanilla-bak that
+        // install_legacy_gpk would have created before overwriting.
+        let vanilla_bytes = b"VANILLA-GPK-BYTES".to_vec();
+        let mod_bytes = b"MOD-GPK-BYTES-DIFFERENT".to_vec();
+        fs::write(cooked.join("S1UI_Party.gpk"), &mod_bytes).unwrap();
+        fs::write(cooked.join("S1UI_Party.gpk.vanilla-bak"), &vanilla_bytes).unwrap();
+
+        uninstall_legacy_gpk(game_root, "S1UI_Party.gpk")
+            .expect("uninstall must succeed when backup exists");
+
+        let restored = fs::read(cooked.join("S1UI_Party.gpk")).unwrap();
+        assert_eq!(
+            restored, vanilla_bytes,
+            "uninstall must restore the vanilla bytes from .vanilla-bak"
+        );
+        assert!(
+            !cooked.join("S1UI_Party.gpk.vanilla-bak").exists(),
+            "backup must be removed after a successful restore"
+        );
+    }
+
+    #[test]
+    fn uninstall_legacy_gpk_removes_modded_file_when_no_backup() {
+        let tmp = TempDir::new().unwrap();
+        let game_root = tmp.path();
+        let cooked = game_root.join(COOKED_PC_DIR);
+        fs::create_dir_all(&cooked).unwrap();
+
+        // Case: the vanilla slot was EMPTY before install (no .vanilla-bak
+        // created). Uninstall must still clean up by removing the mod .gpk.
+        fs::write(cooked.join("S1UI_Chat.gpk"), b"MOD-GPK").unwrap();
+        assert!(!cooked.join("S1UI_Chat.gpk.vanilla-bak").exists());
+
+        uninstall_legacy_gpk(game_root, "S1UI_Chat.gpk")
+            .expect("uninstall must succeed when no backup exists");
+        assert!(
+            !cooked.join("S1UI_Chat.gpk").exists(),
+            "modded file must be removed when no backup to restore"
+        );
+    }
+
+    #[test]
+    fn uninstall_legacy_gpk_rejects_hostile_filename() {
+        let tmp = TempDir::new().unwrap();
+        let err = uninstall_legacy_gpk(tmp.path(), "../../../Windows/System32/foo.gpk")
+            .expect_err("path-traversal attempt must be rejected");
+        assert!(
+            err.contains("not a safe filename"),
+            "error must flag filename as unsafe; got: {err}"
+        );
+    }
 }
