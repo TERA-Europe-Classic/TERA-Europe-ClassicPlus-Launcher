@@ -2187,4 +2187,131 @@ mod tests {
             "apply_mod_patches on ModFile{{packages: []}} must be a no-op"
         );
     }
+
+    // --------------------------------------------------------------------
+    // extract_package_folder_name — UE3 header FolderName parser.
+    // Covers the legacy drop-in GPK install path (fix.gpk-install v1.13):
+    // determines the CookedPC filename the mod must be copied to so the
+    // CompositePackageMapper patch can re-route the composite at the new
+    // file. A wrong parse yields the wrong drop-in filename → mapper
+    // patch lands on the wrong composite → mod silently does nothing.
+    // --------------------------------------------------------------------
+
+    /// Build a fake UE3 header: magic + version + headerSize + FString.
+    /// Caller supplies the FString bytes (length prefix + string bytes).
+    fn fake_header(fstring: &[u8]) -> Vec<u8> {
+        let mut v = Vec::new();
+        v.extend_from_slice(&PACKAGE_MAGIC.to_le_bytes()); // 4: magic
+        v.extend_from_slice(&897u32.to_le_bytes()); // 4: version (tera-modern)
+        v.extend_from_slice(&0i32.to_le_bytes()); // 4: headerSize placeholder
+        v.extend_from_slice(fstring); // FString at offset 12
+        v
+    }
+
+    #[test]
+    fn extract_folder_name_reads_ascii() {
+        // FString: len=+5 (4 ASCII chars + null), bytes "S1UI\0"
+        let mut fstr = Vec::new();
+        fstr.extend_from_slice(&5i32.to_le_bytes());
+        fstr.extend_from_slice(b"S1UI\0");
+        let bytes = fake_header(&fstr);
+        assert_eq!(
+            extract_package_folder_name(&bytes).as_deref(),
+            Some("S1UI"),
+            "ASCII FString must decode to the non-null-terminated name"
+        );
+    }
+
+    #[test]
+    fn extract_folder_name_reads_utf16() {
+        // FString: len=-5 (4 UTF-16 chars + null), bytes "S1UI\0" as u16 LE
+        let mut fstr = Vec::new();
+        fstr.extend_from_slice(&(-5i32).to_le_bytes());
+        for c in "S1UI".chars() {
+            fstr.extend_from_slice(&(c as u16).to_le_bytes());
+        }
+        fstr.extend_from_slice(&0u16.to_le_bytes()); // trailing null
+        let bytes = fake_header(&fstr);
+        assert_eq!(
+            extract_package_folder_name(&bytes).as_deref(),
+            Some("S1UI"),
+            "UTF-16 FString must decode to the non-null-terminated name"
+        );
+    }
+
+    #[test]
+    fn extract_folder_name_rejects_bad_magic() {
+        let mut bytes = vec![0xDE, 0xAD, 0xBE, 0xEF]; // wrong magic
+        bytes.extend_from_slice(&[0u8; 16]);
+        assert!(
+            extract_package_folder_name(&bytes).is_none(),
+            "non-UE3 header must yield None; otherwise legacy install \
+             would copy arbitrary files into CookedPC/"
+        );
+    }
+
+    #[test]
+    fn extract_folder_name_rejects_truncated_header() {
+        let bytes = vec![0u8; 15]; // <16 bytes total
+        assert!(
+            extract_package_folder_name(&bytes).is_none(),
+            "<16-byte input must yield None rather than panic on OOB read"
+        );
+    }
+
+    #[test]
+    fn extract_folder_name_rejects_zero_length_fstring() {
+        // FString len=0 — not a legal UE3 FString; treat as malformed.
+        let mut fstr = Vec::new();
+        fstr.extend_from_slice(&0i32.to_le_bytes());
+        let bytes = fake_header(&fstr);
+        assert!(
+            extract_package_folder_name(&bytes).is_none(),
+            "zero-length FString must yield None (would produce empty \
+             filename `.gpk` — invalid CookedPC drop)"
+        );
+    }
+
+    #[test]
+    fn extract_folder_name_rejects_oversized_length() {
+        // Length > 256 cap — malicious or corrupt header trying to
+        // trick the parser into reading huge slices.
+        let mut fstr = Vec::new();
+        fstr.extend_from_slice(&257i32.to_le_bytes());
+        fstr.extend_from_slice(&[b'X'; 32]);
+        let bytes = fake_header(&fstr);
+        assert!(
+            extract_package_folder_name(&bytes).is_none(),
+            "length > 256 must yield None (sanity cap — longest known \
+             TERA package name is ~40 chars)"
+        );
+    }
+
+    #[test]
+    fn extract_folder_name_rejects_length_beyond_buffer() {
+        // Length that would read past the end of bytes.
+        let mut fstr = Vec::new();
+        fstr.extend_from_slice(&100i32.to_le_bytes());
+        fstr.extend_from_slice(&[b'A'; 10]); // only 10 bytes, not 100
+        let bytes = fake_header(&fstr);
+        assert!(
+            extract_package_folder_name(&bytes).is_none(),
+            "length beyond buffer must yield None rather than OOB panic"
+        );
+    }
+
+    #[test]
+    fn extract_folder_name_trims_trailing_null_only() {
+        // Three-char name "Abc" stored as ASCII with null ⇒ len=+4.
+        // Decoder must strip exactly the trailing null, not the `c`.
+        let mut fstr = Vec::new();
+        fstr.extend_from_slice(&4i32.to_le_bytes());
+        fstr.extend_from_slice(b"Abc\0");
+        let bytes = fake_header(&fstr);
+        assert_eq!(
+            extract_package_folder_name(&bytes).as_deref(),
+            Some("Abc"),
+            "decoder must strip ONLY the single trailing null"
+        );
+    }
 }
