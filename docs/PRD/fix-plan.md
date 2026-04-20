@@ -7,10 +7,10 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 239
+iteration_counter: 240
 last_work_iteration: 239
 last_research_sweep: 230
-last_revalidation: 220
+last_revalidation: 240
 last_revalidation_status: all-gates-green
 last_retrospective: 60
 last_blocked_retry: 50
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 240 REVALIDATION — all-gates-green.**
+>
+> Cadence: N%20=0. Re-ran every proof for the current head state.
+>
+> - `cargo test --quiet`: 1444 passed, 0 failed (unchanged from iter 239 baseline; +81 over iter 228 session start 1363)
+> - `npx vitest run`: 449 passed across 13 test files (unchanged)
+> - `cargo clippy --all-targets -- -D warnings`: exit 0
+> - `cargo audit`: 0 hard vulnerabilities (22 warnings = gtk-rs unmaintained cluster + proc-macro-error + rand RUSTSEC-2026-0097 N/A-by-unreachable-API per iter 230)
+> - Launcher deploy: `https://web.tera-germany.de/classic/classicplus/latest.json` serves `version: 0.1.15` with valid signature
+> - Catalog: `raw.githubusercontent.com/TERA-Europe-Classic/external-mod-catalog/main/catalog.json` shows TCC entry at `version: 2.0.2-classicplus`, `sha256: fe0401bb...`, `size: 6126812` — matches iter-230 commit
+>
+> No regressions since iter 220's last revalidation. Every DONE item in iters 221-239 still holds.
 
 > **Iter 239 WORK — pin.zeroize-audit-path-consts+cargo-zeroize_derive-feature+explicit-use-import+no-log-password+no-clone-on-Zeroizing DONE.**
 >
