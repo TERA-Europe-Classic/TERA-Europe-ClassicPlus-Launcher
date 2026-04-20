@@ -2249,6 +2249,8 @@
             color: var(--muted-foreground);
             font-variant-numeric: tabular-nums;
             line-height: 1;
+            min-width: 3ch;
+            text-align: right;
         }
 
         .progress-track {
@@ -2272,6 +2274,16 @@
             font-size: 12px;
             color: var(--muted-foreground);
             font-variant-numeric: tabular-nums;
+            margin-top: 4px;
+        }
+
+        .progress-footer span {
+            min-width: 0;
+        }
+
+        #download-speed {
+            min-width: 10ch;
+            text-align: right;
         }
 
         #home-launch-buttons {
