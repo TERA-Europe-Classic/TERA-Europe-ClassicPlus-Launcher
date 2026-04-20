@@ -602,3 +602,76 @@ fn auth_rs_does_not_clone_zeroizing_password() {
         );
     }
 }
+
+// --------------------------------------------------------------------
+// Iter 278 structural pins — all-path bounds + PRD cite + auth/models
+// byte bounds.
+// --------------------------------------------------------------------
+
+#[test]
+fn models_rs_byte_bounds() {
+    const MIN: usize = 500;
+    const MAX: usize = 50_000;
+    let bytes = std::fs::metadata(MODELS_RS)
+        .expect("models.rs must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "PRD 3.1.7 (iter 278): {MODELS_RS} is {bytes} bytes; expected \
+         [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn game_service_rs_byte_bounds() {
+    const MIN: usize = 1000;
+    const MAX: usize = 100_000;
+    let bytes = std::fs::metadata(GAME_SERVICE_RS)
+        .expect("game_service.rs must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "PRD 3.1.7 (iter 278): {GAME_SERVICE_RS} is {bytes} bytes; \
+         expected [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn auth_rs_byte_bounds() {
+    const MIN: usize = 1000;
+    const MAX: usize = 100_000;
+    let bytes = std::fs::metadata(AUTH_RS)
+        .expect("auth.rs must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "PRD 3.1.7 (iter 278): {AUTH_RS} is {bytes} bytes; expected \
+         [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn guard_source_byte_bounds() {
+    const MIN: usize = 5000;
+    const MAX: usize = 80_000;
+    let bytes = std::fs::metadata(GUARD_FILE)
+        .expect("guard must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "PRD 3.1.7 (iter 278): guard is {bytes} bytes; expected \
+         [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn guard_source_cites_prd_3_1_7_explicitly() {
+    let body = std::fs::read_to_string(GUARD_FILE)
+        .expect("guard must exist");
+    let header = &body[..body.len().min(500)];
+    assert!(
+        header.contains("PRD 3.1.7"),
+        "PRD 3.1.7 (iter 278): guard header must cite `PRD 3.1.7`.\n\
+         Header:\n{header}"
+    );
+}

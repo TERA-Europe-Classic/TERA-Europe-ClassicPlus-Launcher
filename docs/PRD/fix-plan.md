@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 277
-last_work_iteration: 277
+iteration_counter: 278
+last_work_iteration: 278
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 253
+total_items_done: 254
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,12 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 278 WORK — pin.zeroize-models-bounds+game-service-bounds+auth-bounds+guard-bounds+prd-3-1-7-cite DONE. 20-count tier complete.**
+>
+> PRD 3.1.7 (zeroize-audit); zeroize_audit had 20 tests. Brings to 25. Completes 20-count tier — all 20-count guards now at 25.
+>
+> zeroize_audit: 20 → 25 tests. 1634 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 277 WORK — pin.shell-scope-tauri-conf-bounds+cargo-bounds+capabilities-bounds+guard-bounds+iter-86-provenance DONE.**
 >
