@@ -634,3 +634,134 @@ fn mods_rs_files_walker_includes_three_critical_files() {
         );
     }
 }
+
+// --------------------------------------------------------------------
+// Iter 263 structural pins — reqwest+rustls Cargo dep + Policy::none
+// canonical token + tmm.rs no HTTP + guard byte bounds + timeout
+// duration sanity.
+// --------------------------------------------------------------------
+
+/// Iter 263: Cargo.toml must declare `reqwest` with both `json` and
+/// `stream` features. json powers the catalog fetch parse; stream is
+/// needed for incremental download in external_app.rs. Without them,
+/// both services would fail at compile time with opaque errors.
+#[test]
+fn reqwest_is_declared_with_json_and_stream_features() {
+    let toml = fs::read_to_string("Cargo.toml").expect("Cargo.toml must exist");
+    assert!(
+        toml.contains("reqwest"),
+        "adv.http-redirect-offlist (iter 263): Cargo.toml must \
+         declare `reqwest` — the HTTP client the redirect policy \
+         applies to."
+    );
+    // Find the reqwest line.
+    let reqwest_line = toml
+        .lines()
+        .find(|l| l.trim_start().starts_with("reqwest ") || l.trim_start().starts_with("reqwest="))
+        .expect("reqwest declaration line must exist");
+    assert!(
+        reqwest_line.contains("\"json\""),
+        "adv.http-redirect-offlist (iter 263): reqwest dep must \
+         enable `json` feature (catalog.rs uses .json() to parse \
+         remote catalog). Line: `{reqwest_line}`"
+    );
+    assert!(
+        reqwest_line.contains("\"stream\""),
+        "adv.http-redirect-offlist (iter 263): reqwest dep must \
+         enable `stream` feature (external_app.rs uses bytes_stream() \
+         for incremental downloads). Line: `{reqwest_line}`"
+    );
+}
+
+/// Iter 263: builders must use `Policy::none()`, not `Policy::limit(0)`.
+/// limit(0) raises an error on redirect; none() returns the 3xx
+/// status directly which is what the `!status().is_success()` branches
+/// reject gracefully.
+#[test]
+fn builders_use_policy_none_canonical_token() {
+    for path in ["src/services/mods/catalog.rs", "src/services/mods/external_app.rs"] {
+        let src = fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("{path}: {e}"));
+        assert!(
+            src.contains("Policy::none()"),
+            "adv.http-redirect-offlist (iter 263): {path} must call \
+             `Policy::none()` (canonical token). `Policy::limit(0)` \
+             would look equivalent but raises a redirect error \
+             instead of returning the 3xx status for graceful \
+             rejection by the is_success() branch."
+        );
+    }
+}
+
+/// Iter 263: `src/services/mods/tmm.rs` must not reference `reqwest`.
+/// TMM handles GPK parsing + mapper crypto — it has no business
+/// doing HTTP. A reqwest import in tmm.rs signals scope creep.
+#[test]
+fn tmm_rs_does_not_reference_reqwest() {
+    let src = fs::read_to_string("src/services/mods/tmm.rs")
+        .expect("tmm.rs must exist");
+    assert!(
+        !src.contains("reqwest"),
+        "adv.http-redirect-offlist (iter 263): src/services/mods/tmm.rs \
+         must not reference `reqwest` — TMM handles GPK parsing + \
+         mapper crypto, not HTTP. Any reqwest use would bypass this \
+         guard's builder scanner (which walks all 3 mods files but \
+         tmm.rs is expected to be HTTP-free)."
+    );
+}
+
+/// Iter 263: guard source byte bounds.
+#[test]
+fn guard_source_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 5000;
+    const MAX_BYTES: usize = 80_000;
+    let bytes = fs::metadata("tests/http_redirect_offlist.rs")
+        .expect("guard must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "adv.http-redirect-offlist (iter 263): guard is {bytes} \
+         bytes; expected [{MIN_BYTES}, {MAX_BYTES}]. Outside the \
+         range means gutting or uncontrolled growth."
+    );
+}
+
+/// Iter 263: timeout durations in mods services must be reasonable.
+/// Too small (<5s) causes spurious failures on slow networks; too
+/// large (>600s) defeats the DoS purpose. Scan each `.timeout(`
+/// call's Duration literal and check the seconds value.
+#[test]
+fn mods_services_timeout_durations_are_within_reasonable_bounds() {
+    const MIN_SECS: u64 = 5;
+    const MAX_SECS: u64 = 600;
+    for path in ["src/services/mods/catalog.rs", "src/services/mods/external_app.rs"] {
+        let src = fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("{path}: {e}"));
+        // Scan for `Duration::from_secs(N)` within `.timeout(` calls.
+        let needle = "Duration::from_secs(";
+        let mut cursor = 0;
+        while let Some(rel) = src[cursor..].find(needle) {
+            let pos = cursor + rel + needle.len();
+            let digits: String = src[pos..]
+                .chars()
+                .take_while(|c| c.is_ascii_digit())
+                .collect();
+            if let Ok(n) = digits.parse::<u64>() {
+                assert!(
+                    n >= MIN_SECS,
+                    "adv.http-redirect-offlist (iter 263): {path} has \
+                     `Duration::from_secs({n})` which is below {MIN_SECS}s \
+                     — too short causes spurious failures on slow networks."
+                );
+                assert!(
+                    n <= MAX_SECS,
+                    "adv.http-redirect-offlist (iter 263): {path} has \
+                     `Duration::from_secs({n})` which exceeds {MAX_SECS}s \
+                     — too long defeats the DoS-mitigation purpose of \
+                     the timeout."
+                );
+            }
+            cursor = pos + digits.len();
+        }
+    }
+}

@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 262
-last_work_iteration: 262
+iteration_counter: 263
+last_work_iteration: 263
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 238
+total_items_done: 239
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 263 WORK — pin.http-redirect-reqwest-json-stream-features+policy-none-canonical+tmm-no-http+guard-bounds+timeout-duration-sanity DONE.**
+>
+> adv.http-redirect-offlist (PRD 3.1.5); http_redirect_offlist had 18 tests. Brings to 23.
+>
+> Five new pins:
+> 1. `reqwest_is_declared_with_json_and_stream_features` — both required for catalog.rs + external_app.rs
+> 2. `builders_use_policy_none_canonical_token` — reject `Policy::limit(0)` (different semantics)
+> 3. `tmm_rs_does_not_reference_reqwest` — TMM has no HTTP business (scope creep detector)
+> 4. `guard_source_byte_size_has_sane_bounds` — 5000-80000
+> 5. `mods_services_timeout_durations_are_within_reasonable_bounds` — 5≤N≤600 seconds
+>
+> http_redirect_offlist: 18 → 23 tests. 1559 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 262 WORK — pin.deploy-scope-prd-3-1-14-cite+deploy-yml-bounds+scope-script-bounds+guard-bounds+workflow-dispatch-inputs DONE.**
 >
