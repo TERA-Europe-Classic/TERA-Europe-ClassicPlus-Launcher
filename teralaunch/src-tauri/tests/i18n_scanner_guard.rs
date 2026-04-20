@@ -543,3 +543,81 @@ fn jargon_scanner_iterates_entries_not_stringifies_aggregate() {
          MODS_COMPOSITE_LABEL)."
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 276 structural pins — scanner/guard bounds + translations bounds
+// + PRD 3.4.7 + 3.7.1 cites + translations JSON valid.
+// --------------------------------------------------------------------
+
+#[test]
+fn jargon_scanner_byte_bounds() {
+    const MIN_BYTES: usize = 500;
+    const MAX_BYTES: usize = 30_000;
+    let bytes = std::fs::metadata(JARGON_SCANNER)
+        .expect("jargon scanner must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "PRD 3.4.7 (iter 276): {JARGON_SCANNER} is {bytes} bytes; \
+         expected [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+#[test]
+fn parity_scanner_byte_bounds() {
+    const MIN_BYTES: usize = 500;
+    const MAX_BYTES: usize = 30_000;
+    let bytes = std::fs::metadata(PARITY_SCANNER)
+        .expect("parity scanner must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "PRD 3.7.1 (iter 276): {PARITY_SCANNER} is {bytes} bytes; \
+         expected [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+#[test]
+fn translations_json_byte_bounds() {
+    const MIN_BYTES: usize = 5000;
+    const MAX_BYTES: usize = 500_000;
+    let bytes = std::fs::metadata(TRANSLATIONS)
+        .expect("translations.json must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "PRD 3.7.1 (iter 276): {TRANSLATIONS} is {bytes} bytes; \
+         expected [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+#[test]
+fn guard_source_cites_both_prd_criteria() {
+    let body = std::fs::read_to_string("tests/i18n_scanner_guard.rs")
+        .expect("guard must exist");
+    let header = &body[..body.len().min(1500)];
+    assert!(
+        header.contains("PRD 3.4.7"),
+        "iter 276: guard header must cite `PRD 3.4.7` (no-jargon)."
+    );
+    assert!(
+        header.contains("PRD 3.7.1"),
+        "iter 276: guard header must cite `PRD 3.7.1` (key-parity)."
+    );
+}
+
+#[test]
+fn translations_json_parses_as_valid_json_object() {
+    let body = std::fs::read_to_string(TRANSLATIONS)
+        .expect("translations.json must exist");
+    let v: serde_json::Value = serde_json::from_str(&body)
+        .unwrap_or_else(|e| panic!(
+            "PRD 3.7.1 (iter 276): {TRANSLATIONS} must parse as \
+             valid JSON. Parse error: {e}"
+        ));
+    assert!(
+        v.is_object(),
+        "PRD 3.7.1 (iter 276): {TRANSLATIONS} must parse as a JSON \
+         object (locale → table). Got: {v:?}"
+    );
+}
