@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 249
-last_work_iteration: 249
+iteration_counter: 250
+last_work_iteration: 250
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 225
+total_items_done: 226
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 250 WORK — pin.prd-path-drift-pin-count-ratchet-35+prd-line-ratchet-400+rust-pin-src-or-tests-prefix+js-pin-relative-tests-prefix+rust-test-name-snake-case DONE.**
+>
+> PRD 3.8.2.prd-path-drift-guard; prd_path_drift_guard had 16 tests. Brings to 21. Iter-178 floors (30 pins / 300 PRD lines) no longer reflect current state (39 pins / 437 lines).
+>
+> Five new pins:
+> 1. `pin_count_floor_ratcheted_to_thirty_five` — MIN_RUST_PINS 30→35 (current 39; catches trim of ≥5 rows as visible event)
+> 2. `prd_file_line_count_floor_ratcheted_to_four_hundred` — MIN_PRD_LINES 300→400 (current 437; catches truncation that strips table rows)
+> 3. `every_rust_pin_source_path_starts_with_src_or_tests` — reject absolute paths, reject `..` traversal (brittle workspace-layout leaks)
+> 4. `every_js_pin_path_starts_with_relative_tests_prefix` — JS paths must start `../tests/` verbatim (catches typos like `../src/` or missing `..`)
+> 5. `every_rust_pin_test_name_is_snake_case_identifier` — lowercase+digit+underscore only, starts with letter or `_` (malformed names fail per-entry grep with opaque error)
+>
+> prd_path_drift_guard: 16 → 21 tests. 1494 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 249 WORK — pin.meta-hygiene-guard-test-count-ratchet-16+assertion-ratchet-10+known-guards-ceiling-50+iter-stamp-required+evolution-trail DONE.**
 >

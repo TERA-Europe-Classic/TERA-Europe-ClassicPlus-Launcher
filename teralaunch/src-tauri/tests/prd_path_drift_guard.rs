@@ -846,6 +846,152 @@ fn no_pin_criterion_outside_section_3() {
     }
 }
 
+// --------------------------------------------------------------------
+// Iter 250 structural pins — ratchet pin-count + PRD line floors,
+// path-shape invariants on Rust + JS pins, snake_case test names.
+// --------------------------------------------------------------------
+//
+// Iter 178 set MIN_RUST_PINS=30 and iter 178 set MIN_PRD_LINES=300.
+// Current state: 39 Rust pins, 437 PRD lines. Iter 250 ratchets both
+// floors closer to current (35 / 400) so a bulk-trim is visible
+// earlier. Also pins path shape (no absolute paths, no accidental
+// `../src/` typos on the JS side) and snake_case on Rust test names
+// (a typo like `my-test` or `MyTest` would pass the `fn ` substring
+// check because `fn my-test` isn't valid Rust syntax — the grep
+// would just not match, and the per-entry pin would fail with an
+// opaque "fn name not found" rather than flagging the malformed pin).
+
+/// Ratchet `pin_count_meets_minimum_floor` — bump `MIN_RUST_PINS` from
+/// 30 (iter 178) to 35. Current PINS carries 39 entries; 35 gives a
+/// small margin while catching a trim of ≥ 5 rows as a visible event.
+#[test]
+fn pin_count_floor_ratcheted_to_thirty_five() {
+    const MIN_RUST_PINS_IT250: usize = 35;
+    assert!(
+        PINS.len() >= MIN_RUST_PINS_IT250,
+        "PRD §3 drift-guard (iter 250): PINS table has {} entries; \
+         ratcheted floor is {MIN_RUST_PINS_IT250} (was 30 in iter 178). \
+         A trim past the ratcheted floor signals a bulk-delete — \
+         addition is welcome, deletion is a visible event.",
+        PINS.len()
+    );
+}
+
+/// Ratchet `prd_file_meets_minimum_line_count` — bump `MIN_PRD_LINES`
+/// from 300 (iter 178) to 400. Current PRD is 437 lines; 400 leaves
+/// a small margin while catching a truncation that strips a table
+/// row as a visible event.
+#[test]
+fn prd_file_line_count_floor_ratcheted_to_four_hundred() {
+    const MIN_PRD_LINES_IT250: usize = 400;
+    let body = prd_body();
+    let lines = body.lines().count();
+    assert!(
+        lines >= MIN_PRD_LINES_IT250,
+        "PRD §3 drift-guard (iter 250): {PRD_PATH} has {lines} lines; \
+         ratcheted floor is {MIN_PRD_LINES_IT250} (was 300 in iter \
+         178). A truncation past the ratcheted floor signals a bad \
+         rebase or partial commit — every per-entry pin would then \
+         fail with opaque row-not-found errors."
+    );
+}
+
+/// Every Rust pin's `source_path` must start with `src/` or `tests/`
+/// — no absolute paths, no `../` escape, no `/` prefix. A pin like
+/// `/home/user/repo/src/foo.rs` or `../tera-agnitor/src/foo.rs`
+/// would pass the file-exists check if the path happens to resolve,
+/// but would drift silently when the workspace layout changes (or
+/// leak user-home path information into the guard).
+#[test]
+fn every_rust_pin_source_path_starts_with_src_or_tests() {
+    for pin in PINS {
+        let starts_ok = pin.source_path.starts_with("src/")
+            || pin.source_path.starts_with("tests/");
+        assert!(
+            starts_ok,
+            "PRD §3 drift-guard (iter 250): PINS entry for §{} has \
+             source_path `{}` — must start with `src/` or `tests/`. \
+             Absolute paths or `../` escapes are brittle (leak \
+             layout dependencies) and make the pin invisible to the \
+             workspace-relative checks.",
+            pin.criterion, pin.source_path
+        );
+        assert!(
+            !pin.source_path.contains(".."),
+            "PRD §3 drift-guard (iter 250): PINS entry for §{} has \
+             source_path `{}` containing `..` — path traversal out \
+             of src-tauri/ is not allowed in pins. Use a path rooted \
+             at src/ or tests/ only.",
+            pin.criterion, pin.source_path
+        );
+    }
+}
+
+/// Every JS pin's `js_path` must start with `../tests/` verbatim.
+/// JS pins live at src-tauri/-relative `../tests/foo.test.js`;
+/// a typo like `../src/foo.test.js` or `../docs/foo.test.js` would
+/// pass the `fs::read_to_string` check only if the file happened
+/// to exist at that path (dormant drift). Pinning the prefix
+/// rejects typos early.
+#[test]
+fn every_js_pin_path_starts_with_relative_tests_prefix() {
+    for pin in JS_PINS {
+        assert!(
+            pin.js_path.starts_with("../tests/"),
+            "PRD §3 drift-guard (iter 250): JS_PINS entry for §{} has \
+             js_path `{}` — must start with `../tests/`. A typo like \
+             `../src/` or missing the `..` prefix silently passes the \
+             file-read check if any file happens to exist at that \
+             location, masking drift until a reader notices.",
+            pin.criterion, pin.js_path
+        );
+    }
+}
+
+/// Every Rust pin's `test_name` must be a valid Rust identifier:
+/// lowercase letters, digits, and underscores; must start with a
+/// letter or underscore. A malformed name like `my-test` or
+/// `my test` would pass the `fn {name}` substring check (it just
+/// wouldn't match any real fn), and the per-entry test would
+/// fail with an opaque "fn name not found" rather than flagging
+/// the malformed pin itself. Note: JS pin test names are
+/// intentionally exempt — Vitest `it()` identifiers are arbitrary
+/// English sentences (e.g. §3.7.4's full-sentence name).
+#[test]
+fn every_rust_pin_test_name_is_snake_case_identifier() {
+    for pin in PINS {
+        let name = pin.test_name;
+        assert!(
+            !name.is_empty(),
+            "PRD §3 drift-guard (iter 250): PINS entry for §{} has \
+             empty test_name.",
+            pin.criterion
+        );
+        let first = name.chars().next().unwrap();
+        assert!(
+            first.is_ascii_lowercase() || first == '_',
+            "PRD §3 drift-guard (iter 250): PINS entry for §{} has \
+             test_name `{name}` starting with `{first}` — must start \
+             with a lowercase letter or underscore (Rust identifier \
+             rules). A malformed name fails the per-entry `fn {name}` \
+             grep with an opaque error that doesn't flag the bad pin.",
+            pin.criterion
+        );
+        for c in name.chars() {
+            assert!(
+                c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_',
+                "PRD §3 drift-guard (iter 250): PINS entry for §{} has \
+                 test_name `{name}` containing `{c}` — only lowercase \
+                 ASCII letters, digits, and underscores are allowed. \
+                 Uppercase letters or hyphens aren't valid Rust \
+                 identifiers; dots or spaces would mask as drift in \
+                 the per-entry grep.",
+                pin.criterion
+            );
+        }
+    }
+}
+
 /// Self-test: prove the detector bites if a pin's source path goes
 /// missing or the named test is absent.
 #[test]
