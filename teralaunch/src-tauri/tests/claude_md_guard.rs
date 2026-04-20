@@ -525,6 +525,172 @@ fn running_perfection_loop_subsection_cites_fix_plan_md() {
     );
 }
 
+// --------------------------------------------------------------------
+// Iter 252 structural pins — SECTION_HEADING constant + EXPECTED_SECTIONS
+// ceiling + doc size floor + v100 API comparison table rows + Mod Manager
+// feature-state table shape.
+// --------------------------------------------------------------------
+//
+// The seventeen pins above cover section presence, size, body coverage,
+// subsection roster, and constant sanity. They do NOT pin:
+// (a) the `SECTION_HEADING` constant equals `"## Mod Manager"` verbatim
+//     — a drift to `"## Mod manager"` (lowercase m) would silently cause
+//     every `mod_manager_section(body)` call to return None;
+// (b) the `EXPECTED_SECTIONS` list has a sane ceiling — addition of
+//     unrelated sections would pass the ≥ 7 floor while bloating the
+//     on-ramp surface;
+// (c) CLAUDE.md meets a byte floor — truncation to one section per line
+//     passes presence checks while stripping body content;
+// (d) the v100 API `### Key Differences from Classic API` comparison
+//     table carries the eight rows the section documents (Login, Auth,
+//     Account info, Server list, Registration, Leaderboard consent,
+//     OAuth, Hash file / Updates);
+// (e) the Mod Manager `### Feature state` table carries both `Shipped`
+//     and `Blocked` states (required for reviewers to distinguish
+//     complete from in-progress work).
+
+/// `SECTION_HEADING` must equal `"## Mod Manager"` verbatim. A drift
+/// to `"## Mod manager"` (lowercase m), `"##Mod Manager"` (missing
+/// space), or `"### Mod Manager"` (sub-section depth) would silently
+/// cause every `mod_manager_section(body)` call to return None, and
+/// the prior pins would panic with the opaque "section is missing"
+/// message without identifying the constant as root cause.
+#[test]
+fn section_heading_constant_is_canonical() {
+    let guard_body = fs::read_to_string("tests/claude_md_guard.rs")
+        .expect("guard source must be readable");
+    assert!(
+        guard_body.contains("const SECTION_HEADING: &str = \"## Mod Manager\";"),
+        "PRD 3.8.1 (iter 252): tests/claude_md_guard.rs must retain \
+         `const SECTION_HEADING: &str = \"## Mod Manager\";` verbatim. \
+         A drift to a different casing, depth, or spacing would \
+         silently cause every `mod_manager_section(body)` call to \
+         return None — the prior pins would panic with opaque \
+         'section is missing' messages."
+    );
+}
+
+/// `EXPECTED_SECTIONS` must carry a ceiling of ≤ 20 entries. The iter-
+/// 214 floor (≥ 7) catches a trim; a ceiling catches runaway growth.
+/// Current state: 7 sections. A drift to 20+ top-level sections in
+/// CLAUDE.md is a structural problem worth flagging — the file is
+/// meant to be on-ramp context, not exhaustive documentation.
+#[test]
+fn expected_sections_count_has_sane_ceiling() {
+    const MAX_SECTIONS: usize = 20;
+    assert!(
+        EXPECTED_SECTIONS.len() <= MAX_SECTIONS,
+        "PRD 3.8.1 (iter 252): EXPECTED_SECTIONS carries {} entries; \
+         ceiling is {MAX_SECTIONS}. CLAUDE.md is on-ramp context for \
+         new sessions — a 20+ top-level section count signals the \
+         doc has drifted into exhaustive reference documentation, \
+         which belongs under docs/ instead.",
+        EXPECTED_SECTIONS.len()
+    );
+}
+
+/// CLAUDE.md must meet a minimum byte-size floor. A truncation to
+/// a skeleton (7 section headings with no body) would satisfy
+/// `every_expected_section_heading_exists_in_claude_md` while
+/// stripping the actual content. Current state: ~9.5 KB, 185 lines.
+/// A floor of 3000 bytes (~30%) gives generous margin while catching
+/// accidental mass-truncation.
+#[test]
+fn claude_md_file_size_meets_byte_floor() {
+    const MIN_BYTES: usize = 3000;
+    let bytes = fs::metadata(CLAUDE_MD)
+        .unwrap_or_else(|e| panic!("{CLAUDE_MD}: {e}"))
+        .len() as usize;
+    assert!(
+        bytes >= MIN_BYTES,
+        "PRD 3.8.1 (iter 252): {CLAUDE_MD} is only {bytes} bytes; \
+         floor is {MIN_BYTES}. Truncation past the floor suggests \
+         a skeleton rewrite (section headings but no body) — on-ramp \
+         context that every future session needs is gone."
+    );
+}
+
+/// The v100 API `### Key Differences from Classic API` comparison
+/// table must carry at least six rows. Iter 175 pinned the table's
+/// existence; this pin enforces substance. The section currently
+/// documents 8 comparison rows (Login, Auth, Account info, Server
+/// list, Registration, Leaderboard consent, OAuth, Hash file /
+/// Updates). A floor of 6 gives margin while catching a table
+/// collapse to one or two rows.
+#[test]
+fn v100_api_key_differences_table_meets_row_floor() {
+    const MIN_ROWS: usize = 6;
+    let body = claude_body();
+    let idx = body
+        .find("### Key Differences from Classic API")
+        .expect("subsection must exist (iter 175 pin)");
+    let rest = &body[idx..];
+    let end = rest[3..]
+        .find("\n## ")
+        .map(|i| i + 3)
+        .unwrap_or(rest.len());
+    let subsection = &rest[..end];
+    // Count table rows: lines starting with `| ` that are NOT the
+    // header `| Classic | Classic+ (v100) |` or the separator line.
+    let row_count = subsection
+        .lines()
+        .filter(|l| {
+            let t = l.trim_start();
+            t.starts_with("| ")
+                && !t.starts_with("| Classic |")
+                && !t.starts_with("| Aspect |")
+                && !t.starts_with("|---")
+                && !t.starts_with("| ---")
+        })
+        .count();
+    assert!(
+        row_count >= MIN_ROWS,
+        "PRD 3.8.1 (iter 252): v100 API `### Key Differences` \
+         comparison table has {row_count} content row(s); floor is \
+         {MIN_ROWS}. A table collapse to 1-2 rows would pass the \
+         table-exists pin (iter 175) while stripping the side-by-side \
+         contract that makes the subsection useful.\nSubsection:\n{subsection}"
+    );
+}
+
+/// The Mod Manager `### Feature state` table must cite both
+/// `Shipped` and `Blocked` state terms. Readers use the table to
+/// distinguish complete from in-progress work at a glance; if
+/// either state term is missing, the table either over-promises
+/// (no Blocked means all work looks shipped) or under-reports
+/// (no Shipped means nothing appears complete).
+#[test]
+fn mod_manager_feature_state_table_cites_shipped_and_blocked() {
+    let body = claude_body();
+    let section = mod_manager_section(&body)
+        .expect("## Mod Manager section must exist (iter 107 pin)")
+        .join("\n");
+    let subsection_idx = section
+        .find("### Feature state")
+        .expect("### Feature state subsection must exist (iter 175 pin)");
+    let rest = &section[subsection_idx..];
+    let end = rest[3..]
+        .find("\n### ")
+        .map(|i| i + 3)
+        .unwrap_or(rest.len());
+    let subsection = &rest[..end];
+    assert!(
+        subsection.contains("Shipped"),
+        "PRD 3.8.1 (iter 252): Mod Manager `### Feature state` table \
+         must cite `Shipped` state. Without it, all work appears \
+         in-progress or blocked — readers can't distinguish complete \
+         work from pending.\nSubsection:\n{subsection}"
+    );
+    assert!(
+        subsection.contains("Blocked") || subsection.contains("blocked"),
+        "PRD 3.8.1 (iter 252): Mod Manager `### Feature state` table \
+         must cite a `Blocked` state. Without it, all work looks \
+         shipped — readers can't see which items are gated on \
+         upstream decisions (e.g. sec.tauri-v1-eol-plan sign-off).\n\
+         Subsection:\n{subsection}"
+    );
+}
+
 /// Self-test — prove the detector bites on synthetic bad shapes.
 #[test]
 fn claude_md_detector_self_test() {

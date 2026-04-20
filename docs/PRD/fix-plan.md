@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 251
-last_work_iteration: 251
+iteration_counter: 252
+last_work_iteration: 252
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 227
+total_items_done: 228
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 252 WORK — pin.claude-md-section-heading-const+sections-ceiling+size-floor+v100-api-table-rows+feature-state-shipped-blocked DONE.**
+>
+> PRD 3.8.1.claude-md-mod-manager-section; claude_md_guard had 17 tests. Brings to 22.
+>
+> Five new pins:
+> 1. `section_heading_constant_is_canonical` — pin `SECTION_HEADING = "## Mod Manager"` verbatim (casing/depth drift silently returns None)
+> 2. `expected_sections_count_has_sane_ceiling` — MAX_SECTIONS 20 (current 7; catches doc drift into exhaustive reference docs)
+> 3. `claude_md_file_size_meets_byte_floor` — MIN_BYTES 3000 (current 9460; skeletal truncation passes presence checks but strips body)
+> 4. `v100_api_key_differences_table_meets_row_floor` — MIN_ROWS 6 (current 8; table collapse to 1-2 rows passes existence pin but strips contract)
+> 5. `mod_manager_feature_state_table_cites_shipped_and_blocked` — both state terms required (no Blocked → over-promise; no Shipped → under-report)
+>
+> claude_md_guard: 17 → 22 tests. 1504 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 251 WORK — pin.changelog-cargo-const+size-floor+bullet-dash-consistency+release-count-floor+classic-plus-brand DONE.**
 >
