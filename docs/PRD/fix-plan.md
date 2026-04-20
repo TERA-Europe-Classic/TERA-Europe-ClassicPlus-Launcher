@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 265
-last_work_iteration: 265
+iteration_counter: 266
+last_work_iteration: 266
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 241
+total_items_done: 242
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 266 WORK — pin.secret-scan-workflow-bounds+config-bounds+guard-bounds+audit-doc-exists+prd-3-1-6-cite DONE.**
+>
+> PRD 3.1.6 (secret-scan); secret_scan_guard had 18 tests. Brings to 23.
+>
+> Five new pins:
+> 1. `workflow_file_byte_size_has_sane_bounds` — 200-10000
+> 2. `gitleaks_config_byte_size_has_sane_bounds` — 200-20000
+> 3. `guard_source_byte_size_has_sane_bounds` — 5000-80000
+> 4. `audit_doc_still_exists` — iter-13 triage doc must exist + >500 bytes
+> 5. `guard_source_cites_prd_3_1_6_explicitly` — section-grep discoverability
+>
+> secret_scan_guard: 18 → 23 tests. 1574 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 265 WORK — pin.mods-categories-ui-scanner-bounds+guard-bounds+iter-85-provenance+filter-chip-css-rule+scanner-slot-cite DONE.**
 >

@@ -599,3 +599,93 @@ fn secret_scan_guard_detector_self_test() {
         "self-test: empty regexes array must yield 0 entries"
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 266 structural pins — workflow/config/guard byte bounds +
+// audit doc presence + guard PRD 3.1.6 cite.
+// --------------------------------------------------------------------
+
+/// Iter 266: workflow file byte bounds.
+#[test]
+fn workflow_file_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 200;
+    const MAX_BYTES: usize = 10_000;
+    let bytes = fs::metadata(WORKFLOW)
+        .expect("workflow must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "PRD 3.1.6 (iter 266): {WORKFLOW} is {bytes} bytes; expected \
+         [{MIN_BYTES}, {MAX_BYTES}]. A gutted workflow drops the \
+         gitleaks invocation; bloat signals unrelated CI logic."
+    );
+}
+
+/// Iter 266: `.gitleaks.toml` config file byte bounds.
+#[test]
+fn gitleaks_config_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 200;
+    const MAX_BYTES: usize = 20_000;
+    let bytes = fs::metadata(CONFIG)
+        .expect("gitleaks config must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "PRD 3.1.6 (iter 266): {CONFIG} is {bytes} bytes; expected \
+         [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+/// Iter 266: guard source byte bounds.
+#[test]
+fn guard_source_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 5000;
+    const MAX_BYTES: usize = 80_000;
+    let bytes = fs::metadata("tests/secret_scan_guard.rs")
+        .expect("guard must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "PRD 3.1.6 (iter 266): guard is {bytes} bytes; expected \
+         [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+/// Iter 266: the iter-13 audit doc (`docs/PRD/audits/security/
+/// secret-leak-scan.md`) must exist. Without it, readers tracing
+/// the baseline triage history via AUDIT_REF would panic with a
+/// "file not found" — the guard references it but doesn't prove it
+/// still exists.
+#[test]
+fn audit_doc_still_exists() {
+    let path = "../../docs/PRD/audits/security/secret-leak-scan.md";
+    assert!(
+        fs::metadata(path).is_ok(),
+        "PRD 3.1.6 (iter 266): {path} must exist — iter-13 baseline \
+         triage history lives there. The AUDIT_REF constant points \
+         at it; without the doc, readers chasing the triage history \
+         via that pointer hit a dead link."
+    );
+    let body = fs::read_to_string(path)
+        .unwrap_or_else(|e| panic!("{path}: {e}"));
+    assert!(
+        body.len() > 500,
+        "PRD 3.1.6 (iter 266): {path} must be > 500 bytes. A stub \
+         file passes the existence check but loses the triage \
+         history."
+    );
+}
+
+/// Iter 266: guard header must cite PRD 3.1.6 explicitly.
+#[test]
+fn guard_source_cites_prd_3_1_6_explicitly() {
+    let body = fs::read_to_string("tests/secret_scan_guard.rs")
+        .expect("guard must exist");
+    let header = &body[..body.len().min(500)];
+    assert!(
+        header.contains("PRD 3.1.6"),
+        "PRD 3.1.6 (iter 266): guard header must cite `PRD 3.1.6` \
+         explicitly for section-grep discoverability.\n\
+         Header:\n{header}"
+    );
+}
