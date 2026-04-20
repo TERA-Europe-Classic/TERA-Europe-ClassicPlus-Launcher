@@ -619,3 +619,73 @@ fn fs_write_dest_is_rooted_under_gpk_dir() {
          — that is a path-traversal sink."
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 286 structural pins — commands/main/guard bounds + PRD cite +
+// sha2 crate dep.
+// --------------------------------------------------------------------
+
+#[test]
+fn commands_mods_rs_byte_bounds() {
+    const MIN: usize = 3000;
+    const MAX: usize = 200_000;
+    let bytes = std::fs::metadata(COMMANDS_MODS_RS)
+        .expect("commands/mods.rs must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "PRD 3.3.4 (iter 286): {COMMANDS_MODS_RS} is {bytes} bytes; \
+         expected [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn main_rs_byte_bounds() {
+    const MIN: usize = 5000;
+    const MAX: usize = 100_000;
+    let bytes = std::fs::metadata(MAIN_RS)
+        .expect("main.rs must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "PRD 3.3.4 (iter 286): {MAIN_RS} is {bytes} bytes; expected \
+         [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn guard_source_byte_bounds() {
+    const MIN: usize = 5000;
+    const MAX: usize = 80_000;
+    let bytes = std::fs::metadata(GUARD_SOURCE)
+        .expect("guard must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "PRD 3.3.4 (iter 286): guard is {bytes} bytes; expected \
+         [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn guard_source_cites_prd_3_3_4_explicitly() {
+    let body = fs::read_to_string(GUARD_SOURCE)
+        .expect("guard must exist");
+    let header = &body[..body.len().min(500)];
+    assert!(
+        header.contains("PRD 3.3.4"),
+        "PRD 3.3.4 (iter 286): guard header must cite `PRD 3.3.4`.\n\
+         Header:\n{header}"
+    );
+}
+
+#[test]
+fn sha2_crate_is_declared_in_cargo_toml() {
+    let toml = fs::read_to_string("Cargo.toml")
+        .expect("Cargo.toml must exist");
+    assert!(
+        toml.contains("sha2"),
+        "PRD 3.3.4 (iter 286): Cargo.toml must declare `sha2` — the \
+         hashing crate `Sha256::digest` depends on."
+    );
+}
