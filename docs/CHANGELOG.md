@@ -15,6 +15,28 @@ polished in the main branch.
 
 ---
 
+## 0.1.14 — Update-install flow, GPK mapper patch, discovered-mods CSV
+
+- The "Check for launcher updates" button now actually installs the
+  update. Previously it detected and announced "Update available" but
+  never triggered the download — another Tauri v1 to v2 API miss from
+  the framework migration (v2 requires an explicit
+  `update.downloadAndInstall()` call). Button now prompts to confirm,
+  downloads, installs, and relaunches.
+- Legacy GPK install rewrites `CompositePackageMapper.dat` entries so
+  the mod actually overrides its target composite in-game. Previous
+  release only copied the file into CookedPC/, which TERA's engine
+  ignored because the composite-mapper still pointed at the vanilla
+  packed location. Flight-gauge-style .gpk mods should now hide their
+  target UI after relaunch.
+- Shipped 61 discovered-mod entries at
+  `docs/PRD/audits/research/tera-mods-discovered.csv` for catalog
+  expansion work. These are tera-proxy / tera-toolbox Node.js modules;
+  they'd need a new launcher ModKind + toolbox integration to install
+  automatically.
+
+---
+
 ## 0.1.13 — Portal-offline fix, legacy GPK install, filter alignment
 
 - The "Can't reach the portal server" banner no longer shows when the

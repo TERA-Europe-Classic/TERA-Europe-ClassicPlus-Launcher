@@ -594,8 +594,9 @@ async function handleCheckLauncherUpdate() {
     if (!updater) {
       showUpdateNotification('upToDate', 'Launcher v' + currentVersion, 'Updater not available');
     } else {
-      // Tauri v2 API: check() returns null if up to date, or an Update object.
-      // Fall back to v1's checkUpdate() if the plugin was pinned to v1.
+      // Tauri v2 API: check() returns null if up to date, or an Update object
+      // with a downloadAndInstall() method. v1's checkUpdate() returned
+      // { shouldUpdate, manifest } — kept as fallback.
       const result = updater.check
         ? await updater.check()
         : (updater.checkUpdate ? await updater.checkUpdate() : null);
@@ -605,12 +606,37 @@ async function handleCheckLauncherUpdate() {
         // v1 shape
         if (result.shouldUpdate) {
           showUpdateNotification('upToDate', 'Update available: ' + (result.manifest?.version || 'new version'), 'Current version: ' + currentVersion);
+          // v1 relied on dialog:true in tauri.conf.json to auto-prompt.
         } else {
           showUpdateNotification('upToDate', 'Launcher is up to date (v' + currentVersion + ')', 'No updates available');
         }
       } else {
         // v2 shape — non-null result means an update is available.
-        showUpdateNotification('upToDate', 'Update available: v' + (result.version || 'new'), 'Current version: ' + currentVersion);
+        // Prompt the user; on confirm, download + install + relaunch.
+        const newVersion = result.version || 'new';
+        showUpdateNotification('upToDate', 'Update available: v' + newVersion, 'Current version: ' + currentVersion);
+        const ask = window.__TAURI__?.dialog?.ask;
+        const wantsUpdate = ask
+          ? await ask(
+              `Launcher v${newVersion} is available (current: v${currentVersion}). Download and install now? The launcher will restart.`,
+              { title: 'Launcher Update', kind: 'info' }
+            )
+          : true;
+        if (wantsUpdate && typeof result.downloadAndInstall === 'function') {
+          showUpdateNotification('checking', 'Downloading update…', 'Do not close the launcher.');
+          try {
+            await result.downloadAndInstall();
+            // downloadAndInstall triggers a relaunch on success; if we get
+            // here the install finished but auto-relaunch didn't fire.
+            const relaunch = window.__TAURI__?.process?.relaunch;
+            if (typeof relaunch === 'function') {
+              await relaunch();
+            }
+          } catch (e) {
+            console.error('Update install failed:', e);
+            showUpdateNotification('error', 'Update install failed', e?.message || String(e));
+          }
+        }
       }
     }
   } catch (error) {
@@ -2438,6 +2464,38 @@ const App = {
             this.showCustomNotification(
               `You are on the latest launcher (v${version}).`,
               "success",
+            );
+            return;
+          }
+          // Update available — prompt to download+install.
+          const currentVersion = await window.__TAURI__?.app?.getVersion?.() || "current";
+          const newVersion = ('shouldUpdate' in result
+            ? result.manifest?.version
+            : result.version) || 'new';
+          const ask = window.__TAURI__?.dialog?.ask;
+          const wantsUpdate = ask
+            ? await ask(
+                `Launcher v${newVersion} is available (current: v${currentVersion}). Download and install now? The launcher will restart.`,
+                { title: 'Launcher Update', kind: 'info' }
+              )
+            : true;
+          if (wantsUpdate && typeof result.downloadAndInstall === 'function') {
+            this.showCustomNotification('Downloading update…', 'success');
+            try {
+              await result.downloadAndInstall();
+              const relaunch = window.__TAURI__?.process?.relaunch;
+              if (typeof relaunch === 'function') {
+                await relaunch();
+              }
+            } catch (err) {
+              console.error('Update install failed:', err);
+              this.showCustomNotification('Update install failed.', 'error');
+            }
+          } else if (wantsUpdate) {
+            // v1 path (no downloadAndInstall method on the result).
+            this.showCustomNotification(
+              'Update is available but auto-install is unavailable in this launcher build.',
+              'error'
             );
           }
         } catch (err) {
@@ -5458,29 +5516,45 @@ const App = {
 
     try {
       // Tauri v2 updater plugin. check() returns null if up to date, or an
-      // Update object with `version` if there is an update. v1's checkUpdate
-      // returned { shouldUpdate, manifest } — shim kept for pinned v1 installs.
+      // Update object with `version` + downloadAndInstall() method. v1's
+      // checkUpdate returned { shouldUpdate, manifest } — shim kept.
       const updater = window.__TAURI__?.updater || {};
       const result = updater.check
         ? await updater.check()
         : (updater.checkUpdate ? await updater.checkUpdate() : null);
+      const notify = (msg, b) => {
+        if (typeof window.showUpdateNotification === 'function') {
+          window.showUpdateNotification(msg, b);
+        }
+      };
       if (result == null) {
-        if (typeof window.showUpdateNotification === 'function') {
-          window.showUpdateNotification('Launcher is up to date', true);
-        }
-      } else if ('shouldUpdate' in result) {
-        if (result.shouldUpdate) {
-          if (typeof window.showUpdateNotification === 'function') {
-            window.showUpdateNotification(`Update available: ${result.manifest?.version}`, true);
-          }
-        } else {
-          if (typeof window.showUpdateNotification === 'function') {
-            window.showUpdateNotification('Launcher is up to date', true);
-          }
-        }
-      } else {
-        if (typeof window.showUpdateNotification === 'function') {
-          window.showUpdateNotification(`Update available: ${result.version}`, true);
+        notify('Launcher is up to date', true);
+        return;
+      }
+      const hasUpdate = 'shouldUpdate' in result ? result.shouldUpdate : true;
+      if (!hasUpdate) {
+        notify('Launcher is up to date', true);
+        return;
+      }
+      const newVersion = ('shouldUpdate' in result
+        ? result.manifest?.version
+        : result.version) || 'new';
+      notify(`Update available: ${newVersion}`, true);
+
+      // Only v2 result objects carry downloadAndInstall(). Prompt + install.
+      const ask = window.__TAURI__?.dialog?.ask;
+      const wantsUpdate = ask
+        ? await ask(
+            `Launcher v${newVersion} is available. Download and install now? The launcher will restart.`,
+            { title: 'Launcher Update', kind: 'info' }
+          )
+        : true;
+      if (wantsUpdate && typeof result.downloadAndInstall === 'function') {
+        notify('Downloading update…', false);
+        await result.downloadAndInstall();
+        const relaunch = window.__TAURI__?.process?.relaunch;
+        if (typeof relaunch === 'function') {
+          await relaunch();
         }
       }
     } catch (error) {
