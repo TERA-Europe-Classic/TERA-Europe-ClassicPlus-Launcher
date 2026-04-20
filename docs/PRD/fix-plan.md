@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 269
-last_work_iteration: 269
+iteration_counter: 270
+last_work_iteration: 270
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 245
+total_items_done: 246
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 270 WORK — pin.bogus-gpk-footer-tmm-bounds+guard-bounds+slot-cite+canonical-test-name+ue3-magic-sentinel DONE. 19-count tier begins.**
+>
+> adv.bogus-gpk-footer; bogus_gpk_footer had 19 tests. Brings to 24.
+>
+> Five new pins:
+> 1. `tmm_rs_byte_size_has_sane_bounds` — 5000-200000
+> 2. `guard_source_byte_size_has_sane_bounds` — 5000-80000
+> 3. `guard_source_cites_adv_bogus_gpk_footer_slot`
+> 4. `tmm_rs_carries_canonical_adversarial_test_name` — `parse_mod_file_rejects_non_tmm_gpks` (referenced in guard header)
+> 5. `package_magic_constant_is_ue3_sentinel` — 0x9E2A83C1 pin
+>
+> bogus_gpk_footer: 19 → 24 tests. 1594 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 269 WORK — pin.tauri-v2-audit-guard-bounds+doc-byte-floor+min-lines-const+slot-cite+canonical-prefix DONE. 18-count tier complete.**
 >

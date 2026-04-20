@@ -664,3 +664,85 @@ fn install_legacy_gpk_reads_source_as_raw_bytes() {
          names, binary version ints) trip UTF-8 validation."
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 270 structural pins — tmm.rs bounds + guard bounds + adv slot
+// cite + 19-count tier ratchet begins.
+// --------------------------------------------------------------------
+
+/// Iter 270: tmm.rs byte bounds. Floor ensures the parse/install code
+/// survives; ceiling catches unbounded scope creep.
+#[test]
+fn tmm_rs_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 5000;
+    const MAX_BYTES: usize = 200_000;
+    let bytes = std::fs::metadata(TMM_RS)
+        .expect("tmm.rs must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "adv.bogus-gpk-footer (iter 270): {TMM_RS} is {bytes} bytes; \
+         expected [{MIN_BYTES}, {MAX_BYTES}]. Gutting drops the parse \
+         code; bloat warrants audit."
+    );
+}
+
+/// Iter 270: guard source byte bounds.
+#[test]
+fn guard_source_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 5000;
+    const MAX_BYTES: usize = 80_000;
+    let bytes = std::fs::metadata("tests/bogus_gpk_footer.rs")
+        .expect("guard must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "adv.bogus-gpk-footer (iter 270): guard is {bytes} bytes; \
+         expected [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+/// Iter 270: guard header must cite `adv.bogus-gpk-footer` slot.
+#[test]
+fn guard_source_cites_adv_bogus_gpk_footer_slot() {
+    let body = std::fs::read_to_string("tests/bogus_gpk_footer.rs")
+        .expect("guard must exist");
+    let header = &body[..body.len().min(500)];
+    assert!(
+        header.contains("adv.bogus-gpk-footer"),
+        "adv.bogus-gpk-footer (iter 270): guard header must cite the \
+         fix-plan slot verbatim.\nHeader:\n{header}"
+    );
+}
+
+/// Iter 270: tmm.rs must carry the canonical test name
+/// `parse_mod_file_rejects_non_tmm_gpks` — referenced in the guard
+/// header's documentation. Rename would orphan the header reference.
+#[test]
+fn tmm_rs_carries_canonical_adversarial_test_name() {
+    let src = std::fs::read_to_string(TMM_RS)
+        .expect("tmm.rs must exist");
+    assert!(
+        src.contains("fn parse_mod_file_rejects_non_tmm_gpks"),
+        "adv.bogus-gpk-footer (iter 270): {TMM_RS} must keep \
+         `fn parse_mod_file_rejects_non_tmm_gpks` — the 8-fixture \
+         adversarial corpus the guard header documents. A rename \
+         would orphan the header reference and make the corpus \
+         untraceable via grep."
+    );
+}
+
+/// Iter 270: PACKAGE_MAGIC constant must remain at 0x9E2A83C1 (UE3
+/// sentinel). A change would make the parser accept or reject
+/// different bytes — a semantic regression.
+#[test]
+fn package_magic_constant_is_ue3_sentinel() {
+    let src = std::fs::read_to_string(TMM_RS)
+        .expect("tmm.rs must exist");
+    assert!(
+        src.contains("0x9E2A83C1"),
+        "adv.bogus-gpk-footer (iter 270): {TMM_RS} must keep the UE3 \
+         PACKAGE_MAGIC sentinel `0x9E2A83C1`. A change would alter \
+         which bytes the parser accepts/rejects — a semantic drift."
+    );
+}
