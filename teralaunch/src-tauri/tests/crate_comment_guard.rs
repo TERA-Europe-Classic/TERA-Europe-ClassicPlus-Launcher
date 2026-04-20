@@ -549,3 +549,185 @@ fn forbidden_wip_markers_include_all_four() {
         );
     }
 }
+
+// --------------------------------------------------------------------
+// Iter 231 structural pins — GUARD_FILE canonicalisation, stable-sort
+// determinism, MIN_SUMMARY_CHARS literal pin, self-test era coverage,
+// detector helpers wired into real (not just self-test) assertions.
+//
+// Iter-104 / 143 / 179 / 204 covered filesystem walk invariants and
+// first-order constants. These five extend to the meta-guard surface
+// a confident refactor could still break silently: GUARD_FILE path
+// drift (header-inspection turns into a panic not a pointer), missing
+// sort (failure messages lose determinism), MIN_SUMMARY_CHARS floor
+// drift (the 20-char literal is inlined in the fn body, not a module
+// const — a silent lowering to 1 has no guard today), self-test that
+// doesn't cover both eras (an iter-143 refactor could drop the
+// iter-179 helpers from self-test and nobody would notice).
+// --------------------------------------------------------------------
+
+/// Iter 231: `GUARD_FILE` must stay `tests/crate_comment_guard.rs`
+/// verbatim. Every header-inspection pin below reads this path; a
+/// rename leaves the pin chain intact shape-wise but panics on
+/// `unwrap` with "tests/crate_comment_guard.rs must exist" — a
+/// maintainer reading that message would check for the file's
+/// existence, not suspect a constant drift.
+#[test]
+fn guard_file_constant_is_canonical() {
+    let body = read_guard_file();
+    assert!(
+        body.contains("const GUARD_FILE: &str = \"tests/crate_comment_guard.rs\";"),
+        "PRD 3.8.2 (iter 231): tests/crate_comment_guard.rs must keep \
+         `const GUARD_FILE: &str = \"tests/crate_comment_guard.rs\";` \
+         verbatim. A rename of this file without updating the constant \
+         produces a `file not found` panic that misdirects triage \
+         toward missing files, not a constant-drift bug."
+    );
+}
+
+/// Iter 231: `rs_files_in_mods_dir()` must call `.sort()` on its
+/// output before returning. `fs::read_dir` returns entries in OS-
+/// dependent order — on Linux it's filesystem-hash order (non-
+/// deterministic), on Windows it's sometimes FILE_BASIC_INFO order.
+/// Without sort, failure messages cite files in a non-deterministic
+/// order between CI runs and between machines; a bisect on an intermittent
+/// guard failure sees the diff between two runs' errors but the diff
+/// is just ordering noise.
+#[test]
+fn files_walker_sorts_output_for_deterministic_failures() {
+    let body = read_guard_file();
+    // Find the fn body.
+    let fn_pos = body
+        .find("fn rs_files_in_mods_dir()")
+        .expect("rs_files_in_mods_dir must exist");
+    let fn_end = body[fn_pos..]
+        .find("\n}\n")
+        .map(|i| fn_pos + i)
+        .unwrap_or(fn_pos + 800);
+    let fn_body = &body[fn_pos..fn_end];
+    assert!(
+        fn_body.contains(".sort()"),
+        "PRD 3.8.2 (iter 231): rs_files_in_mods_dir() must call \
+         `.sort()` on its return value so failure messages cite files \
+         in a stable order across CI runs and developer machines. \
+         Without sort, `fs::read_dir` iteration order is OS-dependent \
+         (Linux: fs-hash; Windows: FILE_BASIC_INFO) → intermittent \
+         red CI where a bisect's diff is just ordering noise.\n\
+         Fn body:\n{fn_body}"
+    );
+}
+
+/// Iter 231: pin the `MIN_SUMMARY_CHARS = 20` literal in
+/// `every_mods_doc_first_line_has_nonempty_summary`. The constant
+/// is inlined in the fn body (not a module const), so there's no
+/// existing guard catching a silent lowering. A refactor that
+/// reads "20 is arbitrary; let's loosen to 5" defeats the purpose
+/// of the check — short summaries are exactly what iter 179 was
+/// guarding against.
+#[test]
+fn min_summary_chars_literal_is_pinned_to_twenty() {
+    let body = read_guard_file();
+    assert!(
+        body.contains("const MIN_SUMMARY_CHARS: usize = 20;"),
+        "PRD 3.8.2 (iter 231): \
+         `every_mods_doc_first_line_has_nonempty_summary` must keep \
+         `const MIN_SUMMARY_CHARS: usize = 20;` verbatim. A silent \
+         lowering (e.g. to 5 or 1) turns the summary-floor check into \
+         a vacuous pass — the first `//!` line could say `//! x` and \
+         still satisfy `content.len() >= 5`."
+    );
+}
+
+/// Iter 231: the detector self-test must carry references to BOTH
+/// the iter-143 body-length helper (`crate_doc_body_chars`) AND the
+/// iter-179 helpers (`count_leading_doc_lines`, `crate_doc_is_at_top_of_file`,
+/// `crate_doc_contains_forbidden_marker`). A refactor that dropped the
+/// iter-179 helpers from the self-test would leave them unused by the
+/// assertion layer — the production-gating tests still call them, but
+/// the self-test no longer proves they bite on known-bad shapes.
+#[test]
+fn detector_self_test_covers_both_iter_eras() {
+    let body = read_guard_file();
+    let fn_pos = body
+        .find("fn crate_comment_detector_self_test()")
+        .expect("self-test fn must exist");
+    // Find the END of this fn by scanning for a `\n}\n` that isn't
+    // inside a string literal or nested block. Simple brace-balance
+    // from the opening `{` works because this fn has no nested fns.
+    let brace_start = body[fn_pos..].find('{').expect("fn open brace") + fn_pos;
+    let mut depth = 0i32;
+    let mut in_str = false;
+    let mut escape = false;
+    let bytes = body.as_bytes();
+    let mut fn_end = bytes.len();
+    for (i, &c) in bytes.iter().enumerate().skip(brace_start) {
+        if in_str {
+            if escape { escape = false; }
+            else if c == b'\\' { escape = true; }
+            else if c == b'"' { in_str = false; }
+            continue;
+        }
+        match c {
+            b'"' => in_str = true,
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    fn_end = i + 1;
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    let self_test = &body[fn_pos..fn_end];
+    for helper in [
+        "crate_doc_body_chars",               // iter 143
+        "count_leading_doc_lines",            // iter 179
+        "crate_doc_is_at_top_of_file",        // iter 179
+        "crate_doc_contains_forbidden_marker", // iter 179
+    ] {
+        assert!(
+            self_test.contains(helper),
+            "PRD 3.8.2 (iter 231): crate_comment_detector_self_test \
+             must reference `{helper}` so the self-test covers both \
+             iter-143 and iter-179 detector eras. A refactor that \
+             drops a helper from the self-test leaves it silently \
+             unexercised — the production gate still uses it, but \
+             no one proves it bites on known-bad shapes."
+        );
+    }
+}
+
+/// Iter 231: every iter-179 production-gating helper must appear at
+/// least TWICE in the file: once inside the self-test (proving the
+/// helper bites on known shapes) AND once in a real walking test
+/// (proving the invariant is actually gated on every mods file).
+/// Counting ≥ 2 occurrences of the name is the simplest proxy for
+/// "helper is wired into a real assertion, not just the self-test".
+/// A refactor that removed the walking test would drop the count to
+/// 1 and this pin fires.
+#[test]
+fn iter_179_helpers_wired_into_real_walking_tests() {
+    let body = read_guard_file();
+    for helper in [
+        "count_leading_doc_lines",
+        "crate_doc_is_at_top_of_file",
+        "crate_doc_contains_forbidden_marker",
+    ] {
+        // Count as-identifier occurrences: the name followed by `(` or
+        // by whitespace (no false matches on prefix substrings).
+        let with_paren = format!("{helper}(");
+        let count = body.matches(&with_paren).count();
+        assert!(
+            count >= 2,
+            "PRD 3.8.2 (iter 231): helper `{helper}(` must be called \
+             at least twice — once in the self-test (proof the helper \
+             bites on known shapes) and once in a real walking test \
+             (production gate on every mods file). Found {count} \
+             occurrences; a single call means either the self-test \
+             was dropped (helper untested) or the walking test was \
+             dropped (helper is dead code)."
+        );
+    }
+}

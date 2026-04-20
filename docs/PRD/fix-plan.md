@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 230
-last_work_iteration: 230
+iteration_counter: 231
+last_work_iteration: 231
 last_research_sweep: 230
 last_revalidation: 220
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 207
+total_items_done: 208
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 231 WORK — pin.crate-comment-guard-GUARD_FILE-canonical+stable-sort-determinism+MIN_SUMMARY_CHARS-literal+self-test-era-coverage+iter-179-helpers-wired DONE.**
+>
+> PRD 3.8.2; crate_comment_guard had 13 tests (iter 104 creation + iter 143 +1 + iter 179 +4 + iter 204 +5); 27 iters untouched. Brings to 18.
+>
+> Five new meta-guard pins (GUARD_FILE constant + sort-for-determinism + inlined-literal + detector self-test era coverage + helper-wiring proof):
+> 1. `guard_file_constant_is_canonical` — pin `GUARD_FILE = "tests/crate_comment_guard.rs"` verbatim (path drift masquerades as file-not-found panic)
+> 2. `files_walker_sorts_output_for_deterministic_failures` — pin `.sort()` in `rs_files_in_mods_dir()`; without it, CI failure messages cite files in OS-dependent order, bisect diffs become ordering noise
+> 3. `min_summary_chars_literal_is_pinned_to_twenty` — pin `const MIN_SUMMARY_CHARS: usize = 20;` (iter-179 literal is inlined in fn body, not module-level, so no existing guard catches a silent lowering)
+> 4. `detector_self_test_covers_both_iter_eras` — self-test must reference all 4 helpers (iter-143 body_chars + 3 iter-179 helpers); uses brace-balanced fn-end detection robust to string-literal false matches
+> 5. `iter_179_helpers_wired_into_real_walking_tests` — each iter-179 helper must appear ≥ 2× in file (proves both self-test AND real walking test use it; drop-count-to-1 means one was dropped)
+>
+> crate_comment_guard: 13 → 18 tests. 1404 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 230 WORK — pin.http-redirect-offlist-path-consts+timeout-floor+no-reqwest-get-shortcut+cursor-advance-detector+three-critical-files + DoS-fix (30s/300s timeouts on both HTTP builders) DONE.**
 >
