@@ -561,7 +561,9 @@
             border-radius: 8px;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
             overflow: hidden;
-            z-index: 2001;
+            /* Must stay above .offline-banner (z-index: 10000) so the
+               dropdown opens on top when both are visible. */
+            z-index: 10001;
         }
 
         .account-manager.open .account-dropdown {

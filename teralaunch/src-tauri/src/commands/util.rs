@@ -335,8 +335,13 @@ fn extract_tag_content(line: &str, tag: &str) -> Option<String> {
 pub async fn check_server_connection() -> Result<bool, String> {
     let file_server_url = get_config_value("FILE_SERVER_URL");
     if file_server_url.trim().is_empty() {
+        // Classic+ ships without a patch server today — FILE_SERVER_URL
+        // is intentionally empty. Returning `Ok(false)` here would trip
+        // the frontend's offline banner even though login / launch / in-
+        // game status all work fine. Treat "no URL configured" as
+        // "nothing to probe, so nothing to be offline about."
         log::warn!("FILE_SERVER_URL is empty, skipping server connection check");
-        return Ok(false);
+        return Ok(true);
     }
 
     let client = reqwest::Client::builder()
