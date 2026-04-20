@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 270
-last_work_iteration: 270
+iteration_counter: 271
+last_work_iteration: 271
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 246
+total_items_done: 247
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 271 WORK — pin.conflict-modal-guard-bounds+commands-bounds+tmm-bounds+slot-cite+invoke-handler-registration DONE.**
+>
+> fix.conflict-modal-wiring; conflict_modal had 19 tests. Brings to 24.
+>
+> Five new pins:
+> 1. `guard_source_byte_size_has_sane_bounds` — 5000-80000
+> 2. `commands_mods_byte_size_has_sane_bounds` — 3000-200000
+> 3. `tmm_rs_byte_size_has_sane_bounds` — 5000-200000
+> 4. `guard_source_cites_fix_conflict_modal_wiring_slot`
+> 5. `preview_mod_install_conflicts_is_registered_in_main`
+>
+> conflict_modal: 19 → 24 tests. 1599 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 270 WORK — pin.bogus-gpk-footer-tmm-bounds+guard-bounds+slot-cite+canonical-test-name+ue3-magic-sentinel DONE. 19-count tier begins.**
 >

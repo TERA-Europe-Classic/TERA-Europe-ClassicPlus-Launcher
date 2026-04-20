@@ -602,3 +602,82 @@ fn preview_command_name_is_pinned_verbatim() {
         );
     }
 }
+
+// --------------------------------------------------------------------
+// Iter 271 structural pins — guard/commands/tmm bounds + slot cite +
+// invoke-handler registration.
+// --------------------------------------------------------------------
+
+/// Iter 271: guard source byte bounds.
+#[test]
+fn guard_source_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 5000;
+    const MAX_BYTES: usize = 80_000;
+    let bytes = std::fs::metadata(GUARD_SOURCE)
+        .expect("guard must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "fix.conflict-modal-wiring (iter 271): guard is {bytes} \
+         bytes; expected [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+/// Iter 271: commands/mods.rs byte bounds.
+#[test]
+fn commands_mods_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 3000;
+    const MAX_BYTES: usize = 200_000;
+    let bytes = std::fs::metadata(COMMANDS_MODS_RS)
+        .expect("commands/mods.rs must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "fix.conflict-modal-wiring (iter 271): {COMMANDS_MODS_RS} is \
+         {bytes} bytes; expected [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+/// Iter 271: tmm.rs byte bounds (pure predicate lives there).
+#[test]
+fn tmm_rs_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 5000;
+    const MAX_BYTES: usize = 200_000;
+    let bytes = std::fs::metadata(TMM_RS)
+        .expect("tmm.rs must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "fix.conflict-modal-wiring (iter 271): {TMM_RS} is {bytes} \
+         bytes; expected [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+/// Iter 271: guard header must cite fix-plan slot.
+#[test]
+fn guard_source_cites_fix_conflict_modal_wiring_slot() {
+    let body = std::fs::read_to_string(GUARD_SOURCE)
+        .expect("guard must exist");
+    let header = &body[..body.len().min(500)];
+    assert!(
+        header.contains("fix.conflict-modal-wiring"),
+        "fix.conflict-modal-wiring (iter 271): guard header must \
+         cite the slot verbatim.\nHeader:\n{header}"
+    );
+}
+
+/// Iter 271: `preview_mod_install_conflicts` must be registered in
+/// main.rs invoke-handler. Without registration, the frontend errors
+/// with `command not found`.
+#[test]
+fn preview_mod_install_conflicts_is_registered_in_main() {
+    let main = std::fs::read_to_string("src/main.rs")
+        .expect("main.rs must exist");
+    assert!(
+        main.contains("preview_mod_install_conflicts"),
+        "fix.conflict-modal-wiring (iter 271): src/main.rs must \
+         register `preview_mod_install_conflicts` in \
+         generate_handler! / invoke_handler. Without registration, \
+         the frontend invoke() call errors with 'command not found'."
+    );
+}
