@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 243
-last_work_iteration: 243
+iteration_counter: 244
+last_work_iteration: 244
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 219
+total_items_done: 220
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,21 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 244 WORK — pin.multi-client-path-consts+overlay-enum-two-variants+no-pid-zero-target+spawn-decision-enum-return+game-rs-canonical-import + CRLF normalize fix DONE.**
+>
+> PRD 3.2.11 (attach-once) + 3.2.12 (overlay-lifecycle); multi_client had 16 tests. Brings to 21.
+>
+> Five new pins + one real test-infra fix:
+> 1. `guard_path_constants_are_canonical` — EXTERNAL_APP_RS + GUARD_FILE + GAME_RS verbatim
+> 2. `overlay_lifecycle_action_carries_exactly_two_variants` — Terminate + KeepRunning cardinality pin; +1 variant would bypass game.rs's `== Terminate` gate
+> 3. `stop_process_by_name_does_not_target_pid_zero` — forbid `kill(0)` / `Pid::from(0)` patterns (Windows System Idle Process)
+> 4. `check_spawn_decision_returns_spawn_decision_enum` — pin `-> SpawnDecision` (bool would collapse attach/spawn/skip to two outcomes)
+> 5. `game_rs_imports_overlay_types_from_canonical_path` — pin import from `services::mods::external_app::` (local stub shadow would compile but bypass production)
+>
+> **Real test-infra fix:** both `external_app_src()` and `game_rs_src()` now normalize CRLF → LF before body extraction. Same class of issue iter-235 disk_full hit; my new enum-body extractor fell through to the 400-char fallback and included neighbouring fn bodies, causing "Terminate appears twice" false positive.
+>
+> multi_client: 16 → 21 tests. 1464 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 243 WORK — pin.crash-recovery-path-consts+recover-installing-only+json-err-propagated+registry-has-default+fixture-snake-case-installing DONE.**
 >

@@ -6,6 +6,8 @@
 //! attach-once protocol so the in-crate implementation can't regress to a
 //! structurally different rule silently.
 
+use std::fs;
+
 /// Model of the spawn decision rule. If this ever diverges from
 /// `external_app::decide_spawn`, the integration test here and the in-crate
 /// test will both need to change — which is the pressure we want against
@@ -146,8 +148,12 @@ fn game_rs_gates_overlay_stop_on_decide_overlay_action() {
 const EXTERNAL_APP_RS: &str = "src/services/mods/external_app.rs";
 
 fn external_app_src() -> String {
+    // Normalize CRLF -> LF so fn/enum body extractors that search for
+    // `\n}\n` work correctly on Windows checkouts (iter 243: same
+    // issue the disk_full guard hit at iter 235).
     std::fs::read_to_string(EXTERNAL_APP_RS)
         .unwrap_or_else(|e| panic!("{EXTERNAL_APP_RS} must be readable: {e}"))
+        .replace("\r\n", "\n")
 }
 
 /// The pure predicate `decide_spawn` must accept exactly `(bool)` and
@@ -352,7 +358,9 @@ fn guard_src() -> String {
 }
 
 fn game_rs_src() -> String {
-    std::fs::read_to_string(GAME_RS).expect("commands/game.rs must exist")
+    std::fs::read_to_string(GAME_RS)
+        .expect("commands/game.rs must exist")
+        .replace("\r\n", "\n")
 }
 
 /// The guard's module header must cite both PRDs it protects — 3.2.11
@@ -497,5 +505,166 @@ fn stop_process_by_name_is_case_insensitive_mirror() {
          expected ≥ 2. A one-sided compare means detection finds \
          SHINRA but stop can't kill it — overlays leak across \
          launcher lifetimes.\nWindow:\n{window}"
+    );
+}
+
+// --------------------------------------------------------------------
+// Iter 243 structural pins — path-constant canonicalisation,
+// OverlayLifecycleAction enum discriminants, stop-process forbids
+// PID=0, spawn-decision unit return type, game.rs imports decide_
+// overlay_action from canonical path.
+// --------------------------------------------------------------------
+
+/// Iter 243: `EXTERNAL_APP_RS` + `GUARD_FILE` + `GAME_RS` constants
+/// must stay canonical. Every source-inspection pin reads through
+/// one of these; drift silently redirects tests with misleading
+/// "file not found" panics.
+#[test]
+fn guard_path_constants_are_canonical() {
+    let body = fs::read_to_string(GUARD_FILE).expect("guard source must exist");
+    for (name, expected) in [
+        ("EXTERNAL_APP_RS", "src/services/mods/external_app.rs"),
+        ("GUARD_FILE", "tests/multi_client.rs"),
+        ("GAME_RS", "src/commands/game.rs"),
+    ] {
+        let line = format!("const {name}: &str = \"{expected}\";");
+        assert!(
+            body.contains(&line),
+            "PRD 3.2.11/3.2.12 (iter 243): tests/multi_client.rs \
+             must keep `{line}` verbatim. A rename without updating \
+             the constant leaves every pin reading through it with \
+             file-not-found panics."
+        );
+    }
+}
+
+/// Iter 243: `OverlayLifecycleAction` enum must carry exactly two
+/// variants: `Terminate` and `KeepRunning`. Adding a third variant
+/// (e.g. `Suspend`) would require `decide_overlay_action` to
+/// dispatch to it, but game.rs's gate (`== Terminate`) would either
+/// ignore the new variant (silent leak) or trip a non-exhaustive
+/// match warning. Pin the shape so additions require coordinated
+/// updates.
+#[test]
+fn overlay_lifecycle_action_carries_exactly_two_variants() {
+    let body = external_app_src();
+    let enum_pos = body
+        .find("pub enum OverlayLifecycleAction")
+        .expect("OverlayLifecycleAction enum must exist");
+    let rest = &body[enum_pos..];
+    let end = rest.find("\n}\n").unwrap_or(rest.len().min(400));
+    let enum_body = &rest[..end];
+    assert!(
+        enum_body.contains("Terminate"),
+        "PRD 3.2.12 (iter 243): OverlayLifecycleAction must carry \
+         the `Terminate` variant — the one game.rs gates on.\n\
+         Enum body:\n{enum_body}"
+    );
+    assert!(
+        enum_body.contains("KeepRunning"),
+        "PRD 3.2.12 (iter 243): OverlayLifecycleAction must carry \
+         the `KeepRunning` variant — the default path when TERA \
+         clients remain open.\nEnum body:\n{enum_body}"
+    );
+    // Count variants by comma-terminated identifiers or leading
+    // indentation patterns inside the enum body.
+    let terminate_count = enum_body.matches("Terminate").count();
+    let keep_count = enum_body.matches("KeepRunning").count();
+    assert_eq!(
+        terminate_count, 1,
+        "PRD 3.2.12 (iter 243): Terminate must appear exactly once \
+         in the enum body — duplicates indicate a mis-paste."
+    );
+    assert_eq!(
+        keep_count, 1,
+        "PRD 3.2.12 (iter 243): KeepRunning must appear exactly once."
+    );
+}
+
+/// Iter 243: `stop_process_by_name` must NOT call `kill` on PID 0.
+/// Windows PID 0 is the System Idle Process; calling TerminateProcess
+/// on it returns ACCESS_DENIED — but a hypothetical refactor that
+/// iterated sysinfo's process list without filtering would include
+/// it, and a broken filter would forward PID 0 to the kill call.
+/// Pin that the fn source doesn't contain a raw `kill(0)` / PID=0
+/// pattern.
+#[test]
+fn stop_process_by_name_does_not_target_pid_zero() {
+    let body = external_app_src();
+    let fn_pos = body
+        .find("pub fn stop_process_by_name(")
+        .expect("stop_process_by_name must exist");
+    let window = &body[fn_pos..body.len().min(fn_pos + 1000)];
+    // Forbid any literal `kill(0)` pattern, any `pid == 0` that
+    // would select PID 0, or raw `0 as Pid` construction.
+    for bad in ["kill(0)", "Pid::from(0)", "Pid::from_u32(0)"] {
+        assert!(
+            !window.contains(bad),
+            "PRD 3.2.11 (iter 243): stop_process_by_name must NOT \
+             reference PID 0 (`{bad}`). Windows PID 0 is System \
+             Idle; targeting it returns ACCESS_DENIED but signals \
+             a buggy filter upstream.\nWindow:\n{window}"
+        );
+    }
+}
+
+/// Iter 243: `check_spawn_decision` must return `SpawnDecision`
+/// (an enum), not a bare `bool`. A `bool` return would conflate
+/// the three decisions (Spawn / Attach / Skip) into two — and the
+/// attach-once vs spawn-new distinction is PRD 3.2.11 core. Pin
+/// the return type in the source.
+#[test]
+fn check_spawn_decision_returns_spawn_decision_enum() {
+    let body = external_app_src();
+    let fn_pos = body
+        .find("pub fn check_spawn_decision(")
+        .expect("check_spawn_decision must exist");
+    let window = &body[fn_pos..body.len().min(fn_pos + 300)];
+    assert!(
+        window.contains("-> SpawnDecision"),
+        "PRD 3.2.11 (iter 243): check_spawn_decision must return \
+         `SpawnDecision` (enum), not bool or Option<bool>. The \
+         attach-once / spawn-new / skip decisions are three \
+         distinct outcomes; collapsing to bool loses the attach \
+         case and re-opens the double-spawn class.\nWindow:\n{window}"
+    );
+    // Forbid -> bool on this fn explicitly.
+    assert!(
+        !window.contains("check_spawn_decision(") || !window.contains("-> bool {"),
+        "PRD 3.2.11 (iter 243): check_spawn_decision must NOT \
+         return `bool`."
+    );
+}
+
+/// Iter 243: `src/commands/game.rs` must import `decide_overlay_
+/// action` + `OverlayLifecycleAction` from the canonical
+/// `services::mods::external_app` path. An import from a stub
+/// module or local re-export would satisfy the compile but could
+/// shadow the production fn with a test-only variant.
+#[test]
+fn game_rs_imports_overlay_types_from_canonical_path() {
+    let body = game_rs_src();
+    // Accept either a single `use` importing both or two separate
+    // `use` lines — source-inspection only requires the canonical
+    // module path to appear.
+    assert!(
+        body.contains("services::mods::external_app::")
+            || body.contains("use crate::services::mods::external_app::"),
+        "PRD 3.2.12 (iter 243): commands/game.rs must import \
+         `decide_overlay_action` / `OverlayLifecycleAction` from \
+         `services::mods::external_app::` — the canonical module. \
+         A local stub import would compile but shadow production."
+    );
+    // Both symbols must be referenced somewhere in game.rs (they're
+    // the gate + predicate).
+    assert!(
+        body.contains("decide_overlay_action"),
+        "PRD 3.2.12 (iter 243): commands/game.rs must reference \
+         `decide_overlay_action` — the overlay-lifecycle predicate."
+    );
+    assert!(
+        body.contains("OverlayLifecycleAction::Terminate"),
+        "PRD 3.2.12 (iter 243): commands/game.rs must reference \
+         `OverlayLifecycleAction::Terminate` — the gate variant."
     );
 }
