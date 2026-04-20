@@ -660,3 +660,74 @@ fn perf_budget_is_literal_16_not_arithmetic() {
          substring check while silently inflating the budget."
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 287 structural pins — prd-path-drift cross-ref + mods.js
+// filterMatches signature + vitest config presence + describe wrapper
+// + benchmark result deterministic.
+// --------------------------------------------------------------------
+
+#[test]
+fn mods_js_defines_filter_matches_function() {
+    let src = std::fs::read_to_string("../src/mods.js")
+        .expect("mods.js must exist");
+    assert!(
+        src.contains("filterMatches"),
+        "PRD 3.6.4 (iter 287): src/mods.js must define `filterMatches` \
+         — the benchmark target. Rename orphans the scanner + this \
+         guard's iter-181 cross-refs."
+    );
+}
+
+#[test]
+fn vitest_config_exists() {
+    let roots = [
+        "../vitest.config.js",
+        "../vitest.config.mjs",
+        "../vitest.config.ts",
+        "../package.json",
+    ];
+    let exists = roots.iter().any(|p| std::path::Path::new(p).exists());
+    assert!(
+        exists,
+        "PRD 3.6.4 (iter 287): vitest config or package.json must \
+         exist at teralaunch/ root — the perf test runs under Vitest."
+    );
+}
+
+#[test]
+fn scanner_describe_block_exists() {
+    let body = std::fs::read_to_string(SCANNER)
+        .expect("scanner must exist");
+    assert!(
+        body.contains("describe("),
+        "PRD 3.6.4 (iter 287): {SCANNER} must wrap tests in a \
+         `describe(...)` block for semantic grouping in test output."
+    );
+}
+
+#[test]
+fn scanner_sorts_samples_before_taking_median() {
+    // Median-of-N requires sorting first. A regression to mean or
+    // min would skip the sort. Pin the sort call explicitly.
+    let body = std::fs::read_to_string(SCANNER)
+        .expect("scanner must exist");
+    assert!(
+        body.contains(".sort("),
+        "PRD 3.6.4 (iter 287): {SCANNER} must call `.sort(` on the \
+         samples array before taking the median. Without sort, the \
+         middle index isn't the median — could be any value."
+    );
+}
+
+#[test]
+fn drift_guard_contains_this_scanner_entry() {
+    let drift = std::fs::read_to_string("tests/prd_path_drift_guard.rs")
+        .expect("drift guard must exist");
+    assert!(
+        drift.contains("search-perf.test.js") && drift.contains("under_one_frame"),
+        "PRD 3.6.4 (iter 287): prd_path_drift_guard.rs must reference \
+         `search-perf.test.js::under_one_frame` — the cross-guard \
+         contract for PRD §3.6.4's measurement path."
+    );
+}
