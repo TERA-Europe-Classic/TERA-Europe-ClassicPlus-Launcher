@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 204
+total_items_done: 206
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -2003,8 +2003,8 @@ tauri_v2_migration_ready_for_squash_merge: true
 - [P0] **3.1.10.tcc-shinra-binary-hardening** — Strip TCC + Shinra release-mode debug symbols; evaluate ConfuserEx / Obfuscar for IL-obfuscation on sensitive types (e.g. sniffer keys, session-decryption code). Author `docs/PRD/audits/security/tcc-shinra-binary-hardening.md`. Acceptance: release binaries show no `.pdb`-adjacent symbols; audit doc signed off. Pillar: Security.
 - [P0] **3.1.9.updater-downgrade-refuse** — Patch Tauri updater to refuse downgrades (compare current version vs `latest.json` version; reject older). Author `teralaunch/src-tauri/tests/updater_downgrade.rs::refuses_older_latest_json`. Acceptance: test passes with a signed older `latest.json` fixture. Pillar: Security.
 - [P0] **3.1.12.csp-unsafe-inline** — Audit `tauri.conf.json` CSP; remove `unsafe-inline` for `script-src`. Migrate any inline scripts to external modules. Author `teralaunch/src-tauri/tests/csp_audit.rs::csp_denies_inline_scripts`. Acceptance: test asserts CSP contains no `'unsafe-inline'` in `script-src`. Pillar: Security.
-- [P0] **sec.bytes-rustsec-2026-0007** — `cargo audit` flagged `bytes 1.11.0` with RUSTSEC-2026-0007 (integer overflow in `BytesMut::reserve`). Reachable from every HTTP-call path (tokio → hyper → reqwest → bytes). Action: `cargo update -p bytes` to 1.11.1; verify lockfile-only change; run full suite. Acceptance: `cargo audit` reports 0 vulnerabilities on the lockfile; 1394 Rust + 449 vitest stay green. Discovered iter 230 RESEARCH SWEEP. Pillar: Security.
-- [P1] **sec.rand-rustsec-2026-0097-audit** — RUSTSEC-2026-0097 warns `rand 0.9.2` is unsound when a caller installs a custom RNG logger via `rand::rng()`. rand 0.9.2 reaches us via tauri-plugin-notification + quinn-proto (reqwest) + chamox, but we don't install a custom logger anywhere. Acceptance: close as N/A by unreachable-API proof (grep for `rand::rng` / `SeedableRng` custom-logger setters across our crates returning 0 hits), mirror the template of the two `DONE @ iter 55/56` RUSTSEC entries. Discovered iter 230 RESEARCH SWEEP. Pillar: Security.
+- [DONE @ iter 230] **sec.bytes-rustsec-2026-0007** — Closed on commit-to-land. `cargo update -p bytes` bumped the lockfile from 1.11.0 → 1.11.1, closing the BytesMut::reserve integer-overflow advisory at every caller (tokio → hyper → reqwest → bytes). Post-bump `cargo audit` exit 0 (no hard vulnerabilities; 22 unchanged warnings for unmaintained-crate + rand-unsound). 1394 Rust + 449 vitest stay green; clippy clean. Discovered iter 230 RESEARCH SWEEP; fixed same iter. Pillar: Security.
+- [DONE @ iter 230] **sec.rand-rustsec-2026-0097-audit** — Close as N/A by unreachable-API proof. RUSTSEC-2026-0097 warns that `rand::rng()` called after installing a custom RNG logger emits unsound output. `grep -rE 'rand::rng\(\)|rand::thread_rng\(\)|SeedableRng::|set_rng|register_custom_getrandom'` across `teralaunch/src-tauri/src/**` and `teralib/src/**` returns 0 hits — we never call the unsound API, let alone with a custom logger. rand 0.9.2 reaches the lockfile only via tauri-plugin-notification 2.3.3 + quinn-proto 0.11.14 (reqwest 0.12.28) + chamox 0.1.4 as transitive dependencies. The iter-110 research sweep already authored the full applicability audit at `docs/PRD/audits/research/sweep-iter-110.md`; this DONE mirrors the RUSTSEC-2025-0023 (iter 56) and RUSTSEC-2023-0096 (iter 55) closure pattern. Discovered iter 230 RESEARCH SWEEP; closed same iter. Pillar: Security.
 
 ### User-reported bugs (iter 82 — live triage)
 
