@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 254
-last_work_iteration: 254
+iteration_counter: 255
+last_work_iteration: 255
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 230
+total_items_done: 231
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 255 WORK — pin.offline-banner-scanner-size-ceiling+it-count-ratchet-5+string-literal-preservation+catch-shows-banner+translations-json-valid DONE.**
+>
+> fix.offline-empty-state (iter 84); offline_banner_scanner_guard had 17 tests. Brings to 22.
+>
+> Five new pins:
+> 1. `offline_scanner_file_size_has_upper_ceiling` — MAX_BYTES 50_000 (current ~10KB; catches bloat from unrelated tests)
+> 2. `offline_scanner_it_count_ratcheted_to_five` — iter-182 floor 4→5 (current 6; catches ≥2-test bulk-delete)
+> 3. `strip_js_comments_preserves_string_literal_contents` — documents known limitation that helper is NOT string-literal-aware; fails if app.js init introduces `"//` or `"/*` patterns (would mis-parse strings as comments)
+> 4. `app_js_catch_handler_calls_show_offline_banner` — OUTER init `}} catch (` block must call showOfflineBanner (iter-84 fix covers pre-flip; outer catch handles post-flip throws). Bounded to init method body via `\n  },` method-end marker.
+> 5. `translations_json_is_valid_json` — serde_json parse check (string-contains pins pass on broken JSON; launcher fails at runtime)
+>
+> offline_banner_scanner_guard: 17 → 22 tests. 1519 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 254 WORK — pin.lessons-learned-entry-count-ratchet-15+archive-size-floor+retrospective-cadence+em-dash-separator+title-length-ceiling DONE.**
 >

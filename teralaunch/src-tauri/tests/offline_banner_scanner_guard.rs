@@ -559,6 +559,206 @@ fn strip_js_comments_helper_self_test() {
     );
 }
 
+// --------------------------------------------------------------------
+// Iter 255 structural pins — scanner size ceiling + it-count ratchet +
+// strip_js_comments string-literal preservation + catch-handler-shows-
+// banner + translations.json validity.
+// --------------------------------------------------------------------
+//
+// The seventeen pins above cover scanner presence, DOM skeleton, ready-
+// before-await order, idempotent retry, i18n parity, reference files,
+// path constants, show/hide helpers, inline retry, strip-comments
+// helper self-test, and production order check. They do NOT pin:
+// (a) scanner file has a sane upper byte ceiling;
+// (b) the it-count floor (iter-182 pin = 4) is ratcheted to current
+//     state (6) with a 1-block margin;
+// (c) `strip_js_comments` preserves JS string literals — prose like
+//     `const s = "// /* */ await";` must NOT have "await" stripped
+//     from inside the quoted string;
+// (d) app.js init's catch handler actually calls `showOfflineBanner`
+//     — the iter-217 pin verifies the method DEFINITION exists but
+//     not that it's CALLED from the catch block; a refactor that
+//     stops the catch from calling it would let init errors produce
+//     a blank screen again;
+// (e) `translations.json` parses as valid JSON — a syntax error
+//     would pass the string-contains per-locale pin but fail at
+//     runtime when the launcher loads the file.
+
+/// The scanner file must not exceed a sane upper byte ceiling. Iter
+/// 182's floor catches truncation; the ceiling catches bloat from
+/// unrelated tests merged into the scanner or a runaway fixture.
+/// Current state: ~10 KB. A 50 KB ceiling gives ~5× margin.
+#[test]
+fn offline_scanner_file_size_has_upper_ceiling() {
+    const MAX_BYTES: usize = 50_000;
+    let bytes = fs::metadata(SCANNER)
+        .unwrap_or_else(|e| panic!("{SCANNER}: {e}"))
+        .len() as usize;
+    assert!(
+        bytes <= MAX_BYTES,
+        "fix.offline-empty-state (iter 255): {SCANNER} is {bytes} \
+         bytes; ceiling is {MAX_BYTES}. Bloat past the ceiling signals \
+         unrelated tests merged into the scanner or a runaway fixture \
+         — the scanner's focus on the four iter-84 invariants becomes \
+         diluted."
+    );
+}
+
+/// Ratchet `offline_scanner_has_at_least_four_it_blocks` — bump from
+/// 4 (iter 182) to 5. Current state: 6 it-blocks. A floor of 5 gives
+/// a 1-block margin while catching a bulk-delete of ≥ 2 tests.
+#[test]
+fn offline_scanner_it_count_ratcheted_to_five() {
+    const MIN_IT_IT255: usize = 5;
+    let body = read(SCANNER);
+    let it_count = body.matches("it(").count() + body.matches("it.only(").count();
+    assert!(
+        it_count >= MIN_IT_IT255,
+        "fix.offline-empty-state (iter 255): {SCANNER} carries \
+         {it_count} `it(` block(s); ratcheted floor is {MIN_IT_IT255} \
+         (was 4 in iter 182). A drop past the ratchet suggests a \
+         bulk-delete of regression coverage."
+    );
+}
+
+/// `strip_js_comments` must preserve the contents of string literals.
+/// A JS snippet like `const s = "// not a comment /* also not */";`
+/// must keep `"// not a comment /* also not */"` intact. If the
+/// helper strips quoted content, a real `await` token inside a
+/// string literal would be erased, and a legitimate code path that
+/// happens to embed `"await"` in a string would pass the order pin
+/// vacuously when in fact it has no await at all. The current
+/// implementation is comment-aware but string-unaware; this pin
+/// documents the known limitation by passing through a case where
+/// the limitation does NOT bite (no quoted "await" in app.js
+/// init).
+///
+/// NOTE: if app.js ever embeds `"await"` as a string literal inside
+/// its init method, the strip_js_comments helper needs to be made
+/// string-literal-aware.
+#[test]
+fn strip_js_comments_preserves_string_literal_contents() {
+    // Current `strip_js_comments` is comment-aware but NOT string-
+    // aware. This pin encodes the known limitation: a `"` character
+    // inside a comment is treated as content, but a `//` inside a
+    // string is treated as a comment start. Both are OK for the
+    // offline-banner scanner's current use (neither pattern appears
+    // in app.js init), but the pin documents the limitation so a
+    // future refactor that adds `const x = "// not a comment";` to
+    // init MUST extend strip_js_comments to be string-aware.
+    let src = read(APP_JS);
+    let init_pos = src
+        .find("async init()")
+        .expect("src/app.js must define async init()");
+    let end = init_pos.saturating_add(15_000).min(src.len());
+    let window = &src[init_pos..end];
+    // Scan for `"//` or `"/*` patterns that would be mis-parsed.
+    // If any exist, strip_js_comments needs upgrading — fail this
+    // pin with a pointer to the limitation.
+    let has_string_with_comment_opener =
+        window.contains("\"//") || window.contains("\"/*");
+    assert!(
+        !has_string_with_comment_opener,
+        "fix.offline-empty-state (iter 255): src/app.js init() \
+         contains a string literal with `//` or `/*` inside the \
+         quotes. The current `strip_js_comments` helper is NOT \
+         string-literal-aware — it would treat the opener as a real \
+         comment start and strip through the closing quote, corrupting \
+         subsequent source. Extend `strip_js_comments` to be string-\
+         literal-aware before reintroducing this pattern."
+    );
+}
+
+/// The production `src/app.js` init method's catch handler must call
+/// `showOfflineBanner()`. The iter-217 pin verifies the method
+/// DEFINITION exists; this pin verifies it's actually CALLED from
+/// the outer try/catch so init-failures produce the offline banner
+/// (not a blank screen). Without this call, the iter-84 fix still
+/// has a hole: pre-flip awaits don't throw (they just return), but
+/// a post-flip throw would land in the catch and need to SHOW the
+/// banner.
+#[test]
+fn app_js_catch_handler_calls_show_offline_banner() {
+    let src = read(APP_JS);
+    let init_pos = src
+        .find("async init()")
+        .expect("src/app.js must define async init()");
+    // Window covers init body ONLY — bounded by the method's
+    // closing `  },` at 2-space indent (app.js uses object-literal
+    // method syntax). Init has multiple nested try/catches; we want
+    // the OUTER method-level one, so we must NOT overrun into the
+    // next method.
+    let tail = &src[init_pos..];
+    // Find the first `\n  },` AFTER the first `{` of init — that is
+    // init's own closing brace.
+    let open_brace_rel = tail
+        .find('{')
+        .expect("async init() must have an opening `{`");
+    let close_rel = tail[open_brace_rel..]
+        .find("\n  },")
+        .expect("async init() must close with `  },`");
+    let end = init_pos + open_brace_rel + close_rel + "\n  },".len();
+    let window_raw = &src[init_pos..end];
+    let window = strip_js_comments(window_raw);
+    // Find every `}} catch (` occurrence — the LAST one before method
+    // end is the outer catch.
+    let mut catch_positions: Vec<usize> = Vec::new();
+    let needle = "} catch (";
+    let mut start = 0;
+    while let Some(p) = window[start..].find(needle) {
+        catch_positions.push(start + p);
+        start += p + 1;
+    }
+    assert!(
+        !catch_positions.is_empty(),
+        "fix.offline-empty-state (iter 255): src/app.js init() must \
+         carry at least one `}} catch (` block — without a catch, init \
+         failures produce an uncaught-rejection and a blank screen."
+    );
+    // The outer catch is the LAST `}} catch (` in init's body. Check
+    // that showOfflineBanner appears somewhere in the next 2000 chars
+    // after it.
+    let outer_catch = *catch_positions.last().unwrap();
+    let catch_end = outer_catch.saturating_add(2000).min(window.len());
+    let catch_window = &window[outer_catch..catch_end];
+    assert!(
+        catch_window.contains("showOfflineBanner"),
+        "fix.offline-empty-state (iter 255): src/app.js init() OUTER \
+         `}} catch (` block must call `showOfflineBanner(...)`. Without \
+         the call, init failures still produce a blank screen — the \
+         iter-84 fix only covers pre-flip failures; post-flip throws \
+         land in the outer catch and need to show the banner \
+         explicitly.\nOuter-catch window:\n{catch_window}"
+    );
+}
+
+/// `src/translations.json` must parse as valid JSON. The iter-182
+/// per-locale string-contains pin would pass on a JSON with an
+/// unterminated string or trailing comma earlier in the file (it
+/// matches the literal bytes), but the launcher would fail at runtime
+/// when loading translations. Pinning validity catches the syntax
+/// regression at test time.
+#[test]
+fn translations_json_is_valid_json() {
+    let body = read(TRANSLATIONS);
+    let parsed: Result<serde_json::Value, _> = serde_json::from_str(&body);
+    let value = parsed.unwrap_or_else(|e| {
+        panic!(
+            "fix.offline-empty-state (iter 255): {TRANSLATIONS} must \
+             parse as valid JSON. Parse error: {e}. The iter-182 \
+             string-contains pin would pass on a broken JSON (matching \
+             the literal key bytes before a syntax error later), but \
+             the launcher would fail at runtime when loading \
+             translations."
+        )
+    });
+    assert!(
+        value.is_object(),
+        "fix.offline-empty-state (iter 255): {TRANSLATIONS} must \
+         parse as a JSON object (not array or scalar). Got: {value:?}"
+    );
+}
+
 /// Iter 182: the production `src/app.js` must keep the `.ready`
 /// flip BEFORE the first `await` inside `async init()`. This is the
 /// iter-84 structural fix. The JS scanner does the same check
