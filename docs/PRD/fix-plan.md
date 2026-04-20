@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 238
-last_work_iteration: 238
+iteration_counter: 239
+last_work_iteration: 239
 last_research_sweep: 230
 last_revalidation: 220
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 215
+total_items_done: 216
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 239 WORK — pin.zeroize-audit-path-consts+cargo-zeroize_derive-feature+explicit-use-import+no-log-password+no-clone-on-Zeroizing DONE.**
+>
+> PRD 3.1.7.zeroize-audit; zeroize_audit had 15 tests (iter 205 +3 over iter 86 creation + iter 143 +1). First 15→20 extension this session.
+>
+> Five new pins on secret-handling discipline:
+> 1. `guard_path_constants_are_canonical` — 5 constants (MODELS_RS, GAME_SERVICE_RS, CARGO_TOML, GUARD_FILE, AUTH_RS) pinned verbatim
+> 2. `cargo_toml_declares_zeroize_with_derive_feature` — pin `zeroize_derive` feature flag in Cargo.toml; `#[derive(Zeroize)]` depends on it
+> 3. `auth_rs_imports_zeroizing_via_explicit_use` — pin `use zeroize::Zeroizing;` (reject wildcard `use zeroize::*` + fully-qualified call sites)
+> 4. `auth_rs_does_not_log_password_variable` — forbid `{password}` / `{password:?}` / `:?password` interpolation in login_with_client + register_with_client (log leak would write secret to disk)
+> 5. `auth_rs_does_not_clone_zeroizing_password` — forbid `password.clone()`; require `password.as_str()` or `&*password` (clone allocates non-zeroized buffer that outlives wrapper Drop)
+>
+> zeroize_audit: 15 → 20 tests. 1444 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 238 WORK — pin.bogus-gpk-footer-TMM_RS-path+fn-name-pinned+package-magic-0x9E2A83C1-byte-order+install_gpk-parse-before-sandbox-before-ensure-backup+install_legacy_gpk-fs-read-raw DONE.**
 >

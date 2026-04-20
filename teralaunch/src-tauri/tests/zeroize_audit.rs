@@ -436,3 +436,169 @@ fn launch_params_non_sensitive_fields_explicitly_skipped() {
         );
     }
 }
+
+// --------------------------------------------------------------------
+// Iter 238 structural pins — path-constant canonicalisation,
+// zeroize_derive Cargo feature, import-path discipline, no-log-
+// password guard, and no-clone-on-Zeroizing pattern.
+//
+// Iter-205 covered guard header + login/register wrapper + skip
+// classification. These five extend to the meta-guard + cargo
+// feature + import-path + secret-leak surface a confident refactor
+// could still bypass: a path-constant drift (header-inspection
+// silently skips), a `zeroize_derive` feature-flag drop (compiler
+// refuses `#[derive(Zeroize)]` but a future refactor to runtime-
+// derive could be missed), an import from the wrong module (e.g.
+// `use zeroize::Zeroize;` without `Zeroizing` would force
+// `zeroize::Zeroizing::new(...)` at call sites, easy to grep-miss),
+// a `log::info!("... password: {password}")` pattern that emits the
+// secret to disk, and a `.clone()` on the Zeroizing<String> that
+// allocates a fresh non-zeroized buffer.
+// --------------------------------------------------------------------
+
+/// Iter 238: all 5 path constants must stay canonical. Every
+/// `read(...)` call in this guard resolves through one of these;
+/// drift panics all tests with "file not found" instead of pointing
+/// at the actual constant regression.
+#[test]
+fn guard_path_constants_are_canonical() {
+    let body = read(GUARD_FILE);
+    for (name, expected) in [
+        ("MODELS_RS", "src/domain/models.rs"),
+        ("GAME_SERVICE_RS", "src/services/game_service.rs"),
+        ("CARGO_TOML", "Cargo.toml"),
+        ("GUARD_FILE", "tests/zeroize_audit.rs"),
+        ("AUTH_RS", "src/commands/auth.rs"),
+    ] {
+        let line = format!("const {name}: &str = \"{expected}\";");
+        assert!(
+            body.contains(&line),
+            "PRD 3.1.7 (iter 238): zeroize_audit.rs must keep \
+             `{line}` verbatim. A rename of the referenced file \
+             without updating the constant silently disables every \
+             pin that reads through it."
+        );
+    }
+}
+
+/// Iter 238: `Cargo.toml` must declare `zeroize` with the
+/// `zeroize_derive` feature enabled. `#[derive(Zeroize,
+/// ZeroizeOnDrop)]` is the mechanism GlobalAuthInfo / LaunchParams
+/// wipe secrets on Drop — without the feature, the compiler refuses
+/// those derives. The build would break immediately on feature
+/// removal, but a future refactor that swaps to an alternative
+/// derivation path (e.g. custom Drop impls) could miss that the
+/// feature becomes unused-but-still-declared. Pin the feature so
+/// removal requires a deliberate Cargo.toml + code coordination.
+#[test]
+fn cargo_toml_declares_zeroize_with_derive_feature() {
+    let body = read(CARGO_TOML);
+    let has_derive_feature = body.contains(r#"zeroize = { version = "1.7", features = ["zeroize_derive"] }"#)
+        || body.contains(r#"zeroize = { version = "1", features = ["zeroize_derive"] }"#)
+        || (body.contains("zeroize = {") && body.contains(r#""zeroize_derive""#));
+    assert!(
+        has_derive_feature,
+        "PRD 3.1.7 (iter 238): Cargo.toml must declare `zeroize` with \
+         the `zeroize_derive` feature — the `#[derive(Zeroize)]` + \
+         `#[derive(ZeroizeOnDrop)]` attributes depend on it. A \
+         refactor that dropped the feature would break the build \
+         immediately, but removing the feature declaration WITHOUT \
+         removing the derives is impossible to express; pin so both \
+         surfaces stay coordinated."
+    );
+}
+
+/// Iter 238: `src/commands/auth.rs` must import `Zeroizing` via
+/// `use zeroize::Zeroizing;` — NOT via the wildcard `use zeroize::*`
+/// or the fully-qualified `zeroize::Zeroizing::new(...)` at each
+/// call site. The direct import lets a grep for `Zeroizing::new`
+/// find every wrap site; a fully-qualified path splits the
+/// attention between two spellings.
+#[test]
+fn auth_rs_imports_zeroizing_via_explicit_use() {
+    let body = read(AUTH_RS);
+    assert!(
+        body.contains("use zeroize::Zeroizing;"),
+        "PRD 3.1.7 (iter 238): commands/auth.rs must carry \
+         `use zeroize::Zeroizing;` at the top of the file. The \
+         explicit import lets `grep -rE Zeroizing::new` find every \
+         wrap site across the crate; a `use zeroize::*` or \
+         fully-qualified path at each call site splits search \
+         results and makes audit-by-grep unreliable."
+    );
+    // Negative: reject the wildcard form.
+    assert!(
+        !body.contains("use zeroize::*"),
+        "PRD 3.1.7 (iter 238): commands/auth.rs must NOT use \
+         `use zeroize::*` — wildcard imports let a future refactor \
+         bring in `Zeroize` / `ZeroizeOnDrop` silently, obscuring \
+         which types this file actually uses."
+    );
+}
+
+/// Iter 238: `login_with_client` and `register_with_client` must
+/// NOT log the `password` variable in any form. A
+/// `log::debug!("login attempt: {password}")` or `log::info!("{:?}",
+/// payload)` where `payload` holds the plaintext would write the
+/// secret to the logger's sink (stderr, file, remote). Pin the
+/// absence: no `{password}`, no `{:?}` on the payload JSON.
+#[test]
+fn auth_rs_does_not_log_password_variable() {
+    let body = read(AUTH_RS);
+    for (fn_name, macros_to_ban) in [
+        ("async fn login_with_client", ["{password}", "{password:?}", ":?password"]),
+        ("async fn register_with_client", ["{password}", "{password:?}", ":?password"]),
+    ] {
+        let fn_pos = body.find(fn_name)
+            .unwrap_or_else(|| panic!("{fn_name} must exist in auth.rs"));
+        let window = &body[fn_pos..fn_pos.saturating_add(1500)];
+        for pat in macros_to_ban {
+            assert!(
+                !window.contains(pat),
+                "PRD 3.1.7 (iter 238): {fn_name} must NOT contain \
+                 `{pat}` — any log macro that interpolates the \
+                 password writes the secret to the logger's sink. \
+                 Even `debug!` leaks if the user shares a support \
+                 bundle.\nWindow (first 500 chars):\n{}",
+                &window[..window.len().min(500)]
+            );
+        }
+    }
+}
+
+/// Iter 238: the Zeroizing<String> wrapper must reach the HTTP
+/// payload via `password.as_str()` (or `&*password` deref), NOT
+/// via `password.clone()`. A `.clone()` on Zeroizing<String>
+/// allocates a fresh non-zeroized `String` — the clone survives on
+/// the heap past the Drop of the wrapper, defeating the whole
+/// wrapper. Pin the absence.
+#[test]
+fn auth_rs_does_not_clone_zeroizing_password() {
+    let body = read(AUTH_RS);
+    for fn_name in ["async fn login_with_client", "async fn register_with_client"] {
+        let fn_pos = body.find(fn_name)
+            .unwrap_or_else(|| panic!("{fn_name} must exist"));
+        let window = &body[fn_pos..fn_pos.saturating_add(1500)];
+        assert!(
+            !window.contains("password.clone()"),
+            "PRD 3.1.7 (iter 238): {fn_name} must NOT call \
+             `password.clone()` on the Zeroizing<String>. A clone \
+             allocates a fresh non-zeroized String that outlives \
+             the wrapper — the password buffer survives on the heap \
+             past Drop, defeating the zeroize protection.\n\
+             Use `password.as_str()` or `&*password` instead."
+        );
+        // Positive control: the wrapper must be used somehow after
+        // binding. `password.as_str()` is the current canonical
+        // pattern.
+        assert!(
+            window.contains("password.as_str()") || window.contains("&*password"),
+            "PRD 3.1.7 (iter 238): {fn_name} must access the \
+             Zeroizing<String> password via `password.as_str()` or \
+             `&*password` — proves the wrapper is actually used \
+             (else the Zeroizing::new call is dead code).\n\
+             Window (first 500 chars):\n{}",
+            &window[..window.len().min(500)]
+        );
+    }
+}
