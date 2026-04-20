@@ -3,62 +3,137 @@
 #mods-page {
     --mods-inline-inset: 18px;
     --mods-filter-gap: 6px;
+    --mods-scrollbar-size: 14px;
+    --mods-scrollbar-thumb: rgba(148, 163, 184, 0.34);
+    --mods-scrollbar-track: rgba(15, 23, 42, 0.58);
+    --mods-scrollbar-track-edge: rgba(255, 255, 255, 0.05);
     color: var(--text, #ffffff);
     padding: 32px 40px 80px;
     max-width: 1100px;
     margin: 0 auto;
+    -webkit-app-region: no-drag;
 }
 
-/* Styled scrollbar inside the mods modal. Thin, subtle, almost invisible
-   until hovered — matches the launcher's dark theme without the chunky
-   grey default or the overly-bright accent gradient.
+.mods-modal,
+.mods-modal-shell,
+.mods-modal-content,
+.mods-container,
+.mods-toolbar,
+.mods-filters-row,
+.mods-pane,
+.mods-rows,
+.mods-detail,
+.mods-detail-body {
+    -webkit-app-region: no-drag;
+}
+
+/* Styled scrollbar inside the mods view. It sits visually inside the panel,
+   uses the same smoky glass palette as the rest of the launcher, and only
+   picks up the cyan accent while hovered/dragged.
 
    Chromium exposes ::-webkit-scrollbar; Firefox uses scrollbar-color /
    scrollbar-width. Tauri ships WebView2 (Chromium) on Windows so the
    Firefox fallback is belt-and-braces. */
-#mods-page,
+#mods-page .mods-modal-content,
 #mods-page .mods-pane,
 #mods-page .mods-rows,
 #mods-page .mods-detail-body,
 #mods-page .mods-detail-description,
 #mods-page .mods-category-row {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+    scrollbar-color: var(--mods-scrollbar-thumb) var(--mods-scrollbar-track);
+    scrollbar-gutter: stable both-edges;
     scroll-behavior: smooth;
+    overscroll-behavior: contain;
+    -webkit-app-region: no-drag;
 }
 
-#mods-page ::-webkit-scrollbar,
-#mods-page::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+#mods-page .mods-modal-content::-webkit-scrollbar,
+#mods-page .mods-pane::-webkit-scrollbar,
+#mods-page .mods-rows::-webkit-scrollbar,
+#mods-page .mods-detail-body::-webkit-scrollbar,
+#mods-page .mods-detail-description::-webkit-scrollbar,
+#mods-page .mods-category-row::-webkit-scrollbar {
+    width: var(--mods-scrollbar-size);
+    height: var(--mods-scrollbar-size);
 }
 
-#mods-page ::-webkit-scrollbar-track,
-#mods-page::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-#mods-page ::-webkit-scrollbar-thumb,
-#mods-page::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.12);
+#mods-page .mods-modal-content::-webkit-scrollbar-track,
+#mods-page .mods-pane::-webkit-scrollbar-track,
+#mods-page .mods-rows::-webkit-scrollbar-track,
+#mods-page .mods-detail-body::-webkit-scrollbar-track,
+#mods-page .mods-detail-description::-webkit-scrollbar-track,
+#mods-page .mods-category-row::-webkit-scrollbar-track {
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(15, 23, 42, 0.44));
+    border: 1px solid var(--mods-scrollbar-track-edge);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.015);
     border-radius: 999px;
-    transition: background 200ms ease;
 }
 
-#mods-page ::-webkit-scrollbar-thumb:hover,
-#mods-page::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.28);
+#mods-page .mods-modal-content::-webkit-scrollbar-thumb,
+#mods-page .mods-pane::-webkit-scrollbar-thumb,
+#mods-page .mods-rows::-webkit-scrollbar-thumb,
+#mods-page .mods-detail-body::-webkit-scrollbar-thumb,
+#mods-page .mods-detail-description::-webkit-scrollbar-thumb,
+#mods-page .mods-category-row::-webkit-scrollbar-thumb {
+    min-height: 36px;
+    background: linear-gradient(180deg, rgba(148, 163, 184, 0.55), rgba(100, 116, 139, 0.34));
+    border: 3px solid rgba(15, 23, 42, 0.08);
+    background-clip: padding-box;
+    border-radius: 999px;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.12);
+    transition: background 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
 }
 
-#mods-page ::-webkit-scrollbar-corner,
-#mods-page::-webkit-scrollbar-corner {
+#mods-page .mods-modal-content:hover::-webkit-scrollbar-thumb,
+#mods-page .mods-pane:hover::-webkit-scrollbar-thumb,
+#mods-page .mods-rows:hover::-webkit-scrollbar-thumb,
+#mods-page .mods-detail-body:hover::-webkit-scrollbar-thumb,
+#mods-page .mods-detail-description:hover::-webkit-scrollbar-thumb,
+#mods-page .mods-category-row:hover::-webkit-scrollbar-thumb,
+#mods-page .mods-modal-content::-webkit-scrollbar-thumb:hover,
+#mods-page .mods-pane::-webkit-scrollbar-thumb:hover,
+#mods-page .mods-rows::-webkit-scrollbar-thumb:hover,
+#mods-page .mods-detail-body::-webkit-scrollbar-thumb:hover,
+#mods-page .mods-detail-description::-webkit-scrollbar-thumb:hover,
+#mods-page .mods-category-row::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(103, 232, 249, 0.78), rgba(34, 211, 238, 0.46));
+    border-color: rgba(8, 47, 73, 0.22);
+    box-shadow: inset 0 0 0 1px rgba(186, 230, 253, 0.2), 0 0 10px rgba(34, 211, 238, 0.14);
+}
+
+#mods-page .mods-modal-content::-webkit-scrollbar-thumb:active,
+#mods-page .mods-pane::-webkit-scrollbar-thumb:active,
+#mods-page .mods-rows::-webkit-scrollbar-thumb:active,
+#mods-page .mods-detail-body::-webkit-scrollbar-thumb:active,
+#mods-page .mods-detail-description::-webkit-scrollbar-thumb:active,
+#mods-page .mods-category-row::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(180deg, rgba(34, 211, 238, 0.78), rgba(14, 165, 233, 0.54));
+    border-color: rgba(8, 47, 73, 0.32);
+}
+
+#mods-page .mods-modal-content::-webkit-scrollbar-corner,
+#mods-page .mods-pane::-webkit-scrollbar-corner,
+#mods-page .mods-rows::-webkit-scrollbar-corner,
+#mods-page .mods-detail-body::-webkit-scrollbar-corner,
+#mods-page .mods-detail-description::-webkit-scrollbar-corner,
+#mods-page .mods-category-row::-webkit-scrollbar-corner {
     background: transparent;
 }
 
 .mods-container {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 0;
+}
+
+.mods-workspace-header {
+    margin: 10px 28px 0;
+    padding: 18px 20px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(17, 21, 27, 0.94), rgba(15, 18, 24, 0.82));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 /* Header */
@@ -116,6 +191,7 @@
     gap: 4px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     padding-bottom: 0;
+    margin-top: 6px;
 }
 
 .mods-tab {
@@ -159,6 +235,7 @@
     align-items: center;
     flex-wrap: wrap;
     position: relative;
+    margin-top: 12px;
 }
 
 .mods-search-wrap {
@@ -238,31 +315,29 @@
    chips was dropped so nothing looks container-boxed while categories
    float free. */
 .mods-filters-row {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: max-content 88px minmax(0, 1fr);
     align-items: center;
     row-gap: var(--mods-filter-gap);
     column-gap: 0;
-    /* 18px horizontal inset so the first chip's BORDER edge lines up
-       with the .mods-tab text (tab-pad 18) and the .mods-search BOX
-       left edge (toolbar-pad 18). The visible left edges of the tab
-       labels, search box, and chip pills all share the same x. */
-    padding: 0 var(--mods-inline-inset) 6px;
-    margin-top: -6px;
+    padding: 0 var(--mods-inline-inset) 4px;
+    margin-top: 10px;
 }
 
 .mods-filter-group {
     display: inline-flex;
     flex-wrap: wrap;
     gap: var(--mods-filter-gap);
+    align-items: center;
 }
 
 .mods-filters-divider {
     display: inline-block;
+    justify-self: center;
     width: 1px;
-    height: 18px;
-    background: rgba(255, 255, 255, 0.12);
-    margin: 0 var(--mods-filter-gap);
+    height: 20px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.06));
+    margin: 0;
 }
 
 .mods-filter-chip {
@@ -295,19 +370,25 @@
     display: inline-flex;
     flex-wrap: wrap;
     gap: var(--mods-filter-gap);
+    align-items: center;
     min-width: 0;
-    margin-left: var(--mods-filter-gap);
+    justify-self: start;
+    margin-left: 0;
+    padding-left: 12px;
 }
 
 /* Panes */
 .mods-pane {
     display: none;
     flex-direction: column;
-    gap: 24px;
+    gap: 18px;
 }
 
 .mods-pane.active {
     display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .mods-group {
@@ -342,6 +423,11 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
+}
+
+.mods-pane[data-pane="browse"] .mods-rows {
+    flex: 1 1 auto;
+    min-height: 0;
 }
 
 /* Row */
@@ -920,7 +1006,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 10px 14px 28px;
+    padding: 6px 10px 6px 28px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     background: rgba(12, 16, 22, 0.6);
 }
@@ -961,35 +1047,120 @@
 .mods-toolbar-row {
     display: flex;
     justify-content: flex-end;
-    padding: 14px 28px 0;
+    padding: 0 28px;
+    -webkit-app-region: no-drag;
 }
 
 .mods-modal-content {
     flex: 1;
-    overflow-y: auto;
-    min-height: 480px;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    -webkit-app-region: no-drag;
 }
 
 /* Inside the modal, the mods page cap-width is already capped by the
    shell; the titlebar owns its own spacing so drop the top padding. */
 .mods-modal #mods-page {
-    padding: 0 0 64px;
+    padding: 0 0 14px;
     max-width: none;
+    min-height: 100%;
 }
 
 .mods-modal .mods-container {
-    gap: 16px;
+    gap: 0;
+    min-height: 100%;
 }
 
 /* The old mods-page headers lived at padding 32px — keep the rest of the
    content at the same inset but no longer top-offset the titlebar. */
 .mods-modal .mods-tabs,
 .mods-modal .mods-toolbar,
+.mods-modal .mods-filters-row,
 .mods-modal .mods-pane,
 .mods-modal .mods-download-tray,
 .mods-modal .mods-empty {
     margin-left: 28px;
     margin-right: 28px;
+}
+
+.mods-modal .mods-workspace-header .mods-tabs,
+.mods-modal .mods-workspace-header .mods-toolbar,
+.mods-modal .mods-workspace-header .mods-filters-row {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.mods-modal .mods-tabs {
+    margin-top: 0;
+}
+
+.mods-modal .mods-toolbar {
+    margin-top: 12px;
+}
+
+.mods-modal .mods-filters-row {
+    margin-top: 12px;
+}
+
+@media (max-width: 900px) {
+    .mods-filters-row {
+        grid-template-columns: 1fr;
+        justify-items: start;
+    }
+
+    .mods-filters-divider {
+        display: none;
+    }
+
+    .mods-category-row {
+        padding-left: 0;
+    }
+}
+
+.mods-modal .mods-pane {
+    min-height: 0;
+    padding-right: 16px;
+    margin-right: -10px;
+    padding-top: 2px;
+}
+
+.mods-modal .mods-pane.active {
+    display: flex;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    scrollbar-width: auto;
+    scrollbar-color: rgba(125, 211, 252, 0.95) rgba(13, 17, 24, 0.92);
+}
+
+.mods-modal .mods-pane.active::-webkit-scrollbar {
+    width: 22px;
+}
+
+.mods-modal .mods-pane.active::-webkit-scrollbar-track {
+    background: linear-gradient(180deg, rgba(13, 17, 24, 0.98), rgba(17, 21, 27, 0.82));
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 999px;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+    margin-block: 4px;
+}
+
+.mods-modal .mods-pane.active::-webkit-scrollbar-thumb {
+    min-height: 56px;
+    background: linear-gradient(180deg, rgba(224, 242, 254, 1), rgba(56, 189, 248, 0.82));
+    border: 5px solid rgba(17, 21, 27, 0.78);
+    border-radius: 999px;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24), 0 0 0 1px rgba(15, 23, 42, 0.22), 0 0 16px rgba(34, 211, 238, 0.2);
+}
+
+.mods-modal .mods-pane.active::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(240, 249, 255, 1), rgba(34, 211, 238, 0.9));
+    box-shadow: inset 0 0 0 1px rgba(240, 249, 255, 0.48), 0 0 22px rgba(34, 211, 238, 0.34);
+}
+
+.mods-modal .mods-pane.active::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(180deg, rgba(125, 211, 252, 1), rgba(2, 132, 199, 0.92));
 }
 
 /* ========================================================================

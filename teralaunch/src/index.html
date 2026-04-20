@@ -37,6 +37,12 @@
             box-sizing: border-box;
             margin: 0;
             padding: 0;
+            outline: none;
+        }
+
+        html, body {
+            border: none;
+            outline: none;
         }
 
         body, html {
@@ -49,6 +55,9 @@
             font-family: "Inter", system-ui, sans-serif;
             font-size: 14px;
             line-height: 1.5;
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
         }
 
 
@@ -162,20 +171,29 @@
            MAIN LAYOUT
            ============================================ */
         .mainpage {
-            width: 100vw;
-            height: 100vh;
+            position: fixed;
+            inset: 0;
+            width: auto;
+            height: auto;
             display: flex;
             flex-direction: column;
             background-image: url(./assets/login@3x.webp);
             background-size: cover;
             background-repeat: no-repeat;
             background-position: center;
+            border: none;
+            outline: none;
+            box-shadow: none;
+            overflow: hidden;
         }
 
         #app {
             flex: 1;
             position: relative;
             overflow: hidden;
+            border: none;
+            outline: none;
+            box-shadow: none;
         }
 
         .page {
@@ -198,7 +216,7 @@
             backdrop-filter: blur(4px);
             border-bottom: 1px solid rgba(58, 64, 80, 0.1);
             z-index: 1000;
-            -webkit-app-region: drag; /* Make header draggable */
+            -webkit-app-region: no-drag;
         }
 
         .header-left {
@@ -250,6 +268,7 @@
             display: flex;
             align-items: center;
             gap: 12px;
+            -webkit-app-region: no-drag;
         }
 
         /* Region Selector */
@@ -2643,7 +2662,9 @@
             cursor: not-allowed;
         }
 
-        /* Window Dragging for Home Page */
+        /* Only the header should drag the undecorated window. The rest of the
+           home page must stay no-drag so overlays, scrollbars, and content
+           interactions never get interpreted as window chrome gestures. */
         #home-page,
         #home-bg-container,
         #home-main,
@@ -2651,7 +2672,7 @@
         .info-content,
         #home-news-bar,
         #home-footer {
-            -webkit-app-region: drag;
+            -webkit-app-region: no-drag;
         }
 
         button,
@@ -2684,7 +2705,7 @@
         </div>
     </div>
     <div class="mainpage">
-        <header class="header" data-tauri-drag-region>
+        <header class="header">
             <!-- Left: Logo + Nav -->
             <div class="header-left">
                 <img class="logo" src="./assets/ces-logo.webp" alt="CES" />

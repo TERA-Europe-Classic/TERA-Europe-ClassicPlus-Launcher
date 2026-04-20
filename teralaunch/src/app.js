@@ -79,6 +79,13 @@ function getTranslation(key) {
   return fallbacks[key] || key;
 }
 
+function getTranslationFormat(key, fallback, ...args) {
+  if (window.App && typeof App.t === 'function') {
+    return App.t(key, ...args);
+  }
+  return (fallback || key).replace(/\{(\d+)\}/g, (_, index) => args[index] || "");
+}
+
 function hideAllStatusStates() {
   document.querySelectorAll('#home-status-area .status-state').forEach(s => {
     s.classList.remove('active');
@@ -341,12 +348,12 @@ function showErrorState(errorMessage) {
   const errorText = document.getElementById('status-error-text');
   if (errorText) {
     // Use simple "Error" text - the details are in the toast
-    errorText.textContent = 'Error';
+    errorText.textContent = getTranslation('ERROR') || 'Error';
   }
 
   // Show specific error details in a PERSISTENT toast (won't auto-hide, has X to dismiss)
   if (errorMessage && typeof showUpdateNotification === 'function') {
-    showUpdateNotification('error', 'Update Error', errorMessage, true);
+    showUpdateNotification('error', getTranslation('UPDATE_ERROR_TITLE') || 'Update Error', errorMessage, true);
   }
 
   // Keep launch button disabled
@@ -589,9 +596,9 @@ function normalizeUpdaterResult(result) {
     shouldUpdate,
     version: version || 'new',
     hasInstall: typeof result.downloadAndInstall === 'function' || Number.isInteger(result.rid),
-    async downloadAndInstall() {
+    async downloadAndInstall(onEvent, options) {
       if (typeof result.downloadAndInstall === 'function') {
-        return result.downloadAndInstall();
+        return result.downloadAndInstall(onEvent, options);
       }
       if (!Number.isInteger(result.rid)) {
         throw new Error('Updater returned metadata without an install handle.');
@@ -610,9 +617,27 @@ async function promptLauncherUpdate(update, currentVersion, title = 'Launcher Up
   }
 
   return ask(
-    `Launcher v${update.version} is available (current: v${currentVersion}). Download and install now? The launcher will restart.`,
+    getTranslationFormat(
+      'LAUNCHER_UPDATE_PROMPT',
+      'Launcher v{0} is available (current: v{1}). Download and install now? The launcher will restart.',
+      update.version,
+      currentVersion
+    ),
     { title, kind: 'info' }
   );
+}
+
+function formatUpdateBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  const precision = value >= 100 || unit === 0 ? 0 : value >= 10 ? 1 : 2;
+  return `${value.toFixed(precision)} ${units[unit]}`;
 }
 
 async function installLauncherUpdate(update) {
@@ -620,7 +645,63 @@ async function installLauncherUpdate(update) {
     throw new Error('Updater cannot install this update result.');
   }
 
-  await update.downloadAndInstall();
+  let totalBytes = 0;
+  let downloadedBytes = 0;
+  let sawDownloadEvent = false;
+
+  showUpdateNotification(
+    'checking',
+    getTranslation('LAUNCHER_UPDATE_PREPARING') || 'Preparing update…',
+    getTranslation('LAUNCHER_UPDATE_WAITING_DOWNLOAD') || 'Waiting for download to start…',
+    true
+  );
+
+  await update.downloadAndInstall((progress) => {
+    sawDownloadEvent = true;
+    if (progress.event === 'Started') {
+      totalBytes = progress.data?.contentLength || 0;
+      downloadedBytes = 0;
+      const subtitle = totalBytes > 0
+        ? getTranslationFormat('LAUNCHER_UPDATE_DOWNLOADING_PROGRESS', 'Downloading {0} / {1}', '0 B', formatUpdateBytes(totalBytes))
+        : (getTranslation('LAUNCHER_UPDATE_DOWNLOADING_PACKAGE') || 'Downloading update package…');
+      showUpdateNotification('checking', getTranslation('LAUNCHER_UPDATE_DOWNLOADING') || 'Downloading update…', subtitle, true);
+      return;
+    }
+
+    if (progress.event === 'Progress') {
+      downloadedBytes += progress.data?.chunkLength || 0;
+      const subtitle = totalBytes > 0
+        ? getTranslationFormat('LAUNCHER_UPDATE_DOWNLOADING_PROGRESS', 'Downloading {0} / {1}', formatUpdateBytes(downloadedBytes), formatUpdateBytes(totalBytes))
+        : getTranslationFormat('LAUNCHER_UPDATE_DOWNLOADING_CURRENT', 'Downloading {0}', formatUpdateBytes(downloadedBytes));
+      showUpdateNotification('checking', getTranslation('LAUNCHER_UPDATE_DOWNLOADING') || 'Downloading update…', subtitle, true);
+      return;
+    }
+
+    if (progress.event === 'Finished') {
+      showUpdateNotification(
+        'checking',
+        getTranslation('LAUNCHER_UPDATE_INSTALLING') || 'Installing update…',
+        getTranslation('LAUNCHER_UPDATE_INSTALLING_DOWNLOADED') || 'Download complete. Applying update package…',
+        true
+      );
+    }
+  });
+
+  if (!sawDownloadEvent) {
+    showUpdateNotification(
+      'checking',
+      getTranslation('LAUNCHER_UPDATE_INSTALLING') || 'Installing update…',
+      getTranslation('LAUNCHER_UPDATE_INSTALLING_PACKAGE') || 'Applying downloaded update package…',
+      true
+    );
+  }
+
+  showUpdateNotification(
+    'checking',
+    getTranslation('LAUNCHER_UPDATE_RESTARTING') || 'Restarting launcher…',
+    getTranslation('LAUNCHER_UPDATE_RESTARTING_SUBTITLE') || 'Update installed. Relaunching now…',
+    true
+  );
   const relaunch = window.__TAURI__?.process?.relaunch;
   if (typeof relaunch === 'function') {
     await relaunch();
@@ -647,7 +728,11 @@ async function handleCheckLauncherUpdate() {
   }
 
   // Show notification IMMEDIATELY before any async operations
-  showUpdateNotification('checking', 'Checking for updates...', 'Please wait...');
+  showUpdateNotification(
+    'checking',
+    getTranslation('LAUNCHER_UPDATE_CHECKING') || 'Checking for updates…',
+    getTranslation('LAUNCHER_UPDATE_CONTACTING_SERVER') || 'Contacting the update server…'
+  );
 
   try {
     // Get current launcher version
@@ -663,25 +748,43 @@ async function handleCheckLauncherUpdate() {
       const rawResult = await checkAppUpdate();
       const result = normalizeUpdaterResult(rawResult);
       if (result == null) {
-        showUpdateNotification('upToDate', 'Launcher is up to date (v' + currentVersion + ')', 'No updates available');
+        showUpdateNotification(
+          'success',
+          getTranslation('LAUNCHER_UPDATE_UP_TO_DATE') || 'Launcher is up to date',
+          getTranslationFormat('LAUNCHER_UPDATE_CURRENT_VERSION', 'Current version: v{0}', currentVersion)
+        );
       } else if (!result.shouldUpdate) {
-        showUpdateNotification('upToDate', 'Launcher is up to date (v' + currentVersion + ')', 'No updates available');
+        showUpdateNotification(
+          'success',
+          getTranslation('LAUNCHER_UPDATE_UP_TO_DATE') || 'Launcher is up to date',
+          getTranslationFormat('LAUNCHER_UPDATE_CURRENT_VERSION', 'Current version: v{0}', currentVersion)
+        );
       } else {
-        showUpdateNotification('upToDate', 'Update available: v' + result.version, 'Current version: ' + currentVersion);
+        showUpdateNotification(
+          'success',
+          getTranslationFormat('LAUNCHER_UPDATE_AVAILABLE', 'Update available: v{0}', result.version),
+          getTranslationFormat('LAUNCHER_UPDATE_CURRENT_VERSION', 'Current version: v{0}', currentVersion),
+          true
+        );
         try {
-          const wantsUpdate = await promptLauncherUpdate(result, currentVersion, 'Launcher Update');
+          const wantsUpdate = await promptLauncherUpdate(result, currentVersion, getTranslation('LAUNCHER_UPDATE_DIALOG_TITLE') || 'Launcher Update');
           if (wantsUpdate) {
-            showUpdateNotification('checking', 'Downloading update…', 'Do not close the launcher.');
+            showUpdateNotification(
+              'checking',
+              getTranslation('LAUNCHER_UPDATE_PREPARING') || 'Preparing update…',
+              getTranslation('LAUNCHER_UPDATE_WAITING_DOWNLOAD') || 'Waiting for download to start…',
+              true
+            );
             await installLauncherUpdate(result);
           }
         } catch (e) {
           console.error('Update install failed:', e);
-          showUpdateNotification('error', 'Update install failed', e?.message || String(e), true);
+          showUpdateNotification('error', getTranslation('LAUNCHER_UPDATE_INSTALL_FAILED') || 'Update install failed', e?.message || String(e), true);
         }
     }
   } catch (error) {
     console.error('Error checking for updates:', error);
-    showUpdateNotification('error', 'Update check failed', error.message || 'Unknown error');
+    showUpdateNotification('error', getTranslation('LAUNCHER_UPDATE_CHECK_FAILED') || 'Update check failed', error.message || getTranslation('LAUNCHER_UPDATE_UNKNOWN_ERROR') || 'Unknown error');
   }
 }
 window.handleCheckLauncherUpdate = handleCheckLauncherUpdate;
@@ -924,12 +1027,12 @@ async function saveGameDirectory() {
   const path = input?.value?.trim();
 
   if (!path) {
-    showUpdateNotification('error', 'Invalid path', 'Please enter a valid game directory');
+    showUpdateNotification('error', getTranslation('INVALID_PATH_TITLE') || 'Invalid path', getTranslation('INVALID_GAME_DIRECTORY') || 'Please enter a valid game directory');
     return;
   }
 
   if (!(window.App && App.saveConfig)) {
-    showUpdateNotification('error', 'App not ready', 'Please wait and try again');
+    showUpdateNotification('error', getTranslation('APP_NOT_READY_TITLE') || 'App not ready', getTranslation('PLEASE_WAIT_AND_TRY_AGAIN') || 'Please wait and try again');
     return;
   }
 
@@ -939,7 +1042,7 @@ async function saveGameDirectory() {
     await App.saveConfig('gamePath', path);
   } catch (e) {
     console.error('Failed to save game directory:', e);
-    showUpdateNotification('error', 'Failed to save', e.message || e.toString() || 'Unknown error');
+    showUpdateNotification('error', getTranslation('FAILED_TO_SAVE_TITLE') || 'Failed to save', e.message || e.toString() || getTranslation('LAUNCHER_UPDATE_UNKNOWN_ERROR') || 'Unknown error');
     return; // Keep dialog open; user must pick a valid folder.
   }
 
@@ -953,7 +1056,7 @@ async function saveGameDirectory() {
   const banner = document.getElementById('game-dir-error-banner');
   if (banner) banner.style.display = 'none';
 
-  showUpdateNotification('success', 'Game directory saved', path);
+  showUpdateNotification('success', getTranslation('GAME_DIRECTORY_SAVED') || 'Game directory saved', path);
 
   // If the dialog was opened because the launcher couldn't start without a
   // valid folder, resume initialization now that we have one.
@@ -2039,7 +2142,11 @@ const App = {
           }
           // Show a notification so user knows there might be an issue
           if (typeof window.showUpdateNotification === 'function') {
-            window.showUpdateNotification('warning', 'File Issue', `${this.getFileName(payload.file)} could not be verified. Use 'Repair Game Files' if you have issues.`);
+            window.showUpdateNotification(
+              'warning',
+              this.t('FILE_ISSUE_TITLE') || 'File Issue',
+              this.t('FILE_ISSUE_MESSAGE', this.getFileName(payload.file)) || `${this.getFileName(payload.file)} could not be verified. Use 'Repair Game Files' if you have issues.`
+            );
           }
           break;
         case "completed":
@@ -2489,62 +2596,7 @@ const App = {
     if (checkLauncherUpdate) {
       checkLauncherUpdate.addEventListener("click", async (e) => {
         e.preventDefault();
-        try {
-          const updater = window.__TAURI__?.updater;
-          if (!updater) {
-            this.showCustomNotification("Update check not available.", "error");
-            return;
-          }
-          // Tauri v2: check() returns null when no update. v1 shim kept.
-          const result = updater.check
-            ? await updater.check()
-            : (updater.checkUpdate ? await updater.checkUpdate() : null);
-          const hasUpdate = result != null && (
-            'shouldUpdate' in result ? result.shouldUpdate : true
-          );
-          if (!hasUpdate) {
-            const version = await window.__TAURI__?.app?.getVersion?.() || "unknown";
-            this.showCustomNotification(
-              `You are on the latest launcher (v${version}).`,
-              "success",
-            );
-            return;
-          }
-          // Update available — prompt to download+install.
-          const currentVersion = await window.__TAURI__?.app?.getVersion?.() || "current";
-          const newVersion = ('shouldUpdate' in result
-            ? result.manifest?.version
-            : result.version) || 'new';
-          const ask = window.__TAURI__?.dialog?.ask;
-          const wantsUpdate = ask
-            ? await ask(
-                `Launcher v${newVersion} is available (current: v${currentVersion}). Download and install now? The launcher will restart.`,
-                { title: 'Launcher Update', kind: 'info' }
-              )
-            : true;
-          if (wantsUpdate && typeof result.downloadAndInstall === 'function') {
-            this.showCustomNotification('Downloading update…', 'success');
-            try {
-              await result.downloadAndInstall();
-              const relaunch = window.__TAURI__?.process?.relaunch;
-              if (typeof relaunch === 'function') {
-                await relaunch();
-              }
-            } catch (err) {
-              console.error('Update install failed:', err);
-              this.showCustomNotification('Update install failed.', 'error');
-            }
-          } else if (wantsUpdate) {
-            // v1 path (no downloadAndInstall method on the result).
-            this.showCustomNotification(
-              'Update is available but auto-install is unavailable in this launcher build.',
-              'error'
-            );
-          }
-        } catch (err) {
-          console.error("Update check failed:", err);
-          this.showCustomNotification("Update check failed.", "error");
-        }
+        await handleCheckLauncherUpdate();
       });
     }
   },
@@ -3939,7 +3991,11 @@ const App = {
         } else {
           // No stored auth — need to re-authenticate via OAuth
           console.log("OAuth account — no stored auth, triggering OAuth re-auth for launch");
-          window.showUpdateNotification('info', 'Re-authentication Required', 'Opening browser to re-authenticate...');
+          window.showUpdateNotification(
+            'info',
+            this.t('REAUTH_REQUIRED_TITLE') || 'Re-authentication Required',
+            this.t('REAUTH_REQUIRED_MESSAGE') || 'Opening browser to re-authenticate...'
+          );
           const provider = activeAccountForAuth.provider || 'google';
           startOAuth(provider, 'launch');
           this.setState({ isGameLaunching: false });
@@ -4347,12 +4403,12 @@ const App = {
           let userConfirm = false;
           if (typeof ask === "function") {
             userConfirm = await ask(
-              "A new launcher version is available. Do you want to update now?",
-              { title: "Launcher Update" },
+              getTranslation('LAUNCHER_UPDATE_GENERIC_PROMPT') || "A new launcher version is available. Do you want to update now?",
+              { title: getTranslation('LAUNCHER_UPDATE_DIALOG_TITLE') || "Launcher Update" },
             );
           } else {
             userConfirm = window.confirm(
-              "A new launcher version is available. Do you want to update now?",
+              getTranslation('LAUNCHER_UPDATE_GENERIC_PROMPT') || "A new launcher version is available. Do you want to update now?",
             );
           }
           if (userConfirm) {
@@ -5571,7 +5627,7 @@ const App = {
       if (result == null || !result.shouldUpdate) return;
 
       const currentVersion = await window.__TAURI__?.app?.getVersion?.() || 'current';
-      const wantsUpdate = await promptLauncherUpdate(result, currentVersion, 'Launcher Update Available');
+      const wantsUpdate = await promptLauncherUpdate(result, currentVersion, getTranslation('LAUNCHER_UPDATE_AVAILABLE_TITLE') || 'Launcher Update Available');
       if (!wantsUpdate) return;
       await installLauncherUpdate(result);
     } catch (err) {
@@ -5581,46 +5637,50 @@ const App = {
 
   async checkForLauncherUpdates() {
     if (typeof window.showUpdateNotification === 'function') {
-      window.showUpdateNotification('Checking for launcher updates...', false);
+      window.showUpdateNotification(
+        'checking',
+        getTranslation('LAUNCHER_UPDATE_CHECKING_MENU') || 'Checking for launcher updates…',
+        getTranslation('LAUNCHER_UPDATE_CONTACTING_SERVER') || 'Contacting the update server…'
+      );
     }
 
     try {
       const result = normalizeUpdaterResult(await checkAppUpdate());
-      const notify = (msg, b) => {
+      const notify = (state, title, subtitle = '', persistent = false) => {
         if (typeof window.showUpdateNotification === 'function') {
-          window.showUpdateNotification(msg, b);
+          window.showUpdateNotification(state, title, subtitle, persistent);
         }
       };
       if (result == null) {
-        notify('Launcher is up to date', true);
+        notify('success', getTranslation('LAUNCHER_UPDATE_UP_TO_DATE') || 'Launcher is up to date', getTranslation('LAUNCHER_UPDATE_NONE_AVAILABLE') || 'No updates available.');
         return;
       }
       const hasUpdate = 'shouldUpdate' in result ? result.shouldUpdate : true;
       if (!hasUpdate) {
-        notify('Launcher is up to date', true);
+        notify('success', getTranslation('LAUNCHER_UPDATE_UP_TO_DATE') || 'Launcher is up to date', getTranslation('LAUNCHER_UPDATE_NONE_AVAILABLE') || 'No updates available.');
         return;
       }
       const newVersion = ('shouldUpdate' in result
         ? result.manifest?.version
         : result.version) || 'new';
-      notify(`Update available: ${newVersion}`, true);
+      notify('success', getTranslationFormat('LAUNCHER_UPDATE_AVAILABLE', 'Update available: v{0}', newVersion), getTranslation('LAUNCHER_UPDATE_REVIEWING') || 'Reviewing installer availability…', true);
 
       // Only v2 result objects carry downloadAndInstall(). Prompt + install.
       const ask = window.__TAURI__?.dialog?.ask;
       const wantsUpdate = ask
         ? await ask(
             `Launcher v${newVersion} is available. Download and install now? The launcher will restart.`,
-            { title: 'Launcher Update', kind: 'info' }
+            { title: getTranslation('LAUNCHER_UPDATE_DIALOG_TITLE') || 'Launcher Update', kind: 'info' }
           )
         : true;
       if (wantsUpdate && result.hasInstall) {
-        notify('Downloading update…', false);
+        notify('checking', getTranslation('LAUNCHER_UPDATE_PREPARING') || 'Preparing update…', getTranslation('LAUNCHER_UPDATE_WAITING_DOWNLOAD') || 'Waiting for download to start…', true);
         await installLauncherUpdate(result);
       }
     } catch (error) {
       console.error("Error checking for launcher updates:", error);
       if (typeof window.showUpdateNotification === 'function') {
-        window.showUpdateNotification('Update check failed', true);
+        window.showUpdateNotification('error', getTranslation('LAUNCHER_UPDATE_CHECK_FAILED') || 'Update check failed', error?.message || getTranslation('LAUNCHER_UPDATE_UNKNOWN_ERROR') || 'Unknown updater error', true);
       }
     }
   },
@@ -5630,6 +5690,22 @@ const App = {
    * to allow the user to interact with the window.
    */
   setupWindowControls() {
+    if (appWindow?.setDecorations) {
+      appWindow.setDecorations(false).catch((e) => console.warn('Failed to disable decorations:', e));
+    }
+    if (appWindow?.setShadow) {
+      appWindow.setShadow(false).catch((e) => console.warn('Failed to disable window shadow:', e));
+    }
+    if (appWindow?.setFullscreen) {
+      appWindow.setFullscreen(false).catch((e) => console.warn('Failed to disable fullscreen:', e));
+    }
+    if (appWindow?.setMaximizable) {
+      appWindow.setMaximizable(false).catch((e) => console.warn('Failed to disable maximize:', e));
+    }
+    if (appWindow?.setResizable) {
+      appWindow.setResizable(false).catch((e) => console.warn('Failed to disable resize:', e));
+    }
+
     const appMinimizeBtn = document.getElementById("app-minimize");
     if (appMinimizeBtn) {
       appMinimizeBtn.addEventListener("click", () => appWindow.minimize());
@@ -5648,53 +5724,13 @@ const App = {
   },
 
   /**
-   * Sets up window dragging functionality. In Tauri with decorations disabled,
-   * we need to call appWindow.startDragging() on mousedown for drag regions.
+   * Dragging is intentionally disabled for now.
+   * Borderless window dragging kept conflicting with scrollbar and modal input
+   * on Windows, so the launcher prioritises reliable interaction over custom
+   * drag behaviour.
    */
   setupWindowDragging() {
-    // Handle mousedown on elements with data-tauri-drag-region attribute
-    document.addEventListener("mousedown", async (e) => {
-      // Check if the clicked element or any parent has the drag region attribute
-      const target = e.target;
-
-      // Skip if clicking on interactive elements
-      if (this.isInteractiveElement(target)) {
-        return;
-      }
-
-      // Check for data-tauri-drag-region attribute
-      const hasDragRegion = target.closest("[data-tauri-drag-region]");
-      if (hasDragRegion) {
-        await appWindow.startDragging();
-        return;
-      }
-
-      // Check for CSS -webkit-app-region: drag (computed style check)
-      const computedStyle = window.getComputedStyle(target);
-      // Note: -webkit-app-region is not exposed via getComputedStyle in all browsers
-      // So we check if the element matches our known draggable selectors
-      const draggableSelectors = [
-        "#home-page",
-        "#home-bg-container",
-        "#home-main",
-        "#home-info-section",
-        ".info-content",
-        "#home-news-bar",
-        "#home-footer",
-        ".header"
-      ];
-
-      for (const selector of draggableSelectors) {
-        if (target.matches(selector) || target.closest(selector)) {
-          // Make sure we're not clicking on an interactive child
-          const interactiveChild = target.closest("button, a, input, select, textarea, #home-launch-section, .promo-card, #home-player-badge, .news-item, .news-label, .nav-btn, .control-btn, .region-btn, .login-input, .login-btn, .register-btn, .menu-item, .region-option, .account-manager, .account-dropdown-item, .account-btn, .account-add-btn, .account-register-btn");
-          if (!interactiveChild) {
-            await appWindow.startDragging();
-            return;
-          }
-        }
-      }
-    });
+    return;
   },
 
   /**

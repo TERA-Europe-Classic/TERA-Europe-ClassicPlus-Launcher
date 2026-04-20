@@ -23,6 +23,21 @@ use crate::services::mods::{
 };
 use crate::state::mods_state;
 
+fn rebuild_gpk_runtime_state() -> Result<(), String> {
+    let game_root = resolve_game_root()?;
+    let gpk_dir = get_gpk_dir().ok_or_else(|| "Could not resolve GPK mods dir".to_string())?;
+    let items = mods_state::list_mods()?
+        .into_iter()
+        .filter(|entry| matches!(entry.kind, ModKind::Gpk))
+        .map(|entry| gpk::RebuildItem {
+            source_gpk: gpk_dir.join(format!("{}.gpk", entry.id.replace('/', "_"))),
+            enabled: entry.enabled,
+            deployed_filename: entry.deployed_filename,
+        })
+        .collect::<Vec<_>>();
+    gpk::rebuild_gpk_state(&game_root, &items)
+}
+
 /// Returns the current list of installed mods.
 #[tauri::command]
 #[cfg(not(tarpaulin_include))]
@@ -222,6 +237,7 @@ async fn install_external_mod(
                 "mod_download_progress",
                 serde_json::json!({ "id": entry.id, "progress": 100, "state": "done" }),
             );
+            let _ = rebuild_gpk_runtime_state();
             Ok(final_row)
         }
         Err(err) => finalize_error(&entry.id, err, &window),
@@ -519,6 +535,8 @@ pub async fn add_mod_from_file(path: String) -> Result<ModEntry, String> {
         Ok(())
     })?;
 
+    let _ = rebuild_gpk_runtime_state();
+
     info!(
         "add_mod_from_file: imported {} (sha={}) status={:?}",
         entry.id,
@@ -559,71 +577,25 @@ pub async fn uninstall_mod(id: String, delete_settings: Option<bool>) -> Result<
             }
         }
         ModKind::Gpk => {
-            // Restore the vanilla mapper entries for this mod and delete
-            // its container .gpk from CookedPC. Best-effort: a missing
-            // backup or a moved game path shouldn't block the registry
-            // removal.
-            if let Ok(game_root) = resolve_game_root() {
-                let gpk_dir =
-                    get_gpk_dir().ok_or_else(|| "Could not resolve GPK mods dir".to_string())?;
-                let source_gpk = gpk_dir.join(format!("{}.gpk", entry.id.replace('/', "_")));
-                if let Ok(bytes) = std::fs::read(&source_gpk) {
-                    if let Ok(modfile) = crate::services::mods::gpk::parse_mod_file(&bytes) {
-                        let paths: Vec<String> = modfile
-                            .packages
-                            .iter()
-                            .map(|p| p.object_path.clone())
-                            .filter(|p| !p.is_empty())
-                            .collect();
-                        if !modfile.container.is_empty() && !paths.is_empty() {
-                            let _ = crate::services::mods::gpk::uninstall_gpk(
-                                &game_root,
-                                &modfile.container,
-                                &paths,
-                            );
-                        } else if let Some(target_filename) = entry
-                            .deployed_filename
-                            .clone()
-                            .or_else(|| {
-                                crate::services::mods::gpk::resolve_legacy_target_filename(
-                                    &bytes,
-                                    &source_gpk,
-                                    None,
-                                )
-                            })
-                        {
-                            let _ = crate::services::mods::gpk::uninstall_legacy_gpk(
-                                &game_root,
-                                &target_filename,
-                            );
-                        }
-                    } else if let Some(target_filename) = entry
-                        .deployed_filename
-                        .clone()
-                        .or_else(|| {
-                            crate::services::mods::gpk::resolve_legacy_target_filename(
-                                &bytes,
-                                &source_gpk,
-                                None,
-                            )
-                        })
-                    {
-                        let _ = crate::services::mods::gpk::uninstall_legacy_gpk(
-                            &game_root,
-                            &target_filename,
-                        );
-                    }
-                }
-            }
-            // Also remove the download from the launcher's own gpk folder.
             let gpk_dir =
                 get_gpk_dir().ok_or_else(|| "Could not resolve GPK mods dir".to_string())?;
             let file = gpk_dir.join(format!("{}.gpk", entry.id.replace('/', "_")));
+            let _ = delete_settings; // GPK has no per-mod settings folder
+
+            mods_state::mutate(|reg| {
+                reg.remove(&id);
+                Ok(())
+            })?;
+
+            let rebuild_result = rebuild_gpk_runtime_state();
+
             if file.exists() {
                 std::fs::remove_file(&file)
                     .map_err(|e| format!("Failed to remove {}: {}", file.display(), e))?;
             }
-            let _ = delete_settings; // GPK has no per-mod settings folder
+
+            rebuild_result?;
+            return Ok(());
         }
     }
 
@@ -656,6 +628,15 @@ fn apply_disable_intent(slot: &mut ModEntry) {
     slot.status = ModStatus::Disabled;
 }
 
+fn external_launch_args(id: &str) -> Vec<String> {
+    match id {
+        "classicplus.tcc" | "tera-europe-classic.tcc" | "classicplus.shinra" | "tera-europe-classic.shinra" => {
+            vec!["--toolbox".to_string()]
+        }
+        _ => Vec::new(),
+    }
+}
+
 /// Enables a mod. The toggle records intent only — it does NOT start the
 /// external app. Enabled external apps auto-spawn when the user clicks
 /// Launch Game (see `spawn_auto_launch_external_apps`). Enabled GPKs are
@@ -663,7 +644,7 @@ fn apply_disable_intent(slot: &mut ModEntry) {
 #[tauri::command]
 #[cfg(not(tarpaulin_include))]
 pub async fn enable_mod(id: String) -> Result<ModEntry, String> {
-    let _entry =
+    let entry =
         mods_state::get_mod(&id)?.ok_or_else(|| format!("Mod '{}' is not installed", id))?;
 
     let updated = mods_state::mutate(|reg| {
@@ -673,6 +654,10 @@ pub async fn enable_mod(id: String) -> Result<ModEntry, String> {
         apply_enable_intent(slot);
         Ok(slot.clone())
     })?;
+
+    if matches!(entry.kind, ModKind::Gpk) {
+        rebuild_gpk_runtime_state()?;
+    }
     Ok(updated)
 }
 
@@ -683,7 +668,7 @@ pub async fn enable_mod(id: String) -> Result<ModEntry, String> {
 #[tauri::command]
 #[cfg(not(tarpaulin_include))]
 pub async fn disable_mod(id: String) -> Result<ModEntry, String> {
-    let _entry =
+    let entry =
         mods_state::get_mod(&id)?.ok_or_else(|| format!("Mod '{}' is not installed", id))?;
 
     let updated = mods_state::mutate(|reg| {
@@ -693,6 +678,10 @@ pub async fn disable_mod(id: String) -> Result<ModEntry, String> {
         apply_disable_intent(slot);
         Ok(slot.clone())
     })?;
+
+    if matches!(entry.kind, ModKind::Gpk) {
+        rebuild_gpk_runtime_state()?;
+    }
     Ok(updated)
 }
 
@@ -717,7 +706,8 @@ async fn launch_external_app_impl(id: &str, set_auto_launch: bool) -> Result<Mod
             .ok_or_else(|| "Could not resolve external apps dir".to_string())?;
         let dest = install_root.join(&entry.id);
         let exe_path = external_app::executable_path(&dest, &exe_name)?;
-        external_app::spawn_app(&exe_path, &[])?;
+        let args = external_launch_args(id);
+        external_app::spawn_app(&exe_path, &args)?;
     }
 
     let updated = mods_state::mutate(|reg| {
@@ -879,7 +869,8 @@ pub fn spawn_auto_launch_external_apps() {
                 continue;
             }
         };
-        match external_app::spawn_app(&exe_path, &[]) {
+        let args = external_launch_args(&entry.id);
+        match external_app::spawn_app(&exe_path, &args) {
             Err(e) => log::warn!("Auto-launch: failed to start {}: {}", entry.id, e),
             Ok(_) => {
                 log::info!("Auto-launch: started {}", entry.id);
