@@ -524,3 +524,84 @@ fn detector_self_test_carries_both_era_synthetic_shapes() {
         );
     }
 }
+
+// --------------------------------------------------------------------
+// Iter 265 structural pins — scanner/guard byte bounds + iter-85
+// provenance + mods.css has .mods-filter-chip rule + scanner cites
+// fix-plan slot.
+// --------------------------------------------------------------------
+
+/// Iter 265: scanner file byte bounds.
+#[test]
+fn scanner_file_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 2000;
+    const MAX_BYTES: usize = 50_000;
+    let bytes = fs::metadata(SCANNER)
+        .expect("scanner must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "fix.mods-categories-ui (iter 265): {SCANNER} is {bytes} \
+         bytes; expected [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+/// Iter 265: guard source byte bounds.
+#[test]
+fn guard_source_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 5000;
+    const MAX_BYTES: usize = 80_000;
+    let bytes = fs::metadata("tests/mods_categories_ui_scanner_guard.rs")
+        .expect("guard must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "fix.mods-categories-ui (iter 265): guard is {bytes} bytes; \
+         expected [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+/// Iter 265: guard header must cite `iter 85` as the iteration that
+/// shipped the UX unification fix.
+#[test]
+fn guard_header_cites_iter_85_provenance() {
+    let body = fs::read_to_string("tests/mods_categories_ui_scanner_guard.rs")
+        .expect("guard must exist");
+    let header = &body[..body.len().min(500)];
+    assert!(
+        header.contains("iter 85") || header.contains("iter-85"),
+        "fix.mods-categories-ui (iter 265): guard header must cite \
+         `iter 85` — the iteration that shipped the pill-unification \
+         fix. Readers chasing the iter history need this.\n\
+         Header:\n{header}"
+    );
+}
+
+/// Iter 265: `src/mods.css` must carry a `.mods-filter-chip` rule —
+/// the canonical pill class the whole fix uses. Without the rule,
+/// the HTML carries the class but no styling applies.
+#[test]
+fn mods_css_carries_filter_chip_rule() {
+    let css = fs::read_to_string(MODS_CSS).expect("mods.css must exist");
+    assert!(
+        css.contains(".mods-filter-chip"),
+        "fix.mods-categories-ui (iter 265): {MODS_CSS} must carry a \
+         `.mods-filter-chip` rule. Without the CSS, the HTML markup \
+         gets the class but no pill styling applies — regression to \
+         visually-unstyled chips."
+    );
+}
+
+/// Iter 265: scanner must cite the fix-plan slot name in its own
+/// header (not just the guard header). Cross-reference parity.
+#[test]
+fn scanner_source_cites_fix_mods_categories_ui_slot() {
+    let body = fs::read_to_string(SCANNER).expect("scanner must exist");
+    let header = &body[..body.len().min(1500)];
+    assert!(
+        header.contains("fix.mods-categories-ui") || header.contains("mods-categories-ui"),
+        "fix.mods-categories-ui (iter 265): {SCANNER} header must \
+         cite `fix.mods-categories-ui` or `mods-categories-ui` for \
+         slot-grep discoverability.\nHeader:\n{header}"
+    );
+}
