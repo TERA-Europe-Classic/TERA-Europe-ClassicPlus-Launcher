@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 245
-last_work_iteration: 245
+iteration_counter: 246
+last_work_iteration: 246
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 221
+total_items_done: 222
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 246 WORK — pin.anti-reverse-guard-path-consts+panic-abort+codegen-units-1+cryptify-and-chamox+guardcf-release-gate DONE.**
+>
+> PRD 3.1.8.anti-reverse-hardening; anti_reverse_guard had 16 tests. Brings to 21.
+>
+> Five new pins:
+> 1. `guard_path_constants_are_canonical` — CARGO_TOML + BUILD_RS + AUDIT_DOC verbatim
+> 2. `release_profile_declares_panic_abort` — pin `panic = "abort"` (unwind tables enable RE function-boundary enumeration)
+> 3. `release_profile_codegen_units_is_one` — pin `codegen-units = 1` literal + reject drift to 16/256/0 (LTO cross-function inlining)
+> 4. `cargo_toml_declares_both_obfuscation_crates` — pin both `cryptify` (compile-time string obfuscation) AND `chamox` (secret-bytes + runtime integrity)
+> 5. `build_rs_guards_cf_flag_on_release_profile` — pin `/guard:cf` gated on `PROFILE == "release"` (unconditional would slow debug + break test runtime mocks)
+>
+> anti_reverse_guard: 16 → 21 tests. 1474 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 245 WORK — pin.portal-https-guard-path-host-consts+lan-port-8090+expected-keys-bounded+audit-doc-dormant-preconditions+config-root-shape DONE.**
 >

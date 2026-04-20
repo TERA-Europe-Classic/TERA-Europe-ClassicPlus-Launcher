@@ -482,3 +482,158 @@ fn anti_reverse_guard_detector_self_test() {
         "self-test: audit without M6 must trip wire 10"
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 245 structural pins — path-constant canonicalisation,
+// panic = abort on release, codegen-units = 1 exact literal pin,
+// cryptify + chamox both present, build.rs gates on PROFILE=release.
+// --------------------------------------------------------------------
+
+/// Iter 245: `CARGO_TOML` + `BUILD_RS` + `AUDIT_DOC` constants must
+/// stay canonical. Every source-inspection pin reads through one of
+/// these; drift silently redirects pins with misleading "file not
+/// found" panics.
+#[test]
+fn guard_path_constants_are_canonical() {
+    let body = fs::read_to_string("tests/anti_reverse_guard.rs")
+        .expect("guard source must exist");
+    for (name, expected) in [
+        ("CARGO_TOML", "Cargo.toml"),
+        ("BUILD_RS", "build.rs"),
+        ("AUDIT_DOC", "../../docs/PRD/audits/security/anti-reverse.md"),
+    ] {
+        let line = format!("const {name}: &str = \"{expected}\";");
+        assert!(
+            body.contains(&line),
+            "PRD 3.1.8 (iter 245): tests/anti_reverse_guard.rs must \
+             keep `{line}` verbatim. A rename of any referenced file \
+             without updating the constant leaves every pin reading \
+             through it with file-not-found panics."
+        );
+    }
+}
+
+/// Iter 245: `[profile.release]` must declare `panic = "abort"`.
+/// The default `unwind` leaves a stack-trace landing-pad table in
+/// the binary (needed for `catch_unwind`); attackers use those
+/// tables to enumerate function boundaries during RE. Abort drops
+/// the unwind path — smaller binary + harder to reverse.
+#[test]
+fn release_profile_declares_panic_abort() {
+    let body = fs::read_to_string(CARGO_TOML).expect("Cargo.toml must exist");
+    let section_start = body
+        .find("[profile.release]")
+        .expect("Cargo.toml must carry [profile.release]");
+    let next_section = body[section_start + 1..]
+        .find("\n[")
+        .map(|i| section_start + 1 + i)
+        .unwrap_or(body.len());
+    let section = &body[section_start..next_section];
+    assert!(
+        section.contains(r#"panic = "abort""#),
+        "PRD 3.1.8 (iter 245): [profile.release] must declare \
+         `panic = \"abort\"`. The default `unwind` leaves stack \
+         unwinding tables in the binary that attackers use to \
+         enumerate function boundaries during RE. Abort drops the \
+         unwind path — smaller binary, harder to reverse.\n\
+         Section:\n{section}"
+    );
+}
+
+/// Iter 245: `[profile.release]` must pin `codegen-units = 1`
+/// verbatim. The value 1 maximises LTO's cross-function inlining
+/// opportunities — anti-reverse benefits from function boundaries
+/// dissolving. A drift to 16 or 256 (the Rust default) splits
+/// LTO into local-only optimisation and leaves recognisable
+/// function shapes in the output.
+#[test]
+fn release_profile_codegen_units_is_one() {
+    let body = fs::read_to_string(CARGO_TOML).expect("Cargo.toml must exist");
+    let section_start = body
+        .find("[profile.release]")
+        .expect("Cargo.toml must carry [profile.release]");
+    let next_section = body[section_start + 1..]
+        .find("\n[")
+        .map(|i| section_start + 1 + i)
+        .unwrap_or(body.len());
+    let section = &body[section_start..next_section];
+    assert!(
+        section.contains("codegen-units = 1"),
+        "PRD 3.1.8 (iter 245): [profile.release] must pin \
+         `codegen-units = 1` verbatim. The value maximises LTO's \
+         cross-function inlining; a drift splits LTO into local-\
+         only and leaves recognisable function shapes in the \
+         output binary.\nSection:\n{section}"
+    );
+    // Reject obvious drift values.
+    for bad in [
+        "codegen-units = 16",
+        "codegen-units = 256",
+        "codegen-units = 0",
+    ] {
+        assert!(
+            !section.contains(bad),
+            "PRD 3.1.8 (iter 245): [profile.release] must NOT \
+             contain `{bad}`. The canonical value is 1."
+        );
+    }
+}
+
+/// Iter 245: `[dependencies]` must carry BOTH `cryptify` and
+/// `chamox`. Each provides a distinct obfuscation mechanism:
+///
+///   - `cryptify` — string-literal obfuscation (compile-time)
+///   - `chamox` — secret-bytes obfuscation + runtime integrity
+///
+/// Dropping either leaves a class of sensitive strings unprotected.
+/// The PRD 3.1.8 audit signed off on the pair; single-side would
+/// need a new audit round.
+#[test]
+fn cargo_toml_declares_both_obfuscation_crates() {
+    let body = fs::read_to_string(CARGO_TOML).expect("Cargo.toml must exist");
+    assert!(
+        body.contains("cryptify"),
+        "PRD 3.1.8 (iter 245): Cargo.toml must declare `cryptify` \
+         in [dependencies]. Dropping it leaves string literals \
+         unprotected — portal URLs, error messages, and other \
+         sensitive strings would appear verbatim in the binary. \
+         The PRD 3.1.8 audit signed off on both cryptify + chamox \
+         as a pair."
+    );
+    assert!(
+        body.contains("chamox"),
+        "PRD 3.1.8 (iter 245): Cargo.toml must declare `chamox` in \
+         [dependencies]. Dropping it removes the secret-bytes \
+         obfuscation + runtime integrity layer. Single-side \
+         (cryptify alone) would need a new audit round."
+    );
+}
+
+/// Iter 245: `build.rs`'s `/guard:cf` link flag must be gated on
+/// `PROFILE == "release"`. Applying the flag unconditionally would
+/// force every `cargo build` (including `cargo test`) to link
+/// with the MSVC control-flow-guard runtime, which slows down
+/// debug builds and may break tests that mock the MSVC runtime.
+/// The iter-146 sibling pin checks /guard:cf presence; this adds
+/// the conditional gate.
+#[test]
+fn build_rs_guards_cf_flag_on_release_profile() {
+    let body = fs::read_to_string(BUILD_RS).expect("build.rs must exist");
+    // `/guard:cf` must appear (sibling iter-146 pin verifies).
+    assert!(
+        body.contains("/guard:cf"),
+        "PRD 3.1.8 (iter 245): build.rs must emit `/guard:cf` as \
+         a linker argument (control-flow integrity). Sibling pin \
+         already covers this — restated here for self-containment."
+    );
+    // The guard:cf emission must be inside a `PROFILE == "release"` check.
+    assert!(
+        body.contains("PROFILE") && body.contains("release"),
+        "PRD 3.1.8 (iter 245): build.rs must gate `/guard:cf` on \
+         `PROFILE == \"release\"`. Applying the flag unconditionally \
+         forces every cargo build (incl. tests) to link with the \
+         MSVC control-flow-guard runtime — slowing debug builds \
+         and potentially breaking tests that mock the MSVC \
+         runtime.\nbuild.rs body:\n{body}"
+    );
+}
