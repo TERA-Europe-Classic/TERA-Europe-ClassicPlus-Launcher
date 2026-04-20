@@ -580,3 +580,86 @@ fn guard_header_enumerates_iter_198_five_hazards() {
         );
     }
 }
+
+// --------------------------------------------------------------------
+// Iter 268 structural pins — sha2 dep + main.rs bounds + guard bounds
+// + self_integrity.rs source bounds + PRD 3.1.11 cite.
+// --------------------------------------------------------------------
+
+/// Iter 268: Cargo.toml must declare `sha2` as a dependency — the
+/// algorithm the integrity check relies on. Dropping it would break
+/// compilation of self_integrity.rs and this guard.
+#[test]
+fn sha2_crate_is_declared_in_cargo_toml() {
+    let toml = std::fs::read_to_string("Cargo.toml").expect("Cargo.toml must exist");
+    assert!(
+        toml.contains("sha2"),
+        "PRD 3.1.11 (iter 268): Cargo.toml must declare `sha2` — the \
+         SHA-256 implementation the integrity check depends on. \
+         Without it, both self_integrity.rs and this guard fail to \
+         compile."
+    );
+}
+
+/// Iter 268: main.rs byte bounds.
+#[test]
+fn main_rs_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 5000;
+    const MAX_BYTES: usize = 100_000;
+    let bytes = std::fs::metadata(MAIN_RS)
+        .expect("main.rs must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "PRD 3.1.11 (iter 268): {MAIN_RS} is {bytes} bytes; expected \
+         [{MIN_BYTES}, {MAX_BYTES}]. main.rs is where integrity \
+         verification is called before window construction; a gutting \
+         or bloat warrants audit."
+    );
+}
+
+/// Iter 268: guard source byte bounds.
+#[test]
+fn guard_source_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 5000;
+    const MAX_BYTES: usize = 80_000;
+    let bytes = std::fs::metadata("tests/self_integrity.rs")
+        .expect("guard must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "PRD 3.1.11 (iter 268): guard is {bytes} bytes; expected \
+         [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+/// Iter 268: src/services/self_integrity.rs byte bounds — the
+/// production module the guard is pinning.
+#[test]
+fn self_integrity_service_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 500;
+    const MAX_BYTES: usize = 30_000;
+    let bytes = std::fs::metadata("src/services/self_integrity.rs")
+        .expect("self_integrity.rs must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "PRD 3.1.11 (iter 268): src/services/self_integrity.rs is \
+         {bytes} bytes; expected [{MIN_BYTES}, {MAX_BYTES}]. Gutting \
+         drops the verify_file/verify_self core; bloat signals scope \
+         creep."
+    );
+}
+
+/// Iter 268: guard header must cite PRD 3.1.11 explicitly.
+#[test]
+fn guard_source_cites_prd_3_1_11_explicitly() {
+    let body = std::fs::read_to_string("tests/self_integrity.rs")
+        .expect("guard must exist");
+    let header = &body[..body.len().min(500)];
+    assert!(
+        header.contains("PRD 3.1.11"),
+        "PRD 3.1.11 (iter 268): guard header must cite `PRD 3.1.11` \
+         explicitly for section-grep.\nHeader:\n{header}"
+    );
+}
