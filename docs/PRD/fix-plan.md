@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 272
-last_work_iteration: 272
+iteration_counter: 273
+last_work_iteration: 273
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 248
+total_items_done: 249
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,12 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 273 WORK — pin.http-allowlist-capabilities-bounds+guard-bounds+prd-3-1-5-cite+lan-scope+test-hosts-three DONE.**
+>
+> PRD §3.1.5 (http-allowlist); http_allowlist had 19 tests. Brings to 24.
+>
+> http_allowlist: 19 → 24 tests. 1609 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 272 WORK — pin.disk-full-external-app-bounds+guard-bounds+prd-3-2-8-cite+revert-helpers-present+mod-rs-exports DONE.**
 >

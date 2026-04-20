@@ -730,3 +730,75 @@ fn test_hosts_skip_lives_only_in_scanner_not_in_matcher() {
          example.com would fail the guard."
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 273 structural pins — capabilities/guard bounds + LAN scope +
+// PRD cite + TEST_HOSTS list integrity.
+// --------------------------------------------------------------------
+
+#[test]
+fn capabilities_file_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 500;
+    const MAX_BYTES: usize = 20_000;
+    let bytes = std::fs::metadata("capabilities/migrated.json")
+        .expect("capabilities/migrated.json must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "PRD §3.1.5 (iter 273): capabilities/migrated.json is {bytes} \
+         bytes; expected [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+#[test]
+fn guard_source_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 5000;
+    const MAX_BYTES: usize = 80_000;
+    let bytes = std::fs::metadata(GUARD_SOURCE)
+        .expect("guard must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "PRD §3.1.5 (iter 273): guard is {bytes} bytes; expected \
+         [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+#[test]
+fn guard_source_cites_prd_3_1_5_explicitly() {
+    let body = std::fs::read_to_string(GUARD_SOURCE)
+        .expect("guard must exist");
+    let header = &body[..body.len().min(500)];
+    assert!(
+        header.contains("PRD §3.1.5") || header.contains("PRD 3.1.5"),
+        "PRD §3.1.5 (iter 273): guard header must cite `PRD §3.1.5` \
+         or `PRD 3.1.5`.\nHeader:\n{header}"
+    );
+}
+
+#[test]
+fn lan_dev_http_scope_constant_is_canonical() {
+    let body = std::fs::read_to_string(GUARD_SOURCE)
+        .expect("guard must exist");
+    assert!(
+        body.contains("http://192.168.1.128:8090"),
+        "PRD §3.1.5 (iter 273): guard must retain the LAN dev HTTP \
+         scope `http://192.168.1.128:8090` — used to validate the \
+         portal endpoint URL is on the allowlist."
+    );
+}
+
+#[test]
+fn test_hosts_list_carries_three_canonical_entries() {
+    assert_eq!(
+        TEST_HOSTS.len(),
+        3,
+        "PRD §3.1.5 (iter 273): TEST_HOSTS must carry exactly 3 \
+         entries (example.com, 127.0.0.1, localhost); found {}. A \
+         different count signals drift in the test-skip allowlist.",
+        TEST_HOSTS.len()
+    );
+    assert!(TEST_HOSTS.contains(&"example.com"));
+    assert!(TEST_HOSTS.contains(&"127.0.0.1"));
+    assert!(TEST_HOSTS.contains(&"localhost"));
+}
