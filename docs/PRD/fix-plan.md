@@ -7,9 +7,9 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 229
+iteration_counter: 230
 last_work_iteration: 229
-last_research_sweep: 220
+last_research_sweep: 230
 last_revalidation: 220
 last_revalidation_status: all-gates-green
 last_retrospective: 60
@@ -25,6 +25,16 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 230 RESEARCH SWEEP — deploy post-mortem + dep/advisory scan DONE.**
+>
+> Cadence: N%10=0. Covered: launcher deploy 24644526692 (success, v0.1.15 on FTPS, latest.json reachable, signature present), `cargo update --dry-run` (165 crate updates available at patch/minor), `cargo audit` (1 hard vulnerability + 1 warning surfaced), Tauri crate drift (none — v2 plugins stable at current pins).
+>
+> Queued P0 `sec.bytes-rustsec-2026-0007` — integer overflow in `BytesMut::reserve` on bytes 1.11.0 (our lockfile pin). Fix is a `cargo update -p bytes` patch bump to 1.11.1. Reached via tokio + hyper + reqwest so every HTTP call path trips through it.
+>
+> Queued P1 `sec.rand-rustsec-2026-0097-audit` — rand 0.9.2 unsound when a custom logger is installed via `rand::rng()`. We don't install a custom rand logger, but rand reaches us via tauri-plugin-notification + quinn-proto (reqwest) + chamox. Close by proof-of-no-custom-logger or by bumping rand when upstream releases a fix.
+>
+> No test touches this iter (research only). 1394 Rust, 449 vitest, clippy clean from iter 229.
 
 > **Iter 229 WORK — pin.self-integrity-path-consts+exit-2-uniqueness+sidecar-exe-parent-anchor+precedes-window-construction+iter-198-hazard-header-enum DONE.**
 >
@@ -1993,6 +2003,8 @@ tauri_v2_migration_ready_for_squash_merge: true
 - [P0] **3.1.10.tcc-shinra-binary-hardening** — Strip TCC + Shinra release-mode debug symbols; evaluate ConfuserEx / Obfuscar for IL-obfuscation on sensitive types (e.g. sniffer keys, session-decryption code). Author `docs/PRD/audits/security/tcc-shinra-binary-hardening.md`. Acceptance: release binaries show no `.pdb`-adjacent symbols; audit doc signed off. Pillar: Security.
 - [P0] **3.1.9.updater-downgrade-refuse** — Patch Tauri updater to refuse downgrades (compare current version vs `latest.json` version; reject older). Author `teralaunch/src-tauri/tests/updater_downgrade.rs::refuses_older_latest_json`. Acceptance: test passes with a signed older `latest.json` fixture. Pillar: Security.
 - [P0] **3.1.12.csp-unsafe-inline** — Audit `tauri.conf.json` CSP; remove `unsafe-inline` for `script-src`. Migrate any inline scripts to external modules. Author `teralaunch/src-tauri/tests/csp_audit.rs::csp_denies_inline_scripts`. Acceptance: test asserts CSP contains no `'unsafe-inline'` in `script-src`. Pillar: Security.
+- [P0] **sec.bytes-rustsec-2026-0007** — `cargo audit` flagged `bytes 1.11.0` with RUSTSEC-2026-0007 (integer overflow in `BytesMut::reserve`). Reachable from every HTTP-call path (tokio → hyper → reqwest → bytes). Action: `cargo update -p bytes` to 1.11.1; verify lockfile-only change; run full suite. Acceptance: `cargo audit` reports 0 vulnerabilities on the lockfile; 1394 Rust + 449 vitest stay green. Discovered iter 230 RESEARCH SWEEP. Pillar: Security.
+- [P1] **sec.rand-rustsec-2026-0097-audit** — RUSTSEC-2026-0097 warns `rand 0.9.2` is unsound when a caller installs a custom RNG logger via `rand::rng()`. rand 0.9.2 reaches us via tauri-plugin-notification + quinn-proto (reqwest) + chamox, but we don't install a custom logger anywhere. Acceptance: close as N/A by unreachable-API proof (grep for `rand::rng` / `SeedableRng` custom-logger setters across our crates returning 0 hits), mirror the template of the two `DONE @ iter 55/56` RUSTSEC entries. Discovered iter 230 RESEARCH SWEEP. Pillar: Security.
 
 ### User-reported bugs (iter 82 — live triage)
 
