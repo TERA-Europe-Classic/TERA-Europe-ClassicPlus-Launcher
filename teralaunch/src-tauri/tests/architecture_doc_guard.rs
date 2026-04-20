@@ -731,3 +731,82 @@ fn doc_h1_title_is_canonical() {
          greps for the doc by title."
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 283 structural pins — doc bounds + guard bounds + PRD cite +
+// required subsystem expected file count floors.
+// --------------------------------------------------------------------
+
+#[test]
+fn doc_byte_bounds_iter_283() {
+    const MIN: usize = 5000;
+    const MAX: usize = 500_000;
+    let bytes = std::fs::metadata(DOC)
+        .expect("architecture doc must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "PRD 3.8.4 (iter 283): {DOC} is {bytes} bytes; expected \
+         [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn guard_source_byte_bounds_iter_283() {
+    const MIN: usize = 5000;
+    const MAX: usize = 80_000;
+    let bytes = std::fs::metadata("tests/architecture_doc_guard.rs")
+        .expect("guard must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "PRD 3.8.4 (iter 283): guard is {bytes} bytes; expected \
+         [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn guard_source_cites_prd_3_8_4_explicitly() {
+    let body = std::fs::read_to_string("tests/architecture_doc_guard.rs")
+        .expect("guard must exist");
+    let header = &body[..body.len().min(500)];
+    assert!(
+        header.contains("PRD 3.8.4"),
+        "PRD 3.8.4 (iter 283): guard header must cite `PRD 3.8.4`.\n\
+         Header:\n{header}"
+    );
+}
+
+#[test]
+fn required_subsystems_carries_all_canonical_entries() {
+    for expected in [
+        "tmm.rs",
+        "catalog.rs",
+        "external_app.rs",
+        "registry.rs",
+    ] {
+        assert!(
+            REQUIRED_SUBSYSTEMS.iter().any(|s| s.contains(expected)),
+            "PRD 3.8.4 (iter 283): REQUIRED_SUBSYSTEMS must contain \
+             `{expected}` (canonical production subsystem). Current \
+             set: {REQUIRED_SUBSYSTEMS:?}"
+        );
+    }
+}
+
+#[test]
+fn doc_h1_title_is_at_top_within_first_five_lines() {
+    let body = std::fs::read_to_string(DOC)
+        .expect("architecture doc must exist");
+    let h1_line_num = body
+        .lines()
+        .enumerate()
+        .find(|(_, l)| l.starts_with("# ") && !l.starts_with("## "))
+        .map(|(i, _)| i);
+    assert!(
+        matches!(h1_line_num, Some(n) if n < 5),
+        "PRD 3.8.4 (iter 283): {DOC} H1 title must appear within the \
+         first 5 lines — a convention that makes doc crawling \
+         predictable. Got H1 at line: {h1_line_num:?}"
+    );
+}
