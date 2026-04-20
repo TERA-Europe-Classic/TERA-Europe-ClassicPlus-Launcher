@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 228
-last_work_iteration: 228
+iteration_counter: 229
+last_work_iteration: 229
 last_research_sweep: 220
 last_revalidation: 220
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 201
+total_items_done: 202
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 229 WORK — pin.self-integrity-path-consts+exit-2-uniqueness+sidecar-exe-parent-anchor+precedes-window-construction+iter-198-hazard-header-enum DONE.**
+>
+> PRD 3.1.11 self-integrity; self_integrity had 13 tests (iter 153 creation + iter 198 +5); 31 iters untouched (oldest remaining 13-count). Brings to 18.
+>
+> Five new source-inspection pins (path-constants + exit-code uniqueness + sidecar anchor + stricter pre-UI ordering + meta hazard-header enumeration):
+> 1. `guard_path_constants_are_canonical` — MAIN_RS + GUARD_SOURCE pinned verbatim
+> 2. `exit_code_2_appears_exactly_once_in_fn` — uniqueness; a duplicated exit(2) in the Unreadable arm would brick launchers under transient FS conditions
+> 3. `sidecar_path_anchors_on_exe_parent_dir` — pins `exe.parent()?.join("self_hash.sha256")`, forbids `env::temp_dir` / `env::current_dir`
+> 4. `integrity_check_precedes_any_window_construction` — stricter than iter-153's tauri::Builder check; also before WebviewWindowBuilder / WebviewUrl / `.run(tauri::generate_context!`
+> 5. `guard_header_enumerates_iter_198_five_hazards` — traceability that iter-198 header still cites all five hazard labels
+>
+> self_integrity: 13 → 18 tests. 1381 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 228 WORK — pin.csp-audit-GUARD_SOURCE-const+connect-src-self-baseline+6-directive-set+app.security.csp-json-path+iter-152-197-header-cites DONE (worktree).**
 >

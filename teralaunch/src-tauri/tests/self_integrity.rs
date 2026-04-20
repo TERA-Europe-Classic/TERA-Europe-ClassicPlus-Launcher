@@ -386,3 +386,197 @@ fn verify_self_is_imported_from_services_module() {
         );
     }
 }
+
+// --------------------------------------------------------------------
+// Iter 229 structural pins — path-constants canonicalisation, exit
+// code uniqueness, sidecar anchor on exe parent, stricter pre-UI
+// ordering, iter-198 hazard-header traceability.
+//
+// The iter 153 and iter 198 pins already cover the "does it run / does
+// it exit / does it warn" behaviour. These five extend the surface:
+// structural invariants that a confident refactorer could violate
+// while the behavioural tests still pass. 31 iters have touched other
+// guards (csp_audit, clean_recovery, tampered_catalog, mods_categories,
+// ...) without extending self_integrity — so this is the oldest
+// 13-count remaining, re-levelled to 18.
+// --------------------------------------------------------------------
+
+/// Iter 229: the two path constants this guard uses to read source
+/// files must stay canonical. If a refactor renames src/main.rs or
+/// moves the guard, the `fs::read_to_string` calls start returning
+/// "file not found" panics — test output becomes confusing rather
+/// than pointing at the real regression.
+#[test]
+fn guard_path_constants_are_canonical() {
+    assert_eq!(
+        MAIN_RS, "src/main.rs",
+        "PRD 3.1.11 (iter 229): MAIN_RS must be `src/main.rs` verbatim. \
+         A rename breaks every source-inspection pin in this file."
+    );
+    assert_eq!(
+        GUARD_SOURCE, "tests/self_integrity.rs",
+        "PRD 3.1.11 (iter 229): GUARD_SOURCE must be \
+         `tests/self_integrity.rs` verbatim. Header-inspection pins \
+         read this exact path; a rename would silently skip header \
+         validation."
+    );
+}
+
+/// Iter 229: `std::process::exit(2)` must appear exactly ONCE inside
+/// `run_self_integrity_check`. Iter 198 pinned that exit(2) exists in
+/// the Mismatch arm and is non-zero; this pin adds uniqueness. A
+/// confused refactor that added a second exit(2) in a different arm
+/// (e.g. Unreadable) would still pass iter 198's pin while silently
+/// bricking launchers under transient filesystem conditions. A
+/// duplicated exit is just as broken as a missing one.
+#[test]
+fn exit_code_2_appears_exactly_once_in_fn() {
+    let body = main_rs();
+    let fn_pos = body
+        .find("fn run_self_integrity_check()")
+        .expect("run_self_integrity_check must exist");
+    let window_end = body[fn_pos..]
+        .find("\n}\n")
+        .map(|i| fn_pos + i)
+        .unwrap_or(fn_pos + 3000);
+    let fn_body = &body[fn_pos..window_end];
+    let occurrences = fn_body.matches("process::exit(2)").count();
+    assert_eq!(
+        occurrences, 1,
+        "PRD 3.1.11 (iter 229): run_self_integrity_check must contain \
+         exactly one `process::exit(2)` call (found {occurrences}). \
+         Zero means the tamper-detected signal is missing; more than \
+         one means a non-Mismatch arm also exits, which would brick \
+         legitimate launchers under transient filesystem conditions.\n\
+         Fn body:\n{fn_body}"
+    );
+}
+
+/// Iter 229: the sidecar path MUST be anchored on `exe.parent()`, not
+/// `env::temp_dir()`, `env::current_dir()`, or any user-writable
+/// location. The sidecar sits next to the exe so the release pipeline's
+/// minisign signature covers both; a sidecar read from a writable
+/// location would let a local attacker plant their own "matching"
+/// baseline.
+#[test]
+fn sidecar_path_anchors_on_exe_parent_dir() {
+    let body = main_rs();
+    let fn_pos = body.find("fn run_self_integrity_check()").unwrap();
+    let window_end = body[fn_pos..]
+        .find("\n}\n")
+        .map(|i| fn_pos + i)
+        .unwrap_or(fn_pos + 3000);
+    let fn_body = &body[fn_pos..window_end];
+    // Must use exe.parent() — the release pipeline signs the sidecar
+    // next to the exe.
+    assert!(
+        fn_body.contains("exe.parent()"),
+        "PRD 3.1.11 (iter 229): sidecar path must be constructed via \
+         `exe.parent()`. Dropping this call would either hard-code a \
+         path or source from somewhere else (temp_dir, current_dir) — \
+         a writable location means an attacker's matching baseline \
+         would pass the check."
+    );
+    // Must join `self_hash.sha256` onto that parent.
+    assert!(
+        fn_body.contains(r#".join("self_hash.sha256")"#),
+        "PRD 3.1.11 (iter 229): sidecar path must be constructed via \
+         `exe.parent()?.join(\"self_hash.sha256\")`. The join literal \
+         must be exact so the release pipeline (which writes this \
+         filename next to the exe) stays wired to the launcher."
+    );
+    // Forbid env::temp_dir / env::current_dir as sidecar anchor. A
+    // future refactor that "fixes dev" by sourcing from temp would
+    // silently compromise release-time tamper detection.
+    for bad in ["env::temp_dir", "env::current_dir"] {
+        assert!(
+            !fn_body.contains(bad),
+            "PRD 3.1.11 (iter 229): run_self_integrity_check must NOT \
+             source the sidecar from `{bad}`. The sidecar must be \
+             next to the exe so the release pipeline's minisign \
+             signature covers both files."
+        );
+    }
+}
+
+/// Iter 229: `run_self_integrity_check()` must be called from `main()`
+/// BEFORE any window construction — not just before
+/// `tauri::Builder::default()`. Tauri v2 exposes WebviewWindowBuilder
+/// / WebviewUrl etc.; a refactor that moved window setup earlier in
+/// `main` (before tauri::Builder) but left the integrity call where it
+/// was would still pass iter 153's ordering check while letting a
+/// tampered binary render UI. Pin: integrity call must precede every
+/// window-construction token we know about.
+#[test]
+fn integrity_check_precedes_any_window_construction() {
+    let body = main_rs();
+    let check_idx = body
+        .find("run_self_integrity_check();")
+        .expect("main() must call run_self_integrity_check()");
+    // Tokens that would indicate a window being created / launched.
+    // Not every codebase uses all of them; assert precedence for
+    // whichever ones exist.
+    for token in [
+        "tauri::Builder::default()",
+        "WebviewWindowBuilder",
+        "WebviewUrl::",
+        ".run(tauri::generate_context!",
+    ] {
+        if let Some(idx) = body.find(token) {
+            assert!(
+                check_idx < idx,
+                "PRD 3.1.11 (iter 229): run_self_integrity_check() must \
+                 appear BEFORE `{token}` in main.rs \
+                 (check_idx={check_idx}, token_idx={idx}). Window \
+                 construction or tauri::run after a tampered binary \
+                 passes the integrity check defeats the exit(2) \
+                 signal — the UI flashes before the process dies."
+            );
+        }
+    }
+}
+
+/// Iter 229: the iter-198 header block inside this guard file must
+/// enumerate the five hazards iter 198 pinned, so a maintainer can see
+/// at a glance WHY each pin exists and not relax them thinking they
+/// are redundant. Guard traceability: the header is the map to the
+/// tests; drift in the map silently invites regression.
+#[test]
+fn guard_header_enumerates_iter_198_five_hazards() {
+    let body = fs::read_to_string(GUARD_SOURCE).expect("guard source must exist");
+    // Find the iter-198 section header.
+    let header_pos = body
+        .find("Iter 198 structural pins")
+        .expect("iter 198 header must exist in guard source");
+    // Enumerate the 5 hazard labels iter 198 added (from the header
+    // comment, kept in sync with the actual tests).
+    let header_window_end = body[header_pos..]
+        .find("#[test]")
+        .map(|i| header_pos + i)
+        .unwrap_or(header_pos + 1200);
+    let header_window = &body[header_pos..header_window_end];
+    // Normalise comment-wrapping: collapse `//`, newlines, and multi-
+    // space runs so the hazard labels can live across wrapped lines
+    // in the header comment without tripping the substring check.
+    let normalised: String = header_window
+        .replace("//", " ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    for hazard in [
+        "guard traceability",
+        "non-zero exit",
+        "Unreadable-is-advisory",
+        "sidecar-IO fallbacks",
+        "module import provenance",
+    ] {
+        assert!(
+            normalised.contains(hazard),
+            "PRD 3.1.11 (iter 229): iter-198 header block must cite \
+             `{hazard}` so a maintainer reading the header can map \
+             each test to the hazard it guards. A missing hazard \
+             label invites the pin being relaxed for looking \
+             redundant.\nNormalised header:\n{normalised}"
+        );
+    }
+}
