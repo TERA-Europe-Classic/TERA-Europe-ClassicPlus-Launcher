@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 248
-last_work_iteration: 248
+iteration_counter: 249
+last_work_iteration: 249
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 224
+total_items_done: 225
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 249 WORK — pin.meta-hygiene-guard-test-count-ratchet-16+assertion-ratchet-10+known-guards-ceiling-50+iter-stamp-required+evolution-trail DONE.**
+>
+> PRD 3.8.2.meta-hygiene-guard; meta_hygiene_guard had 16 tests. Brings to 21. Contract-of-contracts ratchet: the iter-174 floors (test-count 2, assertion 1) no longer reflect the quality bar after the iters 230-248 sweep lifted every 13-16-count guard to 21.
+>
+> Five new pins:
+> 1. `every_guard_meets_test_count_floor_of_sixteen` — per-guard MIN_TESTS ratcheted 2→16 (matches sweep baseline; catches stub-guard regressions from quality bar)
+> 2. `every_guard_contains_at_least_ten_assertions` — per-guard MIN_ASSERTS ratcheted 1→10 (catches assertion-stripping refactors that leave test count intact)
+> 3. `known_guards_count_has_sane_ceiling` — MAX_GUARDS = 50 ceiling complements the 19 floor (catches script-misfire bulk-add; legitimate growth past 50 is reviewable event)
+> 4. `every_guard_cites_an_iter_number_somewhere` — body must contain literal `iter ` (provenance invariant; template leftovers or stripped-provenance refactors fail here)
+> 5. `meta_hygiene_guard_header_cites_iter_evolution` — self-documentation: header must cite iters 86/135/174/209/249 so the contract-of-contracts carries its own evolution trace
+>
+> meta_hygiene_guard: 16 → 21 tests. 1489 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 248 WORK — pin.add-mod-from-file-path-consts+slot-filename-slash-sanitize+create-dir-all-precedes-write+deploy-success-enabled-and-auto-launch+sha-log-twelve-prefix DONE.**
 >

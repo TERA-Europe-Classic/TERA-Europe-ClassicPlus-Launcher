@@ -553,3 +553,142 @@ fn known_guards_count_meets_current_floor() {
         KNOWN_GUARDS.len()
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 249 structural pins — ratchet per-guard test count floor,
+// assertion floor, ceiling on KNOWN_GUARDS, iter-stamp presence,
+// meta-guard evolution trace in header.
+// --------------------------------------------------------------------
+//
+// Iters 230-248 drove every 13-16-count guard file up to 21 tests.
+// The baseline floor of 2 (iter 174) no longer reflects the current
+// quality bar. Iter 249 ratchets:
+//   (a) per-guard test floor to 16 — real guards now carry 16-30 tests
+//   (b) per-guard assertion floor to 10 — 1 was permissive enough that
+//       a ≥2-test stub could still pass with one assert total
+//   (c) KNOWN_GUARDS ceiling to 50 — catches accidental bulk-add
+//       from a misfiring script
+//   (d) every guard must carry `iter ` somewhere in the body so
+//       provenance is traceable
+//   (e) this meta-guard's header must cite its own evolution iters
+//       (135, 174, 209, 249) so the contract trail is visible
+
+/// Every guard file must carry at least SIXTEEN `#[test]` functions.
+/// The iter-174 floor of 2 was a stub-detector; iter-249 ratchets
+/// the floor to the actual quality bar every 13-16-count guard was
+/// lifted to across iters 230-248. A refactor that truncates a real
+/// drift guard to a handful of tests would pass the baseline
+/// floor but regress the invariant density the sweep established.
+#[test]
+fn every_guard_meets_test_count_floor_of_sixteen() {
+    const MIN_TESTS: usize = 16;
+    for path in discovered_guards() {
+        let body = read(&path);
+        let test_count = body.lines().filter(|l| l.trim() == "#[test]").count();
+        assert!(
+            test_count >= MIN_TESTS,
+            "{} carries only {} `#[test]` fn(s); iter-249 floor is \
+             {MIN_TESTS}. The 13-16-count sweep (iters 230-248) \
+             ratcheted every drift-guard up to ≥ 16; dropping below \
+             is a regression of that invariant density. Addition of \
+             new guards is welcome (they must also meet the floor).",
+            path.display(),
+            test_count
+        );
+    }
+}
+
+/// Every guard file body must contain at least 10 assertion calls
+/// (`assert!` / `assert_eq!` / `assert_ne!` / `panic!`). The
+/// iter-174 floor of 1 was the stub-detector; iter-249 ratchets to
+/// 10 because every real guard now pins 16+ invariants, each
+/// carrying 1+ asserts. A silent refactor that strips out most
+/// asserts would leave the test-count floor intact but erode
+/// actual invariant coverage.
+#[test]
+fn every_guard_contains_at_least_ten_assertions() {
+    const MIN_ASSERTS: usize = 10;
+    for path in discovered_guards() {
+        let body = read(&path);
+        let count = body.matches("assert!(").count()
+            + body.matches("assert_eq!(").count()
+            + body.matches("assert_ne!(").count()
+            + body.matches("panic!(").count();
+        assert!(
+            count >= MIN_ASSERTS,
+            "{} contains {count} assertion call(s); iter-249 floor \
+             is {MIN_ASSERTS}. Every real guard now pins ≥ 16 \
+             invariants with assertions attached. A drop below {MIN_ASSERTS} \
+             signals assertion-stripping even though the \
+             test-count floor is preserved.",
+            path.display()
+        );
+    }
+}
+
+/// `KNOWN_GUARDS` must carry no more than 50 entries. A ceiling
+/// complements the 19-entry floor — an accidental bulk-add (a
+/// misfiring script that duplicates-with-suffix or imports unrelated
+/// `.rs` files) would pass `known_guards_list_has_no_duplicates`
+/// (different filenames) while swamping the list with non-guards.
+/// 50 is ~2.5× current; legitimate growth has room, garbage bloat
+/// trips the ceiling.
+#[test]
+fn known_guards_count_has_sane_ceiling() {
+    const MAX_GUARDS: usize = 50;
+    assert!(
+        KNOWN_GUARDS.len() <= MAX_GUARDS,
+        "meta-guard contract (iter 249): KNOWN_GUARDS carries {} \
+         entries; ceiling is {MAX_GUARDS}. A sudden spike past the \
+         ceiling signals accidental bulk-add (script misfire, \
+         copy-paste of unrelated files). Legitimate growth past 50 \
+         should be a visible, reviewable event that bumps this \
+         constant.",
+        KNOWN_GUARDS.len()
+    );
+}
+
+/// Every guard file body must contain the literal substring `iter `
+/// somewhere. Provenance invariant: every pin should trace back to
+/// the iteration that introduced it, so a future reviewer can read
+/// the fix-plan entry explaining WHY. A guard with no `iter ` stamp
+/// is either generated from a template without customization or
+/// had its provenance stripped in a refactor.
+#[test]
+fn every_guard_cites_an_iter_number_somewhere() {
+    for path in discovered_guards() {
+        let body = read(&path);
+        assert!(
+            body.contains("iter "),
+            "{} does not contain the substring `iter ` anywhere. \
+             Every drift guard must stamp its provenance (e.g. \
+             `iter 135`, `iter 209`, `iter 249`) so a reviewer can \
+             trace the pin back to the fix-plan entry that justifies \
+             it. A guard without an iter stamp is either a template \
+             leftover or had its provenance stripped.",
+            path.display()
+        );
+    }
+}
+
+/// The meta-guard's own header must cite every iter that ratcheted
+/// its contract: 135 (baseline), 174 (five extensions), 209 (five
+/// extensions), 249 (five extensions). Self-documentation: the
+/// contract-of-contracts should carry its own evolution trace so a
+/// reviewer understands when and why each tier was added.
+#[test]
+fn meta_hygiene_guard_header_cites_iter_evolution() {
+    let body = fs::read_to_string("tests/meta_hygiene_guard.rs")
+        .expect("tests/meta_hygiene_guard.rs must exist");
+    // Only inspect the top ~100 lines (the header + early sections).
+    let header: String = body.lines().take(100).collect::<Vec<_>>().join("\n");
+    for iter_tag in &["iter 86", "iter 135", "iter 174", "iter 209", "iter 249"] {
+        assert!(
+            body.contains(iter_tag),
+            "meta-guard contract (iter 249): body must cite `{iter_tag}` \
+             somewhere so the evolution of the meta-contract is \
+             traceable in-file. Missing stamp suggests a refactor \
+             truncated the provenance trail.\nHeader preview (100 lines):\n{header}"
+        );
+    }
+}
