@@ -765,3 +765,91 @@ fn scanner_safe_identifiers_reject_dom_input_patterns() {
         }
     }
 }
+
+// --------------------------------------------------------------------
+// Iter 289 structural pins — app.js bounds + tauri-plugin-shell dep +
+// capabilities permissions contains shell:allow-open + capabilities
+// JSON valid + scanner mentions both sink patterns.
+// --------------------------------------------------------------------
+
+#[test]
+fn app_js_byte_bounds() {
+    const MIN: usize = 50_000;
+    const MAX: usize = 1_000_000;
+    let bytes = std::fs::metadata(APP_JS)
+        .expect("app.js must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "sec.shell-open-call-sites-pinned (iter 289): {APP_JS} is \
+         {bytes} bytes; expected [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn cargo_toml_declares_tauri_plugin_shell() {
+    let toml = std::fs::read_to_string("Cargo.toml")
+        .expect("Cargo.toml must exist");
+    assert!(
+        toml.contains("tauri-plugin-shell"),
+        "sec.shell-open-call-sites-pinned (iter 289): Cargo.toml \
+         must declare `tauri-plugin-shell` — the plugin that provides \
+         the shell.open endpoint this guard protects."
+    );
+}
+
+#[test]
+fn capabilities_permissions_include_shell_allow_open() {
+    let cap = std::fs::read_to_string(CAPABILITIES)
+        .expect("capabilities/migrated.json must exist");
+    let v: serde_json::Value = serde_json::from_str(&cap)
+        .expect("capabilities JSON must parse");
+    let perms = v
+        .pointer("/permissions")
+        .and_then(|x| x.as_array())
+        .expect("capabilities must carry `permissions` array");
+    let has_shell_open = perms.iter().any(|p| {
+        match p {
+            serde_json::Value::String(s) => s == "shell:allow-open",
+            serde_json::Value::Object(o) => o
+                .get("identifier")
+                .and_then(|v| v.as_str())
+                == Some("shell:allow-open"),
+            _ => false,
+        }
+    });
+    assert!(
+        has_shell_open,
+        "sec.shell-open-call-sites-pinned (iter 289): capabilities \
+         permissions must include `shell:allow-open`. Without it, \
+         shell.open is inaccessible."
+    );
+}
+
+#[test]
+fn capabilities_json_is_well_formed_at_top_level() {
+    let cap = std::fs::read_to_string(CAPABILITIES)
+        .expect("capabilities/migrated.json must exist");
+    let parsed: Result<serde_json::Value, _> = serde_json::from_str(&cap);
+    assert!(
+        parsed.is_ok(),
+        "sec.shell-open-call-sites-pinned (iter 289): \
+         {CAPABILITIES} must parse as valid JSON. Got: {:?}",
+        parsed.err()
+    );
+}
+
+#[test]
+fn scanner_references_both_tauri_api_and_wrapper_sinks() {
+    let body = read(SCANNER);
+    assert!(
+        body.contains("window.__TAURI__.shell.open"),
+        "sec.shell-open-call-sites-pinned (iter 289): {SCANNER} must \
+         mention `window.__TAURI__.shell.open` — direct Tauri API sink."
+    );
+    assert!(
+        body.contains("App.openExternal") || body.contains("openExternal"),
+        "sec.shell-open-call-sites-pinned (iter 289): {SCANNER} must \
+         mention `App.openExternal` or `openExternal` — app wrapper sink."
+    );
+}
