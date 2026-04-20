@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 247
-last_work_iteration: 247
+iteration_counter: 248
+last_work_iteration: 248
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 223
+total_items_done: 224
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 248 WORK — pin.add-mod-from-file-path-consts+slot-filename-slash-sanitize+create-dir-all-precedes-write+deploy-success-enabled-and-auto-launch+sha-log-twelve-prefix DONE.**
+>
+> PRD 3.3.4.add-mod-from-file-wire; add_mod_from_file_wiring had 16 tests. Brings to 21.
+>
+> Five new pins:
+> 1. `guard_path_constants_are_canonical` — COMMANDS_MODS_RS + MAIN_RS + GUARD_SOURCE verbatim + file-exists check (3 constants in one pin)
+> 2. `gpk_slot_filename_sanitizes_slash_to_underscore` — pin `entry.id.replace('/', "_")` verbatim (path-traversal-via-derived-filename prevention, dormant today only because `local.<sha12>` never embeds a slash)
+> 3. `create_dir_all_precedes_fs_write_to_dest` — ordering: `create_dir_all(&gpk_dir)` < `fs::write(&dest, &bytes)` (first-run import fails non-actionably without mkdir first)
+> 4. `deploy_success_sets_enabled_and_auto_launch_true` — pin all three of `entry.enabled = true;`, `entry.auto_launch = true;`, `entry.status = ModStatus::Enabled;` in the deploy-success branch (missing auto_launch = true leaves mod enabled but silently unscheduled)
+> 5. `info_log_sanitizes_sha_to_twelve_chars` — pin `&sha[..12]` in info! (privacy hygiene: full 64-char SHAs in logs ease cross-dump correlation)
+>
+> add_mod_from_file_wiring: 16 → 21 tests. 1484 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 247 WORK — pin.architecture-doc-guard-path-const+required-subsystems-seven+expected-sections-eleven+doc-byte-floor-ceiling+h1-title-canonical DONE.**
 >

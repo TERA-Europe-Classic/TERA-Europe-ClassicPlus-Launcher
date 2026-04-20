@@ -436,6 +436,147 @@ fn fs_errors_are_mapped_not_unwrapped() {
     );
 }
 
+/// Iter 247: pin the three path constants against silent renames.
+/// If `COMMANDS_MODS_RS` / `MAIN_RS` / `GUARD_SOURCE` drift, every
+/// other test in this file reads from the wrong file and silently
+/// passes on the missing-body fall-through.
+#[test]
+fn guard_path_constants_are_canonical() {
+    assert_eq!(
+        COMMANDS_MODS_RS, "src/commands/mods.rs",
+        "PRD 3.3.4 (iter 247): COMMANDS_MODS_RS constant must point \
+         at `src/commands/mods.rs` verbatim. A rename of the module \
+         needs a coordinated guard update."
+    );
+    assert_eq!(
+        MAIN_RS, "src/main.rs",
+        "PRD 3.3.4 (iter 247): MAIN_RS constant must point at \
+         `src/main.rs` verbatim. If Tauri entry point moves, the \
+         invoke-handler registration pin reads from the wrong file."
+    );
+    assert_eq!(
+        GUARD_SOURCE, "tests/add_mod_from_file_wiring.rs",
+        "PRD 3.3.4 (iter 247): GUARD_SOURCE constant must point at \
+         this file's own path verbatim. Header-grep tests otherwise \
+         silently pass on a missing file."
+    );
+    // All three paths must actually exist.
+    assert!(
+        fs::metadata(COMMANDS_MODS_RS).is_ok(),
+        "{COMMANDS_MODS_RS} must exist as a real file — the guard is \
+         useless if the target source is gone."
+    );
+    assert!(
+        fs::metadata(MAIN_RS).is_ok(),
+        "{MAIN_RS} must exist as a real file."
+    );
+    assert!(
+        fs::metadata(GUARD_SOURCE).is_ok(),
+        "{GUARD_SOURCE} must exist as a real file."
+    );
+}
+
+/// Iter 247: the gpk-slot filename sanitises `/` to `_` before being
+/// joined into the destination path. Without this, an `entry.id`
+/// containing a slash (e.g. `local.abcdef/../..`) would let
+/// `gpk_dir.join(...)` escape the sandboxed mods directory. The
+/// `from_local_gpk` constructor currently emits `local.<sha12>` so
+/// the slash is dormant, but this pin prevents a silent drop of the
+/// replacement when the id format evolves.
+#[test]
+fn gpk_slot_filename_sanitizes_slash_to_underscore() {
+    let body = fn_body_window();
+    assert!(
+        body.contains("entry.id.replace('/', \"_\")"),
+        "PRD 3.3.4 (iter 247): the gpk-slot filename must call \
+         `entry.id.replace('/', \"_\")` verbatim before joining \
+         under gpk_dir. A slash in an id would let `gpk_dir.join(\"a/b.gpk\")` \
+         escape the mods sandbox — classic path-traversal via derived \
+         filename, dormant today only because `local.<sha12>` never \
+         embeds a slash."
+    );
+}
+
+/// Iter 247: `create_dir_all(&gpk_dir)` must run BEFORE
+/// `fs::write(&dest, &bytes)`. Without create_dir_all, the first
+/// import on a fresh install would fail with a "file not found"
+/// error pointing at the parent directory, and the user sees
+/// nothing useful to act on. Ordering matters — some past refactors
+/// have shuffled the two.
+#[test]
+fn create_dir_all_precedes_fs_write_to_dest() {
+    let body = fn_body_window();
+    let mkdir_idx = body
+        .find("create_dir_all(&gpk_dir)")
+        .expect("add_mod_from_file must call std::fs::create_dir_all(&gpk_dir) before writing");
+    let write_idx = body
+        .find("std::fs::write(&dest, &bytes)")
+        .expect("add_mod_from_file must call std::fs::write(&dest, &bytes)");
+    assert!(
+        mkdir_idx < write_idx,
+        "PRD 3.3.4 (iter 247): source-order violated. \
+         `create_dir_all(&gpk_dir)` (at {mkdir_idx}) must run BEFORE \
+         `std::fs::write(&dest, &bytes)` (at {write_idx}). First-run \
+         import on a fresh install fails with a non-actionable \
+         'file not found' error if the directory isn't created first."
+    );
+}
+
+/// Iter 247: the deploy-success branch (`if deploy_note.is_some()`)
+/// must set BOTH `entry.enabled = true` AND `entry.auto_launch = true`.
+/// Missing `auto_launch = true` would leave the imported mod in a
+/// state where it's enabled in the registry but never actually
+/// scheduled for apply-on-launch — a silent no-op that would surprise
+/// the user who just clicked Import.
+#[test]
+fn deploy_success_sets_enabled_and_auto_launch_true() {
+    let body = fn_body_window();
+    assert!(
+        body.contains("entry.enabled = true;"),
+        "PRD 3.3.4 (iter 247): the deploy-success branch must set \
+         `entry.enabled = true;` verbatim. Without this, a successfully \
+         deployed import ships disabled and the mapper patch rolls \
+         back on next registry save."
+    );
+    assert!(
+        body.contains("entry.auto_launch = true;"),
+        "PRD 3.3.4 (iter 247): the deploy-success branch must set \
+         `entry.auto_launch = true;` verbatim. Without this, the \
+         mod is 'enabled' but never scheduled to apply at game launch \
+         — a silent no-op that confuses the user."
+    );
+    assert!(
+        body.contains("entry.status = ModStatus::Enabled;"),
+        "PRD 3.3.4 (iter 247): the deploy-success branch must set \
+         `entry.status = ModStatus::Enabled;` verbatim so the \
+         status badge in the UI reflects the deployment."
+    );
+}
+
+/// Iter 247: the info! log emits `&sha[..12]`, NOT the full 64-char
+/// hex digest. Full SHAs in logs make correlation across log dumps
+/// easier for an attacker who recovers them later; the 12-char prefix
+/// is enough to identify the mod during debugging without leaking
+/// content fingerprints. Also reduces log noise since the sha is
+/// already visible in the `entry.id` field.
+#[test]
+fn info_log_sanitizes_sha_to_twelve_chars() {
+    let body = fn_body_window();
+    assert!(
+        body.contains("&sha[..12]"),
+        "PRD 3.3.4 (iter 247): the info! log in add_mod_from_file \
+         must log `&sha[..12]`, not the full 64-char hex digest. \
+         Full SHAs in logs ease cross-dump correlation for an \
+         attacker; 12 chars is enough for debugging."
+    );
+    // Reject a regression back to logging the full sha.
+    assert!(
+        !body.contains("sha={}\",\n        sha,"),
+        "PRD 3.3.4 (iter 247): info! must not log the full sha \
+         variable unsliced. Use `&sha[..12]` instead."
+    );
+}
+
 /// Iter 191: the write dest must be built from `get_gpk_dir()` +
 /// a joined filename. A dest constructed directly from the
 /// user-supplied `path` argument would let an attacker write to
