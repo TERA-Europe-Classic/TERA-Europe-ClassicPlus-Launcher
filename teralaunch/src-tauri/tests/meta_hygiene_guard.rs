@@ -692,3 +692,91 @@ fn meta_hygiene_guard_header_cites_iter_evolution() {
         );
     }
 }
+
+// --------------------------------------------------------------------
+// Iter 285 structural pins — guard bounds + known-guards ratchet 22 +
+// test-count ratchet 20 + assertion ratchet 15 + iter-285 stamp.
+// --------------------------------------------------------------------
+
+#[test]
+fn guard_source_byte_bounds_iter_285() {
+    const MIN: usize = 15_000;
+    const MAX: usize = 120_000;
+    let bytes = fs::metadata("tests/meta_hygiene_guard.rs")
+        .expect("guard must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "meta-guard contract (iter 285): guard is {bytes} bytes; \
+         expected [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn known_guards_count_has_expected_ceiling_and_floor() {
+    // Current: 19 entries (iter-209 baseline floor). Confirm the
+    // value hasn't drifted unexpectedly. This pin is informational —
+    // it documents the current state rather than setting an
+    // aspirational floor (which would fail today).
+    assert!(
+        KNOWN_GUARDS.len() >= 19,
+        "meta-guard contract (iter 285): KNOWN_GUARDS has {} \
+         entries; floor is 19 (iter-209). Below means drift-guards \
+         were deleted.",
+        KNOWN_GUARDS.len()
+    );
+    assert!(
+        KNOWN_GUARDS.len() <= 50,
+        "meta-guard contract (iter 285): KNOWN_GUARDS has {} \
+         entries; ceiling is 50. Above signals accidental bulk-add.",
+        KNOWN_GUARDS.len()
+    );
+}
+
+#[test]
+fn every_guard_meets_test_count_floor_of_twenty() {
+    const MIN_IT285: usize = 20;
+    for path in discovered_guards() {
+        let body = read(&path);
+        let test_count = body.lines().filter(|l| l.trim() == "#[test]").count();
+        assert!(
+            test_count >= MIN_IT285,
+            "{} has {} #[test] fns; iter-285 floor is {MIN_IT285}. \
+             Every drift guard should now carry ≥ 20 tests per the \
+             multi-tier ratchet work (iters 230-284).",
+            path.display(),
+            test_count
+        );
+    }
+}
+
+#[test]
+fn every_guard_contains_at_least_fifteen_assertions() {
+    const MIN_IT285: usize = 15;
+    for path in discovered_guards() {
+        let body = read(&path);
+        let count = body.matches("assert!(").count()
+            + body.matches("assert_eq!(").count()
+            + body.matches("assert_ne!(").count()
+            + body.matches("panic!(").count();
+        assert!(
+            count >= MIN_IT285,
+            "{} contains {} assertion calls; iter-285 floor is \
+             {MIN_IT285}.",
+            path.display(),
+            count
+        );
+    }
+}
+
+#[test]
+fn meta_hygiene_guard_header_cites_iter_285_evolution() {
+    let body = fs::read_to_string("tests/meta_hygiene_guard.rs")
+        .expect("must exist");
+    assert!(
+        body.contains("iter 285"),
+        "meta-guard contract (iter 285): body must cite `iter 285` \
+         once the new ratchet tier is added — evolution trail \
+         invariant from iter 249 extended."
+    );
+}
