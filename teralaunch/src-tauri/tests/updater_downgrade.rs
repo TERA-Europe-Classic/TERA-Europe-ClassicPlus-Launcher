@@ -467,3 +467,154 @@ fn symbolic_predicate_tests_enumerate_five_distinct_case_classes() {
         );
     }
 }
+
+// --------------------------------------------------------------------
+// Iter 260 structural pins — gate source PRD cite + byte-size bounds
+// + semver crate dep + guard source PRD cite + single-pub-fn discipline.
+// --------------------------------------------------------------------
+//
+// The eighteen pins above cover symbolic predicate cases, wiring-order
+// + gate call site + predicate signature + semver-not-string-cmp +
+// strictly-greater + defaults-to-refuse + cargo-pkg-version + refusal-
+// logs + path constants + return type + remote version source + inline
+// test module + five-case-class enumeration. They do NOT pin:
+// (a) `src/services/updater_gate.rs` header cites PRD 3.1.9 explicitly
+//     — guard header cite + gate-wiring exist but the gate source
+//     itself could drift its header;
+// (b) the gate source has sane byte bounds — too small means gutted
+//     (only function signature left); too large means scope creep
+//     past the 3.1.9 criterion into unrelated policy;
+// (c) `semver` is declared as a Cargo dep — the test imports it AND
+//     the source uses it; without the dep declaration both would fail
+//     to compile;
+// (d) the guard file's own header cites PRD 3.1.9 explicitly (the
+//     iter-209 generic anchor check accepts any traceable anchor;
+//     this pin requires the specific section);
+// (e) the gate source exports only ONE public fn (`should_accept_update`)
+//     — any additional `pub fn` in the gate module is API surface
+//     that isn't covered by the other pins, and could accidentally
+//     expose a weaker predicate.
+
+/// The gate source (`src/services/updater_gate.rs`) must cite PRD 3.1.9
+/// in its module header. The guard's own header pin + main.rs wiring
+/// pin both cite it, but the gate source itself could drift. Pinning
+/// the gate header directly ensures readers who grep the production
+/// code for PRD 3.1.9 land on the gate.
+#[test]
+fn gate_source_header_cites_prd_3_1_9() {
+    let body = fs::read_to_string("src/services/updater_gate.rs")
+        .expect("src/services/updater_gate.rs must exist");
+    let header = &body[..body.len().min(500)];
+    assert!(
+        header.contains("PRD 3.1.9"),
+        "PRD 3.1.9 (iter 260): src/services/updater_gate.rs header \
+         must cite `PRD 3.1.9`. The guard header + main.rs wiring \
+         both cite it; the gate source must also so a reader grepping \
+         production code for PRD 3.1.9 lands on the gate.\nHeader:\n{header}"
+    );
+}
+
+/// The gate source must have sane byte bounds. Floor of 1000 catches
+/// a gutting that leaves only the fn signature + empty body; ceiling
+/// of 20_000 catches scope creep past the 3.1.9 criterion into
+/// unrelated policy. Current state: ~3 KB.
+#[test]
+fn gate_source_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 1000;
+    const MAX_BYTES: usize = 20_000;
+    let bytes = fs::metadata("src/services/updater_gate.rs")
+        .expect("gate source must exist")
+        .len() as usize;
+    assert!(
+        bytes >= MIN_BYTES,
+        "PRD 3.1.9 (iter 260): src/services/updater_gate.rs is only \
+         {bytes} bytes; floor is {MIN_BYTES}. A gutted gate (fn \
+         signature + empty body) would still compile and satisfy the \
+         symbolic-parity pins if the inline tests passed, but the \
+         production predicate would be dead."
+    );
+    assert!(
+        bytes <= MAX_BYTES,
+        "PRD 3.1.9 (iter 260): src/services/updater_gate.rs is {bytes} \
+         bytes; ceiling is {MAX_BYTES}. Scope creep past the ceiling \
+         signals the gate module has accumulated unrelated policy — \
+         should_accept_update should stay laser-focused on the 3.1.9 \
+         criterion."
+    );
+}
+
+/// `semver` must be declared in Cargo.toml. Both the guard test
+/// (`use semver::Version;`) and the gate source (per iter-154
+/// `predicate_uses_semver_crate_not_string_cmp`) depend on it;
+/// dropping the dep would break compilation with an opaque
+/// "unresolved import" error.
+#[test]
+fn semver_crate_is_declared_in_cargo_toml() {
+    let toml = fs::read_to_string("Cargo.toml").expect("Cargo.toml must exist");
+    assert!(
+        toml.contains("semver"),
+        "PRD 3.1.9 (iter 260): Cargo.toml must declare `semver` as a \
+         dependency. Both the guard test and the gate source \
+         (should_accept_update) depend on it; the symbolic parity \
+         check would break with an opaque `unresolved import` error."
+    );
+}
+
+/// The guard file's own module header must cite PRD 3.1.9 explicitly.
+/// The iter-209 meta_hygiene generic anchor check accepts any
+/// traceable anchor; this pin requires the specific section number so
+/// readers chasing an updater-downgrade regression land directly.
+#[test]
+fn guard_source_header_cites_prd_3_1_9_explicitly() {
+    let body = fs::read_to_string("tests/updater_downgrade.rs")
+        .expect("tests/updater_downgrade.rs must exist");
+    let header = &body[..body.len().min(500)];
+    assert!(
+        header.contains("PRD 3.1.9"),
+        "PRD 3.1.9 (iter 260): tests/updater_downgrade.rs header must \
+         cite `PRD 3.1.9` explicitly. The iter-209 meta_hygiene check \
+         accepts any traceable anchor; this pin requires the specific \
+         section so readers land here directly via section-grep.\n\
+         Header:\n{header}"
+    );
+}
+
+/// The gate source must export only ONE public fn: `should_accept_update`.
+/// Any additional `pub fn` in the gate module would be API surface
+/// not covered by the other pins — and could accidentally expose a
+/// weaker predicate (e.g. `pub fn should_accept_update_lax`) that
+/// callers might use by mistake. Private helpers (`fn name`) are fine.
+#[test]
+fn gate_source_exports_only_one_public_fn() {
+    let body = fs::read_to_string("src/services/updater_gate.rs")
+        .expect("gate source must exist");
+    // Strip the inline `#[cfg(test)] mod tests { ... }` block first —
+    // test helpers within that block are fine.
+    let test_mod_pos = body.find("#[cfg(test)]");
+    let prod_src = match test_mod_pos {
+        Some(pos) => &body[..pos],
+        None => &body[..],
+    };
+    // Count `pub fn ` occurrences (not `pub(crate) fn` or `pub(super) fn`).
+    // A simple substring count is fine because the gate module is
+    // small and focused.
+    let pub_fn_count = prod_src.matches("\npub fn ").count()
+        + if prod_src.starts_with("pub fn ") { 1 } else { 0 };
+    assert_eq!(
+        pub_fn_count, 1,
+        "PRD 3.1.9 (iter 260): src/services/updater_gate.rs must \
+         export exactly 1 `pub fn` (should_accept_update); found \
+         {pub_fn_count}. Additional public fns would expose API \
+         surface not covered by the other pins — a weaker predicate \
+         like `pub fn should_accept_update_lax` could be accidentally \
+         used by callers."
+    );
+    assert!(
+        prod_src.contains("pub fn should_accept_update"),
+        "PRD 3.1.9 (iter 260): the single public fn must be named \
+         `should_accept_update`. A rename would break the iter-154 \
+         `updater_gate_module_is_public_and_exports_predicate` pin \
+         but this pin surfaces the canonical name requirement \
+         explicitly."
+    );
+}

@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 259
-last_work_iteration: 259
+iteration_counter: 260
+last_work_iteration: 260
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 235
+total_items_done: 236
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 260 WORK — pin.updater-gate-source-prd-cite+byte-size-bounds+semver-cargo-dep+guard-prd-explicit-cite+gate-single-pub-fn DONE.**
+>
+> PRD 3.1.9.updater-downgrade; updater_downgrade had 18 tests. Brings to 23.
+>
+> Five new pins:
+> 1. `gate_source_header_cites_prd_3_1_9` — updater_gate.rs module header must cite `PRD 3.1.9` explicitly (guard + wiring cite it; gate source must also for grep discoverability)
+> 2. `gate_source_byte_size_has_sane_bounds` — 1000≤size≤20000 (current ~3KB; floor catches gutting, ceiling catches scope creep)
+> 3. `semver_crate_is_declared_in_cargo_toml` — both guard + source depend; dropping would give opaque `unresolved import`
+> 4. `guard_source_header_cites_prd_3_1_9_explicitly` — stricter than iter-209 generic anchor (requires specific section number)
+> 5. `gate_source_exports_only_one_public_fn` — exactly 1 `pub fn`, named `should_accept_update` (prevents weaker sibling predicates like `should_accept_update_lax`)
+>
+> updater_downgrade: 18 → 23 tests. 1544 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 259 WORK — pin.crate-comment-mods-dir-bounds+no-nested-subdirs+mod-rs-reexports-siblings+prd-3-8-2-cite+ends-with-newline DONE.**
 >
