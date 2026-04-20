@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 237
-last_work_iteration: 237
+iteration_counter: 238
+last_work_iteration: 238
 last_research_sweep: 230
 last_revalidation: 220
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 214
+total_items_done: 215
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 238 WORK — pin.bogus-gpk-footer-TMM_RS-path+fn-name-pinned+package-magic-0x9E2A83C1-byte-order+install_gpk-parse-before-sandbox-before-ensure-backup+install_legacy_gpk-fs-read-raw DONE.**
+>
+> PRD §5.3 (adversarial corpus) + §3.1.4 (container sandbox); bogus_gpk_footer had 14 tests. **Last 14-count file extended — no 14-count guard files remain in the tests/ tree as of iter 238.**
+>
+> Five new pins:
+> 1. `guard_tmm_rs_path_constant_is_canonical` — TMM_RS literal verbatim + positive sanity that it resolves to a file exporting `pub fn parse_mod_file`
+> 2. `adversarial_corpus_fn_name_is_pinned` — fn name `parse_mod_file_rejects_non_tmm_gpks` load-bearing for iter-156/174/237 pins that reference it by string
+> 3. `package_magic_value_is_little_endian_ue3_sentinel` — pin `0x9E2A83C1` literal + reject byte-swapped `0xC1832A9E` (byte-order swap reads non-TMM as TMM)
+> 4. `install_gpk_four_gates_appear_in_fail_closed_order` — pin parse < sandbox < ensure_backup ordering (sandbox before backup-path write)
+> 5. `install_legacy_gpk_reads_source_as_raw_bytes` — iter-228 drop-in path needs same raw-bytes read as TMM path (UE3 FString bytes trip UTF-8 validation)
+>
+> bogus_gpk_footer: 14 → 19 tests. 1439 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 237 WORK — pin.parallel-install-path-consts+std-sync-rwlock-not-tokio+save-after-closure+refuse-no-upsert+call-sites-assign-installing-first DONE.**
 >

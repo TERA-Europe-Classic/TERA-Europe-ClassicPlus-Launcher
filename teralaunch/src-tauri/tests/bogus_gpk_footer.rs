@@ -490,3 +490,177 @@ fn adversarial_corpus_retains_small_buffer_fixtures() {
          leave every fixture passing."
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 237 structural pins — TMM_RS path-constant canonicalisation,
+// adversarial corpus fn-name pin, PACKAGE_MAGIC byte-order literal,
+// four-gate ordering in install_gpk, install_legacy_gpk reads source
+// as raw bytes (same invariant as install_gpk).
+//
+// Earlier iters covered parse_mod_file invariants + sandbox gates +
+// install_gpk ordering + small-buffer corpus. These five extend to
+// structural invariants a confident refactor could still bypass: a
+// path-constant drift (wrong source inspected), a fn-rename that
+// would silently leave the adversarial corpus test at an inner call
+// site (not the pinned function), a magic-byte-order inversion (TMM
+// uses little-endian; big-endian would silently parse the WRONG
+// prefix as valid), the ordering of the four fail-closed gates in
+// install_gpk (each prevents a distinct class of bypass), and the
+// iter-228 install_legacy_gpk path needing the same raw-bytes read
+// as the TMM path.
+// --------------------------------------------------------------------
+
+/// Iter 237: `TMM_RS` constant must stay canonical. Every source-
+/// inspection pin in this guard reads tmm.rs through this constant;
+/// a rename of the production file without updating the constant
+/// panics all tests with "file not found", misdirecting triage.
+#[test]
+fn guard_tmm_rs_path_constant_is_canonical() {
+    let body = read_tmm_rs();
+    // Read the guard source directly (not through TMM_RS) to pin the
+    // literal value verbatim.
+    let guard = std::fs::read_to_string("tests/bogus_gpk_footer.rs")
+        .expect("guard source must exist")
+        .replace("\r\n", "\n");
+    assert!(
+        guard.contains(r#"const TMM_RS: &str = "src/services/mods/tmm.rs";"#),
+        "PRD §5.3 (iter 237): tests/bogus_gpk_footer.rs must keep \
+         `const TMM_RS: &str = \"src/services/mods/tmm.rs\";` \
+         verbatim. A rename without updating the constant leaves \
+         every tmm.rs inspection reading a stale path — `file not \
+         found` panic misroutes triage."
+    );
+    // Positive sanity: TMM_RS constant resolves to a file with the
+    // expected fn surface.
+    assert!(
+        body.contains("pub fn parse_mod_file"),
+        "PRD §5.3 (iter 237): TMM_RS must resolve to a file \
+         exporting `pub fn parse_mod_file`. If this fails, either \
+         TMM_RS drifted or the parse fn was renamed/moved."
+    );
+}
+
+/// Iter 237: the adversarial corpus fn name must remain exactly
+/// `parse_mod_file_rejects_non_tmm_gpks`. It's referenced by name
+/// from multiple iter-156 / iter-174 / iter-237 pins in this guard
+/// file (via `src.find("fn parse_mod_file_rejects_non_tmm_gpks")`).
+/// A rename in tmm.rs without coordinated updates here turns every
+/// pin's `.expect("adversarial corpus test must exist")` into a
+/// panic pointing at a missing fixture, not the rename.
+#[test]
+fn adversarial_corpus_fn_name_is_pinned() {
+    let body = read_tmm_rs();
+    assert!(
+        body.contains("fn parse_mod_file_rejects_non_tmm_gpks()"),
+        "PRD §5.3 (iter 237): tmm.rs must keep \
+         `fn parse_mod_file_rejects_non_tmm_gpks()` — the fn name is \
+         a load-bearing identifier that this guard's pins reference \
+         by string. A rename needs a coordinated update to every \
+         `src.find(\"fn parse_mod_file_rejects_non_tmm_gpks\")` in \
+         tests/bogus_gpk_footer.rs."
+    );
+}
+
+/// Iter 237: `PACKAGE_MAGIC` must be the little-endian UE3 sentinel
+/// `0x9E2A83C1`. The iter-156 pin checks the constant exists, but
+/// not the specific hex value — a typo (`0xC1832A9E`) would be
+/// byte-order-reversed and would read non-TMM files as TMM
+/// candidates (the first 4 bytes happen to match the swapped
+/// pattern more often than the canonical one). Pin the exact value.
+#[test]
+fn package_magic_value_is_little_endian_ue3_sentinel() {
+    let body = read_tmm_rs();
+    assert!(
+        body.contains("const PACKAGE_MAGIC: u32 = 0x9E2A83C1;"),
+        "PRD §5.3 (iter 237): tmm.rs must declare \
+         `PACKAGE_MAGIC: u32 = 0x9E2A83C1` verbatim (little-endian \
+         UE3 sentinel). A byte-order swap (0xC1832A9E) would read \
+         non-TMM files as TMM candidates, letting malformed inputs \
+         slip past the magic-check fallback."
+    );
+    // Negative: the swapped-order hex literal must NOT appear as a
+    // const value. A typo `0xC1832A9E` would silently flip the
+    // magic-check semantics.
+    assert!(
+        !body.contains("PACKAGE_MAGIC: u32 = 0xC1832A9E"),
+        "PRD §5.3 (iter 237): tmm.rs must NOT declare \
+         `PACKAGE_MAGIC` with byte-swapped value 0xC1832A9E — that \
+         would read non-TMM files as TMM candidates."
+    );
+}
+
+/// Iter 237: `install_gpk`'s four phases must appear in the fail-
+/// closed order:
+///   A. `fs::read(source_gpk)` raw-bytes read (caller-picked path,
+///      already validate_path_within_base'd)
+///   B. `parse_mod_file(&gpk_bytes)` TMM footer validation
+///   C. `is_safe_gpk_container_filename(&modfile.container)` sandbox
+///      (on the PARSED container, so B must run first)
+///   D. `ensure_backup(game_root)` vanilla backup (only on validated
+///      container)
+/// Pin B < C < D so a refactor that moves ensure_backup before the
+/// sandbox check (D before C) can't touch the mapper backup path on
+/// a hostile container name.
+#[test]
+fn install_gpk_four_gates_appear_in_fail_closed_order() {
+    let body = read_tmm_rs();
+    let fn_pos = body
+        .find("pub fn install_gpk")
+        .expect("install_gpk must exist");
+    let window = &body[fn_pos..fn_pos.saturating_add(1800)];
+    let parse_pos = window
+        .find("parse_mod_file")
+        .expect("phase B: parse_mod_file must appear");
+    let sandbox_pos = window
+        .find("is_safe_gpk_container_filename")
+        .expect("phase C: sandbox predicate must appear");
+    let ensure_pos = window
+        .find("ensure_backup(game_root)")
+        .expect("phase D: ensure_backup must appear");
+    assert!(
+        parse_pos < sandbox_pos,
+        "PRD §5.3 (iter 237): install_gpk phase B (parse_mod_file) \
+         must precede phase C (sandbox). The sandbox check runs on \
+         the PARSED modfile.container — parsing has to happen first. \
+         parse_pos={parse_pos}, sandbox_pos={sandbox_pos}."
+    );
+    assert!(
+        sandbox_pos < ensure_pos,
+        "PRD §5.3 (iter 237): install_gpk phase C (sandbox) must \
+         precede phase D (ensure_backup). ensure_backup touches the \
+         mapper file — running it before the sandbox check would \
+         let a hostile container name trigger backup-path writes on \
+         attacker-chosen paths. sandbox_pos={sandbox_pos}, \
+         ensure_pos={ensure_pos}."
+    );
+}
+
+/// Iter 237: `install_legacy_gpk` (the iter-228 drop-in path) must
+/// read its source file via `fs::read`, not `fs::read_to_string`,
+/// for the same reason install_gpk does: UE3 headers contain
+/// arbitrary little-endian bytes (package version, FString length,
+/// FolderName chars if UTF-16). `read_to_string` would fail UTF-8
+/// validation on every non-ASCII folder name, turning a legitimate
+/// mod into a "not a TERA-compatible .gpk" error.
+#[test]
+fn install_legacy_gpk_reads_source_as_raw_bytes() {
+    let body = read_tmm_rs();
+    let fn_pos = body
+        .find("pub fn install_legacy_gpk")
+        .expect("install_legacy_gpk must exist (iter 228 addition)");
+    let window = &body[fn_pos..fn_pos.saturating_add(600)];
+    assert!(
+        window.contains("fs::read(source_gpk)"),
+        "PRD §5.3 (iter 237): install_legacy_gpk must call \
+         `fs::read(source_gpk)` (raw bytes). Switching to \
+         `fs::read_to_string` would fail UTF-8 validation on any \
+         non-ASCII header byte and turn legitimate legacy GPK mods \
+         into \"not a TERA-compatible .gpk\" errors.\nWindow:\n{window}"
+    );
+    assert!(
+        !window.contains("fs::read_to_string(source_gpk)"),
+        "PRD §5.3 (iter 237): install_legacy_gpk must NOT use \
+         `fs::read_to_string` — UE3 FString bytes (UTF-16 folder \
+         names, binary version ints) trip UTF-8 validation."
+    );
+}
