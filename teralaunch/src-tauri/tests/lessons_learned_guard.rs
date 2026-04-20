@@ -516,6 +516,202 @@ fn every_entry_has_pattern_before_when_to_apply() {
     }
 }
 
+// --------------------------------------------------------------------
+// Iter 254 structural pins — entry-count ratchet + archive byte floor
+// + retrospective-cadence advertisement + em-dash separator + title
+// length ceiling.
+// --------------------------------------------------------------------
+//
+// The seventeen pins above cover cap compliance, archive presence,
+// header advertisements, H3 shape + ordering + non-empty title +
+// Pattern/When-to-apply order, combined corpus floor, and active↔
+// archive non-duplication. They do NOT pin:
+// (a) the MIN_TOTAL_ENTRIES floor has been ratcheted to reflect the
+//     current corpus — 10 was the iter-177 baseline, current state
+//     is 16 total, so a ratchet to 15 gives a small margin;
+// (b) the archive file meets a byte floor — iter-108's archive
+//     presence check asserts > 0 lines, but a 3-line placeholder
+//     passes that check while eroding the cumulative memory;
+// (c) the active file header advertises the retrospective CADENCE
+//     (every-30 or "retrospective") — without it, a contributor
+//     editing the file doesn't know when it gets reviewed;
+// (d) the em-dash separator between `iter N` and the title is a real
+//     em-dash (U+2014), not a hyphen — the iter-139 format check
+//     only verifies the prefix `YYYY-MM-DD / iter N`; a hyphen
+//     separator between iter and title would be skipped by the
+//     iter-215 em-dash-specific pin;
+// (e) entry titles have a sane maximum length — rambling 300-char
+//     titles pass the non-empty check but are noise, not signal.
+
+/// Ratchet `total_entry_count_across_active_and_archive_meets_floor`
+/// — bump `MIN_TOTAL_ENTRIES` from 10 (iter 177) to 15. Current state:
+/// 10 active + 6 archive = 16 total. A floor of 15 gives a 1-entry
+/// margin while catching a bulk-delete of multiple entries.
+#[test]
+fn entry_count_floor_ratcheted_to_fifteen() {
+    const MIN_TOTAL_IT254: usize = 15;
+    let active_body = fs::read_to_string(ACTIVE).expect("active file present");
+    let archive_body = fs::read_to_string(ARCHIVE).expect("archive file present");
+    let active_count = active_body
+        .lines()
+        .filter(|l| l.starts_with("### "))
+        .count();
+    let archive_count = archive_body
+        .lines()
+        .filter(|l| l.starts_with("### "))
+        .count();
+    let total = active_count + archive_count;
+    assert!(
+        total >= MIN_TOTAL_IT254,
+        "PRD 3.8.8 (iter 254): total H3 entry count across active + \
+         archive is {total} (active={active_count}, \
+         archive={archive_count}); ratcheted floor is \
+         {MIN_TOTAL_IT254} (was 10 in iter 177). A drop past the \
+         ratcheted floor suggests a bulk delete lost institutional \
+         memory."
+    );
+}
+
+/// The archive file must meet a minimum byte-size floor. The iter-108
+/// archive-exists pin asserts > 0 lines, but a 3-line placeholder
+/// passes that while erasing the cumulative-memory value of the
+/// archive. Current state: ~4.9 KB. A floor of 2000 bytes gives
+/// ~2× margin while catching a bulk-delete regression that left a
+/// stub file behind.
+#[test]
+fn archive_file_size_meets_byte_floor() {
+    const MIN_BYTES: usize = 2000;
+    let bytes = fs::metadata(ARCHIVE)
+        .unwrap_or_else(|e| panic!("{ARCHIVE}: {e}"))
+        .len() as usize;
+    assert!(
+        bytes >= MIN_BYTES,
+        "PRD 3.8.8 (iter 254): {ARCHIVE} is only {bytes} bytes; floor \
+         is {MIN_BYTES}. Truncation past the floor suggests a bulk-\
+         delete that left a stub — the cumulative retrospective corpus \
+         is the point of having an archive at all."
+    );
+}
+
+/// The active file's header must advertise the retrospective cadence
+/// so a contributor editing the file understands WHEN it gets
+/// reviewed. The iter-108 header check pins the cap + archive path;
+/// iter-139 pins newest-at-top + H3 format. Neither pins the
+/// cadence ("retrospective" / "every 30" / "every N iter"). Without
+/// the cadence advertisement, a contributor adds entries without a
+/// review expectation — the file becomes a write-only log.
+#[test]
+fn active_file_advertises_retrospective_cadence() {
+    let body = fs::read_to_string(ACTIVE).expect("active file present");
+    let head: String = body.lines().take(25).collect::<Vec<_>>().join("\n");
+    let advertises = head.to_lowercase().contains("retrospective")
+        || head.to_lowercase().contains("every 30")
+        || head.to_lowercase().contains("every-30 iter");
+    assert!(
+        advertises,
+        "PRD 3.8.8 (iter 254): {ACTIVE} header (first 25 lines) must \
+         advertise the retrospective cadence (`retrospective` / \
+         `every 30` / `every-30 iter`). Without the cadence, \
+         contributors add entries without a review expectation — the \
+         file becomes a write-only log that no loop iter ever \
+         consolidates.\nHead:\n{head}"
+    );
+}
+
+/// Every H3 entry's separator between `iter N` and the title must be
+/// a real em-dash (U+2014), not a hyphen-minus (U+002D). The iter-139
+/// format check verifies the `YYYY-MM-DD / iter N` prefix; iter-215's
+/// em-dash-specific pin only applies to entries WITH an em-dash
+/// (entries with hyphens are skipped). So an entry like
+/// `### 2026-04-19 / iter 50 - hyphen-separator title` passes both
+/// existing pins. Pin the em-dash directly to catch character drift.
+#[test]
+fn every_h3_entry_uses_em_dash_separator_not_hyphen() {
+    let body = fs::read_to_string(ACTIVE).expect("active file present");
+    let mut offenders: Vec<(usize, String)> = Vec::new();
+    for (i, line) in body.lines().enumerate() {
+        if !line.starts_with("### ") {
+            continue;
+        }
+        let tail = line.trim_start_matches("### ");
+        // Find the `iter <digits>` substring; separator follows.
+        let Some(iter_pos) = tail.find(" / iter ") else {
+            continue; // iter-139 catches this
+        };
+        let after_iter = &tail[iter_pos + " / iter ".len()..];
+        // Skip digits of the iter number (single or range).
+        let mut cursor = 0;
+        for c in after_iter.chars() {
+            if c.is_ascii_digit() || c == '-' {
+                cursor += c.len_utf8();
+            } else {
+                break;
+            }
+        }
+        let after_digits = &after_iter[cursor..];
+        // The next 5 bytes should start with ` — ` (space em-dash space).
+        // Em-dash is 3 bytes in UTF-8, so expected: " \u{2014} " = 5 bytes.
+        let is_em_dash = after_digits.starts_with(" \u{2014} ");
+        if !is_em_dash {
+            offenders.push((i + 1, line.to_string()));
+        }
+    }
+    assert!(
+        offenders.is_empty(),
+        "PRD 3.8.8 (iter 254): {} H3 entry/entries use a non-em-dash \
+         separator between `iter N` and the title. The canonical \
+         separator is ` — ` (space U+2014 space). Offenders:\n  {}\n\
+         A hyphen-minus separator passes the iter-139 prefix check \
+         and is skipped by iter-215's em-dash-specific pin — this \
+         pin closes the gap.",
+        offenders.len(),
+        offenders
+            .iter()
+            .map(|(n, l)| format!("L{n}: {l}"))
+            .collect::<Vec<_>>()
+            .join("\n  ")
+    );
+}
+
+/// No H3 entry's title may exceed 150 characters. The iter-215
+/// non-empty-title pin only rejects empty titles; a rambling 300-
+/// char title passes that check but is noise rather than a
+/// scannable signal. 150 is generous — most titles are under 80.
+#[test]
+fn no_h3_entry_title_exceeds_maximum_length() {
+    const MAX_TITLE_CHARS: usize = 150;
+    let body = fs::read_to_string(ACTIVE).expect("active file present");
+    let mut offenders: Vec<(usize, usize, String)> = Vec::new();
+    for (i, line) in body.lines().enumerate() {
+        if !line.starts_with("### ") {
+            continue;
+        }
+        let Some(idx) = line.find(" \u{2014} ") else {
+            continue;
+        };
+        let title = line[idx + " \u{2014} ".len()..].trim();
+        let len = title.chars().count();
+        if len > MAX_TITLE_CHARS {
+            offenders.push((i + 1, len, line.to_string()));
+        }
+    }
+    assert!(
+        offenders.is_empty(),
+        "PRD 3.8.8 (iter 254): {} H3 entry title(s) exceed \
+         {MAX_TITLE_CHARS} chars. A long title reads as noise, not \
+         signal — readers scan H3s to decide if the lesson applies, \
+         and a 200-char heading forces full parsing. \
+         Offenders:\n  {}\nReduce the heading to a noun phrase; \
+         move detail into the Pattern/When-to-apply paragraphs.",
+        offenders.len(),
+        offenders
+            .iter()
+            .map(|(n, len, l)| format!("L{n} ({len} chars): {l}"))
+            .collect::<Vec<_>>()
+            .join("\n  ")
+    );
+}
+
 /// Self-test — prove the detectors bite on known-bad shapes.
 #[test]
 fn lessons_learned_detector_self_test() {

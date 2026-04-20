@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 253
-last_work_iteration: 253
+iteration_counter: 254
+last_work_iteration: 254
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 229
+total_items_done: 230
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 254 WORK — pin.lessons-learned-entry-count-ratchet-15+archive-size-floor+retrospective-cadence+em-dash-separator+title-length-ceiling DONE.**
+>
+> PRD 3.8.8.lessons-learned-cap; lessons_learned_guard had 17 tests. Brings to 22.
+>
+> Five new pins:
+> 1. `entry_count_floor_ratcheted_to_fifteen` — MIN_TOTAL 10→15 (current 16; 1-entry margin catches bulk-delete)
+> 2. `archive_file_size_meets_byte_floor` — MIN_BYTES 2000 (current 4865; catches stub-leaving bulk-delete)
+> 3. `active_file_advertises_retrospective_cadence` — header must mention `retrospective`/`every 30`/`every-30 iter` (without cadence, file becomes write-only log)
+> 4. `every_h3_entry_uses_em_dash_separator_not_hyphen` — U+2014 em-dash between `iter N` and title (catches hyphen-minus drift that iter-139 prefix-check + iter-215 em-dash-only check both skip)
+> 5. `no_h3_entry_title_exceeds_maximum_length` — MAX_TITLE_CHARS 150 (rambling titles pass non-empty check but are noise)
+>
+> lessons_learned_guard: 17 → 22 tests. 1514 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 253 WORK — pin.classicplus-scanner-header-slug+size-ceiling+config-json-valid+appjs-markers-floor+describe-wrapper DONE.**
 >
