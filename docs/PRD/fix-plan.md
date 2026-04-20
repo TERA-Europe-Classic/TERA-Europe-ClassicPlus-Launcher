@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 240
-last_work_iteration: 239
+iteration_counter: 241
+last_work_iteration: 241
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 216
+total_items_done: 217
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 241 WORK — pin.shell-scope-pinned-path-consts+unsafe-hashes-reject+default-src-opaque-schemes+capabilities-count-bounded+header-cites-fix-slot-and-CVE DONE.**
+>
+> sec.shell-scope-hardening (CVE-2025-31477); shell_scope_pinned had 15 tests (iter 206 + follow-ups). 34 iters untouched. Brings to 20.
+>
+> Five new pins:
+> 1. `guard_path_constants_are_canonical` — TAURI_CONF + CARGO_TOML + GUARD_SOURCE + CAPABILITIES_JSON verbatim
+> 2. `csp_rejects_unsafe_hashes_everywhere` — pin absence of CSP3 `'unsafe-hashes'` (iter-206's unsafe-eval pin sibling; unsafe-hashes narrows unsafe-inline but still re-opens inline-event-handler sink)
+> 3. `csp_default_src_rejects_opaque_schemes` — reject `data:` / `blob:` / `filesystem:` in default-src (allowlist bypass via inherited default-src); positive-control that img-src still explicitly carries `data:` for icons
+> 4. `capabilities_permissions_count_stays_bounded` — soft ceiling 30 + floor 5 on `permissions` array; silent growth past ceiling signals unreviewed caps, shrinkage below floor means critical permissions deleted
+> 5. `guard_file_header_cites_fix_slot_and_cve` — pin header cites `sec.shell-scope-hardening` + `CVE-2025-31477` (traceability)
+>
+> shell_scope_pinned: 15 → 20 tests. 1449 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 240 REVALIDATION — all-gates-green.**
 >

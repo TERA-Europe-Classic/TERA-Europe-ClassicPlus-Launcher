@@ -601,3 +601,191 @@ fn csp_script_src_does_not_wildcard_origins() {
         );
     }
 }
+
+// --------------------------------------------------------------------
+// Iter 240 structural pins — path-constants canonicalisation,
+// unsafe-hashes CSP3 rejection, default-src scheme hardening,
+// capabilities list cardinality, guard-source header traceability.
+//
+// Prior iters pinned shell.open literal + stanza cardinality + scope
+// absence + 8 CSP directives + unsafe-eval absence + script-src
+// wildcard rejection. These five extend to the meta-guard + CSP3-
+// evolution surface a confident refactor could still bypass: a
+// path-constant drift, a future CSP3 `'unsafe-hashes'` token, a
+// default-src `data:/blob:/filesystem:` scheme opt-in that widens
+// fetch targets, a capability-array growth that slips unreviewed
+// permissions in, and a guard file without a PRD citation in the
+// header.
+// --------------------------------------------------------------------
+
+/// Iter 240: all 4 path constants must stay canonical. Every
+/// read_conf()/read_cargo()/read_guard/read_capabilities call in
+/// this guard resolves through one of these; a rename without
+/// updating the constant panics tests with "file not found",
+/// misdirecting triage.
+#[test]
+fn guard_path_constants_are_canonical() {
+    let body = fs::read_to_string(GUARD_SOURCE).expect("guard source must exist");
+    for (name, expected) in [
+        ("TAURI_CONF", "tauri.conf.json"),
+        ("CARGO_TOML", "Cargo.toml"),
+        ("GUARD_SOURCE", "tests/shell_scope_pinned.rs"),
+        ("CAPABILITIES_JSON", "capabilities/migrated.json"),
+    ] {
+        let line = format!("const {name}: &str = \"{expected}\";");
+        assert!(
+            body.contains(&line),
+            "sec.shell-scope-hardening (iter 240): \
+             tests/shell_scope_pinned.rs must keep `{line}` \
+             verbatim. A rename without updating the constant \
+             silently disables every pin reading through it."
+        );
+    }
+}
+
+/// Iter 240: CSP must not contain `'unsafe-hashes'` anywhere.
+/// CSP3 introduces `'unsafe-hashes'` as a narrower form of
+/// `'unsafe-inline'` for event handlers (onclick=...) and
+/// javascript: URLs. It's strictly less bad than `'unsafe-inline'`,
+/// but it still re-opens the inline-handler sink — a reflected-XSS
+/// into an attribute context becomes executable. Iter-206 already
+/// pins `'unsafe-eval'` absence; this adds the CSP3 sibling.
+#[test]
+fn csp_rejects_unsafe_hashes_everywhere() {
+    let conf = read_conf();
+    let csp = conf
+        .pointer("/app/security/csp")
+        .and_then(|v| v.as_str())
+        .expect("app.security.csp must be a string");
+    assert!(
+        !csp.contains("'unsafe-hashes'"),
+        "sec.shell-scope-hardening (iter 240): app.security.csp must \
+         not contain `'unsafe-hashes'` in any directive. CSP3 \
+         `'unsafe-hashes'` narrows `'unsafe-inline'` but still \
+         re-opens the inline-event-handler sink (onclick=..., \
+         javascript: URLs). Our hard-line is no inline execution.\n\
+         CSP: {csp}"
+    );
+}
+
+/// Iter 240: `default-src` must NOT include opaque or data-bearing
+/// schemes (`data:`, `blob:`, `filesystem:`). These schemes allow
+/// execution or fetch of inline/dynamic content — `data:` for
+/// arbitrary Base64-encoded HTML/JS, `blob:` for runtime-constructed
+/// URL objects, `filesystem:` for HTML5 FileSystem API. Each
+/// defeats the allowlist for the default-src fallback directives
+/// (script-src inherits if unset; fetch-equivalent inherits).
+#[test]
+fn csp_default_src_rejects_opaque_schemes() {
+    let conf = read_conf();
+    let csp = conf
+        .pointer("/app/security/csp")
+        .and_then(|v| v.as_str())
+        .expect("app.security.csp must be a string");
+    let default_pos = csp
+        .find("default-src")
+        .expect("CSP must declare default-src");
+    let rest = &csp[default_pos..];
+    let end = rest.find(';').unwrap_or(rest.len());
+    let directive = &rest[..end];
+    for bad in ["data:", "blob:", "filesystem:"] {
+        assert!(
+            !directive.split_whitespace().any(|t| t == bad),
+            "sec.shell-scope-hardening (iter 240): default-src must \
+             not include `{bad}` — the scheme allows opaque / \
+             runtime-constructed content that defeats the allowlist \
+             for any directive inheriting default-src.\n\
+             Directive: {directive}"
+        );
+    }
+    // img-src is allowed to have data: (legitimate inline icons)
+    // but ONLY explicitly in img-src, never via default-src
+    // inheritance. This positive pin documents the allowed
+    // exception.
+    let img_pos = csp.find("img-src").expect("CSP must declare img-src");
+    let img_rest = &csp[img_pos..];
+    let img_end = img_rest.find(';').unwrap_or(img_rest.len());
+    let img_directive = &img_rest[..img_end];
+    assert!(
+        img_directive.contains("data:"),
+        "sec.shell-scope-hardening (iter 240): img-src must \
+         explicitly carry `data:` (iter 206 invariant). If it's \
+         missing here, either CSP has been narrowed (good) or \
+         img-src is falling back to default-src (bad — no inline \
+         icons would render, and the CSP narrows the allowlist).\n\
+         img-src directive: {img_directive}"
+    );
+}
+
+/// Iter 240: the `permissions` array in `capabilities/migrated.json`
+/// must stay bounded. Every entry is a reviewed capability grant;
+/// silent growth past a reasonable floor means a refactor added
+/// permissions without a PRD audit trail. Pin a soft upper bound
+/// that catches a 2×+ growth — raising the ceiling requires a
+/// deliberate test update.
+#[test]
+fn capabilities_permissions_count_stays_bounded() {
+    let body = fs::read_to_string(CAPABILITIES_JSON)
+        .expect("capabilities/migrated.json must exist");
+    let cap: serde_json::Value =
+        serde_json::from_str(&body).expect("capability JSON must parse");
+    let perms = cap
+        .pointer("/permissions")
+        .and_then(|v| v.as_array())
+        .expect("capability must carry a permissions array");
+    // Current set at iter 240 is small (< 25 entries). Pin at 30 so
+    // adding 2-3 new capabilities fits without churn, but a doubling
+    // (e.g. from 20 to 45) trips CI and forces an audit.
+    assert!(
+        perms.len() < 30,
+        "sec.shell-scope-hardening (iter 240): \
+         capabilities/migrated.json's `permissions` array has grown \
+         to {} entries — above the soft ceiling of 30. Each entry \
+         is a reviewed capability grant; this growth indicates \
+         permissions may have landed without an audit. Re-run the \
+         capability audit, then raise this ceiling if the new set \
+         is legitimate.",
+        perms.len()
+    );
+    // Lower floor: any drop below 5 means critical permissions
+    // (http:default, shell:default-deny, process:allow-restart) were
+    // deleted — something's broken.
+    assert!(
+        perms.len() >= 5,
+        "sec.shell-scope-hardening (iter 240): \
+         capabilities/migrated.json's `permissions` array has \
+         shrunk to {} entries — below the floor of 5. Critical \
+         capabilities (http:default, shell:default-deny, process: \
+         allow-restart, updater:default, ...) appear to have been \
+         deleted. The launcher will fail at runtime with permission \
+         errors.",
+        perms.len()
+    );
+}
+
+/// Iter 240: the guard source header must cite `sec.shell-scope-
+/// hardening` + `CVE-2025-31477` so a reader tracing a CI failure
+/// lands on both the fix-plan slot and the specific advisory the
+/// pins defend against. Header-inspection pin parallels iter-199's
+/// http_redirect_offlist traceability.
+#[test]
+fn guard_file_header_cites_fix_slot_and_cve() {
+    let body = fs::read_to_string(GUARD_SOURCE).expect("guard source must exist");
+    let header = &body[..body.len().min(2000)];
+    assert!(
+        header.contains("sec.shell-scope-hardening") || header.contains("shell-scope-hardening"),
+        "sec.shell-scope-hardening (iter 240): \
+         tests/shell_scope_pinned.rs header must cite \
+         `sec.shell-scope-hardening` (the fix-plan slot) so the PRD \
+         trail is reachable via grep. Without it, a CI failure \
+         triggers an anonymous red with no pointer to the criterion."
+    );
+    assert!(
+        header.contains("CVE-2025-31477"),
+        "sec.shell-scope-hardening (iter 240): \
+         tests/shell_scope_pinned.rs header must cite \
+         `CVE-2025-31477` so the underlying advisory is reachable \
+         via grep. Without the CVE reference, a maintainer might \
+         relax a pin thinking the defensive posture is theoretical."
+    );
+}
