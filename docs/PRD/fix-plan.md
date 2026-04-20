@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 258
-last_work_iteration: 258
+iteration_counter: 259
+last_work_iteration: 259
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 234
+total_items_done: 235
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 259 WORK — pin.crate-comment-mods-dir-bounds+no-nested-subdirs+mod-rs-reexports-siblings+prd-3-8-2-cite+ends-with-newline DONE.**
+>
+> PRD 3.8.2.crate-level-doc; crate_comment_guard had 18 tests. Brings to 23. First 18-count tier extension.
+>
+> Five new pins:
+> 1. `mods_dir_file_count_is_within_sane_bounds` — MIN 4, MAX 20 files (current 6; floor catches bulk-delete, ceiling catches accumulation)
+> 2. `mods_dir_has_no_nested_subdirectories` — walks only top-level `*.rs`; nested trees would be uncovered silently
+> 3. `mod_rs_re_exports_every_sibling_module` — dead sibling files pass crate-doc pins trivially
+> 4. `guard_file_header_cites_prd_3_8_2_explicitly` — explicit section + criterion keyword (stricter than iter-209 generic anchor)
+> 5. `every_mods_file_ends_with_newline` — POSIX convention; cargo test surfaces regression even when pre-commit hooks bypassed
+>
+> crate_comment_guard: 18 → 23 tests. 1539 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 258 WORK — pin.smoke-harness-integration-floor-ratchet-35+guard-floor-ratchet-18+serde-json-dep+common-mod-size-range+no-stub-files DONE.**
 >

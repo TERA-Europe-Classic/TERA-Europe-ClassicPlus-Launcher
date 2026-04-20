@@ -699,6 +699,166 @@ fn detector_self_test_covers_both_iter_eras() {
     }
 }
 
+// --------------------------------------------------------------------
+// Iter 259 structural pins — mods dir file-count bounds + no-nested-
+// subdirs + mod.rs re-exports all siblings + guard PRD-3.8.2 cite +
+// every mods file ends with newline.
+// --------------------------------------------------------------------
+//
+// The eighteen pins above cover per-file doc-header presence, body
+// substance, multi-line block, top-of-file, forbidden-marker absence,
+// filename set, constants sanity, forbidden-list completeness, and the
+// iter-179 helper wiring. They do NOT pin:
+// (a) the mods/ dir file count is within sane bounds — too few means
+//     files were deleted, too many signals accumulation that weakens
+//     per-file header discipline;
+// (b) the mods/ dir has NO nested subdirectories — the crate-doc pin
+//     walks only top-level `.rs`, so a nested module tree would be
+//     uncovered silently;
+// (c) `mod.rs` re-exports every sibling module (`pub mod X;` for each
+//     X.rs) — a mods/ file that exists on disk but isn't re-exported
+//     is dead code that passes the crate-doc pin trivially;
+// (d) the guard's own header explicitly cites PRD 3.8.2 with the
+//     section number + criterion keyword — meta-guard contract;
+// (e) every mods/*.rs file ends with a trailing newline — POSIX
+//     convention; missing newline is a common pre-commit-hook check
+//     item but doesn't block compilation.
+
+/// The `src/services/mods/` directory file count must be within sane
+/// bounds. Floor of 4 catches a bulk-delete (leaves enough to claim
+/// the layout); ceiling of 20 catches accumulation (too many files
+/// signals the module has lost its focused shape). Current state: 6
+/// files (catalog, external_app, mod, registry, tmm, types).
+#[test]
+fn mods_dir_file_count_is_within_sane_bounds() {
+    const MIN_FILES: usize = 4;
+    const MAX_FILES: usize = 20;
+    let files = rs_files_in_mods_dir();
+    assert!(
+        files.len() >= MIN_FILES,
+        "PRD 3.8.2 (iter 259): {MODS_DIR} has {} file(s); floor is \
+         {MIN_FILES}. A bulk-delete past the floor suggests a bad \
+         rebase removed mods-manager source files.",
+        files.len()
+    );
+    assert!(
+        files.len() <= MAX_FILES,
+        "PRD 3.8.2 (iter 259): {MODS_DIR} has {} file(s); ceiling is \
+         {MAX_FILES}. Accumulation past the ceiling signals the \
+         mod-manager module has lost its focused shape — split \
+         concerns should live under a different subdirectory.",
+        files.len()
+    );
+}
+
+/// The `src/services/mods/` directory must have NO nested
+/// subdirectories. The `every_mods_source_file_has_crate_level_doc`
+/// pin (iter 104) walks only top-level `*.rs` — a nested module tree
+/// (e.g. `src/services/mods/gpk/mapper.rs`) would be uncovered
+/// silently by every crate-doc pin in this guard.
+#[test]
+fn mods_dir_has_no_nested_subdirectories() {
+    let dir = std::path::PathBuf::from(MODS_DIR);
+    for entry in fs::read_dir(&dir).expect("read mods dir") {
+        let entry = entry.expect("dir entry");
+        let ft = entry.file_type().expect("file type");
+        if ft.is_dir() {
+            panic!(
+                "PRD 3.8.2 (iter 259): {MODS_DIR} contains a \
+                 subdirectory `{}`. The crate-doc pins walk only \
+                 top-level *.rs; a nested module tree would be \
+                 uncovered. Flatten the structure or extend every \
+                 pin to recurse.",
+                entry.file_name().to_string_lossy()
+            );
+        }
+    }
+}
+
+/// `src/services/mods/mod.rs` must re-export every sibling module
+/// with a `pub mod <name>;` line. A file on disk that isn't declared
+/// in mod.rs is dead code — the compiler still sees it as its own
+/// integration-test binary (none) but the production code never
+/// reaches it. The crate-doc pins would trivially pass against a
+/// dead file with a `//!` header that does nothing.
+#[test]
+fn mod_rs_re_exports_every_sibling_module() {
+    let mod_rs_path = format!("{MODS_DIR}/mod.rs");
+    let mod_body = fs::read_to_string(&mod_rs_path)
+        .unwrap_or_else(|e| panic!("{mod_rs_path}: {e}"));
+    for path in rs_files_in_mods_dir() {
+        let stem = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .expect("file stem");
+        // mod.rs itself doesn't re-export; skip it.
+        if stem == "mod" {
+            continue;
+        }
+        let needle = format!("pub mod {stem};");
+        assert!(
+            mod_body.contains(&needle),
+            "PRD 3.8.2 (iter 259): {mod_rs_path} must declare \
+             `{needle}` — the sibling file `{stem}.rs` exists on \
+             disk but isn't re-exported. Dead sibling files pass the \
+             crate-doc pins trivially; re-export or delete."
+        );
+    }
+}
+
+/// The guard's own module header must cite PRD 3.8.2 explicitly with
+/// the section number AND the criterion keyword (`crate-level` or
+/// `doc comment`). The iter-209 meta_hygiene generic header check
+/// accepts broad traceable anchors; this pin is specific so a reader
+/// chasing a crate-doc regression lands here directly.
+#[test]
+fn guard_file_header_cites_prd_3_8_2_explicitly() {
+    let body = read_guard_file();
+    let header = &body[..body.len().min(1500)];
+    assert!(
+        header.contains("PRD 3.8.2"),
+        "PRD 3.8.2 (iter 259): tests/crate_comment_guard.rs header \
+         must cite `PRD 3.8.2` explicitly. A reader chasing a crate-\
+         doc regression should land here via section-grep.\nHeader:\n{header}"
+    );
+    let cites_criterion = header.contains("crate-level")
+        || header.contains("doc comment")
+        || header.contains("`//!`");
+    assert!(
+        cites_criterion,
+        "PRD 3.8.2 (iter 259): header must cite the criterion keyword \
+         (`crate-level` / `doc comment` / backticked `//!`). The \
+         iter-209 meta_hygiene check accepts any traceable anchor; \
+         this pin requires the specific criterion term."
+    );
+}
+
+/// Every file in `src/services/mods/*.rs` must end with a trailing
+/// newline. POSIX convention; missing newline is a common pre-commit-
+/// hook check but doesn't block compilation. Pinning it here means
+/// `cargo test` surfaces the regression even when pre-commit hooks
+/// are bypassed via `--no-verify`.
+#[test]
+fn every_mods_file_ends_with_newline() {
+    let mut offenders: Vec<String> = Vec::new();
+    for path in rs_files_in_mods_dir() {
+        let body = fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+        if !body.ends_with('\n') {
+            offenders.push(path.display().to_string());
+        }
+    }
+    assert!(
+        offenders.is_empty(),
+        "PRD 3.8.2 (iter 259): {} mods/*.rs file(s) do not end with \
+         a trailing newline (POSIX convention). Files:\n  {}\n\
+         Pre-commit hooks normally catch this; pinning in cargo test \
+         surfaces it even when hooks are bypassed.",
+        offenders.len(),
+        offenders.join("\n  ")
+    );
+}
+
 /// Iter 231: every iter-179 production-gating helper must appear at
 /// least TWICE in the file: once inside the self-test (proving the
 /// helper bites on known shapes) AND once in a real walking test
