@@ -9,14 +9,13 @@
     margin: 0 auto;
 }
 
-/* Styled scrollbar inside the mods modal so the UA-default isn't a
-   jarring grey rectangle against the dark theme. Scoped to #mods-page
-   plus the overflow containers so nothing outside the modal is
-   affected.
+/* Styled scrollbar inside the mods modal. Thin, subtle, almost invisible
+   until hovered — matches the launcher's dark theme without the chunky
+   grey default or the overly-bright accent gradient.
 
    Chromium exposes ::-webkit-scrollbar; Firefox uses scrollbar-color /
-   scrollbar-width. Tauri v1 ships WebView2 (Chromium) on Windows so
-   the Firefox fallback is belt-and-braces. */
+   scrollbar-width. Tauri ships WebView2 (Chromium) on Windows so the
+   Firefox fallback is belt-and-braces. */
 #mods-page,
 #mods-page .mods-pane,
 #mods-page .mods-rows,
@@ -24,34 +23,31 @@
 #mods-page .mods-detail-description,
 #mods-page .mods-category-row {
     scrollbar-width: thin;
-    scrollbar-color: rgba(34, 211, 238, 0.32) rgba(255, 255, 255, 0.04);
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+    scroll-behavior: smooth;
 }
 
 #mods-page ::-webkit-scrollbar,
 #mods-page::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 6px;
+    height: 6px;
 }
 
 #mods-page ::-webkit-scrollbar-track,
 #mods-page::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.03);
-    border-radius: 999px;
+    background: transparent;
 }
 
 #mods-page ::-webkit-scrollbar-thumb,
 #mods-page::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, rgba(34, 211, 238, 0.32), rgba(34, 211, 238, 0.18));
-    border: 2px solid transparent;
-    background-clip: padding-box;
+    background: rgba(255, 255, 255, 0.12);
     border-radius: 999px;
-    transition: background 120ms ease;
+    transition: background 200ms ease;
 }
 
 #mods-page ::-webkit-scrollbar-thumb:hover,
 #mods-page::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, rgba(34, 211, 238, 0.55), rgba(34, 211, 238, 0.35));
-    background-clip: padding-box;
+    background: rgba(255, 255, 255, 0.28);
 }
 
 #mods-page ::-webkit-scrollbar-corner,
@@ -162,10 +158,6 @@
     gap: 12px;
     align-items: center;
     flex-wrap: wrap;
-    /* Align the search-input BOX's left edge at x=18 so it lines up
-       with the .mods-tab text inset (tabs have padding 12px 18px) and
-       the .mods-filter-chip border edge below. */
-    padding: 0 var(--mods-inline-inset);
     position: relative;
 }
 
@@ -304,6 +296,7 @@
     flex-wrap: wrap;
     gap: var(--mods-filter-gap);
     min-width: 0;
+    margin-left: var(--mods-filter-gap);
 }
 
 /* Panes */

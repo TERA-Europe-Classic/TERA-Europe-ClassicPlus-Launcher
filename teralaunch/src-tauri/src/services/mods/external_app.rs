@@ -15,8 +15,16 @@ use std::path::{Path, PathBuf};
 #[cfg(not(windows))]
 use std::process::Command;
 
+use reqwest::header::LOCATION;
 use sha2::{Digest, Sha256};
 use sysinfo::System;
+
+const MAX_ALLOWED_REDIRECTS: usize = 3;
+const ALLOWED_REDIRECT_HOSTS: &[&str] = &[
+    "github.com",
+    "release-assets.githubusercontent.com",
+    "objects.githubusercontent.com",
+];
 
 /// Downloads the zip at `url`, verifies the SHA-256 matches `expected_sha256`
 /// (hex, lowercase), and extracts it into `dest_dir`. Any existing contents
@@ -156,17 +164,69 @@ async fn fetch_bytes_streaming(
         .build()
         .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
 
-    let response = client
-        .get(url)
-        .send()
-        .await
-        .map_err(|e| format!("Failed to download from {}: {}", url, e))?;
+    let mut current_url =
+        reqwest::Url::parse(url).map_err(|e| format!("Failed to parse download URL {}: {}", url, e))?;
+    let mut redirects_followed = 0usize;
+    let response = loop {
+        let response = client
+            .get(current_url.clone())
+            .send()
+            .await
+            .map_err(|e| format!("Failed to download from {}: {}", current_url, e))?;
+
+        if response.status().is_redirection() {
+            let location = response
+                .headers()
+                .get(LOCATION)
+                .ok_or_else(|| {
+                    format!(
+                        "Download returned HTTP {} from {} without a Location header",
+                        response.status(),
+                        current_url
+                    )
+                })?
+                .to_str()
+                .map_err(|e| format!("Redirect Location header was not valid UTF-8: {}", e))?;
+
+            let next_url = current_url
+                .join(location)
+                .or_else(|_| reqwest::Url::parse(location))
+                .map_err(|e| format!("Failed to resolve redirect target {}: {}", location, e))?;
+
+            let host = next_url.host_str().ok_or_else(|| {
+                format!(
+                    "Redirect target {} has no valid host component",
+                    next_url
+                )
+            })?;
+
+            if !redirect_host_is_allowed(host) {
+                return Err(format!(
+                    "Download redirect to {} is not allowed (from {})",
+                    host, current_url
+                ));
+            }
+
+            redirects_followed += 1;
+            if redirects_followed > MAX_ALLOWED_REDIRECTS {
+                return Err(format!(
+                    "Download exceeded the redirect limit ({}) starting from {}",
+                    MAX_ALLOWED_REDIRECTS, url
+                ));
+            }
+
+            current_url = next_url;
+            continue;
+        }
+
+        break response;
+    };
 
     if !response.status().is_success() {
         return Err(format!(
             "Download returned HTTP {} from {}",
             response.status(),
-            url
+            current_url
         ));
     }
 
@@ -184,6 +244,12 @@ async fn fetch_bytes_streaming(
     }
 
     Ok(buf)
+}
+
+fn redirect_host_is_allowed(host: &str) -> bool {
+    ALLOWED_REDIRECT_HOSTS
+        .iter()
+        .any(|allowed| host.eq_ignore_ascii_case(allowed))
 }
 
 fn hex_lower(bytes: &[u8]) -> String {
@@ -488,6 +554,17 @@ mod tests {
     fn is_process_running_returns_false_for_garbage_name() {
         // A process name we're sure doesn't exist on any sane system.
         assert!(!is_process_running("zzzz_nonexistent_binary_name_qqqq.exe"));
+    }
+
+    #[test]
+    fn redirect_host_allowlist_is_narrow_and_matches_github_release_assets() {
+        assert!(redirect_host_is_allowed("github.com"));
+        assert!(redirect_host_is_allowed("release-assets.githubusercontent.com"));
+        assert!(redirect_host_is_allowed("objects.githubusercontent.com"));
+
+        assert!(!redirect_host_is_allowed("raw.githubusercontent.com"));
+        assert!(!redirect_host_is_allowed("example.com"));
+        assert!(!redirect_host_is_allowed("githubusercontent.com"));
     }
 
     // --- PRD 3.2.11.multi-client-attach-once --------------------------------

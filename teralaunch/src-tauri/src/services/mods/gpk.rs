@@ -689,7 +689,7 @@ pub fn recover_missing_clean(game_root: &Path) -> Result<(), String> {
     if map.contains_key(TMM_MARKER) {
         return Err(
             "Cannot recover .clean: the current CompositePackageMapper.dat \
-             has mod entries (TMM marker present). Run Steam / the launcher's \
+             has mod entries (patcher marker present). Run Steam / the launcher's \
              \"verify game files\" to restore the vanilla mapper, then retry."
                 .into(),
         );
@@ -807,16 +807,46 @@ fn is_placeholder_package_name(name: &str) -> bool {
 }
 
 /// Resolves the game-facing filename for a legacy `.gpk` that lacks embedded
-/// override metadata. Prefer the UE3 package header when it carries a useful
-/// name; otherwise fall back to the source filename stem, which matches the
-/// filename-based install convention used by toolbox-style removers.
-pub fn resolve_legacy_target_filename(bytes: &[u8], source_gpk: &Path) -> Option<String> {
+/// override metadata. Resolution priority:
+///
+///   1. UE3 package header `FolderName` (when present and not a placeholder).
+///   2. `url_filename_hint` — the last path segment of the download URL
+///      (e.g. `S1UI_ProgressBar.gpk` from `.../remove_FlightGauge/S1UI_ProgressBar.gpk`).
+///      Catalog-installed mods are stored as `<catalog-id>.gpk`, so the
+///      file stem is the opaque catalog ID, not the real game-package name.
+///   3. Source filename stem (last resort for manually imported files).
+pub fn resolve_legacy_target_filename(
+    bytes: &[u8],
+    source_gpk: &Path,
+    url_filename_hint: Option<&str>,
+) -> Option<String> {
+    // 1. UE3 header FolderName
     if let Some(folder_name) = extract_package_folder_name(bytes) {
         if !is_placeholder_package_name(&folder_name) {
             return Some(format!("{folder_name}.gpk"));
         }
     }
 
+    // 2. URL-derived filename — the download URL's last path segment is the
+    //    real game-package name (e.g. S1UI_ProgressBar.gpk). This is more
+    //    reliable than the file stem for catalog-installed mods, where the
+    //    on-disk name is an opaque catalog ID like "foglio1024.ui-remover-flight-gauge".
+    if let Some(hint) = url_filename_hint {
+        let trimmed = hint.trim();
+        if !trimmed.is_empty()
+            && !trimmed.eq_ignore_ascii_case("none")
+            && trimmed.ends_with(".gpk")
+        {
+            return Some(trimmed.to_string());
+        }
+        // Also accept a bare folder name without the .gpk extension.
+        if !trimmed.is_empty() && !trimmed.eq_ignore_ascii_case("none") {
+            return Some(format!("{trimmed}.gpk"));
+        }
+    }
+
+    // 3. Source filename stem (matches toolbox-style removable mods where
+    //    users manually named the file to match the game package).
     let stem = source_gpk.file_stem()?.to_str()?.trim();
     if stem.is_empty() || stem.eq_ignore_ascii_case("none") {
         return None;
@@ -846,11 +876,12 @@ pub fn resolve_legacy_target_filename(bytes: &[u8], source_gpk: &Path) -> Option
 pub fn install_legacy_gpk(
     game_root: &Path,
     source_gpk: &Path,
+    url_filename_hint: Option<&str>,
 ) -> Result<String, String> {
     let bytes = fs::read(source_gpk)
         .map_err(|e| format!("Failed to read mod file: {}", e))?;
-    let target_filename = resolve_legacy_target_filename(&bytes, source_gpk)
-        .ok_or_else(|| {
+    let target_filename =
+        resolve_legacy_target_filename(&bytes, source_gpk, url_filename_hint).ok_or_else(|| {
             "Mod file has no usable package name in its UE3 header or filename — can't map it to a game file."
                 .to_string()
         })?;
@@ -966,7 +997,7 @@ pub fn install_gpk(game_root: &Path, source_gpk: &Path) -> Result<ModFile, Strin
     let gpk_bytes = fs::read(source_gpk).map_err(|e| format!("Failed to read mod file: {}", e))?;
     let modfile = parse_mod_file(&gpk_bytes)?;
     if modfile.container.is_empty() {
-        return Err("Mod file has no TMM container name — this .gpk is not TMM-compatible.".into());
+        return Err("Mod file has no embedded container metadata — falling back to filename-based install.".into());
     }
     if !is_safe_gpk_container_filename(&modfile.container) {
         return Err(format!(
@@ -2386,7 +2417,7 @@ mod tests {
         // it in explicitly (mirrors production add-from-file flow).
         let source_gpk = write_fake_gpk(game_root, "mod-flight-gauge.gpk", "S1UI_Gauge");
 
-        let target_name = install_legacy_gpk(game_root, &source_gpk)
+        let target_name = install_legacy_gpk(game_root, &source_gpk, None)
             .expect("install must succeed on matching mapper entry");
         assert_eq!(target_name, "S1UI_Gauge.gpk");
 
@@ -2426,7 +2457,7 @@ mod tests {
         write_mapper_at(game_root, &map);
 
         let source_gpk = write_fake_gpk(game_root, "mod-orphan.gpk", "UnknownPkg");
-        let err = install_legacy_gpk(game_root, &source_gpk)
+        let err = install_legacy_gpk(game_root, &source_gpk, None)
             .expect_err("install must fail when no mapper entry matches");
         assert!(
             err.contains("UnknownPkg"),
@@ -2446,7 +2477,7 @@ mod tests {
 
         let source_gpk = write_fake_gpk(game_root, "S1UI_ProgressBar.gpk", "None");
 
-        let target_name = install_legacy_gpk(game_root, &source_gpk)
+        let target_name = install_legacy_gpk(game_root, &source_gpk, None)
             .expect("filename fallback must deploy remover-style gpks");
         assert_eq!(target_name, "S1UI_ProgressBar.gpk");
 

@@ -296,7 +296,7 @@ async fn install_gpk_mod(entry: CatalogEntry, window: tauri::Window) -> Result<M
             // Attempt deploy through embedded metadata first, then fall back
             // to filename-based legacy install when the file lacks that
             // metadata but still maps cleanly to a known game package.
-            let deploy = try_deploy_gpk(&entry.id, &dest);
+            let deploy = try_deploy_gpk(&entry.id, &dest, Some(&entry.download_url));
 
             let final_row = mods_state::mutate(|reg| {
                 let slot = reg.find_mut(&entry.id).ok_or_else(|| {
@@ -320,20 +320,27 @@ async fn install_gpk_mod(entry: CatalogEntry, window: tauri::Window) -> Result<M
     }
 }
 
-/// Tries to deploy a downloaded GPK to the game via tmm.rs. On success
+/// Tries to deploy a downloaded GPK to the game via gpk.rs. On success
 /// returns None (no message to surface). On any failure returns a
 /// human-readable explanation that the caller stashes in `last_error`
 /// so the user can see why the mod won't apply in-game yet.
 ///
 /// Two install paths:
-///   1. **TMM** — `.gpk` carries a TMM footer → patch
+///   1. **Footer-based** — `.gpk` carries a TMM-style footer → patch
 ///      CompositePackageMapper.dat to route composites at the new file.
-///   2. **Legacy drop-in** — no TMM footer → read the UE3 package
+///   2. **Legacy drop-in** — no footer → read the UE3 package
 ///      FolderName from the GPK header and drop the file into
 ///      `<game>/CookedPC/<name>.gpk`, backing up any existing vanilla
-///      file as `<name>.gpk.vanilla-bak`. Matches the pre-TMM community
+///      file as `<name>.gpk.vanilla-bak`. Matches the pre-toolbox community
 ///      convention where users manually dropped mods in by filename.
-fn try_deploy_gpk(_mod_id: &str, source_gpk: &std::path::Path) -> GpkDeployOutcome {
+///
+/// `download_url` is used to extract the real game-package filename when
+/// the on-disk name is an opaque catalog ID (e.g. `foglio1024.ui-remover-flight-gauge`).
+fn try_deploy_gpk(
+    _mod_id: &str,
+    source_gpk: &std::path::Path,
+    download_url: Option<&str>,
+) -> GpkDeployOutcome {
     use crate::services::mods::gpk;
     let game_root = match resolve_game_root() {
         Ok(p) => p,
@@ -347,6 +354,13 @@ fn try_deploy_gpk(_mod_id: &str, source_gpk: &std::path::Path) -> GpkDeployOutco
             };
         }
     };
+    // Extract the real game-package filename from the download URL.
+    // For catalog mods the on-disk name is an opaque ID like
+    // "foglio1024.ui-remover-flight-gauge", but the URL's last segment
+    // reveals the actual target (e.g. "S1UI_ProgressBar.gpk").
+    let url_hint = download_url.and_then(|url| {
+        url::Url::parse(url).ok()?.path_segments()?.last().map(str::to_string)
+    });
     match gpk::install_gpk(&game_root, source_gpk) {
         Ok(modfile) => GpkDeployOutcome {
             last_error: None,
@@ -356,7 +370,7 @@ fn try_deploy_gpk(_mod_id: &str, source_gpk: &std::path::Path) -> GpkDeployOutco
             // Footer-based deploy rejected the mod. Fall back to legacy
             // filename-based install if the .gpk exposes a usable target
             // through its UE3 header or source filename.
-            match gpk::install_legacy_gpk(&game_root, source_gpk) {
+            match gpk::install_legacy_gpk(&game_root, source_gpk, url_hint.as_deref()) {
                 Ok(installed_name) => {
                     log::info!(
                         "legacy drop-in install succeeded for {} as {}",
@@ -443,7 +457,7 @@ pub async fn add_mod_from_file(path: String) -> Result<ModEntry, String> {
         std::fs::read(&src).map_err(|e| format!("Failed to read {}: {e}", src.display()))?;
 
     let modfile = gpk::parse_mod_file(&bytes)?;
-    let fallback_display_name = gpk::resolve_legacy_target_filename(&bytes, &src)
+    let fallback_display_name = gpk::resolve_legacy_target_filename(&bytes, &src, None)
         .and_then(|name| name.strip_suffix(".gpk").map(str::to_string));
     if modfile.container.is_empty() && fallback_display_name.is_none() {
         return Err(
@@ -451,7 +465,7 @@ pub async fn add_mod_from_file(path: String) -> Result<ModEntry, String> {
                 .into(),
         );
     }
-    if let Some(target_filename) = gpk::resolve_legacy_target_filename(&bytes, &src) {
+    if let Some(target_filename) = gpk::resolve_legacy_target_filename(&bytes, &src, None) {
         if !gpk::is_safe_gpk_container_filename(&target_filename) {
             return Err(format!(
                 "Imported .gpk would deploy to an unsafe filename '{}' — refusing to import.",
@@ -487,7 +501,7 @@ pub async fn add_mod_from_file(path: String) -> Result<ModEntry, String> {
     // Best-effort mapper deploy. If the game root isn't configured we still
     // persist the import so the user can see it; the deploy happens next
     // time they hit enable.
-    let deploy = try_deploy_gpk(&entry.id, &dest);
+    let deploy = try_deploy_gpk(&entry.id, &dest, None);
     entry.deployed_filename = deploy.deployed_filename.clone();
     entry.last_error = deploy.last_error.clone();
     if deploy.last_error.is_none() {
@@ -574,6 +588,7 @@ pub async fn uninstall_mod(id: String, delete_settings: Option<bool>) -> Result<
                                 crate::services::mods::gpk::resolve_legacy_target_filename(
                                     &bytes,
                                     &source_gpk,
+                                    None,
                                 )
                             })
                         {
@@ -589,6 +604,7 @@ pub async fn uninstall_mod(id: String, delete_settings: Option<bool>) -> Result<
                             crate::services::mods::gpk::resolve_legacy_target_filename(
                                 &bytes,
                                 &source_gpk,
+                                None,
                             )
                         })
                     {
