@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 256
-last_work_iteration: 256
+iteration_counter: 257
+last_work_iteration: 257
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 232
+total_items_done: 233
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 257 WORK — pin.shell-open-callsite-scanner-size-ceiling+capabilities-json-valid+safe-ids-ceiling+callsite-ceiling+describe-wrapper DONE.**
+>
+> PRD 3.1.5 (CVE-2025-31477); shell_open_callsite_guard had 17 tests. Brings to 22.
+>
+> Five new pins:
+> 1. `scanner_file_size_has_upper_ceiling` — MAX_BYTES 40_000 (current ~8KB; catches bloat)
+> 2. `capabilities_json_is_valid` — explicit serde_json::from_str pin (iter-219 pin does it implicitly but panics opaquely)
+> 3. `safe_identifiers_list_has_sane_ceiling` — MAX 20 entries (widens trusted surface; ad-hoc exception accumulation)
+> 4. `app_js_shell_open_call_site_count_has_sane_ceiling` — MAX 50 (security surface pressure; runaway count signals feature leaking into wrong sinks)
+> 5. `scanner_carries_describe_wrapper_block` — ≥1 `describe(` for semantic grouping in test output
+>
+> shell_open_callsite_guard: 17 → 22 tests. 1529 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 256 WORK — pin.search-perf-scanner-size-ceiling+fixture-sanity-cap+sample-count-exactly-7+budget-min-16+vitest-import DONE.**
 >

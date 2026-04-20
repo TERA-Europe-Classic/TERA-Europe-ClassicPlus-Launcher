@@ -578,6 +578,150 @@ fn capabilities_windows_scope_is_main_not_wildcard() {
     );
 }
 
+// --------------------------------------------------------------------
+// Iter 257 structural pins — scanner size ceiling + capabilities JSON
+// validity + SAFE_IDENTIFIERS ceiling + app.js call-site ceiling +
+// scanner describe wrapper.
+// --------------------------------------------------------------------
+//
+// The seventeen pins above cover scanner presence, sink shapes,
+// SAFE_IDENTIFIERS provenance, classifier branches, self-tests,
+// app.js existence, it-count, marker absence, call-site floor,
+// capability bare-string + main-window scope, header cite, path
+// constants, sister scope guard, openExternal wrapper, DOM-input
+// rejection. They do NOT pin:
+// (a) the scanner file has a sane upper byte ceiling;
+// (b) `capabilities/migrated.json` parses as valid JSON (iter-219
+//     `capabilities_windows_scope_is_main_not_wildcard` does
+//     serde_json::from_str internally but doesn't PIN validity
+//     explicitly — if someone removes the windows array, the test
+//     fails with an opaque "must carry a windows array" panic);
+// (c) SAFE_IDENTIFIERS has a sane upper ceiling — adding entries
+//     widens the trusted surface and each addition should be audited;
+// (d) `src/app.js` shell-open call-site count has a ceiling — security
+//     surface pressure. Too many call sites means each is probably
+//     not being audited;
+// (e) the scanner carries a top-level `describe(` block — Vitest
+//     idiom; without it failures land with only file:line context,
+//     not the security-category grouping the scanner intends.
+
+/// The scanner file must not exceed a sane upper byte ceiling.
+/// Current state: ~8 KB. A 40 KB ceiling gives 5× margin while
+/// catching bloat from unrelated tests merged into the scanner.
+#[test]
+fn scanner_file_size_has_upper_ceiling() {
+    const MAX_BYTES: usize = 40_000;
+    let bytes = fs::metadata(SCANNER)
+        .unwrap_or_else(|e| panic!("{SCANNER}: {e}"))
+        .len() as usize;
+    assert!(
+        bytes <= MAX_BYTES,
+        "sec.shell-open-call-sites-pinned (iter 257): {SCANNER} is \
+         {bytes} bytes; ceiling is {MAX_BYTES}. Bloat past the ceiling \
+         signals unrelated tests merged into the scanner or a runaway \
+         fixture — the CVE-2025-31477 focus narrows."
+    );
+}
+
+/// `capabilities/migrated.json` must parse as valid JSON. The
+/// iter-219 `capabilities_windows_scope_is_main_not_wildcard` pin
+/// does a serde_json::from_str internally but panics with an opaque
+/// message if the file structure changes (missing windows array).
+/// This pin pins VALIDITY explicitly so a syntax regression surfaces
+/// here, with a clear message, before the other pins misfire.
+#[test]
+fn capabilities_json_is_valid() {
+    let cap = read(CAPABILITIES);
+    let parsed: Result<serde_json::Value, _> = serde_json::from_str(&cap);
+    let value = parsed.unwrap_or_else(|e| {
+        panic!(
+            "sec.shell-open-call-sites-pinned (iter 257): {CAPABILITIES} \
+             must parse as valid JSON. Parse error: {e}. An unterminated \
+             string or trailing comma would cause the Tauri build to \
+             fail at boot; pinning validity here surfaces the regression \
+             at test time."
+        )
+    });
+    assert!(
+        value.is_object(),
+        "sec.shell-open-call-sites-pinned (iter 257): {CAPABILITIES} \
+         must parse as a JSON object (not array or scalar). Got: {value:?}"
+    );
+}
+
+/// `SAFE_IDENTIFIERS` must carry a sane upper ceiling. Each added
+/// entry widens the trusted surface — a list that grows to 30+
+/// entries signals the allowlist has accumulated ad-hoc exceptions
+/// instead of being maintained as a curated set. Current state:
+/// ~5-10 entries; a ceiling of 20 gives generous room while catching
+/// runaway additions.
+#[test]
+fn safe_identifiers_list_has_sane_ceiling() {
+    const MAX_ENTRIES: usize = 20;
+    let body = read(SCANNER);
+    let start = body
+        .find("SAFE_IDENTIFIERS = [")
+        .expect("scanner SAFE_IDENTIFIERS missing");
+    let remaining = &body[start..];
+    let end_rel = remaining.find("];").expect("SAFE_IDENTIFIERS not closed");
+    let block = &remaining[..end_rel];
+    let quoted_entries = block.matches('\'').count() / 2;
+    assert!(
+        quoted_entries <= MAX_ENTRIES,
+        "sec.shell-open-call-sites-pinned (iter 257): \
+         SAFE_IDENTIFIERS has {quoted_entries} entries; ceiling is \
+         {MAX_ENTRIES}. A list that grows past the ceiling signals \
+         ad-hoc exceptions accumulating instead of a curated set — \
+         each widening of the trusted surface deserves an audit."
+    );
+}
+
+/// `src/app.js` shell-open call-site count must not exceed a sane
+/// ceiling. Each call-site is a security surface that needs its
+/// argument classified as safe by the scanner; a runaway count (50+)
+/// signals the feature is leaking into codepaths that should probably
+/// use a different sink (e.g. relative-link navigation via Router).
+/// Current state: ~10-20 call sites; a ceiling of 50 gives margin.
+#[test]
+fn app_js_shell_open_call_site_count_has_sane_ceiling() {
+    const MAX_CALLS: usize = 50;
+    let src = read(APP_JS);
+    let shell_open_count = src.matches("window.__TAURI__.shell.open(").count();
+    let app_external_count = src.matches("App.openExternal(").count();
+    let this_external_count = src.matches("this.openExternal(").count();
+    let total = shell_open_count + app_external_count + this_external_count;
+    assert!(
+        total <= MAX_CALLS,
+        "sec.shell-open-call-sites-pinned (iter 257): {APP_JS} has \
+         {total} shell-open call sites (shell.open: \
+         {shell_open_count}, App.openExternal: {app_external_count}, \
+         this.openExternal: {this_external_count}); ceiling is \
+         {MAX_CALLS}. A runaway count signals the feature is leaking \
+         into codepaths that should use a different sink (Router, \
+         in-launcher navigation)."
+    );
+}
+
+/// The scanner must carry at least one top-level `describe(` wrapper
+/// block. Vitest supports flat tests without a describe, but the
+/// scanner's 5+ `it(` blocks need a describe wrapper to give the
+/// suite a name in test output — without it, failures surface as
+/// `shell-open-callsite.test.js:<line>` rather than the
+/// CVE-2025-31477-category grouping the scanner is organizing.
+#[test]
+fn scanner_carries_describe_wrapper_block() {
+    let body = read(SCANNER);
+    let describe_count = body.matches("describe(").count();
+    assert!(
+        describe_count >= 1,
+        "sec.shell-open-call-sites-pinned (iter 257): {SCANNER} has \
+         {describe_count} `describe(` block(s); floor is 1. A flat \
+         test file gives readers no semantic grouping when a failure \
+         lands — the only context is file:line, not the CVE-2025-31477 \
+         category the failure belongs to."
+    );
+}
+
 /// Iter 184: the SAFE_IDENTIFIERS allowlist in the scanner must not
 /// contain entries with DOM-input-derived suffixes. `.value`,
 /// `.innerText`, `.textContent`, `.innerHTML` are attacker-
