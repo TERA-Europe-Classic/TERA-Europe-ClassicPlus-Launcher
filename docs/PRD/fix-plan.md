@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 250
-last_work_iteration: 250
+iteration_counter: 251
+last_work_iteration: 251
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 226
+total_items_done: 227
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 251 WORK — pin.changelog-cargo-const+size-floor+bullet-dash-consistency+release-count-floor+classic-plus-brand DONE.**
+>
+> PRD 3.8.5.changelog-player-facing; changelog_guard had 17 tests. Brings to 22. Entering 17-count tier.
+>
+> Five new pins:
+> 1. `cargo_toml_path_constant_is_canonical` — pin `CARGO_TOML = "Cargo.toml"` verbatim (used by version-sync pin; rename → opaque "file not readable")
+> 2. `changelog_file_size_meets_byte_floor` — MIN_BYTES 2000 (current 6442; 3× margin catches accidental truncation)
+> 3. `every_bullet_uses_dash_not_asterisk` — all bullets use `- ` (consistency for player-facing doc; current state: 30 dashes, 0 asterisks)
+> 4. `release_heading_count_meets_minimum_floor` — MIN_RELEASES 5 (current 13; catches mass-truncation of history section)
+> 5. `changelog_preamble_cites_classic_plus_brand_name` — `Classic+` in preamble first 5 lines (brand identity: fork vs upstream Classic)
+>
+> changelog_guard: 17 → 22 tests. 1499 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 250 WORK — pin.prd-path-drift-pin-count-ratchet-35+prd-line-ratchet-400+rust-pin-src-or-tests-prefix+js-pin-relative-tests-prefix+rust-test-name-snake-case DONE.**
 >

@@ -665,6 +665,154 @@ fn every_numbered_release_has_substantive_body() {
     );
 }
 
+// --------------------------------------------------------------------
+// Iter 251 structural pins — CARGO_TOML constant pin + byte floor
+// + bullet-style consistency + release heading floor + Classic+ brand.
+// --------------------------------------------------------------------
+//
+// The seventeen pins above cover conv-commit absence, preamble, release
+// shape, ordering, and Cargo-version sync. They do NOT pin:
+// (a) the `CARGO_TOML` constant (added iter 213) equals `"Cargo.toml"`
+//     verbatim — a rename would break the version-sync pin with an
+//     opaque "file not readable" panic;
+// (b) the CHANGELOG meets a byte-size floor — a truncation to just a
+//     preamble + `## Unreleased` stub would pass preamble + structure
+//     pins while erasing real history;
+// (c) bullet list style is consistent (`- ` not `* `) — mixed syntaxes
+//     look unprofessional in a player-facing doc;
+// (d) a minimum number of numbered release headings — a doc with just
+//     `## Unreleased` + a single release passes every structural pin
+//     while offering no history to players;
+// (e) the preamble cites the `Classic+` brand name — drift to the
+//     plain `TERA` or `TERA Europe Classic` brand would mis-position
+//     the release notes for players of the Classic+ fork.
+
+/// The `CARGO_TOML` path constant must equal `"Cargo.toml"` verbatim.
+/// A rename (e.g. to `"./Cargo.toml"` or `"../Cargo.toml"`) would break
+/// `newest_release_matches_cargo_toml_version` with an opaque
+/// "file not readable" panic that doesn't point at the constant.
+#[test]
+fn cargo_toml_path_constant_is_canonical() {
+    let guard_body = fs::read_to_string("tests/changelog_guard.rs")
+        .expect("guard source must be readable");
+    assert!(
+        guard_body.contains("const CARGO_TOML: &str = \"Cargo.toml\";"),
+        "PRD 3.8.5 (iter 251): tests/changelog_guard.rs must retain \
+         `const CARGO_TOML: &str = \"Cargo.toml\";` verbatim. A \
+         rename would break the cargo-version-sync pin (iter 213) \
+         with an opaque `file not readable` panic."
+    );
+}
+
+/// CHANGELOG.md must meet a minimum byte-size floor. A truncation to
+/// just the preamble + a stub `## Unreleased` would pass the preamble,
+/// structure, and Unreleased-section pins while erasing real history
+/// — 13 current release sections compress into ~6.4 KB, so 2000
+/// bytes gives ~3× margin while catching an accidental truncation.
+#[test]
+fn changelog_file_size_meets_byte_floor() {
+    const MIN_BYTES: usize = 2000;
+    let bytes = fs::metadata(CHANGELOG)
+        .unwrap_or_else(|e| panic!("{CHANGELOG}: {e}"))
+        .len() as usize;
+    assert!(
+        bytes >= MIN_BYTES,
+        "PRD 3.8.5 (iter 251): {CHANGELOG} is only {bytes} bytes; \
+         floor is {MIN_BYTES}. Truncation past the floor suggests \
+         an accidental overwrite or bad rebase — player-facing \
+         history is gone even though preamble + structure pins still \
+         pass."
+    );
+}
+
+/// Every bullet line must use `- ` (dash-space), NOT `* ` (asterisk-
+/// space). Both are valid CommonMark but mixing styles looks
+/// unprofessional in a player-facing document, and the
+/// `numbered_release_sections_carry_no_placeholder_markers` + the
+/// `no_conventional_commit_prefixes` + `every_numbered_release_has_
+/// substantive_body` detectors all normalise `- ` AND `* ` prefixes
+/// together — flipping the syntax silently works, but inconsistency
+/// is real drift.
+#[test]
+fn every_bullet_uses_dash_not_asterisk() {
+    let body = changelog_body();
+    let mut offenders: Vec<(usize, String)> = Vec::new();
+    for (i, line) in body.lines().enumerate() {
+        if line.trim_start().starts_with("* ") {
+            offenders.push((i + 1, line.to_string()));
+        }
+    }
+    assert!(
+        offenders.is_empty(),
+        "PRD 3.8.5 (iter 251): {} bullet line(s) use `* ` instead \
+         of `- `. Mixed bullet styles look unprofessional in a \
+         player-facing doc. Offenders:\n  {}",
+        offenders.len(),
+        offenders
+            .iter()
+            .map(|(n, l)| format!("L{n}: {l}"))
+            .collect::<Vec<_>>()
+            .join("\n  ")
+    );
+}
+
+/// CHANGELOG must carry at least FIVE numbered release headings. The
+/// structure pin (iter 109) only checks ≥ 1 heading, which passes
+/// for a doc with just `## Unreleased` + one release — no history
+/// is far worse than no changelog. Current state: 13 numbered
+/// releases. A floor at 5 gives generous margin while catching
+/// accidental mass-truncation of the history section.
+#[test]
+fn release_heading_count_meets_minimum_floor() {
+    const MIN_RELEASES: usize = 5;
+    let body = changelog_body();
+    let count = body
+        .lines()
+        .filter(|l| {
+            if !l.starts_with("## ") {
+                return false;
+            }
+            let tail = l.trim_start_matches("## ");
+            if tail == "Unreleased" {
+                return false;
+            }
+            let first = tail.split_whitespace().next().unwrap_or("");
+            let parts: Vec<&str> = first.split('.').collect();
+            parts.len() == 3
+                && parts
+                    .iter()
+                    .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
+        })
+        .count();
+    assert!(
+        count >= MIN_RELEASES,
+        "PRD 3.8.5 (iter 251): CHANGELOG.md has {count} numbered \
+         release heading(s); floor is {MIN_RELEASES}. A changelog \
+         with < {MIN_RELEASES} numbered releases offers players no \
+         history — the structure pin (≥ 1) passes on a single-\
+         release stub."
+    );
+}
+
+/// The CHANGELOG preamble must cite the `Classic+` brand name. Brand
+/// drift (e.g. to `TERA Europe Classic` without the `+`, or plain
+/// `TERA`) would mis-position the release notes — Classic+ is a
+/// distinct fork from upstream Classic, and players need to see the
+/// brand in the header to trust they're reading notes for the right
+/// build.
+#[test]
+fn changelog_preamble_cites_classic_plus_brand_name() {
+    let body = changelog_body();
+    let head: String = body.lines().take(5).collect::<Vec<_>>().join("\n");
+    assert!(
+        head.contains("Classic+"),
+        "PRD 3.8.5 (iter 251): CHANGELOG.md preamble (first 5 \
+         lines) must cite `Classic+` so players know this is the \
+         fork-specific release log, not upstream Classic. Head \
+         seen:\n{head}"
+    );
+}
+
 /// Self-test — prove the detector bites on known-bad shapes.
 #[test]
 fn changelog_detector_self_test() {
