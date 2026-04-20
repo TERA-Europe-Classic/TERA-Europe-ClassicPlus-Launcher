@@ -20,7 +20,7 @@ const AUDITS_UNITS_DIR: &str = "../../docs/PRD/audits/units";
 /// Current floor per category. Raise these as rollout progresses.
 const FLOOR_EXTERNAL: usize = 2;
 const FLOOR_GPK: usize = 1;
-const FLOOR_LAUNCHER: usize = 4;
+const FLOOR_LAUNCHER: usize = 7;
 const FLOOR_TCC: usize = 0;
 
 /// Eventual target per PRD §3.8.7 / §5.5. Keep documented here so a
