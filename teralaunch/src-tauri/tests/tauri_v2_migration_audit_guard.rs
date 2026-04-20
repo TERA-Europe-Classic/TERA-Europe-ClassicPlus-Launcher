@@ -548,3 +548,92 @@ fn every_docs_fixture_filename_starts_with_tauri_v2_migration() {
         );
     }
 }
+
+// --------------------------------------------------------------------
+// Iter 269 structural pins — guard bounds + each audit doc bounds +
+// MIN_LINES_PER_DOC constant + sec slot cite.
+// --------------------------------------------------------------------
+
+/// Iter 269: guard source byte bounds.
+#[test]
+fn guard_source_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 5000;
+    const MAX_BYTES: usize = 80_000;
+    let bytes = std::fs::metadata("tests/tauri_v2_migration_audit_guard.rs")
+        .expect("guard must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "tauri-v2 (iter 269): guard is {bytes} bytes; expected \
+         [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+/// Iter 269: every audit doc file must meet a byte-size floor. The
+/// existing iter-198 pin checks line count; this pin adds a byte
+/// floor to catch a doc with many empty lines that passes the line
+/// pin vacuously.
+#[test]
+fn every_audit_doc_meets_byte_floor() {
+    const MIN_BYTES: usize = 2000;
+    for doc in DOCS {
+        let path = format!("{AUDIT_DIR}/{}", doc.filename);
+        let bytes = std::fs::metadata(&path)
+            .unwrap_or_else(|e| panic!("{path}: {e}"))
+            .len() as usize;
+        assert!(
+            bytes >= MIN_BYTES,
+            "tauri-v2 (iter 269): {path} is {bytes} bytes; floor is \
+             {MIN_BYTES}. A doc with padded empty lines passes \
+             MIN_LINES_PER_DOC but loses real content."
+        );
+    }
+}
+
+/// Iter 269: MIN_LINES_PER_DOC constant must remain at the canonical
+/// value (100). A silent lowering to 0 would vacate the iter-198
+/// line-floor pin.
+#[test]
+fn min_lines_per_doc_constant_is_one_hundred() {
+    let body = std::fs::read_to_string("tests/tauri_v2_migration_audit_guard.rs")
+        .expect("guard must exist");
+    assert!(
+        body.contains("const MIN_LINES_PER_DOC: usize = 100;"),
+        "tauri-v2 (iter 269): guard must retain \
+         `const MIN_LINES_PER_DOC: usize = 100;` verbatim. A silent \
+         lowering would vacate the per-doc line floor."
+    );
+}
+
+/// Iter 269: guard header must cite the `sec.tauri-v1-eol-plan` slot
+/// (the fix-plan name for this audit) — or the tauri-v2 label.
+#[test]
+fn guard_source_cites_tauri_v2_or_eol_plan_slot() {
+    let body = std::fs::read_to_string("tests/tauri_v2_migration_audit_guard.rs")
+        .expect("guard must exist");
+    let header = &body[..body.len().min(500)];
+    assert!(
+        header.contains("tauri-v2") || header.contains("sec.tauri-v1-eol-plan"),
+        "tauri-v2 (iter 269): guard header must cite `tauri-v2` or \
+         the fix-plan slot `sec.tauri-v1-eol-plan`.\n\
+         Header:\n{header}"
+    );
+}
+
+/// Iter 269: every audit doc filename must start with `tauri-v2-` —
+/// the canonical prefix. A file named `v2-migration.md` or
+/// `migration.md` would pass individual pins but drift the naming
+/// convention.
+#[test]
+fn every_audit_doc_filename_has_canonical_prefix() {
+    for doc in DOCS {
+        assert!(
+            doc.filename.starts_with("tauri-v2-"),
+            "tauri-v2 (iter 269): DocFixture filename `{}` must start \
+             with `tauri-v2-` — the canonical prefix that groups the \
+             4-doc quartet. Naming drift splits the audit-trail across \
+             naming conventions.",
+            doc.filename
+        );
+    }
+}

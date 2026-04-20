@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 268
-last_work_iteration: 268
+iteration_counter: 269
+last_work_iteration: 269
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 244
+total_items_done: 245
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 269 WORK — pin.tauri-v2-audit-guard-bounds+doc-byte-floor+min-lines-const+slot-cite+canonical-prefix DONE. 18-count tier complete.**
+>
+> tauri-v2 migration audit; tauri_v2_migration_audit_guard had 18 tests. Brings to 23. Completes 18-count tier — all 18-count guards now at 23.
+>
+> Five new pins:
+> 1. `guard_source_byte_size_has_sane_bounds` — 5000-80000
+> 2. `every_audit_doc_meets_byte_floor` — MIN_BYTES 2000 per doc (catches padded-empty-lines that pass line-count pin)
+> 3. `min_lines_per_doc_constant_is_one_hundred` — pin constant verbatim
+> 4. `guard_source_cites_tauri_v2_or_eol_plan_slot` — slot-grep cite
+> 5. `every_audit_doc_filename_has_canonical_prefix` — all start with `tauri-v2-`
+>
+> tauri_v2_migration_audit_guard: 18 → 23 tests. 1589 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 268 WORK — pin.self-integrity-sha2-dep+main-bounds+guard-bounds+service-bounds+prd-3-1-11-cite DONE.**
 >
