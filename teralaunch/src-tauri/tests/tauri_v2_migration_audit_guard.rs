@@ -403,3 +403,148 @@ fn tauri_v2_audit_guard_detector_self_test() {
         "self-test: baseline without SHA must be flagged"
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 231 structural pins — guard-const canonicalisation, fixture-
+// array cardinality, threshold literal pin, plan-side rollback pairing,
+// doc-filename prefix invariant.
+//
+// Iter-122/147/172 cover file presence + line floor + citation
+// requirements + decision rubric + rollback pointer. These five
+// extend to the meta-guard / structural-integrity surface a confident
+// refactor could silently drift: a renamed AUDIT_DIR (reads no files,
+// every test fails with "file not found" pointing at the FS not the
+// constant), a silently dropped DocFixture (set-cardinality falls to
+// 3 without anyone noticing because the walk still succeeds), a
+// lowered MIN_LINES_PER_DOC (turns the stub check vacuous), a plan
+// doc without the rollback-strategy section (validation doc's
+// rollback-pointer test points at a missing target), a renamed
+// filename that breaks the prefix invariant.
+// --------------------------------------------------------------------
+
+/// Iter 231: `AUDIT_DIR` must stay `../../docs/PRD/audits/security`
+/// verbatim. The relative path is relative to `src-tauri/` at test
+/// runtime; drift to `docs/PRD/audits/security` (missing `../../`)
+/// would work for tests run from the repo root but fail in CI's
+/// working-directory layout. A misroute leaves every file-read with
+/// a "file not found" pointing at the FS, not at the constant.
+#[test]
+fn guard_audit_dir_constant_is_canonical() {
+    let guard_body = fs::read_to_string("tests/tauri_v2_migration_audit_guard.rs")
+        .expect("guard source must exist");
+    assert!(
+        guard_body.contains("const AUDIT_DIR: &str = \"../../docs/PRD/audits/security\";"),
+        "Iter 231: tests/tauri_v2_migration_audit_guard.rs must keep \
+         `const AUDIT_DIR: &str = \"../../docs/PRD/audits/security\";` \
+         verbatim. A drift to an absolute path or a different relative \
+         route would read no files in CI's working-directory layout, \
+         turning every `file not found` into a misrouted investigation."
+    );
+}
+
+/// Iter 231: the `DOCS` fixture array must enumerate exactly FOUR
+/// doc fixtures. Lifting the cardinality requires adding a new
+/// milestone audit AND the fifth fixture together; lowering it
+/// requires deleting a milestone audit AND a fixture — both
+/// coordinated changes. A silent drop to 3 (e.g. removing the
+/// baseline fixture while the other three tests keep passing)
+/// would shrink the audit trail without anyone noticing.
+#[test]
+fn docs_array_enumerates_exactly_four_fixtures() {
+    assert_eq!(
+        DOCS.len(),
+        4,
+        "Iter 231: DOCS must enumerate exactly 4 fixtures (baseline, \
+         plan, umbrella, validation). Current len={}. Lifting the \
+         cardinality means adding a fifth milestone audit; lowering \
+         means shrinking the M0-M8 trail — either is a coordinated \
+         PRD/docs change, not a silent drift.",
+        DOCS.len()
+    );
+    // Also pin that the four expected filenames are present in the
+    // array. A swap (e.g. `-baseline` → `-migration-v2`) would pass
+    // the cardinality check but change the semantic content.
+    let names: Vec<&str> = DOCS.iter().map(|d| d.filename).collect();
+    for expected in [
+        "tauri-v2-migration-baseline.md",
+        "tauri-v2-migration-plan.md",
+        "tauri-v2-migration.md",
+        "tauri-v2-migration-validation.md",
+    ] {
+        assert!(
+            names.contains(&expected),
+            "Iter 231: DOCS array must enumerate `{expected}`. Current \
+             filenames: {names:?}. A rename of any of the four shifts \
+             the audit trail to a different filename set without a PRD \
+             change to match."
+        );
+    }
+}
+
+/// Iter 231: `MIN_LINES_PER_DOC` must stay `100` verbatim. A silent
+/// lowering to 10 or 1 makes the "truncation is a stub replacement"
+/// signal vacuous. A principled lift to 200 is fine, but drift in
+/// either direction without a PRD note is a smell worth surfacing
+/// in code review.
+#[test]
+fn min_lines_per_doc_literal_is_pinned_to_one_hundred() {
+    let guard_body = fs::read_to_string("tests/tauri_v2_migration_audit_guard.rs")
+        .expect("guard source must exist");
+    assert!(
+        guard_body.contains("const MIN_LINES_PER_DOC: usize = 100;"),
+        "Iter 231: tests/tauri_v2_migration_audit_guard.rs must keep \
+         `const MIN_LINES_PER_DOC: usize = 100;` verbatim. A silent \
+         lowering (e.g. to 10 or 1) turns \
+         `every_audit_doc_meets_minimum_line_count` into a vacuous \
+         pass — a stub replacement slips through. A principled lift \
+         is fine but should land with a PRD note, not as a drift."
+    );
+}
+
+/// Iter 231: the plan doc must carry a `## Rollback strategy`
+/// section. The validation doc's `## Rollback pointer` test (iter
+/// 172) only asserts the pointer exists + references the plan; if
+/// the plan doc itself drops the target section, the pointer
+/// becomes a dead link. Pair the two: validation points AT, plan
+/// documents HOW.
+#[test]
+fn plan_doc_carries_rollback_strategy_section() {
+    let body = read(&format!("{AUDIT_DIR}/tauri-v2-migration-plan.md"));
+    assert!(
+        body.contains("## Rollback strategy") || body.contains("## Rollback"),
+        "Iter 231: plan doc must carry `## Rollback strategy` (or at \
+         minimum `## Rollback`). The validation doc's iter-172 pin \
+         already asserts a `## Rollback pointer` that references the \
+         plan — if the plan itself lacks the section, the pointer \
+         points at nothing and the rollback contract is a dead link."
+    );
+}
+
+/// Iter 231: every DOCS fixture's filename must start with the
+/// `tauri-v2-migration` prefix. A rename to `tauri-2-migration-*`
+/// (dropping `v`) or `tauri-migration-v2-*` (word swap) would shift
+/// the audit-trail's filename convention; CI keeps passing because
+/// the fixtures still enumerate the renamed files — but grep-
+/// discoverability breaks for any tool keying off the original
+/// prefix.
+#[test]
+fn every_docs_fixture_filename_starts_with_tauri_v2_migration() {
+    for doc in DOCS {
+        assert!(
+            doc.filename.starts_with("tauri-v2-migration"),
+            "Iter 231: DocFixture filename `{}` must start with \
+             `tauri-v2-migration`. Dropping or reshaping the prefix \
+             breaks grep-discoverability for any tooling that keys \
+             off the migration's canonical filename scheme.",
+            doc.filename
+        );
+        assert!(
+            doc.filename.ends_with(".md"),
+            "Iter 231: DocFixture filename `{}` must end with \
+             `.md` — a non-markdown extension drift would leave the \
+             audit-trail discoverability intact but change the \
+             document format without a PRD note.",
+            doc.filename
+        );
+    }
+}

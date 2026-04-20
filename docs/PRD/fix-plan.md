@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 231
-last_work_iteration: 231
+iteration_counter: 232
+last_work_iteration: 232
 last_research_sweep: 230
 last_revalidation: 220
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 208
+total_items_done: 209
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 232 WORK — pin.tauri-v2-migration-audit-guard-AUDIT_DIR-canonical+DOCS-cardinality-4+MIN_LINES-100-literal+plan-rollback-strategy-pairing+filename-prefix-invariant DONE.**
+>
+> PRD §3.1 (Tauri v2 migration audit trail); tauri_v2_migration_audit_guard had 13 tests (iter 122 creation + iter 147 +1 + iter 172 +5); 59 iters untouched. Brings to 18.
+>
+> Five new meta-guard + cross-doc-pairing pins:
+> 1. `guard_audit_dir_constant_is_canonical` — pin `AUDIT_DIR = "../../docs/PRD/audits/security"` verbatim; drift breaks CI's working-dir-relative read but produces FS-not-found messages that misroute triage
+> 2. `docs_array_enumerates_exactly_four_fixtures` — pin DOCS.len() == 4 AND the four expected filenames; silent drop to 3 would shrink audit trail unnoticed
+> 3. `min_lines_per_doc_literal_is_pinned_to_one_hundred` — pin `MIN_LINES_PER_DOC = 100`; silent lowering makes the truncation check vacuous
+> 4. `plan_doc_carries_rollback_strategy_section` — pair with iter-172's validation-doc rollback-pointer pin; without both, the pointer points at a missing target (dead link)
+> 5. `every_docs_fixture_filename_starts_with_tauri_v2_migration` — pin filename prefix invariant + `.md` extension; breaks grep-discoverability if either drifts
+>
+> tauri_v2_migration_audit_guard: 13 → 18 tests. 1409 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 231 WORK — pin.crate-comment-guard-GUARD_FILE-canonical+stable-sort-determinism+MIN_SUMMARY_CHARS-literal+self-test-era-coverage+iter-179-helpers-wired DONE.**
 >
