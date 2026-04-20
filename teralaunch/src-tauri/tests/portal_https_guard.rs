@@ -833,3 +833,74 @@ fn config_root_is_an_object_with_url_valued_entries() {
          http(s) URL. Found 0 — config appears to have been gutted."
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 281 structural pins — config/audit/guard bounds + PRD cite +
+// EXPECTED_KEYS minimum.
+// --------------------------------------------------------------------
+
+#[test]
+fn config_json_byte_bounds() {
+    const MIN: usize = 100;
+    const MAX: usize = 20_000;
+    let bytes = std::fs::metadata(CONFIG_JSON)
+        .expect("config.json must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "PRD 3.1.13 (iter 281): {CONFIG_JSON} is {bytes} bytes; \
+         expected [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn audit_doc_byte_bounds() {
+    const MIN: usize = 500;
+    const MAX: usize = 50_000;
+    let bytes = std::fs::metadata(AUDIT_DOC)
+        .expect("audit doc must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "PRD 3.1.13 (iter 281): {AUDIT_DOC} is {bytes} bytes; \
+         expected [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn guard_source_byte_bounds() {
+    const MIN: usize = 5000;
+    const MAX: usize = 80_000;
+    let bytes = std::fs::metadata("tests/portal_https_guard.rs")
+        .expect("guard must exist")
+        .len() as usize;
+    assert!(
+        (MIN..=MAX).contains(&bytes),
+        "PRD 3.1.13 (iter 281): guard is {bytes} bytes; expected \
+         [{MIN}, {MAX}]."
+    );
+}
+
+#[test]
+fn guard_source_cites_prd_3_1_13_explicitly() {
+    let body = std::fs::read_to_string("tests/portal_https_guard.rs")
+        .expect("guard must exist");
+    let header = &body[..body.len().min(500)];
+    assert!(
+        header.contains("PRD 3.1.13"),
+        "PRD 3.1.13 (iter 281): guard header must cite `PRD 3.1.13`.\n\
+         Header:\n{header}"
+    );
+}
+
+#[test]
+fn expected_keys_count_has_reasonable_floor() {
+    const MIN: usize = 5;
+    assert!(
+        EXPECTED_KEYS.len() >= MIN,
+        "PRD 3.1.13 (iter 281): EXPECTED_KEYS has {} entries; floor \
+         is {MIN}. A coordinated trim would vacate the per-key URL \
+         scheme check.",
+        EXPECTED_KEYS.len()
+    );
+}
