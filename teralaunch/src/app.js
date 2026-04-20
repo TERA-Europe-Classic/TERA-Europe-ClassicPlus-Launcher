@@ -1413,7 +1413,10 @@ const App = {
       }
       this.sendStoredAuthInfoToBackend();
       this.setupMutationObserver();
-      // Tauri's built-in updater (dialog: true) handles update checks automatically at startup
+      // Tauri v2 removed the built-in updater dialog. We run the check
+      // ourselves and prompt the user via __TAURI__.dialog.ask. Fire and
+      // forget — don't block startup on the network round-trip.
+      this.checkAutoUpdateOnStartup();
       this.checkAuthentication();
       this.resetState();
       this.updateUI();
@@ -5509,6 +5512,55 @@ const App = {
    * Checks for launcher updates and shows notification.
    * Uses Tauri's built-in updater.
    */
+  /**
+   * Startup auto-update prompt.
+   *
+   * v1's `dialog: true` handled this natively — the plugin auto-prompted
+   * the moment a newer version was found. v2 removed that feature (per
+   * Tauri v2 migration docs / plugin-updater README); apps must build
+   * their own UX. We replicate it here: check, prompt via dialog.ask,
+   * install on confirm, relaunch.
+   *
+   * Fire-and-forget at app startup. Swallow all errors so a network
+   * hiccup never blocks the launcher from booting.
+   */
+  async checkAutoUpdateOnStartup() {
+    try {
+      const updater = window.__TAURI__?.updater;
+      if (!updater?.check && !updater?.checkUpdate) return;
+      const result = updater.check
+        ? await updater.check()
+        : await updater.checkUpdate();
+      if (result == null) return;
+      const hasUpdate = 'shouldUpdate' in result ? result.shouldUpdate : true;
+      if (!hasUpdate) return;
+
+      const currentVersion = await window.__TAURI__?.app?.getVersion?.() || 'current';
+      const newVersion = ('shouldUpdate' in result
+        ? result.manifest?.version
+        : result.version) || 'new';
+      const ask = window.__TAURI__?.dialog?.ask;
+      if (!ask) return;
+
+      const wantsUpdate = await ask(
+        `A new launcher version (v${newVersion}) is available. ` +
+        `You're on v${currentVersion}. Download and install now? ` +
+        `The launcher will restart automatically.`,
+        { title: 'Launcher Update Available', kind: 'info' }
+      );
+      if (!wantsUpdate) return;
+      if (typeof result.downloadAndInstall !== 'function') return;
+
+      await result.downloadAndInstall();
+      const relaunch = window.__TAURI__?.process?.relaunch;
+      if (typeof relaunch === 'function') {
+        await relaunch();
+      }
+    } catch (err) {
+      console.warn('[startup-update-check] skipped:', err);
+    }
+  },
+
   async checkForLauncherUpdates() {
     if (typeof window.showUpdateNotification === 'function') {
       window.showUpdateNotification('Checking for launcher updates...', false);
