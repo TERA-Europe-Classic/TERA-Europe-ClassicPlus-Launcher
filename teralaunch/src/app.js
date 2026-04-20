@@ -9,6 +9,9 @@ import {
 } from "./utils/updateState.js";
 import { localizeForumUrl } from "./utils/forumLinks.js";
 import * as AccountManager from './accountManager.js';
+import { ask, message } from '@tauri-apps/plugin-dialog';
+import { relaunch } from '@tauri-apps/plugin-process';
+import { check as checkAppUpdate } from '@tauri-apps/plugin-updater';
 
 const { invoke } = window.__TAURI__.core || window.__TAURI__.tauri;
 const { listen } = window.__TAURI__.event;
@@ -17,7 +20,6 @@ const { listen } = window.__TAURI__.event;
 const appWindow = window.__TAURI__.window?.appWindow
   || window.__TAURI__.window?.getCurrent?.()
   || window.__TAURI__.webviewWindow?.getCurrentWebviewWindow?.();
-const { message, ask } = window.__TAURI__.dialog;
 
 /**
  * Application URL configuration.
@@ -557,6 +559,66 @@ function hideUpdateNotification() {
 }
 window.hideUpdateNotification = hideUpdateNotification;
 
+/**
+ * Normalizes the updater check result across the Tauri v1/v2/global API shapes.
+ *
+ * In this launcher we access the plugin through `window.__TAURI__` globals.
+ * Some runtime shapes expose an Update instance with `downloadAndInstall()`,
+ * others surface raw metadata (`{ rid, version, ... }`) that still needs to be
+ * driven through the plugin invoke commands. The toast-only bug happens when we
+ * detect an update, but the returned object lacks the method and the code exits
+ * silently before prompting or installing.
+ */
+function normalizeUpdaterResult(result) {
+  if (result == null) return null;
+
+  const shouldUpdate = 'shouldUpdate' in result ? !!result.shouldUpdate : true;
+  const version = 'shouldUpdate' in result
+    ? result.manifest?.version
+    : result.version;
+
+  const update = {
+    raw: result,
+    shouldUpdate,
+    version: version || 'new',
+    hasInstall: typeof result.downloadAndInstall === 'function' || Number.isInteger(result.rid),
+    async downloadAndInstall() {
+      if (typeof result.downloadAndInstall === 'function') {
+        return result.downloadAndInstall();
+      }
+      if (!Number.isInteger(result.rid)) {
+        throw new Error('Updater returned metadata without an install handle.');
+      }
+      return invoke('plugin:updater|download_and_install', { rid: result.rid });
+    },
+  };
+
+  return update;
+}
+
+async function promptLauncherUpdate(update, currentVersion, title = 'Launcher Update') {
+  if (typeof ask !== 'function') {
+    throw new Error('Dialog ask API is unavailable.');
+  }
+
+  return ask(
+    `Launcher v${update.version} is available (current: v${currentVersion}). Download and install now? The launcher will restart.`,
+    { title, kind: 'info' }
+  );
+}
+
+async function installLauncherUpdate(update) {
+  if (!update?.hasInstall) {
+    throw new Error('Updater cannot install this update result.');
+  }
+
+  await update.downloadAndInstall();
+  const relaunch = window.__TAURI__?.process?.relaunch;
+  if (typeof relaunch === 'function') {
+    await relaunch();
+  }
+}
+
 // Set up toast close button event listener (WebView2 compatible - no inline onclick)
 document.addEventListener('DOMContentLoaded', () => {
   const toastCloseBtn = document.getElementById('toast-close-btn');
@@ -590,54 +652,24 @@ async function handleCheckLauncherUpdate() {
       console.warn('Could not get version:', e);
     }
 
-    const updater = window.__TAURI__?.updater;
-    if (!updater) {
-      showUpdateNotification('upToDate', 'Launcher v' + currentVersion, 'Updater not available');
-    } else {
-      // Tauri v2 API: check() returns null if up to date, or an Update object
-      // with a downloadAndInstall() method. v1's checkUpdate() returned
-      // { shouldUpdate, manifest } — kept as fallback.
-      const result = updater.check
-        ? await updater.check()
-        : (updater.checkUpdate ? await updater.checkUpdate() : null);
+      const rawResult = await checkAppUpdate();
+      const result = normalizeUpdaterResult(rawResult);
       if (result == null) {
         showUpdateNotification('upToDate', 'Launcher is up to date (v' + currentVersion + ')', 'No updates available');
-      } else if ('shouldUpdate' in result) {
-        // v1 shape
-        if (result.shouldUpdate) {
-          showUpdateNotification('upToDate', 'Update available: ' + (result.manifest?.version || 'new version'), 'Current version: ' + currentVersion);
-          // v1 relied on dialog:true in tauri.conf.json to auto-prompt.
-        } else {
-          showUpdateNotification('upToDate', 'Launcher is up to date (v' + currentVersion + ')', 'No updates available');
-        }
+      } else if (!result.shouldUpdate) {
+        showUpdateNotification('upToDate', 'Launcher is up to date (v' + currentVersion + ')', 'No updates available');
       } else {
-        // v2 shape — non-null result means an update is available.
-        // Prompt the user; on confirm, download + install + relaunch.
-        const newVersion = result.version || 'new';
-        showUpdateNotification('upToDate', 'Update available: v' + newVersion, 'Current version: ' + currentVersion);
-        const ask = window.__TAURI__?.dialog?.ask;
-        const wantsUpdate = ask
-          ? await ask(
-              `Launcher v${newVersion} is available (current: v${currentVersion}). Download and install now? The launcher will restart.`,
-              { title: 'Launcher Update', kind: 'info' }
-            )
-          : true;
-        if (wantsUpdate && typeof result.downloadAndInstall === 'function') {
-          showUpdateNotification('checking', 'Downloading update…', 'Do not close the launcher.');
-          try {
-            await result.downloadAndInstall();
-            // downloadAndInstall triggers a relaunch on success; if we get
-            // here the install finished but auto-relaunch didn't fire.
-            const relaunch = window.__TAURI__?.process?.relaunch;
-            if (typeof relaunch === 'function') {
-              await relaunch();
-            }
-          } catch (e) {
-            console.error('Update install failed:', e);
-            showUpdateNotification('error', 'Update install failed', e?.message || String(e));
+        showUpdateNotification('upToDate', 'Update available: v' + result.version, 'Current version: ' + currentVersion);
+        try {
+          const wantsUpdate = await promptLauncherUpdate(result, currentVersion, 'Launcher Update');
+          if (wantsUpdate) {
+            showUpdateNotification('checking', 'Downloading update…', 'Do not close the launcher.');
+            await installLauncherUpdate(result);
           }
+        } catch (e) {
+          console.error('Update install failed:', e);
+          showUpdateNotification('error', 'Update install failed', e?.message || String(e), true);
         }
-      }
     }
   } catch (error) {
     console.error('Error checking for updates:', error);
@@ -5526,36 +5558,14 @@ const App = {
    */
   async checkAutoUpdateOnStartup() {
     try {
-      const updater = window.__TAURI__?.updater;
-      if (!updater?.check && !updater?.checkUpdate) return;
-      const result = updater.check
-        ? await updater.check()
-        : await updater.checkUpdate();
-      if (result == null) return;
-      const hasUpdate = 'shouldUpdate' in result ? result.shouldUpdate : true;
-      if (!hasUpdate) return;
+      const rawResult = await checkAppUpdate();
+      const result = normalizeUpdaterResult(rawResult);
+      if (result == null || !result.shouldUpdate) return;
 
       const currentVersion = await window.__TAURI__?.app?.getVersion?.() || 'current';
-      const newVersion = ('shouldUpdate' in result
-        ? result.manifest?.version
-        : result.version) || 'new';
-      const ask = window.__TAURI__?.dialog?.ask;
-      if (!ask) return;
-
-      const wantsUpdate = await ask(
-        `A new launcher version (v${newVersion}) is available. ` +
-        `You're on v${currentVersion}. Download and install now? ` +
-        `The launcher will restart automatically.`,
-        { title: 'Launcher Update Available', kind: 'info' }
-      );
+      const wantsUpdate = await promptLauncherUpdate(result, currentVersion, 'Launcher Update Available');
       if (!wantsUpdate) return;
-      if (typeof result.downloadAndInstall !== 'function') return;
-
-      await result.downloadAndInstall();
-      const relaunch = window.__TAURI__?.process?.relaunch;
-      if (typeof relaunch === 'function') {
-        await relaunch();
-      }
+      await installLauncherUpdate(result);
     } catch (err) {
       console.warn('[startup-update-check] skipped:', err);
     }
@@ -5567,13 +5577,7 @@ const App = {
     }
 
     try {
-      // Tauri v2 updater plugin. check() returns null if up to date, or an
-      // Update object with `version` + downloadAndInstall() method. v1's
-      // checkUpdate returned { shouldUpdate, manifest } — shim kept.
-      const updater = window.__TAURI__?.updater || {};
-      const result = updater.check
-        ? await updater.check()
-        : (updater.checkUpdate ? await updater.checkUpdate() : null);
+      const result = normalizeUpdaterResult(await checkAppUpdate());
       const notify = (msg, b) => {
         if (typeof window.showUpdateNotification === 'function') {
           window.showUpdateNotification(msg, b);
@@ -5601,13 +5605,9 @@ const App = {
             { title: 'Launcher Update', kind: 'info' }
           )
         : true;
-      if (wantsUpdate && typeof result.downloadAndInstall === 'function') {
+      if (wantsUpdate && result.hasInstall) {
         notify('Downloading update…', false);
-        await result.downloadAndInstall();
-        const relaunch = window.__TAURI__?.process?.relaunch;
-        if (typeof relaunch === 'function') {
-          await relaunch();
-        }
+        await installLauncherUpdate(result);
       }
     } catch (error) {
       console.error("Error checking for launcher updates:", error);
