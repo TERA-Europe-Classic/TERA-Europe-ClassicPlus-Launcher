@@ -155,10 +155,27 @@ const ModsView = {
         });
 
         if (this.$search) {
+            const wrap = document.getElementById('mods-search-wrap');
+            const clearBtn = document.getElementById('mods-search-clear');
+            const updateClear = () => {
+                if (!wrap) return;
+                wrap.classList.toggle('has-query', this.$search.value.length > 0);
+            };
             this.$search.addEventListener('input', (e) => {
                 this.state.query = e.target.value.trim().toLowerCase();
+                updateClear();
                 this.render();
             });
+            if (clearBtn) {
+                clearBtn.addEventListener('click', () => {
+                    this.$search.value = '';
+                    this.state.query = '';
+                    updateClear();
+                    this.$search.focus();
+                    this.render();
+                });
+            }
+            updateClear();
         }
 
         const folderBtn = document.getElementById('mods-folder-btn');

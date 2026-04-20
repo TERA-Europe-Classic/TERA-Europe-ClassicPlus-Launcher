@@ -801,14 +801,25 @@ pub fn extract_package_folder_name(bytes: &[u8]) -> Option<String> {
     }
 }
 
-/// Drop-in install for legacy (non-TMM) .gpk mods. Copies the source
-/// .gpk into `<game>/CookedPC/<package-name>.gpk`. If a file with that
-/// name already exists, backs it up as `<package-name>.gpk.vanilla-bak`
-/// so uninstall can restore it.
+/// Drop-in install for legacy (non-TMM) .gpk mods.
 ///
-/// The package name is read directly from the GPK's UE3 header. This
-/// matches pre-TMM community-mod convention where users drop mods in
-/// by hand using the filename the mapper expects.
+/// TERA Classic+'s game engine loads GPKs through
+/// `CompositePackageMapper.dat`, which maps composite UIDs to
+/// `(filename, offset, length)` in the packaged container file.
+/// Simply copying a .gpk into CookedPC/ is a no-op — the game still
+/// loads the vanilla bytes because the mapper still points at the
+/// vanilla file. To make a legacy (non-TMM) mod actually override
+/// its target composite we must:
+///   1. Read the PackageName from the mod's UE3 header.
+///   2. Copy the file into CookedPC/ with that name + `.gpk`.
+///   3. Patch every mapper entry whose ObjectPath ends in
+///      `.<PackageName>` so it points at our new file at offset 0,
+///      length = file size.
+///
+/// This mirrors what tera-toolbox's `installer.gpk(path)` does (see
+/// TCC's `tcc-launcher.js::tryInstallRemover`). Every TMM-stamped
+/// mod encodes this information in its footer; plain community mods
+/// don't — we derive it from the UE3 header instead.
 pub fn install_legacy_gpk(
     game_root: &Path,
     source_gpk: &Path,
@@ -840,6 +851,47 @@ pub fn install_legacy_gpk(
 
     fs::copy(source_gpk, &dest)
         .map_err(|e| format!("Failed to install .gpk into CookedPC: {}", e))?;
+
+    // Mapper patch: redirect every composite whose ObjectPath ends in
+    // `.<folder_name>` at our new file. This is what makes the drop-in
+    // actually override the vanilla composite in-game.
+    ensure_backup(game_root)?;
+    let mapper_bytes = fs::read(mapper_path(game_root))
+        .map_err(|e| format!("Failed to read mapper after install: {e}"))?;
+    let decrypted = decrypt_mapper(&mapper_bytes);
+    let decrypted_str = String::from_utf8_lossy(&decrypted).to_string();
+    let mut map = parse_mapper(&decrypted_str);
+
+    let file_size = fs::metadata(&dest)
+        .map_err(|e| format!("Failed to stat installed .gpk: {e}"))?
+        .len() as i64;
+    let suffix = format!(".{folder_name}");
+
+    let mut rewritten = 0usize;
+    for entry in map.values_mut() {
+        if entry.object_path.ends_with(&suffix)
+            || entry.object_path == folder_name
+        {
+            entry.filename = target_filename.clone();
+            entry.offset = 0;
+            entry.size = file_size;
+            rewritten += 1;
+        }
+    }
+
+    if rewritten == 0 {
+        return Err(format!(
+            "Installed {target_filename} but no mapper entry matched `{folder_name}` — \
+             the mod's PackageName doesn't correspond to any known composite. \
+             File is on disk; game will not override anything."
+        ));
+    }
+
+    // Serialize + re-encrypt + write mapper back.
+    let new_plain = serialize_mapper(&map);
+    let new_encrypted = encrypt_mapper(new_plain.as_bytes());
+    fs::write(mapper_path(game_root), &new_encrypted)
+        .map_err(|e| format!("Failed to write patched mapper: {e}"))?;
 
     Ok(target_filename)
 }

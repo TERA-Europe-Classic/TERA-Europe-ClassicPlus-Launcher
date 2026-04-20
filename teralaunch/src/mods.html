@@ -36,7 +36,10 @@
         </div>
 
         <div class="mods-toolbar">
-            <input type="text" id="mods-search" class="mods-search" placeholder="Search by name, author, or category" data-translate-placeholder="MODS_SEARCH" />
+            <div class="mods-search-wrap" id="mods-search-wrap">
+                <input type="text" id="mods-search" class="mods-search" placeholder="Search by name, author, or category" data-translate-placeholder="MODS_SEARCH" />
+                <button type="button" id="mods-search-clear" class="mods-search-clear" aria-label="Clear search" data-translate-aria-label="MODS_SEARCH_CLEAR">×</button>
+            </div>
         </div>
 
         <!-- Unified filter strip — fix.mods-categories-ui (iter 85).

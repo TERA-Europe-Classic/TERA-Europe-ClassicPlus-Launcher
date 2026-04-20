@@ -113,8 +113,10 @@ fn install_gpk_mod_routes_err_through_finalize_error() {
     let fn_pos = src
         .find("async fn install_gpk_mod")
         .expect("install_gpk_mod must exist");
-    // install_gpk_mod is ~80 lines — 6000 chars covers the body.
-    let window = &src[fn_pos..fn_pos.saturating_add(6000)];
+    // install_gpk_mod is ~80 lines; take up to 6000 bytes safely.
+    // `get` avoids panicking if the end falls inside a multi-byte char.
+    let end = fn_pos.saturating_add(6000).min(src.len());
+    let window = src.get(fn_pos..end).unwrap_or(&src[fn_pos..]);
 
     assert!(
         window.contains("download_file"),

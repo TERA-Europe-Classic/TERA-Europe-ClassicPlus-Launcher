@@ -160,6 +160,53 @@
     gap: 12px;
     align-items: center;
     flex-wrap: wrap;
+    /* Match the .mods-tab left inset (tab text sits at 18px; input text
+       sits at input.padding-left = 14px, so 4px here brings it to 18). */
+    padding: 0 4px;
+    position: relative;
+}
+
+.mods-search-wrap {
+    flex: 1 1 240px;
+    min-width: 200px;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.mods-search-wrap .mods-search {
+    flex: 1 1 auto;
+    padding-right: 34px;
+}
+
+.mods-search-clear {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    font-size: 14px;
+    line-height: 1;
+    transition: background 120ms ease, color 120ms ease;
+}
+
+.mods-search-clear:hover {
+    background: rgba(255, 255, 255, 0.18);
+    color: var(--text, #fff);
+}
+
+.mods-search-wrap.has-query .mods-search-clear {
+    display: inline-flex;
 }
 
 .mods-search {
@@ -191,7 +238,11 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 6px;
-    padding: 0 4px 6px;
+    /* 8px horizontal inset so the first chip's TEXT starts at 18px
+       (row-pad 8 + chip-pad 10), matching the .mods-tab text inset
+       (tab-pad 18). Without this the chips drifted left of the tabs
+       and read as a broken column. */
+    padding: 0 8px 6px;
     margin-top: -6px;
 }
 

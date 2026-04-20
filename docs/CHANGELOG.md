@@ -15,6 +15,29 @@ polished in the main branch.
 
 ---
 
+## 0.1.13 — Portal-offline fix, legacy GPK install, filter alignment
+
+- The "Can't reach the portal server" banner no longer shows when the
+  launcher has no patch server configured. Classic+ ships without one
+  today, so the banner was falsely firing on every start.
+- "Update check not available" was a Tauri v1 to v2 API regression from
+  the framework migration. Fixed.
+- Legacy (non-TMM) GPK mods install now: the launcher reads the UE3
+  PackageName from the mod's header, copies the file into CookedPC/
+  with the matching filename, backs up the vanilla file as
+  `<name>.gpk.vanilla-bak`, and patches CompositePackageMapper.dat to
+  route the composite at the new file. Covers historical community
+  mods that predate the TMM format.
+- Account dropdown no longer opens behind the offline banner when both
+  are visible. Dropdown z-index bumped above the banner.
+- Filter-strip chips align with the tab row now. The first chip's text
+  starts at the same horizontal position as the tab labels, not 4 px
+  to the left.
+- Search bar grew an X clear button on the right that appears whenever
+  the field is non-empty.
+
+---
+
 ## 0.1.12 — Update detection and launch-time banner
 
 Your mods now know when a new version is out. The launcher compares each
