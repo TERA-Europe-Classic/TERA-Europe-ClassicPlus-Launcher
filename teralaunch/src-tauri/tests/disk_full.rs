@@ -550,3 +550,79 @@ fn download_file_err_arm_preserves_original_io_error() {
          bundles.\nBranch:\n{err_block}"
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 272 structural pins — external_app/guard bounds + PRD 3.2.8
+// cite + revert helpers present + service module in mods mod.
+// --------------------------------------------------------------------
+
+#[test]
+fn external_app_rs_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 3000;
+    const MAX_BYTES: usize = 200_000;
+    let bytes = std::fs::metadata(EXTERNAL_APP_RS)
+        .expect("external_app.rs must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "PRD 3.2.8 (iter 272): {EXTERNAL_APP_RS} is {bytes} bytes; \
+         expected [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+#[test]
+fn guard_source_byte_size_has_sane_bounds() {
+    const MIN_BYTES: usize = 5000;
+    const MAX_BYTES: usize = 80_000;
+    let bytes = std::fs::metadata(GUARD_SOURCE)
+        .expect("guard must exist")
+        .len() as usize;
+    assert!(
+        (MIN_BYTES..=MAX_BYTES).contains(&bytes),
+        "PRD 3.2.8 (iter 272): guard is {bytes} bytes; expected \
+         [{MIN_BYTES}, {MAX_BYTES}]."
+    );
+}
+
+#[test]
+fn guard_source_cites_prd_3_2_8_explicitly() {
+    let body = std::fs::read_to_string(GUARD_SOURCE)
+        .expect("guard must exist");
+    let header = &body[..body.len().min(500)];
+    assert!(
+        header.contains("PRD 3.2.8"),
+        "PRD 3.2.8 (iter 272): guard header must cite `PRD 3.2.8`.\n\
+         Header:\n{header}"
+    );
+}
+
+#[test]
+fn external_app_defines_both_revert_helpers() {
+    let src = std::fs::read_to_string(EXTERNAL_APP_RS)
+        .expect("external_app.rs must exist");
+    assert!(
+        src.contains("revert_partial_install_dir"),
+        "PRD 3.2.8 (iter 272): {EXTERNAL_APP_RS} must define \
+         `revert_partial_install_dir` — referenced by the guard \
+         header."
+    );
+    assert!(
+        src.contains("revert_partial_install_file"),
+        "PRD 3.2.8 (iter 272): {EXTERNAL_APP_RS} must define \
+         `revert_partial_install_file` — referenced by the guard \
+         header for the gpk revert path."
+    );
+}
+
+#[test]
+fn mods_mod_rs_exports_external_app_module() {
+    let mod_rs = std::fs::read_to_string("src/services/mods/mod.rs")
+        .expect("mod.rs must exist");
+    assert!(
+        mod_rs.contains("pub mod external_app;"),
+        "PRD 3.2.8 (iter 272): src/services/mods/mod.rs must carry \
+         `pub mod external_app;`. Without it, the revert helpers in \
+         external_app.rs aren't reachable from callers and the whole \
+         disk-full path is dead code."
+    );
+}
