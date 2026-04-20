@@ -21,8 +21,7 @@ pub enum ModKind {
     /// Separate process (Shinra Meter, TCC). Lifecycle = download, extract,
     /// spawn, monitor. Does not touch game files.
     External,
-    /// TMM-compatible `.gpk` pack that patches `CompositePackageMapper.dat`.
-    /// Phase C — not yet implemented end-to-end.
+    /// `.gpk` pack that patches `CompositePackageMapper.dat`.
     Gpk,
 }
 
@@ -73,6 +72,12 @@ pub struct ModEntry {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_url: Option<String>,
 
+    /// The filename currently deployed into `S1Game/CookedPC`, when known.
+    /// Used by uninstall to remove legacy filename-based overrides whose
+    /// embedded metadata does not carry a stable container name.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deployed_filename: Option<String>,
+
     /// URL of the icon image, if any.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub icon_url: Option<String>,
@@ -120,20 +125,25 @@ pub struct ModEntry {
 impl ModEntry {
     /// PRD 3.3.4.add-mod-from-file-wire: builder for a user-imported local
     /// GPK, where we have no catalog entry. `bytes_sha256` is the hex digest
-    /// of the GPK bytes (lowercase) and `modfile` is the parsed TMM footer.
+    /// of the GPK bytes (lowercase) and `modfile` is the parsed metadata footer.
     /// id format: `local.<sha12>` — stable across reinstalls of the same bytes.
     ///
     /// Caller is responsible for deploying the GPK and upserting into the
     /// registry; this is just the entry shape.
     pub fn from_local_gpk(
         bytes_sha256: &str,
-        modfile: &crate::services::mods::tmm::ModFile,
+        modfile: &crate::services::mods::gpk::ModFile,
+        fallback_display_name: Option<&str>,
     ) -> Self {
         let sha12 = bytes_sha256.get(..12).unwrap_or("unknown0000");
         let id = format!("local.{sha12}");
         let name = if modfile.mod_name.trim().is_empty() {
             if modfile.container.trim().is_empty() {
-                "Local GPK".to_string()
+                fallback_display_name
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or("Local GPK")
+                    .to_string()
             } else {
                 modfile.container.trim().to_string()
             }
@@ -154,6 +164,7 @@ impl ModEntry {
             version: "local".to_string(),
             status: ModStatus::NotInstalled,
             source_url: None,
+            deployed_filename: None,
             icon_url: None,
             progress: None,
             last_error: None,
@@ -177,6 +188,7 @@ impl ModEntry {
             version: catalog.version.clone(),
             status: ModStatus::NotInstalled,
             source_url: catalog.source_url.clone(),
+            deployed_filename: None,
             icon_url: catalog.icon_url.clone(),
             progress: None,
             last_error: None,
@@ -342,7 +354,7 @@ mod tests {
 
     // --- PRD 3.3.4.add-mod-from-file-wire ----------------------------------
 
-    use crate::services::mods::tmm::ModFile;
+    use crate::services::mods::gpk::ModFile;
 
     fn modfile(name: &str, author: &str, container: &str) -> ModFile {
         ModFile {
@@ -357,7 +369,7 @@ mod tests {
     fn from_local_gpk_id_uses_sha_prefix() {
         let mf = modfile("Tiny Icons", "someone", "S1Data_icons.gpk");
         let sha = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
-        let entry = ModEntry::from_local_gpk(sha, &mf);
+        let entry = ModEntry::from_local_gpk(sha, &mf, None);
         assert_eq!(entry.id, "local.abcdef123456");
         assert_eq!(entry.kind, ModKind::Gpk);
         assert_eq!(entry.name, "Tiny Icons");
@@ -370,7 +382,7 @@ mod tests {
     fn from_local_gpk_empty_name_falls_back_to_container() {
         let mf = modfile("", "", "S1Data_nameless.gpk");
         let sha = "000000000000000000000000000000000000000000000000000000000000abcd";
-        let entry = ModEntry::from_local_gpk(sha, &mf);
+        let entry = ModEntry::from_local_gpk(sha, &mf, None);
         assert_eq!(entry.name, "S1Data_nameless.gpk");
         assert_eq!(entry.author, "Unknown");
     }
@@ -379,7 +391,7 @@ mod tests {
     fn from_local_gpk_empty_name_and_container_falls_back_to_generic() {
         let mf = modfile("", "", "");
         let sha = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
-        let entry = ModEntry::from_local_gpk(sha, &mf);
+        let entry = ModEntry::from_local_gpk(sha, &mf, None);
         assert_eq!(entry.name, "Local GPK");
     }
 
@@ -389,8 +401,8 @@ mod tests {
         // registry upsert.
         let mf = modfile("X", "Y", "Z.gpk");
         let sha = "1111111111111111111111111111111111111111111111111111111111111111";
-        let a = ModEntry::from_local_gpk(sha, &mf);
-        let b = ModEntry::from_local_gpk(sha, &mf);
+        let a = ModEntry::from_local_gpk(sha, &mf, None);
+        let b = ModEntry::from_local_gpk(sha, &mf, None);
         assert_eq!(a.id, b.id);
     }
 
@@ -398,8 +410,17 @@ mod tests {
     fn from_local_gpk_trims_whitespace_from_name_and_author() {
         let mf = modfile("  Spaced  ", "  Author  ", "S1.gpk");
         let sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-        let entry = ModEntry::from_local_gpk(sha, &mf);
+        let entry = ModEntry::from_local_gpk(sha, &mf, None);
         assert_eq!(entry.name, "Spaced");
         assert_eq!(entry.author, "Author");
+    }
+
+    #[test]
+    fn from_local_gpk_empty_container_can_fall_back_to_filename_stem() {
+        let mf = modfile("", "", "");
+        let sha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        let entry = ModEntry::from_local_gpk(sha, &mf, Some("S1UI_ProgressBar"));
+        assert_eq!(entry.name, "S1UI_ProgressBar");
+        assert_eq!(entry.author, "Unknown");
     }
 }

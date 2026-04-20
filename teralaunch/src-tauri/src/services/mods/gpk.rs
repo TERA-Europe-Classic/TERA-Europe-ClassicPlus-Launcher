@@ -801,6 +801,29 @@ pub fn extract_package_folder_name(bytes: &[u8]) -> Option<String> {
     }
 }
 
+fn is_placeholder_package_name(name: &str) -> bool {
+    let trimmed = name.trim();
+    trimmed.is_empty() || trimmed.eq_ignore_ascii_case("none")
+}
+
+/// Resolves the game-facing filename for a legacy `.gpk` that lacks embedded
+/// override metadata. Prefer the UE3 package header when it carries a useful
+/// name; otherwise fall back to the source filename stem, which matches the
+/// filename-based install convention used by toolbox-style removers.
+pub fn resolve_legacy_target_filename(bytes: &[u8], source_gpk: &Path) -> Option<String> {
+    if let Some(folder_name) = extract_package_folder_name(bytes) {
+        if !is_placeholder_package_name(&folder_name) {
+            return Some(format!("{folder_name}.gpk"));
+        }
+    }
+
+    let stem = source_gpk.file_stem()?.to_str()?.trim();
+    if stem.is_empty() || stem.eq_ignore_ascii_case("none") {
+        return None;
+    }
+    Some(format!("{stem}.gpk"))
+}
+
 /// Drop-in install for legacy (non-TMM) .gpk mods.
 ///
 /// TERA Classic+'s game engine loads GPKs through
@@ -826,11 +849,14 @@ pub fn install_legacy_gpk(
 ) -> Result<String, String> {
     let bytes = fs::read(source_gpk)
         .map_err(|e| format!("Failed to read mod file: {}", e))?;
-    let folder_name = extract_package_folder_name(&bytes)
-        .ok_or_else(|| "Mod file has no readable UE3 package header — not a TERA-compatible .gpk.".to_string())?;
+    let target_filename = resolve_legacy_target_filename(&bytes, source_gpk)
+        .ok_or_else(|| {
+            "Mod file has no usable package name in its UE3 header or filename — can't map it to a game file."
+                .to_string()
+        })?;
+    let folder_name = target_filename.strip_suffix(".gpk").unwrap_or(&target_filename);
 
     // Sanity-gate the filename so a malformed header can't escape CookedPC.
-    let target_filename = format!("{folder_name}.gpk");
     if !is_safe_gpk_container_filename(&target_filename) {
         return Err(format!(
             "Package name '{folder_name}' would produce an unsafe CookedPC filename — refusing to deploy."
@@ -2406,6 +2432,31 @@ mod tests {
             err.contains("UnknownPkg"),
             "error message must name the unmatched folder_name; got: {err}"
         );
+    }
+
+    #[test]
+    fn install_legacy_gpk_falls_back_to_filename_when_header_name_is_none() {
+        let tmp = TempDir::new().unwrap();
+        let game_root = tmp.path();
+
+        let vanilla_map = mapper_with(&[
+            ("S1UI_ProgressBar", "SomePackage.S1UI_ProgressBar", "S1Data1.gpk"),
+        ]);
+        write_mapper_at(game_root, &vanilla_map);
+
+        let source_gpk = write_fake_gpk(game_root, "S1UI_ProgressBar.gpk", "None");
+
+        let target_name = install_legacy_gpk(game_root, &source_gpk)
+            .expect("filename fallback must deploy remover-style gpks");
+        assert_eq!(target_name, "S1UI_ProgressBar.gpk");
+
+        let patched_enc = fs::read(game_root.join(COOKED_PC_DIR).join(MAPPER_FILE)).unwrap();
+        let patched_plain = decrypt_mapper(&patched_enc);
+        let patched_map = parse_mapper(&String::from_utf8_lossy(&patched_plain));
+        let matched = patched_map.get("S1UI_ProgressBar").unwrap();
+        assert_eq!(matched.filename, "S1UI_ProgressBar.gpk");
+        assert_eq!(matched.offset, 0);
+        assert!(matched.size > 0);
     }
 
     #[test]

@@ -1,6 +1,8 @@
 /* Mods view — dark theme, matches the launcher's token palette. */
 
 #mods-page {
+    --mods-inline-inset: 18px;
+    --mods-filter-gap: 6px;
     color: var(--text, #ffffff);
     padding: 32px 40px 80px;
     max-width: 1100px;
@@ -163,7 +165,7 @@
     /* Align the search-input BOX's left edge at x=18 so it lines up
        with the .mods-tab text inset (tabs have padding 12px 18px) and
        the .mods-filter-chip border edge below. */
-    padding: 0 18px;
+    padding: 0 var(--mods-inline-inset);
     position: relative;
 }
 
@@ -177,7 +179,7 @@
 
 .mods-search-wrap .mods-search {
     flex: 1 1 auto;
-    padding-right: 34px;
+    padding-right: 40px;
 }
 
 .mods-search-clear {
@@ -185,29 +187,38 @@
     right: 8px;
     top: 50%;
     transform: translateY(-50%);
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     border: 0;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.62);
     cursor: pointer;
     display: none;
     align-items: center;
     justify-content: center;
     padding: 0;
-    font-size: 14px;
-    line-height: 1;
-    transition: background 120ms ease, color 120ms ease;
+    line-height: 0;
+    transition: background 120ms ease, color 120ms ease, transform 120ms ease;
 }
 
 .mods-search-clear:hover {
-    background: rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.14);
     color: var(--text, #fff);
 }
 
 .mods-search-wrap.has-query .mods-search-clear {
     display: inline-flex;
+}
+
+.mods-search-clear svg {
+    width: 12px;
+    height: 12px;
+    display: block;
+    stroke: currentColor;
+    stroke-width: 2.25;
+    stroke-linecap: round;
+    fill: none;
 }
 
 .mods-search {
@@ -238,19 +249,20 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    row-gap: var(--mods-filter-gap);
+    column-gap: 0;
     /* 18px horizontal inset so the first chip's BORDER edge lines up
        with the .mods-tab text (tab-pad 18) and the .mods-search BOX
        left edge (toolbar-pad 18). The visible left edges of the tab
        labels, search box, and chip pills all share the same x. */
-    padding: 0 18px 6px;
+    padding: 0 var(--mods-inline-inset) 6px;
     margin-top: -6px;
 }
 
 .mods-filter-group {
     display: inline-flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--mods-filter-gap);
 }
 
 .mods-filters-divider {
@@ -258,7 +270,7 @@
     width: 1px;
     height: 18px;
     background: rgba(255, 255, 255, 0.12);
-    margin: 0 4px;
+    margin: 0 var(--mods-filter-gap);
 }
 
 .mods-filter-chip {
@@ -290,7 +302,7 @@
 .mods-category-row {
     display: inline-flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--mods-filter-gap);
     min-width: 0;
 }
 

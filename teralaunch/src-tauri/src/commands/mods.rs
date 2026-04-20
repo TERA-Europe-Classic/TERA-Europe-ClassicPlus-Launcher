@@ -17,8 +17,8 @@ use tauri::Emitter;
 use crate::services::mods::{
     catalog::{self, CachedCatalog},
     external_app,
+    gpk::{self, ModConflict},
     registry::{get_external_apps_dir, get_gpk_dir, get_registry_path},
-    tmm::{self, ModConflict},
     types::{Catalog, CatalogEntry, ModEntry, ModKind, ModStatus},
 };
 use crate::state::mods_state;
@@ -81,13 +81,24 @@ pub async fn get_mods_catalog(force_refresh: Option<bool>) -> Result<Catalog, St
 /// just picked without an extra click — they can untoggle from the Installed
 /// tab if they change their mind. Kept as a single helper so both the external
 /// and GPK install paths can't drift on defaults.
-fn finalize_installed_slot(slot: &mut ModEntry, new_version: &str, last_error: Option<String>) {
+fn finalize_installed_slot(
+    slot: &mut ModEntry,
+    new_version: &str,
+    last_error: Option<String>,
+    deployed_filename: Option<String>,
+) {
     slot.enabled = true;
     slot.auto_launch = true;
     slot.status = ModStatus::Enabled;
     slot.progress = None;
     slot.last_error = last_error;
     slot.version = new_version.to_string();
+    slot.deployed_filename = deployed_filename;
+}
+
+struct GpkDeployOutcome {
+    last_error: Option<String>,
+    deployed_filename: Option<String>,
 }
 
 /// Installs a mod from a catalog entry: download, verify, extract, register.
@@ -203,7 +214,7 @@ async fn install_external_mod(
                 let slot = reg.find_mut(&entry.id).ok_or_else(|| {
                     format!("Registry entry for {} disappeared mid-install", entry.id)
                 })?;
-                finalize_installed_slot(slot, &entry.version, None);
+                finalize_installed_slot(slot, &entry.version, None, None);
                 Ok(slot.clone())
             })?;
 
@@ -282,17 +293,21 @@ async fn install_gpk_mod(entry: CatalogEntry, window: tauri::Window) -> Result<M
 
     match dl_result {
         Ok(_) => {
-            // Attempt the TMM-style deploy: parse the .gpk, back up the
-            // vanilla mapper, patch it to point composites at the mod file.
-            // The mapper patcher lives in services::mods::tmm.rs — it
-            // mirrors VenoMKO/TMM's CompositeMapper.cpp + Mod.cpp.
-            let deploy_note = try_deploy_gpk(&entry.id, &dest);
+            // Attempt deploy through embedded metadata first, then fall back
+            // to filename-based legacy install when the file lacks that
+            // metadata but still maps cleanly to a known game package.
+            let deploy = try_deploy_gpk(&entry.id, &dest);
 
             let final_row = mods_state::mutate(|reg| {
                 let slot = reg.find_mut(&entry.id).ok_or_else(|| {
                     format!("Registry entry for {} disappeared mid-install", entry.id)
                 })?;
-                finalize_installed_slot(slot, &entry.version, deploy_note);
+                finalize_installed_slot(
+                    slot,
+                    &entry.version,
+                    deploy.last_error,
+                    deploy.deployed_filename,
+                );
                 Ok(slot.clone())
             })?;
             let _ = window.emit(
@@ -318,36 +333,48 @@ async fn install_gpk_mod(entry: CatalogEntry, window: tauri::Window) -> Result<M
 ///      `<game>/CookedPC/<name>.gpk`, backing up any existing vanilla
 ///      file as `<name>.gpk.vanilla-bak`. Matches the pre-TMM community
 ///      convention where users manually dropped mods in by filename.
-fn try_deploy_gpk(_mod_id: &str, source_gpk: &std::path::Path) -> Option<String> {
-    use crate::services::mods::tmm;
+fn try_deploy_gpk(_mod_id: &str, source_gpk: &std::path::Path) -> GpkDeployOutcome {
+    use crate::services::mods::gpk;
     let game_root = match resolve_game_root() {
         Ok(p) => p,
         Err(e) => {
-            return Some(format!(
-                "Downloaded, but game path isn't set yet — can't deploy. Set the game folder under Settings, then click Retry. ({})",
-                e
-            ));
+            return GpkDeployOutcome {
+                last_error: Some(format!(
+                    "Downloaded, but game path isn't set yet — can't deploy. Set the game folder under Settings, then click Retry. ({})",
+                    e
+                )),
+                deployed_filename: None,
+            };
         }
     };
-    match tmm::install_gpk(&game_root, source_gpk) {
-        Ok(_) => None,
-        Err(tmm_err) => {
-            // TMM parse rejected the mod. Fall back to legacy drop-in
-            // if the .gpk has a readable UE3 package header. Most pre-
-            // TMM community mods land here.
-            match tmm::install_legacy_gpk(&game_root, source_gpk) {
+    match gpk::install_gpk(&game_root, source_gpk) {
+        Ok(modfile) => GpkDeployOutcome {
+            last_error: None,
+            deployed_filename: Some(modfile.container),
+        },
+        Err(metadata_err) => {
+            // Footer-based deploy rejected the mod. Fall back to legacy
+            // filename-based install if the .gpk exposes a usable target
+            // through its UE3 header or source filename.
+            match gpk::install_legacy_gpk(&game_root, source_gpk) {
                 Ok(installed_name) => {
                     log::info!(
                         "legacy drop-in install succeeded for {} as {}",
                         source_gpk.display(),
                         installed_name
                     );
-                    None
+                    GpkDeployOutcome {
+                        last_error: None,
+                        deployed_filename: Some(installed_name),
+                    }
                 }
-                Err(legacy_err) => Some(format!(
-                    "Downloaded, but deploy failed — TMM: {tmm_err}; legacy drop-in: {legacy_err}. Mod file is at {}",
-                    source_gpk.display()
-                )),
+                Err(legacy_err) => GpkDeployOutcome {
+                    last_error: Some(format!(
+                        "Downloaded, but deploy failed — metadata-based install: {metadata_err}; filename-based install: {legacy_err}. Mod file is at {}",
+                        source_gpk.display()
+                    )),
+                    deployed_filename: None,
+                },
             }
         }
     }
@@ -400,7 +427,7 @@ fn finalize_error(id: &str, err: String, window: &tauri::Window) -> Result<ModEn
 }
 
 /// PRD 3.3.4.add-mod-from-file-wire: user picks a local `.gpk`; we parse it,
-/// compute its sha256, copy it into `mods/gpk/<id>.gpk`, attempt the TMM
+/// compute its sha256, copy it into `mods/gpk/<id>.gpk`, attempt the GPK
 /// mapper patch (best-effort), and upsert into the registry. Returns the
 /// new registry entry.
 ///
@@ -415,15 +442,23 @@ pub async fn add_mod_from_file(path: String) -> Result<ModEntry, String> {
     let bytes =
         std::fs::read(&src).map_err(|e| format!("Failed to read {}: {e}", src.display()))?;
 
-    let modfile = tmm::parse_mod_file(&bytes)?;
-    if modfile.container.is_empty() {
+    let modfile = gpk::parse_mod_file(&bytes)?;
+    let fallback_display_name = gpk::resolve_legacy_target_filename(&bytes, &src)
+        .and_then(|name| name.strip_suffix(".gpk").map(str::to_string));
+    if modfile.container.is_empty() && fallback_display_name.is_none() {
         return Err(
-            "Imported file isn't a TMM-compatible .gpk (no container name in footer).".into(),
+            "Imported file has no deployable override metadata and no usable target filename."
+                .into(),
         );
     }
-    // Reuse the deploy-sandbox predicate so an imported file with a hostile
-    // container can't be deployed (PRD 3.1.4).
-    if !tmm::is_safe_gpk_container_filename(&modfile.container) {
+    if let Some(target_filename) = gpk::resolve_legacy_target_filename(&bytes, &src) {
+        if !gpk::is_safe_gpk_container_filename(&target_filename) {
+            return Err(format!(
+                "Imported .gpk would deploy to an unsafe filename '{}' — refusing to import.",
+                target_filename
+            ));
+        }
+    } else if !gpk::is_safe_gpk_container_filename(&modfile.container) {
         return Err(format!(
             "Imported .gpk has an unsafe container filename '{}' — refusing to import.",
             modfile.container
@@ -439,7 +474,7 @@ pub async fn add_mod_from_file(path: String) -> Result<ModEntry, String> {
         hex
     };
 
-    let mut entry = ModEntry::from_local_gpk(&sha, &modfile);
+    let mut entry = ModEntry::from_local_gpk(&sha, &modfile, fallback_display_name.as_deref());
 
     // Copy into our gpk slot so uninstall can find it.
     let gpk_dir = get_gpk_dir().ok_or_else(|| "Could not resolve GPK mods dir".to_string())?;
@@ -452,13 +487,17 @@ pub async fn add_mod_from_file(path: String) -> Result<ModEntry, String> {
     // Best-effort mapper deploy. If the game root isn't configured we still
     // persist the import so the user can see it; the deploy happens next
     // time they hit enable.
-    let deploy_note = try_deploy_gpk(&entry.id, &dest);
-    if deploy_note.is_some() {
+    let deploy = try_deploy_gpk(&entry.id, &dest);
+    entry.deployed_filename = deploy.deployed_filename.clone();
+    entry.last_error = deploy.last_error.clone();
+    if deploy.last_error.is_none() {
         entry.enabled = true;
         entry.auto_launch = true;
         entry.status = ModStatus::Enabled;
     } else {
-        entry.status = ModStatus::Disabled;
+        entry.enabled = false;
+        entry.auto_launch = false;
+        entry.status = ModStatus::Error;
     }
 
     mods_state::mutate(|reg| {
@@ -515,7 +554,7 @@ pub async fn uninstall_mod(id: String, delete_settings: Option<bool>) -> Result<
                     get_gpk_dir().ok_or_else(|| "Could not resolve GPK mods dir".to_string())?;
                 let source_gpk = gpk_dir.join(format!("{}.gpk", entry.id.replace('/', "_")));
                 if let Ok(bytes) = std::fs::read(&source_gpk) {
-                    if let Ok(modfile) = crate::services::mods::tmm::parse_mod_file(&bytes) {
+                    if let Ok(modfile) = crate::services::mods::gpk::parse_mod_file(&bytes) {
                         let paths: Vec<String> = modfile
                             .packages
                             .iter()
@@ -523,28 +562,39 @@ pub async fn uninstall_mod(id: String, delete_settings: Option<bool>) -> Result<
                             .filter(|p| !p.is_empty())
                             .collect();
                         if !modfile.container.is_empty() && !paths.is_empty() {
-                            let _ = crate::services::mods::tmm::uninstall_gpk(
+                            let _ = crate::services::mods::gpk::uninstall_gpk(
                                 &game_root,
                                 &modfile.container,
                                 &paths,
                             );
-                        } else if let Some(folder_name) =
-                            crate::services::mods::tmm::extract_package_folder_name(&bytes)
+                        } else if let Some(target_filename) = entry
+                            .deployed_filename
+                            .clone()
+                            .or_else(|| {
+                                crate::services::mods::gpk::resolve_legacy_target_filename(
+                                    &bytes,
+                                    &source_gpk,
+                                )
+                            })
                         {
-                            // Legacy drop-in install — restore the vanilla .gpk
-                            // from the .vanilla-bak backup (or remove if no backup).
-                            let target = format!("{folder_name}.gpk");
-                            let _ = crate::services::mods::tmm::uninstall_legacy_gpk(
-                                &game_root, &target,
+                            let _ = crate::services::mods::gpk::uninstall_legacy_gpk(
+                                &game_root,
+                                &target_filename,
                             );
                         }
-                    } else if let Some(folder_name) =
-                        crate::services::mods::tmm::extract_package_folder_name(&bytes)
+                    } else if let Some(target_filename) = entry
+                        .deployed_filename
+                        .clone()
+                        .or_else(|| {
+                            crate::services::mods::gpk::resolve_legacy_target_filename(
+                                &bytes,
+                                &source_gpk,
+                            )
+                        })
                     {
-                        // Same as above, but when parse_mod_file itself errored.
-                        let target = format!("{folder_name}.gpk");
-                        let _ = crate::services::mods::tmm::uninstall_legacy_gpk(
-                            &game_root, &target,
+                        let _ = crate::services::mods::gpk::uninstall_legacy_gpk(
+                            &game_root,
+                            &target_filename,
                         );
                     }
                 }
@@ -721,12 +771,12 @@ pub async fn preview_mod_install_conflicts(
     let bytes = std::fs::read(&source_gpk)
         .map_err(|e| format!("Failed to read {}: {e}", source_gpk.display()))?;
     let game_root = resolve_game_root()?;
-    tmm::preview_conflicts_from_bytes(&game_root, &bytes)
+    gpk::preview_conflicts_from_bytes(&game_root, &bytes)
 }
 
 /// User-invoked recovery path for a missing `CompositePackageMapper.clean`
 /// backup. Resolves the configured game root, then defers to
-/// `tmm::recover_missing_clean` which:
+/// `gpk::recover_missing_clean` which:
 ///   - no-ops when `.clean` already exists,
 ///   - copies the current (vanilla) mapper to `.clean` when safe,
 ///   - refuses with a `verify-game-files` instruction when the current
@@ -741,7 +791,7 @@ pub async fn preview_mod_install_conflicts(
 #[cfg(not(tarpaulin_include))]
 pub async fn recover_clean_mapper() -> Result<(), String> {
     let game_root = resolve_game_root()?;
-    tmm::recover_missing_clean(&game_root)
+    gpk::recover_missing_clean(&game_root)
 }
 
 /// Opens the OS file-explorer at the mods directory. Used by the "Open folder"
@@ -912,6 +962,7 @@ mod tests {
             version: "0.0.0".into(),
             status: ModStatus::Installing,
             source_url: None,
+            deployed_filename: None,
             icon_url: None,
             progress: Some(42),
             last_error: Some("stale error from previous attempt".into()),
@@ -931,7 +982,7 @@ mod tests {
     #[test]
     fn fresh_install_defaults_enabled() {
         let mut slot = disabled_slot();
-        finalize_installed_slot(&mut slot, "1.2.3", None);
+        finalize_installed_slot(&mut slot, "1.2.3", None, None);
 
         assert!(slot.enabled, "fresh install must be enabled by default");
         assert!(
@@ -953,7 +1004,7 @@ mod tests {
     fn fresh_install_preserves_deploy_note() {
         let mut slot = disabled_slot();
         let note = Some("mapper not patched: backup missing".to_string());
-        finalize_installed_slot(&mut slot, "2.0.0", note.clone());
+        finalize_installed_slot(&mut slot, "2.0.0", note.clone(), None);
 
         assert!(slot.enabled);
         assert!(slot.auto_launch);
@@ -972,7 +1023,7 @@ mod tests {
         slot.status = ModStatus::Disabled;
         slot.version = "0.9.0".into();
 
-        finalize_installed_slot(&mut slot, "1.0.0", None);
+        finalize_installed_slot(&mut slot, "1.0.0", None, None);
 
         assert!(slot.enabled);
         assert!(slot.auto_launch);

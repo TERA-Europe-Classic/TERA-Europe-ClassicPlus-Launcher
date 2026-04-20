@@ -178,6 +178,7 @@ mod tests {
             version: "1.0".into(),
             status: ModStatus::Disabled,
             source_url: None,
+            deployed_filename: None,
             icon_url: None,
             progress: None,
             last_error: None,

@@ -93,8 +93,8 @@ aborted before anything touches disk.
 **Fix.**
 - Don't install the file. Report the source — it's either malformed
   or hostile.
-- If you trust the source and the name is benign (rare), rename the
-  container inside the GPK with your TMM toolchain and try again.
+- If you trust the source and the name is benign (rare), repair the
+  embedded GPK metadata with a compatible packaging tool and try again.
 
 ---
 
@@ -122,7 +122,7 @@ extractor refuses and leaves the install dir empty.
 **Error text:** `Composite entry for '<object_path>' not found in mapper. Your game version may not match the mod.`
 
 **What's going on.** The GPK is meant for a different game build than
-the one you have. TMM-style GPKs patch specific `(composite, object)`
+the one you have. Metadata-driven GPKs patch specific `(composite, object)`
 slots — if your mapper doesn't contain the slot the mod expects, the
 mod is silently incompatible.
 
@@ -150,7 +150,7 @@ isn't running with write access.
 
 **Fix.**
 - Close the game client.
-- Close any other mod tool (TMM, etc.).
+- Close any other mod tool that may be holding the mapper file open.
 - Run the launcher as Administrator once to create the `.clean` file.
   Subsequent runs don't need elevated privileges.
 - If nothing else works, reinstall the game into a user-writable
@@ -183,8 +183,8 @@ files (running game, open editor) or permissions are denied.
 
 **Error text:**
 - `Failed to read mod file: <...>`
-- `Imported file isn't a TMM-compatible .gpk (no container name in footer).`
-- `Mod file has no TMM container name — this .gpk is not TMM-compatible.`
+- `Imported file has no deployable override metadata and no usable target filename.`
+- `Mod file has no usable package name in its UE3 header or filename — can't map it to a game file.`
 - `Mod file declares no composite packages to override.`
 - `Mod file has a composite package with no object path — can't be installed.`
 - `Mod file is too small to contain metadata`
@@ -196,8 +196,8 @@ files (running game, open editor) or permissions are denied.
 - `UTF-16 string past EOF`
 - `Malformed string at offset <n>` / `Malformed footer size at offset <n>` / `Malformed UTF-16 at offset <n>`
 
-**What's going on.** You tried to add a `.gpk` that isn't a TMM-style
-mod, or the file is truncated.
+**What's going on.** You tried to add a `.gpk` that doesn't carry usable
+override metadata, or the file is truncated.
 
 **Fix.**
 - Verify you're importing the actual mod file, not a vanilla
