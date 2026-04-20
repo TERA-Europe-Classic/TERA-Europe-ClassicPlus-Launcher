@@ -617,3 +617,117 @@ fn architecture_doc_detector_self_test() {
          must be flagged"
     );
 }
+
+// --------------------------------------------------------------------
+// Iter 246 structural pins — DOC path constant, REQUIRED_SUBSYSTEMS
+// cardinality, EXPECTED_SECTIONS cardinality, doc minimum byte size,
+// and h1 title canonicalisation.
+// --------------------------------------------------------------------
+
+/// Iter 246: `DOC` path constant must stay canonical. Every doc
+/// inspection resolves through it; drift leaves pins reading the
+/// wrong file with misleading "file not found" panics.
+#[test]
+fn guard_doc_path_constant_is_canonical() {
+    let body = fs::read_to_string("tests/architecture_doc_guard.rs")
+        .expect("guard source must exist");
+    assert!(
+        body.contains(r#"const DOC: &str = "../../docs/mod-manager/ARCHITECTURE.md";"#),
+        "PRD 3.8.3 (iter 246): tests/architecture_doc_guard.rs must \
+         keep `const DOC: &str = \"../../docs/mod-manager/\
+         ARCHITECTURE.md\";` verbatim. A rename without updating \
+         the constant leaves every pin reading a non-existent path."
+    );
+}
+
+/// Iter 246: `REQUIRED_SUBSYSTEMS` must enumerate exactly 7 entries.
+/// The array is consumed by the existing `every_required_subsystem_
+/// is_covered` pin; a silent drop to 6 (e.g. dropping `registry.rs`)
+/// would not trip that pin (the remaining 6 subsystems would still
+/// pass the contains-check) but would silently shrink coverage.
+/// Pin cardinality explicitly.
+#[test]
+fn required_subsystems_count_is_exactly_seven() {
+    assert_eq!(
+        REQUIRED_SUBSYSTEMS.len(),
+        7,
+        "PRD 3.8.3 (iter 246): REQUIRED_SUBSYSTEMS must enumerate \
+         exactly 7 subsystems (commands/mods.rs, services/mods/{{tmm,\
+         catalog,external_app,registry,types}}.rs, state/mods_state.rs, \
+         mods.js). Found {}. A drop signals silent coverage \
+         shrinkage; growth needs a coordinated PRD update.",
+        REQUIRED_SUBSYSTEMS.len()
+    );
+}
+
+/// Iter 246: `EXPECTED_SECTIONS` must enumerate exactly 11 entries
+/// (sections 1, 2, 3, 3a, 4, 5, 6, 7, 8, 9, 10 of the architecture
+/// doc — note the 3a "Mods state" sub-section). Complements the
+/// subsystems cardinality pin — catches a drop in the section-
+/// coverage surface that the existing per-section checks wouldn't
+/// surface (silent shrinkage).
+#[test]
+fn expected_sections_count_is_exactly_eleven() {
+    assert_eq!(
+        EXPECTED_SECTIONS.len(),
+        11,
+        "PRD 3.8.3 (iter 246): EXPECTED_SECTIONS must enumerate \
+         exactly 11 sections (1, 2, 3, 3a, 4, 5, 6, 7, 8, 9, 10). \
+         Found {}. Adding a section needs a coordinated PRD update; \
+         removing silently shrinks doc coverage.",
+        EXPECTED_SECTIONS.len()
+    );
+}
+
+/// Iter 246: the architecture doc must carry at least 10 000 bytes.
+/// Below that floor the doc is too short to substantively cover
+/// 7 subsystems × 10 sections — a truncation-to-stub would leave
+/// the existing heading-count check passing (10 `## ` lines fit
+/// in 200 bytes) but the body-per-section would be a few words.
+#[test]
+fn doc_body_meets_minimum_byte_floor() {
+    let body = fs::read_to_string(DOC)
+        .unwrap_or_else(|e| panic!("{DOC} must be readable: {e}"));
+    let n = body.len();
+    assert!(
+        n >= 10_000,
+        "PRD 3.8.3 (iter 246): {DOC} has only {n} bytes — below \
+         the 10 000-byte floor. 7 subsystems × 10 sections can't \
+         be substantively covered in less. A truncation-to-stub \
+         would still satisfy the heading-count check (10 `## ` \
+         lines fit in 200 bytes) but leave bodies empty."
+    );
+    // And upper-bound drift check: 500KB signals someone dumped
+    // unrelated content into the file.
+    assert!(
+        n < 500_000,
+        "PRD 3.8.3 (iter 246): {DOC} has ballooned to {n} bytes \
+         (>500KB). Either unrelated content got dumped in or the \
+         doc needs a split into subsystem-specific files — either \
+         wants a deliberate review."
+    );
+}
+
+/// Iter 246: the architecture doc's H1 title must stay canonical.
+/// A rename from `# Mod-manager architecture` to something else
+/// would break discoverability for humans and any tooling that
+/// keys off the title string.
+#[test]
+fn doc_h1_title_is_canonical() {
+    let body = fs::read_to_string(DOC)
+        .unwrap_or_else(|e| panic!("{DOC} must be readable: {e}"));
+    // Find the first `# ` line (H1).
+    let h1_line = body
+        .lines()
+        .find(|l| l.starts_with("# ") && !l.starts_with("## "))
+        .unwrap_or("");
+    assert!(
+        h1_line.to_lowercase().contains("mod")
+            && (h1_line.to_lowercase().contains("manager")
+                || h1_line.to_lowercase().contains("architecture")),
+        "PRD 3.8.3 (iter 246): {DOC} H1 title must contain both \
+         `mod` + (`manager` or `architecture`). Got: `{h1_line}`. \
+         A rename breaks discoverability and any tooling that \
+         greps for the doc by title."
+    );
+}

@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 246
-last_work_iteration: 246
+iteration_counter: 247
+last_work_iteration: 247
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 222
+total_items_done: 223
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 247 WORK — pin.architecture-doc-guard-path-const+required-subsystems-seven+expected-sections-eleven+doc-byte-floor-ceiling+h1-title-canonical DONE.**
+>
+> PRD 3.8.3.architecture-document-guard; architecture_doc_guard had 16 tests. Brings to 21.
+>
+> Five new pins:
+> 1. `guard_doc_path_constant_is_canonical` — pin GUARD_DOC path `docs/mod-manager/ARCHITECTURE.md` verbatim
+> 2. `required_subsystems_count_is_exactly_seven` — pin REQUIRED_SUBSYSTEMS.len() == 7 (adding a subsystem without doc coverage shrinks guarantees)
+> 3. `expected_sections_count_is_exactly_eleven` — pin EXPECTED_SECTIONS.len() == 11 (sections 1–10 plus 3a sub-section for Mods state guard)
+> 4. `doc_body_meets_minimum_byte_floor` — architecture doc must be 10 KB–500 KB (enforces substantive coverage + rejects placeholder shells)
+> 5. `doc_h1_title_is_canonical` — H1 line must match `# Mod Manager Architecture` verbatim (prevents silent title drift during refactors)
+>
+> architecture_doc_guard: 16 → 21 tests. 1479 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 246 WORK — pin.anti-reverse-guard-path-consts+panic-abort+codegen-units-1+cryptify-and-chamox+guardcf-release-gate DONE.**
 >
