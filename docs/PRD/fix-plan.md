@@ -7,8 +7,8 @@ Each iteration: read the counter below, detect iteration type (work / research /
 ## Loop header (machine-parseable — DO NOT reformat)
 
 ```yaml
-iteration_counter: 255
-last_work_iteration: 255
+iteration_counter: 256
+last_work_iteration: 256
 last_research_sweep: 230
 last_revalidation: 240
 last_revalidation_status: all-gates-green
@@ -16,7 +16,7 @@ last_retrospective: 60
 last_blocked_retry: 50
 last_blocked_retry_status: all-still-blocked
 last_investigation_iteration: 87
-total_items_done: 231
+total_items_done: 232
 total_items_regressed: 0
 total_iterations_to_cap: 1000
 tauri_v2_migration_milestone: M8-validated
@@ -25,6 +25,19 @@ tauri_v2_migration_branch: tauri-v2-migration
 tauri_v2_migration_last_commit: 8ee9774
 tauri_v2_migration_ready_for_squash_merge: true
 ```
+
+> **Iter 256 WORK — pin.search-perf-scanner-size-ceiling+fixture-sanity-cap+sample-count-exactly-7+budget-min-16+vitest-import DONE.**
+>
+> PRD 3.6.4 (search-one-frame); search_perf_guard had 17 tests. Brings to 22.
+>
+> Five new pins:
+> 1. `scanner_file_size_has_upper_ceiling` — MAX_BYTES 30_000 (current ~4KB; catches garbage bloat)
+> 2. `fixture_size_is_not_inflated_past_sanity_cap` — reject `makeCatalogEntries(N)` for N ≥ 1000 (slow perf tests → team widens budget)
+> 3. `perf_sample_count_is_exactly_seven_not_inflated` — `i < 7` must be followed by non-digit (iter-109 substring pin would match `i < 77`)
+> 4. `perf_budget_is_not_reduced_below_sixteen` — all `toBeLessThanOrEqual(N)` must have N ≥ 16 (tighter budget = flaky tests = team widens real perf envelope)
+> 5. `scanner_imports_from_vitest` — pin `from 'vitest'` import (without it, test harness undefined at load; gate silently missing from CI)
+>
+> search_perf_guard: 17 → 22 tests. 1524 Rust (+5), clippy clean, vitest 449/449.
 
 > **Iter 255 WORK — pin.offline-banner-scanner-size-ceiling+it-count-ratchet-5+string-literal-preservation+catch-shows-banner+translations-json-valid DONE.**
 >

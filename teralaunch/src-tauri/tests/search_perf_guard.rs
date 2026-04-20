@@ -475,6 +475,166 @@ fn perf_test_is_referenced_in_prd_path_drift_guard() {
     );
 }
 
+// --------------------------------------------------------------------
+// Iter 256 structural pins — scanner size ceiling + fixture ceiling +
+// sample count exactness + budget-min + vitest-import.
+// --------------------------------------------------------------------
+//
+// The seventeen pins above cover threshold, fixture size, sampling,
+// sanity controls, Tauri stub, production-filter exercise, perf.now
+// timing, it-count, marker absence, fixture field shape, header cite,
+// SCANNER const, under_one_frame it-name, drift cross-ref, and
+// no-arithmetic-on-16. They do NOT pin:
+// (a) the scanner file has a sane upper byte ceiling;
+// (b) the fixture size isn't inflated past a sanity cap (e.g. 10_000
+//     entries would make the test slow and mask scaling regressions
+//     by virtue of being too slow to run);
+// (c) the sample count (`i < 7`) is exactly 7 — the iter-109 substring
+//     check `body.contains("i < 7")` passes if `i < 7` appears
+//     anywhere, but not if someone changes to `i < 77` (which still
+//     contains the substring);
+// (d) the budget isn't reduced below 16 — a regression to 8 or 4 would
+//     be over-strict and cause flaky failures the team would paper
+//     over by widening again;
+// (e) the scanner imports from `vitest` — without the import, the
+//     `it()`/`describe()`/`expect()` calls would be undefined at
+//     runtime and the whole file would error out on load.
+
+/// The scanner file must not exceed a sane upper byte ceiling.
+/// Current state: ~4 KB. A 30 KB ceiling gives ~7× margin while
+/// catching accidental inclusion of a large fixture file or unrelated
+/// tests merged into the perf scanner.
+#[test]
+fn scanner_file_size_has_upper_ceiling() {
+    const MAX_BYTES: usize = 30_000;
+    let bytes = fs::metadata(SCANNER)
+        .unwrap_or_else(|e| panic!("{SCANNER}: {e}"))
+        .len() as usize;
+    assert!(
+        bytes <= MAX_BYTES,
+        "PRD 3.6.4 (iter 256): {SCANNER} is {bytes} bytes; ceiling \
+         is {MAX_BYTES}. Bloat past the ceiling signals garbage in \
+         the fixture or unrelated tests merged into this file — the \
+         perf test's focus on ≤16 ms narrows."
+    );
+}
+
+/// The fixture size must be capped to a sane maximum. A refactor
+/// that bumps `makeCatalogEntries(300)` to `makeCatalogEntries(10_000)`
+/// would pass the iter-109 fixture-has-300 check (because the 300
+/// literal appears in a comment or neighbouring test), but the perf
+/// test would take seconds to run and the team would paper over
+/// flakiness by widening the budget. Pinning that no 4-digit or
+/// larger N value appears in `makeCatalogEntries(N)` calls catches
+/// such bloat.
+#[test]
+fn fixture_size_is_not_inflated_past_sanity_cap() {
+    let body = read(SCANNER);
+    // Scan for `makeCatalogEntries(<N>)` call-expressions and verify
+    // N is <= 999.
+    let needle = "makeCatalogEntries(";
+    let mut search_from = 0;
+    while let Some(rel) = body[search_from..].find(needle) {
+        let pos = search_from + rel + needle.len();
+        // Parse the digit run at `pos`.
+        let digits: String = body[pos..]
+            .chars()
+            .take_while(|c| c.is_ascii_digit())
+            .collect();
+        if !digits.is_empty() {
+            let n: usize = digits.parse().unwrap();
+            assert!(
+                n <= 999,
+                "PRD 3.6.4 (iter 256): {SCANNER} has \
+                 `makeCatalogEntries({n})` — sanity cap is 999. A \
+                 4-digit fixture would make the perf test slow enough \
+                 that the team would paper over flakiness by widening \
+                 the budget."
+            );
+        }
+        search_from = pos + digits.len();
+    }
+}
+
+/// The sample count (`i < 7`) must be exactly 7, not 77 or 777. The
+/// iter-109 substring check passes if `i < 7` appears anywhere, which
+/// `i < 77` would also satisfy (prefix match). Pinning the next
+/// character as `;` or whitespace catches silent inflation.
+#[test]
+fn perf_sample_count_is_exactly_seven_not_inflated() {
+    let body = read(SCANNER);
+    let needle = "i < 7";
+    let pos = body
+        .find(needle)
+        .expect("PRD 3.6.4: `i < 7` must appear (iter-109 pin)");
+    let after = &body[pos + needle.len()..];
+    let next_char = after.chars().next().unwrap_or(' ');
+    assert!(
+        !next_char.is_ascii_digit(),
+        "PRD 3.6.4 (iter 256): {SCANNER} `i < 7` must be followed by \
+         non-digit — a regression to `i < 77` (or `i < 777`) would \
+         pass the substring check but run 11× or 111× more samples, \
+         widening the test duration until the team relaxes the budget. \
+         Found next char: `{next_char}`."
+    );
+}
+
+/// The budget literal `16` must not be reduced below 16. The
+/// iter-109 pin checks the threshold is `16`; the iter-216 pin
+/// rejects arithmetic on the literal; this pin guards against a
+/// silent lowering to a tighter budget (e.g. 4 or 8) that would
+/// be over-strict, cause flaky failures, and lead the team to
+/// compensate by widening the real application code's perf envelope.
+/// 16ms (one 60fps frame) is the principled budget; tighter is
+/// theatrically ambitious but not user-visible.
+#[test]
+fn perf_budget_is_not_reduced_below_sixteen() {
+    let body = read(SCANNER);
+    // Scan for all `toBeLessThanOrEqual(N)` occurrences and verify
+    // no N < 16.
+    let needle = "toBeLessThanOrEqual(";
+    let mut search_from = 0;
+    while let Some(rel) = body[search_from..].find(needle) {
+        let pos = search_from + rel + needle.len();
+        let digits: String = body[pos..]
+            .chars()
+            .take_while(|c| c.is_ascii_digit())
+            .collect();
+        if !digits.is_empty() {
+            let n: usize = digits.parse().unwrap();
+            assert!(
+                n >= 16,
+                "PRD 3.6.4 (iter 256): {SCANNER} has \
+                 `toBeLessThanOrEqual({n})` — minimum is 16 (one 60fps \
+                 frame). A tighter budget is theatrically ambitious \
+                 but causes flaky failures the team papers over by \
+                 widening the real perf envelope."
+            );
+        }
+        search_from = pos + digits.len();
+    }
+}
+
+/// The scanner must import from `vitest`. Without the import, the
+/// `it()` / `describe()` / `expect()` function calls would be
+/// undefined at module load — the whole file errors out on startup
+/// and the perf gate goes silent. Current idiom:
+/// `import { describe, it, expect } from 'vitest';`.
+#[test]
+fn scanner_imports_from_vitest() {
+    let body = read(SCANNER);
+    let has_import = body.contains("from 'vitest'")
+        || body.contains("from \"vitest\"");
+    assert!(
+        has_import,
+        "PRD 3.6.4 (iter 256): {SCANNER} must import from `vitest` \
+         (`import {{ describe, it, expect }} from 'vitest';`). Without \
+         the import, the test harness functions are undefined and the \
+         module fails to load — the perf gate silently goes missing \
+         from CI."
+    );
+}
+
 /// The `16` budget literal must appear as `toBeLessThanOrEqual(16)`
 /// with NO leading arithmetic — not `toBeLessThanOrEqual(16 * 10)`
 /// or `toBeLessThanOrEqual(budget + 16)` that would produce a larger
