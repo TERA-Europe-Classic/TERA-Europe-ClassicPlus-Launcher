@@ -628,12 +628,30 @@ fn apply_disable_intent(slot: &mut ModEntry) {
     slot.status = ModStatus::Disabled;
 }
 
-fn external_launch_args(id: &str) -> Vec<String> {
+fn noctenium_tcc_maps_dir(game_root: &std::path::Path) -> std::path::PathBuf {
+    game_root
+        .join("Binaries")
+        .join("noctenium")
+        .join("interop")
+        .join("tcc")
+        .join("opcodes")
+}
+
+fn external_launch_args(id: &str) -> Result<Vec<String>, String> {
     match id {
-        "classicplus.tcc" | "tera-europe-classic.tcc" | "classicplus.shinra" | "tera-europe-classic.shinra" => {
-            vec!["--toolbox".to_string()]
+        "classicplus.tcc" | "tera-europe-classic.tcc" => {
+            let game_root = resolve_game_root()?;
+            let maps_dir = noctenium_tcc_maps_dir(&game_root);
+            Ok(vec![
+                "--toolbox".to_string(),
+                "--map_export_dir".to_string(),
+                maps_dir.to_string_lossy().into_owned(),
+            ])
         }
-        _ => Vec::new(),
+        "classicplus.shinra" | "tera-europe-classic.shinra" => {
+            Ok(vec!["--toolbox".to_string()])
+        }
+        _ => Ok(Vec::new()),
     }
 }
 
@@ -706,7 +724,7 @@ async fn launch_external_app_impl(id: &str, set_auto_launch: bool) -> Result<Mod
             .ok_or_else(|| "Could not resolve external apps dir".to_string())?;
         let dest = install_root.join(&entry.id);
         let exe_path = external_app::executable_path(&dest, &exe_name)?;
-        let args = external_launch_args(id);
+        let args = external_launch_args(id)?;
         external_app::spawn_app(&exe_path, &args)?;
     }
 
@@ -869,7 +887,13 @@ pub fn spawn_auto_launch_external_apps() {
                 continue;
             }
         };
-        let args = external_launch_args(&entry.id);
+        let args = match external_launch_args(&entry.id) {
+            Ok(v) => v,
+            Err(e) => {
+                log::warn!("Auto-launch: could not resolve args for {}: {}", entry.id, e);
+                continue;
+            }
+        };
         match external_app::spawn_app(&exe_path, &args) {
             Err(e) => log::warn!("Auto-launch: failed to start {}: {}", entry.id, e),
             Ok(_) => {
