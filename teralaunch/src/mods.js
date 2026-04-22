@@ -244,21 +244,7 @@ const ModsView = {
     async loadInstalled() {
         try {
             this.state.installed = await modsInvoke('list_installed_mods');
-            if (Array.isArray(this.state.catalog) && this.state.catalog.length) {
-                const byId = new Map(this.state.catalog.map(c => [c.id, c]));
-                this.state.installed.forEach(m => {
-                    const cat = byId.get(m.id);
-                    if (!cat) return;
-                    m.icon_url = cat.icon_url || null;
-                    m.source_url = cat.source_url || m.source_url;
-                    m.license = cat.license || m.license;
-                    m.credits = cat.credits || m.credits;
-                    const skip = new Set(['installing', 'error', 'running', 'starting']);
-                    if (!skip.has(m.status) && cat.version && m.version && cat.version !== m.version) {
-                        m.status = 'update_available';
-                    }
-                });
-            }
+            this.reconcileInstalledFromCatalog();
         } catch (e) { console.error('list_installed_mods failed:', e); this.state.installed = []; }
     },
 
@@ -272,7 +258,25 @@ const ModsView = {
             this.state.catalog = [];
             this._catalogError = String(e);
         }
+        this.reconcileInstalledFromCatalog();
         this.renderCategoryChips();
+    },
+
+    reconcileInstalledFromCatalog() {
+        if (!Array.isArray(this.state.installed) || !Array.isArray(this.state.catalog) || this.state.catalog.length === 0) return;
+        const byId = new Map(this.state.catalog.map(c => [c.id, c]));
+        this.state.installed.forEach(m => {
+            const cat = byId.get(m.id);
+            if (!cat) return;
+            m.icon_url = cat.icon_url || null;
+            m.source_url = cat.source_url || m.source_url;
+            m.license = cat.license || m.license;
+            m.credits = cat.credits || m.credits;
+            const skip = new Set(['installing', 'error', 'running', 'starting']);
+            if (!skip.has(m.status) && cat.version && m.version && cat.version !== m.version) {
+                m.status = 'update_available';
+            }
+        });
     },
 
     renderCategoryChips() {
@@ -410,9 +414,13 @@ const ModsView = {
             const entry = this.state.installed.find(m => m.id === id) || this.state.catalog.find(m => m.id === id);
             const name = entry ? entry.name : id;
             const pct = info.progress || 0;
+            const received = info.received_bytes || 0;
+            const total = info.total_bytes || 0;
             const row = document.createElement('div');
             row.className = 'mods-download-tray-item';
-            row.innerHTML = `<div class="mods-download-tray-item-header"><span>${escapeHtml(name)}</span><span>${pct}%</span></div>
+            row.dataset.dlId = id;
+            row.innerHTML = `<div class="mods-download-tray-item-header"><span class="mods-download-tray-name">${escapeHtml(name)}</span><span class="mods-download-tray-progress">${pct}%</span></div>
+                             <div class="mods-download-tray-item-meta"><span class="mods-download-tray-bytes">${total > 0 ? `${formatMB(received)} / ${formatMB(total)}` : ''}</span></div>
                              <div class="mods-download-tray-bar"><div class="mods-download-tray-bar-fill" style="width:${pct}%"></div></div>`;
             this.$trayItems.appendChild(row);
         }

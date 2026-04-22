@@ -130,6 +130,8 @@
     color: #fff;
     font-size: 14px;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: text;
+    -webkit-user-select: text;
 }
 
 .mods-search:focus {
@@ -392,6 +394,123 @@
     box-shadow: 0 0 12px var(--mods-accent-glow);
 }
 
+.mods-download-tray {
+    position: absolute;
+    right: 24px;
+    bottom: 24px;
+    width: min(340px, calc(100vw - 96px));
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    background: rgba(15, 19, 26, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.38);
+    backdrop-filter: blur(18px);
+    z-index: 80;
+}
+
+.mods-download-tray[hidden] {
+    display: none !important;
+}
+
+.mods-download-tray-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.72);
+}
+
+.mods-download-tray-count {
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgba(34, 211, 238, 0.12);
+    color: var(--mods-accent);
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.mods-download-tray-items {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.mods-download-tray-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.mods-download-tray-item-header,
+.mods-download-tray-item-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.mods-download-tray-name,
+.mods-download-tray-bytes {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mods-download-tray-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+}
+
+.mods-download-tray-bytes {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.52);
+}
+
+.mods-download-tray-progress,
+.mods-row-progressbar-label {
+    min-width: 4ch;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.mods-download-tray-progress {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--mods-accent);
+}
+
+.mods-download-tray-bar {
+    height: 6px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.mods-download-tray-bar-fill {
+    height: 100%;
+    background: var(--mods-accent);
+    box-shadow: 0 0 12px var(--mods-accent-glow);
+    transition: width 0.3s ease;
+}
+
 .mods-row-overflow {
     width: 32px;
     height: 32px;
@@ -573,6 +692,8 @@
 .mods-onboarding-btn.primary:hover { filter: brightness(1.1); transform: translateY(-2px); box-shadow: 0 6px 20px var(--mods-accent-glow); }
 .mods-onboarding-btn.secondary { background: rgba(255, 255, 255, 0.1); color: #fff !important; border-color: rgba(255, 255, 255, 0.2); }
 .mods-onboarding-btn.secondary:hover { background: rgba(255, 255, 255, 0.15); border-color: rgba(255, 255, 255, 0.3); transform: translateY(-2px); }
+.mods-onboarding-btn.danger { background: #000; color: #fff !important; border-color: rgba(255, 255, 255, 0.12); box-shadow: none; }
+.mods-onboarding-btn.danger:hover { background: #111; border-color: rgba(255, 255, 255, 0.24); transform: translateY(-2px); }
 
 /* --- DETAIL PANEL --- */
 .mods-detail-backdrop {
