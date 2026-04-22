@@ -217,7 +217,7 @@
             backdrop-filter: blur(4px);
             border-bottom: 1px solid rgba(58, 64, 80, 0.1);
             z-index: 1000;
-            -webkit-app-region: no-drag;
+            -webkit-app-region: drag;
         }
 
         .header-left {
@@ -1815,6 +1815,8 @@
             display: flex;
             flex-direction: column;
             gap: 2px;
+            flex: 1;
+            min-width: 0;
         }
 
         .update-toast-title {
@@ -1826,6 +1828,10 @@
         .update-toast-subtitle {
             font-size: 12px;
             color: var(--muted-foreground);
+            display: block;
+            min-width: 24ch;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
         }
 
         /* ============================================

@@ -488,6 +488,7 @@ let originalGamePath = '';
 
 // Track toast auto-hide timeout so we can cancel it
 let toastAutoHideTimeout = null;
+let lastUpdateToastState = null;
 
 /**
  * Shows the update notification toast with the given state, title, and subtitle.
@@ -514,24 +515,29 @@ function showUpdateNotification(state, title, subtitle, persistent = false) {
     toastAutoHideTimeout = null;
   }
 
-  // Update text
-  if (titleEl) titleEl.textContent = title || 'Checking...';
-  if (subtitleEl) subtitleEl.textContent = subtitle || '';
+  // Update text only when changed to reduce layout/repaint churn during download progress
+  const nextTitle = title || 'Checking...';
+  const nextSubtitle = subtitle || '';
+  if (titleEl && titleEl.textContent !== nextTitle) titleEl.textContent = nextTitle;
+  if (subtitleEl && subtitleEl.textContent !== nextSubtitle) subtitleEl.textContent = nextSubtitle;
 
   // Update icon based on state
-  if (icon) {
-    icon.className = 'update-toast-icon ' + state;
-    if (state === 'checking') {
-      icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>';
-    } else if (state === 'upToDate' || state === 'success') {
-      icon.className = 'update-toast-icon success';
-      icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>';
-    } else if (state === 'error') {
-      icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
-    } else if (state === 'warning') {
-      icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>';
+  if (lastUpdateToastState !== state) {
+    if (icon) {
+      icon.className = 'update-toast-icon ' + state;
+      if (state === 'checking') {
+        icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>';
+      } else if (state === 'upToDate' || state === 'success') {
+        icon.className = 'update-toast-icon success';
+        icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+      } else if (state === 'error') {
+        icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
+      } else if (state === 'warning') {
+        icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>';
+      }
     }
   }
+  lastUpdateToastState = state;
 
   // Show/hide close button based on persistent mode
   if (closeBtn) {
@@ -5729,14 +5735,10 @@ const App = {
     this.setupLanguageSelectorListener();
   },
 
-  /**
-   * Dragging is intentionally disabled for now.
-   * Borderless window dragging kept conflicting with scrollbar and modal input
-   * on Windows, so the launcher prioritises reliable interaction over custom
-   * drag behaviour.
-   */
   setupWindowDragging() {
-    return;
+    // Tauri/WebView2 respects CSS drag regions (`-webkit-app-region: drag`),
+    // so there is nothing else to do here as long as interactive controls keep
+    // their explicit `no-drag` styling.
   },
 
   /**
