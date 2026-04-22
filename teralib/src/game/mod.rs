@@ -6,7 +6,6 @@ use crate::{
 use lazy_static::lazy_static;
 use log::{error, info, Level, Metadata, Record};
 use once_cell::sync::Lazy;
-use prost::Message;
 use reqwest;
 use serde_json::Value;
 use std::fs::{File, OpenOptions};
@@ -1039,9 +1038,65 @@ async fn get_server_list() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         server_list.servers.len()
     );
 
-    let mut buf = Vec::new();
-    server_list.encode(&mut buf)?;
-    Ok(buf)
+    Ok(encode_server_list_wire_compatible(&server_list))
+}
+
+fn utf16_host_bytes(address: &str, port: u32) -> Vec<u8> {
+    utf16_to_bytes(&format!("{}:{}", address, port))
+}
+
+fn encode_varint(out: &mut Vec<u8>, mut value: u64) {
+    while value >= 0x80 {
+        out.push(((value as u8) & 0x7F) | 0x80);
+        value >>= 7;
+    }
+    out.push(value as u8);
+}
+
+fn encode_tag(out: &mut Vec<u8>, field_num: u32, wire_type: u8) {
+    encode_varint(out, ((field_num << 3) | wire_type as u32) as u64);
+}
+
+fn encode_fixed32_field(out: &mut Vec<u8>, field_num: u32, value: u32) {
+    encode_tag(out, field_num, 5);
+    out.extend_from_slice(&value.to_le_bytes());
+}
+
+fn encode_bytes_field(out: &mut Vec<u8>, field_num: u32, data: &[u8]) {
+    encode_tag(out, field_num, 2);
+    encode_varint(out, data.len() as u64);
+    out.extend_from_slice(data);
+}
+
+fn encode_server_info_wire_compatible(server: &ServerInfo) -> Vec<u8> {
+    let mut out = Vec::new();
+    encode_fixed32_field(&mut out, 1, server.id);
+    encode_bytes_field(&mut out, 2, &server.name);
+    encode_bytes_field(&mut out, 3, &server.category);
+    encode_bytes_field(&mut out, 4, &server.title);
+    encode_bytes_field(&mut out, 5, &server.queue);
+    encode_bytes_field(&mut out, 6, &server.population);
+    encode_fixed32_field(&mut out, 7, server.address);
+    encode_fixed32_field(&mut out, 8, server.port);
+    encode_fixed32_field(&mut out, 9, server.available);
+    encode_bytes_field(&mut out, 10, &server.unavailable_message);
+    encode_bytes_field(&mut out, 11, &server.host);
+    out
+}
+
+fn encode_server_list_wire_compatible(server_list: &ServerList) -> Vec<u8> {
+    let mut out = Vec::new();
+
+    for server in &server_list.servers {
+        let server_bytes = encode_server_info_wire_compatible(server);
+        encode_tag(&mut out, 1, 2);
+        encode_varint(&mut out, server_bytes.len() as u64);
+        out.extend_from_slice(&server_bytes);
+    }
+
+    encode_fixed32_field(&mut out, 2, server_list.last_server_id);
+    encode_fixed32_field(&mut out, 3, server_list.sort_criterion);
+    out
 }
 
 /// Strips HTML tags from a string. Used to extract plain text from CDATA like
@@ -1176,7 +1231,7 @@ fn parse_server_list_xml(xml: &str) -> Result<ServerList, Box<dyn std::error::Er
             port,
             available: if is_available { 1 } else { 0 },
             unavailable_message: utf16_to_bytes(&popup),
-            host: Vec::new(),
+            host: utf16_host_bytes(&address_str, port),
         };
         server_list.servers.push(server_info);
     }
@@ -1214,7 +1269,7 @@ fn parse_server_list_xml(xml: &str) -> Result<ServerList, Box<dyn std::error::Er
             port: relay_port,
             available: if relay_available { 1 } else { 0 },
             unavailable_message: utf16_to_bytes(relay_unavailable_message),
-            host: Vec::new(),
+            host: utf16_host_bytes(relay_address_str, relay_port),
         });
     }
 
@@ -1352,7 +1407,7 @@ fn parse_server_list_json(json: &Value) -> Result<ServerList, Box<dyn std::error
             port,
             available: if is_available { 1 } else { 0 },
             unavailable_message: utf16_to_bytes(unavailable_message),
-            host: Vec::new(),
+            host: utf16_host_bytes(address_str, port),
         };
         server_list.servers.push(server_info);
     }
@@ -1402,7 +1457,7 @@ fn parse_server_list_json(json: &Value) -> Result<ServerList, Box<dyn std::error
             port: relay_port,
             available: if relay_available { 1 } else { 0 },
             unavailable_message: utf16_to_bytes(relay_unavailable_msg),
-            host: Vec::new(),
+            host: utf16_host_bytes(relay_address_str, relay_port),
         };
 
         server_list.servers.push(relay_server);
@@ -1454,6 +1509,157 @@ fn ipv4_to_u32(ip: &str) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn decode_varint_for_test(data: &[u8], start: usize) -> Option<(u64, usize)> {
+        let mut value = 0u64;
+        let mut shift = 0u32;
+        let mut i = start;
+
+        while i < data.len() {
+            let byte = data[i];
+            i += 1;
+            value |= ((byte & 0x7F) as u64) << shift;
+
+            if (byte & 0x80) == 0 {
+                return Some((value, i));
+            }
+
+            shift += 7;
+            if shift >= 64 {
+                return None;
+            }
+        }
+
+        None
+    }
+
+    fn first_nested_server_bytes(data: &[u8]) -> Option<&[u8]> {
+        let mut i = 0usize;
+
+        while i < data.len() {
+            let (tag, next) = decode_varint_for_test(data, i)?;
+            i = next;
+
+            let wire_type = (tag & 0x07) as u8;
+            let field = (tag >> 3) as u32;
+
+            match wire_type {
+                2 => {
+                    let (len, next) = decode_varint_for_test(data, i)?;
+                    let len = len as usize;
+                    i = next;
+                    if i + len > data.len() {
+                        return None;
+                    }
+                    if field == 1 {
+                        return Some(&data[i..i + len]);
+                    }
+                    i += len;
+                }
+                5 => {
+                    i += 4;
+                }
+                _ => return None,
+            }
+        }
+
+        None
+    }
+
+    fn contains_len_field(data: &[u8], field_num: u32, expected: &[u8]) -> bool {
+        let mut i = 0usize;
+        let expected_tag = ((field_num << 3) | 2) as u64;
+
+        while i < data.len() {
+            let Some((tag, next)) = decode_varint_for_test(data, i) else {
+                return false;
+            };
+            i = next;
+
+            let wire_type = (tag & 0x07) as u8;
+
+            match wire_type {
+                2 => {
+                    let Some((len, next)) = decode_varint_for_test(data, i) else {
+                        return false;
+                    };
+                    let len = len as usize;
+                    i = next;
+                    if i + len > data.len() {
+                        return false;
+                    }
+                    if tag == expected_tag && &data[i..i + len] == expected {
+                        return true;
+                    }
+                    i += len;
+                }
+                5 => {
+                    i += 4;
+                }
+                _ => return false,
+            }
+        }
+
+        false
+    }
+
+    #[test]
+    fn test_server_list_encoder_emits_empty_required_style_fields() {
+        let server = ServerInfo {
+            id: 1,
+            name: utf16_to_bytes("Classic+"),
+            category: Vec::new(),
+            title: utf16_to_bytes("Classic+"),
+            queue: Vec::new(),
+            population: Vec::new(),
+            address: ipv4_to_u32("127.0.0.1"),
+            port: 7801,
+            available: 1,
+            unavailable_message: Vec::new(),
+            host: utf16_to_bytes("127.0.0.1:7801"),
+        };
+        let list = ServerList {
+            servers: vec![server],
+            last_server_id: 0,
+            sort_criterion: 2,
+        };
+
+        let encoded = encode_server_list_wire_compatible(&list);
+        let server_bytes = first_nested_server_bytes(&encoded).expect("server entry must be present");
+
+        assert!(contains_len_field(server_bytes, 3, &[]), "category must be emitted even when empty");
+        assert!(contains_len_field(server_bytes, 5, &[]), "queue must be emitted even when empty");
+        assert!(contains_len_field(server_bytes, 6, &[]), "population must be emitted even when empty");
+        assert!(contains_len_field(server_bytes, 10, &[]), "unavailable_message must be emitted even when empty");
+    }
+
+    #[test]
+    fn test_server_list_encoder_emits_host_as_ip_port_utf16() {
+        let host = utf16_to_bytes("127.0.0.1:7801");
+        let server = ServerInfo {
+            id: 1,
+            name: utf16_to_bytes("Classic+"),
+            category: utf16_to_bytes("PvE"),
+            title: utf16_to_bytes(&format!("Classic+{}", "x".repeat(80))),
+            queue: utf16_to_bytes(""),
+            population: utf16_to_bytes("Online"),
+            address: ipv4_to_u32("127.0.0.1"),
+            port: 7801,
+            available: 1,
+            unavailable_message: Vec::new(),
+            host: host.clone(),
+        };
+        let list = ServerList {
+            servers: vec![server],
+            last_server_id: 0,
+            sort_criterion: 2,
+        };
+
+        let encoded = encode_server_list_wire_compatible(&list);
+        let server_bytes = first_nested_server_bytes(&encoded).expect("server entry must be present");
+
+        assert!(contains_len_field(server_bytes, 11, &host), "host must be encoded as UTF-16 ip:port bytes");
+    }
 
     #[test]
     fn test_to_wstring_empty() {
