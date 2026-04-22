@@ -445,11 +445,22 @@ const ModsView = {
         if (context === 'browse') return `<button class="mods-row-primary install" data-action="install">Install</button>`;
         const download = this.state.downloads.get(entry.id);
         if (download) return this.buildProgressBar(download.progress || 0);
+        if (this.isCuratedPatchBlocked(entry)) {
+            return `<span class="mods-row-state-pill curated" title="${escapeHtml(entry.last_error || '')}">Curated patch</span>`;
+        }
         if (entry.status === 'error') return `<button class="mods-row-primary error" data-action="retry">Retry</button>`;
         if (entry.status === 'update_available') return `<button class="mods-row-primary update" data-action="update">Update</button>`;
         const enabled = entry.enabled || entry.status === 'enabled' || entry.status === 'running' || entry.status === 'starting';
         return `<label class="mods-row-toggle"><input type="checkbox" data-action="toggle" ${enabled ? 'checked' : ''} /><span class="mods-row-toggle-track"><span class="mods-row-toggle-thumb"></span></span></label>
                 ${entry.status === 'running' ? `<span class="mods-row-running-pill"><span class="mods-row-running-dot"></span>Active</span>` : ''}`;
+    },
+
+    isCuratedPatchBlocked(entry) {
+        const note = String(entry?.last_error || '');
+        return entry?.kind === 'gpk' && entry?.status === 'error' && (
+            note.includes('Curated patch artifacts are detected') ||
+            note.includes('Patch manifest for')
+        );
     },
 
     buildProgressBar(pct) {

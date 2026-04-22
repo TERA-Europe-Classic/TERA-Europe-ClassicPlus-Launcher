@@ -92,4 +92,11 @@ describe('mods UI regression fixes', () => {
         expect(css).toMatch(/\.mods-search\s*\{[^}]*user-select:\s*text/i);
         expect(css).toMatch(/\.mods-search\s*\{[^}]*-webkit-user-select:\s*text/i);
     });
+
+    it('surfaces curated GPK blocks explicitly instead of generic retry UI', () => {
+        const js = fs.readFileSync(MODS_JS, 'utf8');
+        expect(js).toContain('isCuratedPatchBlocked');
+        expect(js).toContain('mods-row-state-pill curated');
+        expect(js).toContain('Curated patch');
+    });
 });
