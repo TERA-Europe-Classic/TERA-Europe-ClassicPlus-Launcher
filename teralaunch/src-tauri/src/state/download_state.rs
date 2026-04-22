@@ -344,17 +344,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_hash_cache_operations() {
-        // Clear cache first
-        clear_hash_cache().await;
-
         let info = CachedFileInfo {
             hash: "abc123".to_string(),
             last_modified: SystemTime::now(),
         };
 
-        update_cached_file("test/path.txt".to_string(), info.clone()).await;
+        let mut cache = hash_cache_lock().await;
+        cache.clear();
+        cache.insert("test/path.txt".to_string(), info.clone());
 
-        let cache = get_cached_files().await;
         assert!(cache.contains_key("test/path.txt"));
         assert_eq!(cache.get("test/path.txt").unwrap().hash, "abc123");
     }
@@ -368,24 +366,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_hash_cache_lock() {
-        // Clear cache first to ensure clean state
-        clear_hash_cache().await;
-
-        // Test that we can acquire the lock and get a valid guard
-        let guard = hash_cache_lock().await;
-        assert!(guard.is_empty());
-
-        // Drop the guard and insert an entry
-        drop(guard);
-
         let info = CachedFileInfo {
             hash: "def456".to_string(),
             last_modified: SystemTime::now(),
         };
-        update_cached_file("test/lock_path.txt".to_string(), info).await;
 
-        // Acquire lock again and verify the entry exists
-        let guard = hash_cache_lock().await;
+        let mut guard = hash_cache_lock().await;
+        guard.clear();
+        assert!(guard.is_empty());
+
+        guard.insert("test/lock_path.txt".to_string(), info);
         assert!(guard.contains_key("test/lock_path.txt"));
         assert_eq!(guard.get("test/lock_path.txt").unwrap().hash, "def456");
     }

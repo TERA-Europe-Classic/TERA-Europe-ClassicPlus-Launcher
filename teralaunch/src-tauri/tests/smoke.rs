@@ -90,11 +90,7 @@ fn tests_dir_has_only_the_common_submodule() {
     let mut subdirs: Vec<String> = Vec::new();
     for entry in fs::read_dir(&dir).expect("read tests/") {
         let entry = entry.expect("dir entry");
-        if entry
-            .file_type()
-            .expect("file type")
-            .is_dir()
-        {
+        if entry.file_type().expect("file type").is_dir() {
             subdirs.push(entry.file_name().to_string_lossy().to_string());
         }
     }
@@ -179,10 +175,7 @@ fn tempfile_is_declared_in_dev_dependencies() {
         .expect("Cargo.toml must carry a [dev-dependencies] section");
     let rest = &toml[dev_pos + 1..];
     // Bound the section to the next top-level `[` header (or end-of-file).
-    let section_end = rest[20..]
-        .find("\n[")
-        .map(|p| 20 + p)
-        .unwrap_or(rest.len());
+    let section_end = rest[20..].find("\n[").map(|p| 20 + p).unwrap_or(rest.len());
     let section = &rest[..section_end];
     assert!(
         section.contains("tempfile"),
@@ -280,8 +273,8 @@ fn every_integration_test_file_carries_test_functions() {
     let files = integration_test_files();
     let mut empties = Vec::new();
     for path in &files {
-        let body = fs::read_to_string(path)
-            .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+        let body =
+            fs::read_to_string(path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
         let has_test = body.contains("#[test]")
             || body.contains("#[tokio::test]")
             || body.contains("#[rstest]");
@@ -404,8 +397,7 @@ fn path_and_threshold_constants_are_canonical() {
 /// while losing the auto-cleanup invariant that TempDir provides.
 #[test]
 fn common_mod_rs_uses_tempfile_crate_directly() {
-    let body = fs::read_to_string(COMMON_MOD_RS)
-        .expect("tests/common/mod.rs must exist");
+    let body = fs::read_to_string(COMMON_MOD_RS).expect("tests/common/mod.rs must exist");
     assert!(
         body.contains("use tempfile::TempDir;"),
         "harness (iter 221): tests/common/mod.rs must import \
@@ -644,17 +636,13 @@ fn cargo_toml_has_reasonable_deps_count() {
         .split("[dependencies]")
         .nth(1)
         .expect("Cargo.toml must have [dependencies]");
-    let deps_end = deps_section
-        .find("\n[")
-        .unwrap_or(deps_section.len());
+    let deps_end = deps_section.find("\n[").unwrap_or(deps_section.len());
     let deps_block = &deps_section[..deps_end];
     let dep_lines = deps_block
         .lines()
         .filter(|l| {
             let t = l.trim_start();
-            !t.is_empty()
-                && !t.starts_with('#')
-                && t.contains('=')
+            !t.is_empty() && !t.starts_with('#') && t.contains('=')
         })
         .count();
     assert!(

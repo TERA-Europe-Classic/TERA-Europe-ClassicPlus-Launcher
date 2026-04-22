@@ -246,13 +246,11 @@ fn load_calls_recover_stuck_installs_before_return() {
     let rest = &body[fn_pos..];
     let end = rest.find("\n    }\n").unwrap_or(rest.len().min(1000));
     let fn_body = &rest[..end];
-    let recover_pos = fn_body
-        .find("recover_stuck_installs()")
-        .expect(
-            "Registry::load must call recover_stuck_installs() — \
+    let recover_pos = fn_body.find("recover_stuck_installs()").expect(
+        "Registry::load must call recover_stuck_installs() — \
              without it, stranded Installing rows never get flipped \
              to Error and the UI is stuck forever (PRD 3.2.2)",
-        );
+    );
     let return_pos = fn_body
         .find("Ok(reg)")
         .expect("Registry::load must return Ok(reg)");
@@ -361,22 +359,18 @@ fn save_is_atomic_tmp_plus_rename_not_direct_write() {
     let end = rest.find("\n    }\n").unwrap_or(rest.len().min(1500));
     let fn_body = &rest[..end];
     // A `.tmp` sibling must be written to.
-    let tmp_write_pos = fn_body
-        .find("fs::write(&tmp")
-        .expect(
-            "PRD 3.2.2: Registry::save must write to `&tmp` (a .tmp \
+    let tmp_write_pos = fn_body.find("fs::write(&tmp").expect(
+        "PRD 3.2.2: Registry::save must write to `&tmp` (a .tmp \
              sibling) first. Direct `fs::write(path, ...)` corrupts \
              the registry on SIGKILL mid-write.",
-        );
+    );
     // Then atomically renamed to the real path.
-    let rename_pos = fn_body
-        .find("fs::rename(&tmp, path)")
-        .expect(
-            "PRD 3.2.2: Registry::save must call \
+    let rename_pos = fn_body.find("fs::rename(&tmp, path)").expect(
+        "PRD 3.2.2: Registry::save must call \
              `fs::rename(&tmp, path)` after the tmp write. Without \
              the rename, the real registry file never gets the new \
              content.",
-        );
+    );
     assert!(
         tmp_write_pos < rename_pos,
         "PRD 3.2.2: the tmp write must precede the rename in source \
@@ -627,8 +621,8 @@ fn recover_stuck_installs_targets_installing_status_only() {
          break idempotence on subsequent startups.\nBody:\n{fn_body}"
     );
     // Must NOT match on Error (would re-flip on every startup).
-    let matches_error_in_filter = fn_body.contains("ModStatus::Error =>")
-        || fn_body.contains("| ModStatus::Error");
+    let matches_error_in_filter =
+        fn_body.contains("ModStatus::Error =>") || fn_body.contains("| ModStatus::Error");
     assert!(
         !matches_error_in_filter,
         "PRD 3.2.2 (iter 242): recover_stuck_installs must NOT \
@@ -721,8 +715,7 @@ fn stuck_registry_fixture_contains_installing_row() {
     // Window the raw-string fixture up to 1500 chars (generous).
     let window = &body[fixture_pos..fixture_pos.saturating_add(1500)];
     assert!(
-        window.contains(r#""status": "installing""#)
-            || window.contains(r#""status":"installing""#),
+        window.contains(r#""status": "installing""#) || window.contains(r#""status":"installing""#),
         "PRD 3.2.2 (iter 242): STUCK_REGISTRY_JSON fixture must \
          carry a row with `\"status\": \"installing\"` (snake_case \
          — serde serialisation matches the `installing_state_\
@@ -782,8 +775,7 @@ fn guard_source_byte_bounds() {
 
 #[test]
 fn guard_source_cites_prd_3_2_2_explicitly() {
-    let body = std::fs::read_to_string(GUARD_SOURCE)
-        .expect("guard must exist");
+    let body = std::fs::read_to_string(GUARD_SOURCE).expect("guard must exist");
     let header = &body[..body.len().min(500)];
     assert!(
         header.contains("PRD 3.2.2"),
@@ -794,12 +786,13 @@ fn guard_source_cites_prd_3_2_2_explicitly() {
 
 #[test]
 fn stuck_registry_fixture_parses_as_valid_json() {
-    let parsed: Result<serde_json::Value, _> =
-        serde_json::from_str(STUCK_REGISTRY_JSON);
-    let v = parsed.unwrap_or_else(|e| panic!(
-        "PRD 3.2.2 (iter 279): STUCK_REGISTRY_JSON fixture must parse \
+    let parsed: Result<serde_json::Value, _> = serde_json::from_str(STUCK_REGISTRY_JSON);
+    let v = parsed.unwrap_or_else(|e| {
+        panic!(
+            "PRD 3.2.2 (iter 279): STUCK_REGISTRY_JSON fixture must parse \
          as valid JSON. Parse error: {e}"
-    ));
+        )
+    });
     assert!(
         v.is_object(),
         "PRD 3.2.2 (iter 279): STUCK_REGISTRY_JSON must parse as a \

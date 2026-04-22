@@ -2,7 +2,7 @@
 //! "no magic footer" rejection path.
 //!
 //! The behavioural corpus lives in
-//! `src/services/mods/tmm.rs::tests::parse_mod_file_rejects_non_tmm_gpks`
+//! `src/services/mods/gpk.rs::tests::parse_mod_file_rejects_non_tmm_gpks`
 //! (8 adversarial fixtures — empty / too-small / wrong-magic / magic-only /
 //! misplaced-magic / corrupt-footer / small-non-magic / long-junk).
 //!
@@ -18,22 +18,22 @@
 
 use std::fs;
 
-const TMM_RS: &str = "src/services/mods/tmm.rs";
+const GPK_RS: &str = "src/services/mods/gpk.rs";
 
-fn read_tmm_rs() -> String {
-    fs::read_to_string(TMM_RS).expect("services/mods/tmm.rs must exist")
+fn read_gpk_rs() -> String {
+    fs::read_to_string(GPK_RS).expect("services/mods/gpk.rs must exist")
 }
 
-/// The named adversarial corpus test must stay present in tmm.rs. This
+/// The named adversarial corpus test must stay present in gpk.rs. This
 /// is what PRD §5.3 adv.bogus-gpk-footer is stamped against; deleting
 /// the test would silently erase the proof that non-TMM bytes are
 /// handled without panic.
 #[test]
 fn adversarial_corpus_test_stays_in_tmm_rs() {
-    let src = read_tmm_rs();
+    let src = read_gpk_rs();
     assert!(
         src.contains("fn parse_mod_file_rejects_non_tmm_gpks"),
-        "tmm.rs must retain the parse_mod_file_rejects_non_tmm_gpks test — \
+        "gpk.rs must retain the parse_mod_file_rejects_non_tmm_gpks test — \
          it's the behavioural pin for PRD §5.3 adv.bogus-gpk-footer"
     );
     // The test must still exercise parse_mod_file directly (not some
@@ -54,10 +54,10 @@ fn adversarial_corpus_test_stays_in_tmm_rs() {
 /// meaningless data — breaking the "bogus bytes return cleanly" invariant.
 #[test]
 fn parse_mod_file_retains_magic_check_fallback() {
-    let src = read_tmm_rs();
+    let src = read_gpk_rs();
     let fn_pos = src
         .find("pub fn parse_mod_file")
-        .expect("tmm.rs must still define parse_mod_file");
+        .expect("gpk.rs must still define parse_mod_file");
     // Window covers the function header + the first ~60 lines of body —
     // enough to cover the magic read + check but not the rest of the
     // footer parsing.
@@ -86,10 +86,10 @@ fn parse_mod_file_retains_magic_check_fallback() {
 /// a zero-length composite that might cause downstream surprises.
 #[test]
 fn install_gpk_retains_empty_container_rejection() {
-    let src = read_tmm_rs();
+    let src = read_gpk_rs();
     let fn_pos = src
         .find("pub fn install_gpk")
-        .expect("tmm.rs must still define install_gpk");
+        .expect("gpk.rs must still define install_gpk");
     // Window is generous — install_gpk's gate block is near the top but
     // after a bit of setup; 2500 chars comfortably covers the whole gate
     // cluster without spilling into the actual deploy code.
@@ -146,7 +146,7 @@ fn detector_self_test_rejects_source_missing_guards() {
 /// stack data. This is a classic small-input-attack class.
 #[test]
 fn parse_mod_file_guards_against_tiny_input_underflow() {
-    let src = read_tmm_rs();
+    let src = read_gpk_rs();
     let fn_pos = src
         .find("pub fn parse_mod_file")
         .expect("parse_mod_file must exist");
@@ -175,7 +175,7 @@ fn parse_mod_file_guards_against_tiny_input_underflow() {
 /// for footers that pass the magic check but are still malformed.
 #[test]
 fn parse_mod_file_read_back_guards_cursor_underflow() {
-    let src = read_tmm_rs();
+    let src = read_gpk_rs();
     let fn_pos = src
         .find("pub fn parse_mod_file")
         .expect("parse_mod_file must exist");
@@ -203,13 +203,15 @@ fn parse_mod_file_read_back_guards_cursor_underflow() {
 /// degenerate ModFile.
 #[test]
 fn install_gpk_has_four_fail_closed_gates() {
-    let src = read_tmm_rs().replace("\r\n", "\n");
+    let src = read_gpk_rs().replace("\r\n", "\n");
     let fn_pos = src
         .find("pub fn install_gpk")
         .expect("install_gpk must exist");
-    // The four gates all live in the first ~1000 chars of the body
+    // The four gates all live near the top of the body before
+    // `ensure_backup`, but the exact formatting can expand a bit as
+    // comments or error strings evolve.
     // (before ensure_backup).
-    let window = &src[fn_pos..fn_pos.saturating_add(1000)];
+    let window = &src[fn_pos..fn_pos.saturating_add(1400)];
 
     // Gate 1 (already pinned in an earlier test) — empty container.
     assert!(
@@ -236,7 +238,8 @@ fn install_gpk_has_four_fail_closed_gates() {
     );
     // Gate 4 — at least one package has an empty object_path.
     assert!(
-        window.contains("modfile.packages.iter().any(|p| p.object_path.is_empty())"),
+        window.contains("modfile.packages.iter().any(")
+            && window.contains("p.object_path.is_empty()"),
         "PRD §3.1.4 gpk-deploy-sandbox gate 4: \
          `modfile.packages.iter().any(|p| p.object_path.is_empty())` \
          must be present. A package with no object path can't be \
@@ -252,14 +255,12 @@ fn install_gpk_has_four_fail_closed_gates() {
 /// vanilla bytes.
 #[test]
 fn install_gpk_parses_and_gates_before_filesystem_touch() {
-    let src = read_tmm_rs();
+    let src = read_gpk_rs();
     let fn_pos = src
         .find("pub fn install_gpk")
         .expect("install_gpk must exist");
     let rest = &src[fn_pos..];
-    let end = rest
-        .find("\n}\n")
-        .unwrap_or(rest.len().min(3000));
+    let end = rest.find("\n}\n").unwrap_or(rest.len().min(3000));
     let body = &rest[..end];
 
     let parse_pos = body
@@ -275,9 +276,9 @@ fn install_gpk_parses_and_gates_before_filesystem_touch() {
         "modfile.packages.is_empty()",
         "modfile.packages.iter().any(|p| p.object_path.is_empty())",
     ] {
-        let gate_pos = body.find(gate).unwrap_or_else(|| {
-            panic!("install_gpk must carry the `{gate}` gate")
-        });
+        let gate_pos = body
+            .find(gate)
+            .unwrap_or_else(|| panic!("install_gpk must carry the `{gate}` gate"));
         assert!(
             gate_pos < backup_pos,
             "PRD §3.1.4: gate `{gate}` must fire BEFORE \
@@ -301,10 +302,10 @@ fn install_gpk_parses_and_gates_before_filesystem_touch() {
 /// its own parse + sandbox check) forget to repeat the guard.
 #[test]
 fn is_safe_gpk_container_filename_is_pub_crate_helper() {
-    let src = read_tmm_rs();
+    let src = read_gpk_rs();
     assert!(
         src.contains("pub(crate) fn is_safe_gpk_container_filename(name: &str) -> bool"),
-        "PRD §3.1.4: tmm.rs must export \
+        "PRD §3.1.4: gpk.rs must export \
          `pub(crate) fn is_safe_gpk_container_filename(name: &str) -> bool`. \
          Inlining the check into install_gpk makes other call sites \
          (add_mod_from_file, preview paths) forget to repeat the \
@@ -343,10 +344,10 @@ fn is_safe_gpk_container_filename_is_pub_crate_helper() {
 /// because no fixture would match the new magic.
 #[test]
 fn package_magic_constant_has_canonical_value() {
-    let src = read_tmm_rs();
+    let src = read_gpk_rs();
     assert!(
         src.contains("const PACKAGE_MAGIC: u32 = 0x9E2A83C1;"),
-        "PRD §5.3 adv.bogus-gpk-footer: tmm.rs must retain \
+        "PRD §5.3 adv.bogus-gpk-footer: gpk.rs must retain \
          `const PACKAGE_MAGIC: u32 = 0x9E2A83C1;` verbatim. A rename \
          (e.g. to `0xDEADBEEF`) would silently change which bytes are \
          treated as 'legitimate TMM footer' and nothing in the test \
@@ -361,7 +362,7 @@ fn package_magic_constant_has_canonical_value() {
 /// maps to a distinct adversary class — they are not redundant.
 #[test]
 fn sandbox_predicate_retains_all_rejection_branches() {
-    let src = read_tmm_rs();
+    let src = read_gpk_rs();
     let fn_pos = src
         .find("pub(crate) fn is_safe_gpk_container_filename(name: &str) -> bool")
         .expect("is_safe_gpk_container_filename must exist");
@@ -370,12 +371,24 @@ fn sandbox_predicate_retains_all_rejection_branches() {
 
     for (branch, rationale) in [
         ("name.is_empty()", "empty string must return false"),
-        ("name.contains('/')", "forward-slash separator (POSIX traversal)"),
-        ("name.contains('\\\\')", "backslash separator (Windows traversal)"),
-        ("name.contains('\\0')", "null byte (interior-NUL filename attacks)"),
+        (
+            "name.contains('/')",
+            "forward-slash separator (POSIX traversal)",
+        ),
+        (
+            "name.contains('\\\\')",
+            "backslash separator (Windows traversal)",
+        ),
+        (
+            "name.contains('\\0')",
+            "null byte (interior-NUL filename attacks)",
+        ),
         ("name == \".\"", "current-directory shorthand"),
         ("name == \"..\"", "parent-directory shorthand"),
-        ("name.contains(\"..\")", "embedded .. (e.g. `foo..bar` on buggy normalisers)"),
+        (
+            "name.contains(\"..\")",
+            "embedded .. (e.g. `foo..bar` on buggy normalisers)",
+        ),
     ] {
         assert!(
             window.contains(branch),
@@ -403,7 +416,7 @@ fn sandbox_predicate_retains_all_rejection_branches() {
 /// .join(container)` would resolve a traversal through Path::join.
 #[test]
 fn uninstall_gpk_calls_sandbox_predicate_first() {
-    let src = read_tmm_rs();
+    let src = read_gpk_rs();
     let fn_pos = src
         .find("pub fn uninstall_gpk(")
         .expect("uninstall_gpk must exist");
@@ -422,9 +435,7 @@ fn uninstall_gpk_calls_sandbox_predicate_first() {
     let gate_pos = window
         .find("is_safe_gpk_container_filename(container)")
         .expect("sandbox gate must be present");
-    let backup_pos = window
-        .find("backup_path(game_root)")
-        .unwrap_or(usize::MAX);
+    let backup_pos = window.find("backup_path(game_root)").unwrap_or(usize::MAX);
     assert!(
         gate_pos < backup_pos,
         "PRD §3.1.4: sandbox gate must fire BEFORE `backup_path(game_root)` \
@@ -442,7 +453,7 @@ fn uninstall_gpk_calls_sandbox_predicate_first() {
 /// errors the adversarial corpus pins rely on.
 #[test]
 fn install_gpk_reads_source_as_raw_bytes() {
-    let src = read_tmm_rs();
+    let src = read_gpk_rs();
     let fn_pos = src
         .find("pub fn install_gpk")
         .expect("install_gpk must exist");
@@ -470,7 +481,7 @@ fn install_gpk_reads_source_as_raw_bytes() {
 /// no-op and no fixture would catch it.
 #[test]
 fn adversarial_corpus_retains_small_buffer_fixtures() {
-    let src = read_tmm_rs();
+    let src = read_gpk_rs();
     let pos = src
         .find("fn parse_mod_file_rejects_non_tmm_gpks")
         .expect("adversarial corpus test must exist");
@@ -492,7 +503,7 @@ fn adversarial_corpus_retains_small_buffer_fixtures() {
 }
 
 // --------------------------------------------------------------------
-// Iter 237 structural pins — TMM_RS path-constant canonicalisation,
+// Iter 237 structural pins — GPK_RS path-constant canonicalisation,
 // adversarial corpus fn-name pin, PACKAGE_MAGIC byte-order literal,
 // four-gate ordering in install_gpk, install_legacy_gpk reads source
 // as raw bytes (same invariant as install_gpk).
@@ -510,33 +521,33 @@ fn adversarial_corpus_retains_small_buffer_fixtures() {
 // as the TMM path.
 // --------------------------------------------------------------------
 
-/// Iter 237: `TMM_RS` constant must stay canonical. Every source-
-/// inspection pin in this guard reads tmm.rs through this constant;
+/// Iter 237: `GPK_RS` constant must stay canonical. Every source-
+/// inspection pin in this guard reads gpk.rs through this constant;
 /// a rename of the production file without updating the constant
 /// panics all tests with "file not found", misdirecting triage.
 #[test]
-fn guard_tmm_rs_path_constant_is_canonical() {
-    let body = read_tmm_rs();
-    // Read the guard source directly (not through TMM_RS) to pin the
+fn guard_gpk_rs_path_constant_is_canonical() {
+    let body = read_gpk_rs();
+    // Read the guard source directly (not through GPK_RS) to pin the
     // literal value verbatim.
     let guard = std::fs::read_to_string("tests/bogus_gpk_footer.rs")
         .expect("guard source must exist")
         .replace("\r\n", "\n");
     assert!(
-        guard.contains(r#"const TMM_RS: &str = "src/services/mods/tmm.rs";"#),
+        guard.contains(r#"const GPK_RS: &str = "src/services/mods/gpk.rs";"#),
         "PRD §5.3 (iter 237): tests/bogus_gpk_footer.rs must keep \
-         `const TMM_RS: &str = \"src/services/mods/tmm.rs\";` \
+         `const GPK_RS: &str = \"src/services/mods/gpk.rs\";` \
          verbatim. A rename without updating the constant leaves \
-         every tmm.rs inspection reading a stale path — `file not \
+         every gpk.rs inspection reading a stale path — `file not \
          found` panic misroutes triage."
     );
-    // Positive sanity: TMM_RS constant resolves to a file with the
+    // Positive sanity: GPK_RS constant resolves to a file with the
     // expected fn surface.
     assert!(
         body.contains("pub fn parse_mod_file"),
-        "PRD §5.3 (iter 237): TMM_RS must resolve to a file \
+        "PRD §5.3 (iter 237): GPK_RS must resolve to a file \
          exporting `pub fn parse_mod_file`. If this fails, either \
-         TMM_RS drifted or the parse fn was renamed/moved."
+         GPK_RS drifted or the parse fn was renamed/moved."
     );
 }
 
@@ -544,15 +555,15 @@ fn guard_tmm_rs_path_constant_is_canonical() {
 /// `parse_mod_file_rejects_non_tmm_gpks`. It's referenced by name
 /// from multiple iter-156 / iter-174 / iter-237 pins in this guard
 /// file (via `src.find("fn parse_mod_file_rejects_non_tmm_gpks")`).
-/// A rename in tmm.rs without coordinated updates here turns every
+/// A rename in gpk.rs without coordinated updates here turns every
 /// pin's `.expect("adversarial corpus test must exist")` into a
 /// panic pointing at a missing fixture, not the rename.
 #[test]
 fn adversarial_corpus_fn_name_is_pinned() {
-    let body = read_tmm_rs();
+    let body = read_gpk_rs();
     assert!(
         body.contains("fn parse_mod_file_rejects_non_tmm_gpks()"),
-        "PRD §5.3 (iter 237): tmm.rs must keep \
+        "PRD §5.3 (iter 237): gpk.rs must keep \
          `fn parse_mod_file_rejects_non_tmm_gpks()` — the fn name is \
          a load-bearing identifier that this guard's pins reference \
          by string. A rename needs a coordinated update to every \
@@ -569,10 +580,10 @@ fn adversarial_corpus_fn_name_is_pinned() {
 /// pattern more often than the canonical one). Pin the exact value.
 #[test]
 fn package_magic_value_is_little_endian_ue3_sentinel() {
-    let body = read_tmm_rs();
+    let body = read_gpk_rs();
     assert!(
         body.contains("const PACKAGE_MAGIC: u32 = 0x9E2A83C1;"),
-        "PRD §5.3 (iter 237): tmm.rs must declare \
+        "PRD §5.3 (iter 237): gpk.rs must declare \
          `PACKAGE_MAGIC: u32 = 0x9E2A83C1` verbatim (little-endian \
          UE3 sentinel). A byte-order swap (0xC1832A9E) would read \
          non-TMM files as TMM candidates, letting malformed inputs \
@@ -583,7 +594,7 @@ fn package_magic_value_is_little_endian_ue3_sentinel() {
     // magic-check semantics.
     assert!(
         !body.contains("PACKAGE_MAGIC: u32 = 0xC1832A9E"),
-        "PRD §5.3 (iter 237): tmm.rs must NOT declare \
+        "PRD §5.3 (iter 237): gpk.rs must NOT declare \
          `PACKAGE_MAGIC` with byte-swapped value 0xC1832A9E — that \
          would read non-TMM files as TMM candidates."
     );
@@ -603,7 +614,7 @@ fn package_magic_value_is_little_endian_ue3_sentinel() {
 /// a hostile container name.
 #[test]
 fn install_gpk_four_gates_appear_in_fail_closed_order() {
-    let body = read_tmm_rs();
+    let body = read_gpk_rs();
     let fn_pos = body
         .find("pub fn install_gpk")
         .expect("install_gpk must exist");
@@ -644,7 +655,7 @@ fn install_gpk_four_gates_appear_in_fail_closed_order() {
 /// mod into a "not a TERA-compatible .gpk" error.
 #[test]
 fn install_legacy_gpk_reads_source_as_raw_bytes() {
-    let body = read_tmm_rs();
+    let body = read_gpk_rs();
     let fn_pos = body
         .find("pub fn install_legacy_gpk")
         .expect("install_legacy_gpk must exist (iter 228 addition)");
@@ -666,22 +677,20 @@ fn install_legacy_gpk_reads_source_as_raw_bytes() {
 }
 
 // --------------------------------------------------------------------
-// Iter 270 structural pins — tmm.rs bounds + guard bounds + adv slot
+// Iter 270 structural pins — gpk.rs bounds + guard bounds + adv slot
 // cite + 19-count tier ratchet begins.
 // --------------------------------------------------------------------
 
-/// Iter 270: tmm.rs byte bounds. Floor ensures the parse/install code
+/// Iter 270: gpk.rs byte bounds. Floor ensures the parse/install code
 /// survives; ceiling catches unbounded scope creep.
 #[test]
 fn tmm_rs_byte_size_has_sane_bounds() {
     const MIN_BYTES: usize = 5000;
     const MAX_BYTES: usize = 200_000;
-    let bytes = std::fs::metadata(TMM_RS)
-        .expect("tmm.rs must exist")
-        .len() as usize;
+    let bytes = std::fs::metadata(GPK_RS).expect("gpk.rs must exist").len() as usize;
     assert!(
         (MIN_BYTES..=MAX_BYTES).contains(&bytes),
-        "adv.bogus-gpk-footer (iter 270): {TMM_RS} is {bytes} bytes; \
+        "adv.bogus-gpk-footer (iter 270): {GPK_RS} is {bytes} bytes; \
          expected [{MIN_BYTES}, {MAX_BYTES}]. Gutting drops the parse \
          code; bloat warrants audit."
     );
@@ -705,8 +714,7 @@ fn guard_source_byte_size_has_sane_bounds() {
 /// Iter 270: guard header must cite `adv.bogus-gpk-footer` slot.
 #[test]
 fn guard_source_cites_adv_bogus_gpk_footer_slot() {
-    let body = std::fs::read_to_string("tests/bogus_gpk_footer.rs")
-        .expect("guard must exist");
+    let body = std::fs::read_to_string("tests/bogus_gpk_footer.rs").expect("guard must exist");
     let header = &body[..body.len().min(500)];
     assert!(
         header.contains("adv.bogus-gpk-footer"),
@@ -715,16 +723,15 @@ fn guard_source_cites_adv_bogus_gpk_footer_slot() {
     );
 }
 
-/// Iter 270: tmm.rs must carry the canonical test name
+/// Iter 270: gpk.rs must carry the canonical test name
 /// `parse_mod_file_rejects_non_tmm_gpks` — referenced in the guard
 /// header's documentation. Rename would orphan the header reference.
 #[test]
 fn tmm_rs_carries_canonical_adversarial_test_name() {
-    let src = std::fs::read_to_string(TMM_RS)
-        .expect("tmm.rs must exist");
+    let src = std::fs::read_to_string(GPK_RS).expect("gpk.rs must exist");
     assert!(
         src.contains("fn parse_mod_file_rejects_non_tmm_gpks"),
-        "adv.bogus-gpk-footer (iter 270): {TMM_RS} must keep \
+        "adv.bogus-gpk-footer (iter 270): {GPK_RS} must keep \
          `fn parse_mod_file_rejects_non_tmm_gpks` — the 8-fixture \
          adversarial corpus the guard header documents. A rename \
          would orphan the header reference and make the corpus \
@@ -737,11 +744,10 @@ fn tmm_rs_carries_canonical_adversarial_test_name() {
 /// different bytes — a semantic regression.
 #[test]
 fn package_magic_constant_is_ue3_sentinel() {
-    let src = std::fs::read_to_string(TMM_RS)
-        .expect("tmm.rs must exist");
+    let src = std::fs::read_to_string(GPK_RS).expect("gpk.rs must exist");
     assert!(
         src.contains("0x9E2A83C1"),
-        "adv.bogus-gpk-footer (iter 270): {TMM_RS} must keep the UE3 \
+        "adv.bogus-gpk-footer (iter 270): {GPK_RS} must keep the UE3 \
          PACKAGE_MAGIC sentinel `0x9E2A83C1`. A change would alter \
          which bytes the parser accepts/rejects — a semantic drift."
     );

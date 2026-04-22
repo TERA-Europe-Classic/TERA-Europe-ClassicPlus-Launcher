@@ -13,7 +13,7 @@
 //! directly, so we source-inspect the body to pin five invariant
 //! wires that must all be present:
 //!
-//! 1. `tmm::parse_mod_file(&bytes)` — rejects non-TMM GPKs before any
+//! 1. `gpk::parse_mod_file(&bytes)` — rejects non-TMM GPKs before any
 //!    disk write (PRD 3.1.3 + 5.3.adv.bogus-gpk-footer).
 //! 2. `is_safe_gpk_container_filename` — refuses hostile container
 //!    names (PRD 3.1.4 deploy-sandbox).
@@ -33,8 +33,8 @@ const MAIN_RS: &str = "src/main.rs";
 const GUARD_SOURCE: &str = "tests/add_mod_from_file_wiring.rs";
 
 fn fn_body_window() -> String {
-    let src = fs::read_to_string(COMMANDS_MODS_RS)
-        .unwrap_or_else(|e| panic!("{COMMANDS_MODS_RS}: {e}"));
+    let src =
+        fs::read_to_string(COMMANDS_MODS_RS).unwrap_or_else(|e| panic!("{COMMANDS_MODS_RS}: {e}"));
     let pos = src
         .find("pub async fn add_mod_from_file")
         .expect("add_mod_from_file must exist as a pub async fn");
@@ -45,8 +45,8 @@ fn fn_body_window() -> String {
 fn fn_with_prelude_window() -> String {
     // Slightly wider window that includes the `#[tauri::command]` and
     // `#[cfg(...)]` attribute lines that precede the fn.
-    let src = fs::read_to_string(COMMANDS_MODS_RS)
-        .unwrap_or_else(|e| panic!("{COMMANDS_MODS_RS}: {e}"));
+    let src =
+        fs::read_to_string(COMMANDS_MODS_RS).unwrap_or_else(|e| panic!("{COMMANDS_MODS_RS}: {e}"));
     let pos = src
         .find("pub async fn add_mod_from_file")
         .expect("add_mod_from_file must exist as a pub async fn");
@@ -55,15 +55,15 @@ fn fn_with_prelude_window() -> String {
     src[start..pos.saturating_add(4000)].to_string()
 }
 
-/// Wire 1 — must call `tmm::parse_mod_file` to reject non-TMM bytes
+/// Wire 1 — must call `gpk::parse_mod_file` to reject non-TMM bytes
 /// before any disk write or registry mutation.
 #[test]
 fn add_mod_from_file_calls_parse_mod_file() {
     let body = fn_body_window();
     assert!(
-        body.contains("tmm::parse_mod_file(&bytes)"),
+        body.contains("gpk::parse_mod_file(&bytes)"),
         "PRD 3.3.4 wiring violated: add_mod_from_file must call \
-         tmm::parse_mod_file(&bytes) to reject non-TMM imports. \
+         gpk::parse_mod_file(&bytes) to reject non-TMM imports. \
          Without this, a hostile or corrupt file could reach \
          install_gpk or the registry."
     );
@@ -140,7 +140,7 @@ fn add_mod_from_file_persists_via_registry_upsert() {
 fn parse_mod_file_precedes_container_safety_check() {
     let body = fn_body_window();
     let parse_idx = body
-        .find("tmm::parse_mod_file(&bytes)")
+        .find("gpk::parse_mod_file(&bytes)")
         .expect("parse_mod_file call must exist (wire 1)");
     let safe_idx = body
         .find("is_safe_gpk_container_filename")
@@ -162,7 +162,7 @@ fn parse_mod_file_precedes_container_safety_check() {
 #[test]
 fn parse_mod_file_precedes_fs_write_to_gpk_slot() {
     let body = fn_body_window();
-    let parse_idx = body.find("tmm::parse_mod_file(&bytes)").unwrap();
+    let parse_idx = body.find("gpk::parse_mod_file(&bytes)").unwrap();
     // Find the first fs::write (either std::fs::write or fs::write).
     let write_idx = body
         .find("fs::write(")
@@ -198,7 +198,7 @@ fn signature_returns_result_mod_entry_string() {
 /// must stay. A TMM file with no container name would pass the
 /// parse but have nothing for `is_safe_gpk_container_filename` to
 /// check; the fail-fast gives a specific user-facing error
-/// ("no container name in footer") before the sandbox test runs.
+/// ("no deployable override metadata") before the sandbox test runs.
 #[test]
 fn empty_container_name_is_fail_fast() {
     let body = fn_body_window();
@@ -211,9 +211,9 @@ fn empty_container_name_is_fail_fast() {
          pass (iter-33 fix)."
     );
     assert!(
-        body.contains("no container name in footer"),
+        body.contains("no deployable override metadata"),
         "PRD 3.3.4 error-text drift: the empty-container error must \
-         cite `no container name in footer` so users understand the \
+         cite `no deployable override metadata` so users understand the \
          failure. Changing the wording breaks the docs/mod-manager/\
          TROUBLESHOOT.md cross-reference."
     );
@@ -228,9 +228,9 @@ fn empty_container_name_is_fail_fast() {
 fn id_derivation_uses_from_local_gpk_constructor() {
     let body = fn_body_window();
     assert!(
-        body.contains("ModEntry::from_local_gpk(&sha, &modfile)"),
+        body.contains("ModEntry::from_local_gpk(&sha, &modfile, fallback_display_name.as_deref())"),
         "PRD 3.3.4 id-derivation violated: add_mod_from_file must \
-         use `ModEntry::from_local_gpk(&sha, &modfile)`. \
+         use `ModEntry::from_local_gpk(&sha, &modfile, fallback_display_name.as_deref())`. \
          `from_catalog` would produce a different id prefix \
          (catalog.<name> vs local.<sha12>) and a re-import of the \
          same file would no longer be idempotent — worse, a \
@@ -249,13 +249,13 @@ fn add_mod_from_file_detector_self_test() {
         fs::write(dest, &bytes)?;
     }";
     assert!(
-        !missing_parse.contains("tmm::parse_mod_file(&bytes)"),
+        !missing_parse.contains("gpk::parse_mod_file(&bytes)"),
         "self-test: body missing parse must trip wire 1"
     );
 
     // Bad shape B: body missing sandbox predicate.
     let missing_sandbox = "pub async fn add_mod_from_file(path: String) -> Result<_, _> {
-        let modfile = tmm::parse_mod_file(&bytes)?;
+        let modfile = gpk::parse_mod_file(&bytes)?;
         fs::write(dest, &bytes)?;
     }";
     assert!(
@@ -345,8 +345,7 @@ fn add_mod_from_file_detector_self_test() {
 /// wiring back to the end-to-end IPC test it complements.
 #[test]
 fn guard_file_header_cites_prd_and_playwright_spec() {
-    let body = fs::read_to_string(GUARD_SOURCE)
-        .unwrap_or_else(|e| panic!("{GUARD_SOURCE}: {e}"));
+    let body = fs::read_to_string(GUARD_SOURCE).unwrap_or_else(|e| panic!("{GUARD_SOURCE}: {e}"));
     let header = &body[..body.len().min(1500)];
     assert!(
         header.contains("PRD 3.3.4"),
@@ -391,8 +390,7 @@ fn fn_is_tauri_command_and_async() {
 /// this guard would still pass the function-exists pins.
 #[test]
 fn fn_is_registered_in_invoke_handler() {
-    let main_src = fs::read_to_string(MAIN_RS)
-        .unwrap_or_else(|e| panic!("{MAIN_RS}: {e}"));
+    let main_src = fs::read_to_string(MAIN_RS).unwrap_or_else(|e| panic!("{MAIN_RS}: {e}"));
     assert!(
         main_src.contains("commands::mods::add_mod_from_file"),
         "PRD 3.3.4 (iter 191): {MAIN_RS} must register \
@@ -587,10 +585,10 @@ fn info_log_sanitizes_sha_to_twelve_chars() {
 fn fs_write_dest_is_rooted_under_gpk_dir() {
     let body = fn_body_window();
     // Must resolve gpk_dir before the write.
-    let gpk_dir_idx = body
-        .find("get_gpk_dir()")
-        .expect("add_mod_from_file must call get_gpk_dir() to \
-                 resolve the sandboxed mods directory");
+    let gpk_dir_idx = body.find("get_gpk_dir()").expect(
+        "add_mod_from_file must call get_gpk_dir() to \
+                 resolve the sandboxed mods directory",
+    );
     // Must compute `dest` from gpk_dir.join(...).
     let dest_idx = body
         .find("let dest = gpk_dir.join(")
@@ -669,8 +667,7 @@ fn guard_source_byte_bounds() {
 
 #[test]
 fn guard_source_cites_prd_3_3_4_explicitly() {
-    let body = fs::read_to_string(GUARD_SOURCE)
-        .expect("guard must exist");
+    let body = fs::read_to_string(GUARD_SOURCE).expect("guard must exist");
     let header = &body[..body.len().min(500)];
     assert!(
         header.contains("PRD 3.3.4"),
@@ -681,8 +678,7 @@ fn guard_source_cites_prd_3_3_4_explicitly() {
 
 #[test]
 fn sha2_crate_is_declared_in_cargo_toml() {
-    let toml = fs::read_to_string("Cargo.toml")
-        .expect("Cargo.toml must exist");
+    let toml = fs::read_to_string("Cargo.toml").expect("Cargo.toml must exist");
     assert!(
         toml.contains("sha2"),
         "PRD 3.3.4 (iter 286): Cargo.toml must declare `sha2` — the \

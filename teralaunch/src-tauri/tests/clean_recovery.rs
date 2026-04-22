@@ -2,7 +2,7 @@
 //! `commands::mods::recover_clean_mapper`.
 //!
 //! The behavioural test of the underlying predicate lives inline in
-//! `src/services/mods/tmm.rs::tests` (four cases: nop-when-backup-exists,
+//! `src/services/mods/gpk.rs::tests` (four cases: nop-when-backup-exists,
 //! creates-backup-from-vanilla, refuses-when-current-is-modded, missing-
 //! mapper-returns-err). This integration test only covers the piece the
 //! unit tests can't reach: that the Tauri command layer is actually
@@ -16,13 +16,12 @@ use std::fs;
 
 /// `commands::mods::recover_clean_mapper` must (a) exist with a
 /// `#[tauri::command]` attribute, (b) call through to
-/// `tmm::recover_missing_clean`, and (c) resolve the game root via the
+/// `gpk::recover_missing_clean`, and (c) resolve the game root via the
 /// existing `resolve_game_root()` helper rather than a fresh ad-hoc path
 /// lookup that could drift from the other mods commands.
 #[test]
-fn recover_clean_mapper_is_a_tauri_command_and_delegates_to_tmm() {
-    let mods_rs =
-        fs::read_to_string("src/commands/mods.rs").expect("commands/mods.rs must exist");
+fn recover_clean_mapper_is_a_tauri_command_and_delegates_to_gpk() {
+    let mods_rs = fs::read_to_string("src/commands/mods.rs").expect("commands/mods.rs must exist");
 
     let decl_pos = mods_rs
         .find("pub async fn recover_clean_mapper")
@@ -49,8 +48,8 @@ fn recover_clean_mapper_is_a_tauri_command_and_delegates_to_tmm() {
     // sibling function further down.
     let body_window = &mods_rs[decl_pos..decl_pos.saturating_add(600)];
     assert!(
-        body_window.contains("tmm::recover_missing_clean"),
-        "recover_clean_mapper must delegate to tmm::recover_missing_clean"
+        body_window.contains("gpk::recover_missing_clean"),
+        "recover_clean_mapper must delegate to gpk::recover_missing_clean"
     );
     assert!(
         body_window.contains("resolve_game_root"),
@@ -73,25 +72,25 @@ fn recover_clean_mapper_is_registered_in_main_generate_handler() {
     );
 }
 
-/// The underlying `tmm::recover_missing_clean` must not be gated with
+/// The underlying `gpk::recover_missing_clean` must not be gated with
 /// `#[allow(dead_code)]` any more. While the attribute doesn't affect
 /// semantics, its presence would be a tell that nobody's actually
 /// calling the function — historically it was a TODO flag. Removing
 /// it as part of the wiring commit makes the promotion explicit.
 #[test]
 fn recover_missing_clean_is_no_longer_dead_code_gated() {
-    let tmm_rs =
-        fs::read_to_string("src/services/mods/tmm.rs").expect("services/mods/tmm.rs must exist");
+    let gpk_rs =
+        fs::read_to_string("src/services/mods/gpk.rs").expect("services/mods/gpk.rs must exist");
 
-    let fn_pos = tmm_rs
+    let fn_pos = gpk_rs
         .find("pub fn recover_missing_clean")
-        .expect("tmm.rs must still define recover_missing_clean");
+        .expect("gpk.rs must still define recover_missing_clean");
 
     // The 200-char window immediately before the fn must not contain
     // `#[allow(dead_code)]`. A nearby but unrelated allow(dead_code) on
     // a sibling item won't trip this — 200 chars comfortably fits the
     // doc comment block without spilling into other items.
-    let pre = &tmm_rs[fn_pos.saturating_sub(200)..fn_pos];
+    let pre = &gpk_rs[fn_pos.saturating_sub(200)..fn_pos];
     assert!(
         !pre.contains("#[allow(dead_code)]"),
         "recover_missing_clean is now wired up (see commands::mods::recover_clean_mapper) — \
@@ -117,18 +116,16 @@ fn recover_missing_clean_is_no_longer_dead_code_gated() {
 //   - renamed filename constants → ensure_backup writes to the wrong
 //     path, breaking the recovery contract silently.
 
-const TMM_RS: &str = "src/services/mods/tmm.rs";
+const GPK_RS: &str = "src/services/mods/gpk.rs";
 
-fn tmm_src() -> String {
-    fs::read_to_string(TMM_RS).unwrap_or_else(|e| panic!("{TMM_RS} must be readable: {e}"))
+fn gpk_src() -> String {
+    fs::read_to_string(GPK_RS).unwrap_or_else(|e| panic!("{GPK_RS} must be readable: {e}"))
 }
 
 /// Returns the body of `fn_name` as a slice — from the `pub fn` up to
 /// the trailing `\n}\n` that closes the fn.
 fn fn_body_of<'a>(src: &'a str, sig: &str) -> &'a str {
-    let fn_pos = src
-        .find(sig)
-        .unwrap_or_else(|| panic!("{sig} must exist"));
+    let fn_pos = src.find(sig).unwrap_or_else(|| panic!("{sig} must exist"));
     let rest = &src[fn_pos..];
     let end = rest.find("\n}\n").unwrap_or(rest.len().min(2000));
     &rest[..end]
@@ -142,7 +139,7 @@ fn fn_body_of<'a>(src: &'a str, sig: &str) -> &'a str {
 /// restore vanilla).
 #[test]
 fn recover_missing_clean_noops_when_backup_already_exists() {
-    let src = tmm_src();
+    let src = gpk_src();
     let body = fn_body_of(&src, "pub fn recover_missing_clean");
     let exists_pos = body
         .find("if dst.exists() {")
@@ -167,7 +164,7 @@ fn recover_missing_clean_noops_when_backup_already_exists() {
 /// the ability to cleanly uninstall any mod.
 #[test]
 fn recover_missing_clean_refuses_modded_current_mapper() {
-    let src = tmm_src();
+    let src = gpk_src();
     let body = fn_body_of(&src, "pub fn recover_missing_clean");
     assert!(
         body.contains("if map.contains_key(TMM_MARKER)"),
@@ -179,8 +176,7 @@ fn recover_missing_clean_refuses_modded_current_mapper() {
     // The refusal error message must name the TMM marker so operators
     // understand why recovery refused.
     assert!(
-        body.contains("Cannot recover .clean")
-            && body.contains("verify game files"),
+        body.contains("Cannot recover .clean") && body.contains("verify game files"),
         "PRD §3.2.9: recover_missing_clean refusal error must carry \
          the `Cannot recover .clean` phrase + guidance to verify game \
          files. Without this, the user gets a generic error and \
@@ -197,7 +193,7 @@ fn recover_missing_clean_refuses_modded_current_mapper() {
 /// scenario.
 #[test]
 fn ensure_backup_is_idempotent_on_existing_backup() {
-    let src = tmm_src();
+    let src = gpk_src();
     let body = fn_body_of(&src, "pub fn ensure_backup");
     let exists_pos = body
         .find("if dst.exists() {")
@@ -227,17 +223,17 @@ fn ensure_backup_is_idempotent_on_existing_backup() {
 /// literal string.
 #[test]
 fn mapper_and_backup_filename_constants_are_pinned() {
-    let src = tmm_src();
+    let src = gpk_src();
     assert!(
         src.contains(r#"pub const MAPPER_FILE: &str = "CompositePackageMapper.dat";"#),
-        "PRD §3.1.4: tmm.rs must pin \
+        "PRD §3.1.4: gpk.rs must pin \
          `pub const MAPPER_FILE: &str = \"CompositePackageMapper.dat\";` \
          verbatim. The UE3 loader reads the file by literal name; \
          renaming breaks every mod load."
     );
     assert!(
         src.contains(r#"pub const BACKUP_FILE: &str = "CompositePackageMapper.clean";"#),
-        "PRD §3.1.4: tmm.rs must pin \
+        "PRD §3.1.4: gpk.rs must pin \
          `pub const BACKUP_FILE: &str = \"CompositePackageMapper.clean\";` \
          verbatim. Renaming desyncs ensure_backup + recover_missing_clean \
          + every call-site scanner that greps for `.clean`."
@@ -252,7 +248,7 @@ fn mapper_and_backup_filename_constants_are_pinned() {
 /// to be visible to the module that registers it.
 #[test]
 fn backup_and_recover_functions_stay_pub() {
-    let src = tmm_src();
+    let src = gpk_src();
     assert!(
         src.contains("pub fn ensure_backup(game_root: &Path) -> Result<(), String>"),
         "PRD §3.1.4: ensure_backup must stay \
@@ -306,7 +302,7 @@ fn guard_file_header_cites_prd_and_fix_slot() {
 /// error and no actionable guidance.
 #[test]
 fn recover_missing_clean_has_missing_mapper_error_branch() {
-    let src = tmm_src();
+    let src = gpk_src();
     let body = fn_body_of(&src, "pub fn recover_missing_clean");
     assert!(
         body.contains("if !src.exists()"),
@@ -334,11 +330,8 @@ fn recover_missing_clean_has_missing_mapper_error_branch() {
 /// panic the process, leaving the user no route but to relaunch.
 #[test]
 fn backup_and_recover_use_map_err_not_unwrap() {
-    let src = tmm_src();
-    for sig in [
-        "pub fn ensure_backup",
-        "pub fn recover_missing_clean",
-    ] {
+    let src = gpk_src();
+    for sig in ["pub fn ensure_backup", "pub fn recover_missing_clean"] {
         let body = fn_body_of(&src, sig);
         assert!(
             body.contains(".map_err(|e|"),
@@ -365,10 +358,10 @@ fn backup_and_recover_use_map_err_not_unwrap() {
 /// modded mappers as vanilla baselines.
 #[test]
 fn tmm_marker_constant_is_pinned_verbatim() {
-    let src = tmm_src();
+    let src = gpk_src();
     assert!(
         src.contains(r#"const TMM_MARKER: &str = "tmm_marker";"#),
-        "PRD §3.2.9 (iter 195): tmm.rs must pin \
+        "PRD §3.2.9 (iter 195): gpk.rs must pin \
          `const TMM_MARKER: &str = \"tmm_marker\";` verbatim. The \
          string is the sentinel used by recover_missing_clean + \
          ensure_backup + parse_mapper; renaming breaks the mod-\
@@ -382,7 +375,7 @@ fn tmm_marker_constant_is_pinned_verbatim() {
 /// the current mapper, permanently corrupting the user's install.
 #[test]
 fn recover_missing_clean_copies_src_to_dst_not_reverse() {
-    let src = tmm_src();
+    let src = gpk_src();
     let body = fn_body_of(&src, "pub fn recover_missing_clean");
     assert!(
         body.contains("fs::copy(&src, &dst)"),
@@ -412,7 +405,7 @@ fn recover_missing_clean_copies_src_to_dst_not_reverse() {
 /// existing pin.
 #[test]
 fn ensure_backup_copies_src_to_dst_not_reverse() {
-    let src = tmm_src();
+    let src = gpk_src();
     let body = fn_body_of(&src, "pub fn ensure_backup");
     assert!(
         body.contains("fs::copy(&src, &dst)"),
@@ -430,17 +423,17 @@ fn ensure_backup_copies_src_to_dst_not_reverse() {
 }
 
 /// Iter 227: the two path constants declared inside the guard
-/// (`TMM_RS` and `GUARD_SOURCE`) must be pinned verbatim at canonical
-/// values. A rename of either target (tmm.rs → mapper.rs, or the
+/// (`GPK_RS` and `GUARD_SOURCE`) must be pinned verbatim at canonical
+/// values. A rename of either target (gpk.rs → mapper.rs, or the
 /// guard file itself) would surface as a generic must-exist panic at
 /// `fs::read_to_string` time instead of a guarded diff. Pinning the
 /// literal makes the rename a conscious guard update.
 #[test]
 fn guard_path_constants_are_canonical() {
-    let src = fs::read_to_string("tests/clean_recovery.rs")
-        .expect("tests/clean_recovery.rs must exist");
+    let src =
+        fs::read_to_string("tests/clean_recovery.rs").expect("tests/clean_recovery.rs must exist");
     for line in [
-        r#"const TMM_RS: &str = "src/services/mods/tmm.rs";"#,
+        r#"const GPK_RS: &str = "src/services/mods/gpk.rs";"#,
         r#"const GUARD_SOURCE: &str = "tests/clean_recovery.rs";"#,
     ] {
         assert!(
@@ -463,7 +456,7 @@ fn guard_path_constants_are_canonical() {
 /// silently read the wrong file.
 #[test]
 fn mapper_and_backup_path_helpers_join_via_cooked_pc_dir() {
-    let src = tmm_src();
+    let src = gpk_src();
     for (helper, filename_const) in [
         ("fn mapper_path", "MAPPER_FILE"),
         ("fn backup_path", "BACKUP_FILE"),
@@ -495,7 +488,7 @@ fn mapper_and_backup_path_helpers_join_via_cooked_pc_dir() {
 /// (CookedPC-dir plus the filename constants).
 #[test]
 fn backup_functions_source_paths_via_shared_helpers() {
-    let src = tmm_src();
+    let src = gpk_src();
     for sig in ["pub fn ensure_backup", "pub fn recover_missing_clean"] {
         let body = fn_body_of(&src, sig);
         assert!(
@@ -515,7 +508,7 @@ fn backup_functions_source_paths_via_shared_helpers() {
 
 // --------------------------------------------------------------------
 // Iter 261 structural pins — guard source PRD cite + guard byte bounds
-// + tmm.rs inline test module presence + recover_clean_mapper in
+// + gpk.rs inline test module presence + recover_clean_mapper in
 // invoke_handler list + fix-plan-slot cross-ref in guard header.
 // --------------------------------------------------------------------
 
@@ -525,8 +518,8 @@ fn backup_functions_source_paths_via_shared_helpers() {
 /// a reader chasing the fix-plan slot wouldn't land here.
 #[test]
 fn guard_source_cites_fix_clean_recovery_wiring_slot() {
-    let body = fs::read_to_string("tests/clean_recovery.rs")
-        .expect("tests/clean_recovery.rs must exist");
+    let body =
+        fs::read_to_string("tests/clean_recovery.rs").expect("tests/clean_recovery.rs must exist");
     let header = &body[..body.len().min(500)];
     assert!(
         header.contains("fix.clean-recovery-wiring"),
@@ -558,21 +551,20 @@ fn guard_source_byte_size_has_sane_bounds() {
         "fix.clean-recovery-wiring (iter 261): tests/clean_recovery.rs \
          is {bytes} bytes; ceiling is {MAX_BYTES}. Past the ceiling \
          the file likely accumulated tests that belong in the inline \
-         tmm.rs test module."
+ gpk.rs test module."
     );
 }
 
-/// Iter 261: `src/services/mods/tmm.rs` must carry an inline
+/// Iter 261: `src/services/mods/gpk.rs` must carry an inline
 /// `#[cfg(test)] mod tests` block. The guard's header points to
 /// four behavioural cases that live there; without the inline test
 /// module, those cases aren't tested at all.
 #[test]
 fn tmm_carries_inline_test_module() {
-    let src = fs::read_to_string("src/services/mods/tmm.rs")
-        .expect("tmm.rs must exist");
+    let src = fs::read_to_string("src/services/mods/gpk.rs").expect("gpk.rs must exist");
     assert!(
         src.contains("#[cfg(test)]"),
-        "fix.clean-recovery-wiring (iter 261): src/services/mods/tmm.rs \
+        "fix.clean-recovery-wiring (iter 261): src/services/mods/gpk.rs \
          must carry an inline `#[cfg(test)] mod tests` block. The \
          guard's header references four behavioural cases that live \
          there (nop-when-backup-exists / creates-backup-from-vanilla \
@@ -581,7 +573,7 @@ fn tmm_carries_inline_test_module() {
     );
     assert!(
         src.contains("mod tests"),
-        "fix.clean-recovery-wiring (iter 261): tmm.rs inline module \
+        "fix.clean-recovery-wiring (iter 261): gpk.rs inline module \
          must be named `tests`."
     );
 }
@@ -602,7 +594,8 @@ fn recover_clean_mapper_is_in_invoke_handler_list() {
          `command not found`."
     );
     // Also confirm it's in a handler-like context.
-    let handler_pos = main.find("generate_handler!")
+    let handler_pos = main
+        .find("generate_handler!")
         .or_else(|| main.find("invoke_handler"));
     assert!(
         handler_pos.is_some(),
@@ -618,8 +611,8 @@ fn recover_clean_mapper_is_in_invoke_handler_list() {
 /// this pin requires the specific criterion section for discoverability.
 #[test]
 fn guard_source_cites_prd_3_2_9_explicitly() {
-    let body = fs::read_to_string("tests/clean_recovery.rs")
-        .expect("tests/clean_recovery.rs must exist");
+    let body =
+        fs::read_to_string("tests/clean_recovery.rs").expect("tests/clean_recovery.rs must exist");
     let header_plus = &body[..body.len().min(2000)];
     assert!(
         header_plus.contains("3.2.9") || header_plus.contains("PRD 3.2.9"),
@@ -641,8 +634,8 @@ fn guard_source_cites_prd_3_2_9_explicitly() {
 /// reverse-engineering from the test body.
 #[test]
 fn guard_header_enumerates_four_iter_164_refactor_hazards() {
-    let src = fs::read_to_string("tests/clean_recovery.rs")
-        .expect("tests/clean_recovery.rs must exist");
+    let src =
+        fs::read_to_string("tests/clean_recovery.rs").expect("tests/clean_recovery.rs must exist");
     for phrase in [
         "dropped dst.exists() early return",
         "dropped TMM_MARKER refusal",

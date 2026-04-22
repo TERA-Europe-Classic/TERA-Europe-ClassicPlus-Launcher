@@ -469,7 +469,10 @@ fn revert_helpers_use_sync_fs_not_tokio_fs() {
     let src = external_app_src();
     let dir_body = external_app_fn_body(&src, "pub(crate) fn revert_partial_install_dir");
     let file_body = external_app_fn_body(&src, "pub(crate) fn revert_partial_install_file");
-    for (name, body) in [("revert_partial_install_dir", dir_body), ("revert_partial_install_file", file_body)] {
+    for (name, body) in [
+        ("revert_partial_install_dir", dir_body),
+        ("revert_partial_install_file", file_body),
+    ] {
         assert!(
             !body.contains("tokio::fs"),
             "PRD 3.2.8 (iter 234): {name} must NOT use `tokio::fs::...`. \
@@ -586,8 +589,7 @@ fn guard_source_byte_size_has_sane_bounds() {
 
 #[test]
 fn guard_source_cites_prd_3_2_8_explicitly() {
-    let body = std::fs::read_to_string(GUARD_SOURCE)
-        .expect("guard must exist");
+    let body = std::fs::read_to_string(GUARD_SOURCE).expect("guard must exist");
     let header = &body[..body.len().min(500)];
     assert!(
         header.contains("PRD 3.2.8"),
@@ -598,8 +600,7 @@ fn guard_source_cites_prd_3_2_8_explicitly() {
 
 #[test]
 fn external_app_defines_both_revert_helpers() {
-    let src = std::fs::read_to_string(EXTERNAL_APP_RS)
-        .expect("external_app.rs must exist");
+    let src = std::fs::read_to_string(EXTERNAL_APP_RS).expect("external_app.rs must exist");
     assert!(
         src.contains("revert_partial_install_dir"),
         "PRD 3.2.8 (iter 272): {EXTERNAL_APP_RS} must define \
@@ -616,8 +617,7 @@ fn external_app_defines_both_revert_helpers() {
 
 #[test]
 fn mods_mod_rs_exports_external_app_module() {
-    let mod_rs = std::fs::read_to_string("src/services/mods/mod.rs")
-        .expect("mod.rs must exist");
+    let mod_rs = std::fs::read_to_string("src/services/mods/mod.rs").expect("mod.rs must exist");
     assert!(
         mod_rs.contains("pub mod external_app;"),
         "PRD 3.2.8 (iter 272): src/services/mods/mod.rs must carry \

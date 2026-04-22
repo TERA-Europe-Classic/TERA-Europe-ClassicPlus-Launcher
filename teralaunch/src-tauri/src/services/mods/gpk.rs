@@ -726,8 +726,12 @@ fn restore_clean_mapper_state(game_root: &Path) -> Result<(), String> {
     let clean = backup_path(game_root);
     let current = mapper_path(game_root);
     if clean.exists() {
-        fs::copy(&clean, &current)
-            .map_err(|e| format!("Failed to restore CompositePackageMapper.dat from clean backup: {}", e))?;
+        fs::copy(&clean, &current).map_err(|e| {
+            format!(
+                "Failed to restore CompositePackageMapper.dat from clean backup: {}",
+                e
+            )
+        })?;
     } else if current.exists() {
         ensure_backup(game_root)?;
     }
@@ -788,8 +792,13 @@ pub fn rebuild_gpk_state(game_root: &Path, items: &[RebuildItem]) -> Result<(), 
 
         match parsed {
             Ok(modfile) if !modfile.container.trim().is_empty() && !modfile.packages.is_empty() => {
-                install_gpk(game_root, &item.source_gpk)
-                    .map_err(|e| format!("Failed to rebuild composite GPK state for {}: {}", item.source_gpk.display(), e))?;
+                install_gpk(game_root, &item.source_gpk).map_err(|e| {
+                    format!(
+                        "Failed to rebuild composite GPK state for {}: {}",
+                        item.source_gpk.display(),
+                        e
+                    )
+                })?;
             }
             _ => {
                 install_legacy_gpk(
@@ -797,7 +806,13 @@ pub fn rebuild_gpk_state(game_root: &Path, items: &[RebuildItem]) -> Result<(), 
                     &item.source_gpk,
                     item.deployed_filename.as_deref(),
                 )
-                .map_err(|e| format!("Failed to rebuild legacy GPK state for {}: {}", item.source_gpk.display(), e))?;
+                .map_err(|e| {
+                    format!(
+                        "Failed to rebuild legacy GPK state for {}: {}",
+                        item.source_gpk.display(),
+                        e
+                    )
+                })?;
             }
         }
     }
@@ -805,7 +820,10 @@ pub fn rebuild_gpk_state(game_root: &Path, items: &[RebuildItem]) -> Result<(), 
     Ok(())
 }
 
-fn patch_pkg_mapper_for_standalone_gpk(game_root: &Path, folder_name: &str) -> Result<usize, String> {
+fn patch_pkg_mapper_for_standalone_gpk(
+    game_root: &Path,
+    folder_name: &str,
+) -> Result<usize, String> {
     let path = pkg_mapper_path(game_root);
     if !path.exists() {
         return Ok(0);
@@ -825,21 +843,27 @@ fn patch_pkg_mapper_for_standalone_gpk(game_root: &Path, folder_name: &str) -> R
     if removed > 0 {
         let serialized = serialize_pkg_mapper(&entries);
         let reencrypted = encrypt_mapper(serialized.as_bytes());
-        fs::write(&path, &reencrypted).map_err(|e| format!("Failed to write patched PkgMapper.dat: {}", e))?;
+        fs::write(&path, &reencrypted)
+            .map_err(|e| format!("Failed to write patched PkgMapper.dat: {}", e))?;
     }
 
     Ok(removed)
 }
 
-fn restore_pkg_mapper_for_standalone_gpk(game_root: &Path, folder_name: &str) -> Result<usize, String> {
+fn restore_pkg_mapper_for_standalone_gpk(
+    game_root: &Path,
+    folder_name: &str,
+) -> Result<usize, String> {
     let current_path = pkg_mapper_path(game_root);
     let backup_path = pkg_mapper_backup_path(game_root);
     if !current_path.exists() || !backup_path.exists() {
         return Ok(0);
     }
 
-    let current_encrypted = fs::read(&current_path).map_err(|e| format!("Failed to read PkgMapper.dat: {}", e))?;
-    let backup_encrypted = fs::read(&backup_path).map_err(|e| format!("Failed to read PkgMapper.clean: {}", e))?;
+    let current_encrypted =
+        fs::read(&current_path).map_err(|e| format!("Failed to read PkgMapper.dat: {}", e))?;
+    let backup_encrypted =
+        fs::read(&backup_path).map_err(|e| format!("Failed to read PkgMapper.clean: {}", e))?;
     let current_text = String::from_utf8_lossy(&decrypt_mapper(&current_encrypted)).to_string();
     let backup_text = String::from_utf8_lossy(&decrypt_mapper(&backup_encrypted)).to_string();
     let mut current_entries = parse_pkg_mapper(&current_text);
@@ -847,8 +871,14 @@ fn restore_pkg_mapper_for_standalone_gpk(game_root: &Path, folder_name: &str) ->
     let prefix = format!("{folder_name}.");
 
     let mut restored = 0usize;
-    for entry in backup_entries.into_iter().filter(|entry| entry.uid.starts_with(&prefix)) {
-        if current_entries.iter().any(|existing| existing.uid.eq_ignore_ascii_case(&entry.uid)) {
+    for entry in backup_entries
+        .into_iter()
+        .filter(|entry| entry.uid.starts_with(&prefix))
+    {
+        if current_entries
+            .iter()
+            .any(|existing| existing.uid.eq_ignore_ascii_case(&entry.uid))
+        {
             continue;
         }
         current_entries.push(entry);
@@ -858,7 +888,8 @@ fn restore_pkg_mapper_for_standalone_gpk(game_root: &Path, folder_name: &str) ->
     if restored > 0 {
         let serialized = serialize_pkg_mapper(&current_entries);
         let reencrypted = encrypt_mapper(serialized.as_bytes());
-        fs::write(&current_path, &reencrypted).map_err(|e| format!("Failed to restore PkgMapper.dat: {}", e))?;
+        fs::write(&current_path, &reencrypted)
+            .map_err(|e| format!("Failed to restore PkgMapper.dat: {}", e))?;
     }
 
     Ok(restored)
@@ -993,7 +1024,11 @@ pub fn extract_package_folder_name(bytes: &[u8]) -> Option<String> {
             slice
         };
         let s = std::str::from_utf8(trimmed).ok()?.to_string();
-        if s.is_empty() { None } else { Some(s) }
+        if s.is_empty() {
+            None
+        } else {
+            Some(s)
+        }
     } else {
         // UTF-16 LE: (-len) chars including trailing null. Sanity-cap to 256.
         let n = (-len) as usize;
@@ -1002,13 +1037,20 @@ pub fn extract_package_folder_name(bytes: &[u8]) -> Option<String> {
         }
         let mut u16s = Vec::with_capacity(n);
         for i in 0..n {
-            u16s.push(u16::from_le_bytes([bytes[16 + i * 2], bytes[16 + i * 2 + 1]]));
+            u16s.push(u16::from_le_bytes([
+                bytes[16 + i * 2],
+                bytes[16 + i * 2 + 1],
+            ]));
         }
         if u16s.last() == Some(&0) {
             u16s.pop();
         }
         let s = String::from_utf16(&u16s).ok()?;
-        if s.is_empty() { None } else { Some(s) }
+        if s.is_empty() {
+            None
+        } else {
+            Some(s)
+        }
     }
 }
 
@@ -1044,9 +1086,7 @@ pub fn resolve_legacy_target_filename(
     //    on-disk name is an opaque catalog ID like "foglio1024.ui-remover-flight-gauge".
     if let Some(hint) = url_filename_hint {
         let trimmed = hint.trim();
-        if !trimmed.is_empty()
-            && !trimmed.eq_ignore_ascii_case("none")
-            && trimmed.ends_with(".gpk")
+        if !trimmed.is_empty() && !trimmed.eq_ignore_ascii_case("none") && trimmed.ends_with(".gpk")
         {
             return Some(trimmed.to_string());
         }
@@ -1089,14 +1129,15 @@ pub fn install_legacy_gpk(
     source_gpk: &Path,
     url_filename_hint: Option<&str>,
 ) -> Result<String, String> {
-    let bytes = fs::read(source_gpk)
-        .map_err(|e| format!("Failed to read mod file: {}", e))?;
+    let bytes = fs::read(source_gpk).map_err(|e| format!("Failed to read mod file: {}", e))?;
     let target_filename =
         resolve_legacy_target_filename(&bytes, source_gpk, url_filename_hint).ok_or_else(|| {
             "Mod file has no usable package name in its UE3 header or filename — can't map it to a game file."
                 .to_string()
         })?;
-    let folder_name = target_filename.strip_suffix(".gpk").unwrap_or(&target_filename);
+    let folder_name = target_filename
+        .strip_suffix(".gpk")
+        .unwrap_or(&target_filename);
 
     // Sanity-gate the filename so a malformed header can't escape CookedPC.
     if !is_safe_gpk_container_filename(&target_filename) {
@@ -1106,15 +1147,13 @@ pub fn install_legacy_gpk(
     }
 
     let cooked_pc = game_root.join(COOKED_PC_DIR);
-    fs::create_dir_all(&cooked_pc)
-        .map_err(|e| format!("Failed to create CookedPC dir: {}", e))?;
+    fs::create_dir_all(&cooked_pc).map_err(|e| format!("Failed to create CookedPC dir: {}", e))?;
     let dest = cooked_pc.join(&target_filename);
 
     // Back up existing vanilla .gpk if present and no backup exists yet.
     let backup = cooked_pc.join(format!("{target_filename}.vanilla-bak"));
     if dest.exists() && !backup.exists() {
-        fs::copy(&dest, &backup)
-            .map_err(|e| format!("Failed to back up vanilla .gpk: {}", e))?;
+        fs::copy(&dest, &backup).map_err(|e| format!("Failed to back up vanilla .gpk: {}", e))?;
     }
 
     fs::copy(source_gpk, &dest)
@@ -1138,9 +1177,7 @@ pub fn install_legacy_gpk(
 
     let mut rewritten = 0usize;
     for entry in map.values_mut() {
-        if entry.object_path.ends_with(&suffix)
-            || entry.object_path == folder_name
-        {
+        if entry.object_path.ends_with(&suffix) || entry.object_path == folder_name {
             entry.filename = target_filename.clone();
             entry.offset = 0;
             entry.size = file_size;
@@ -1177,10 +1214,7 @@ pub fn install_legacy_gpk(
 /// the modded .gpk and copies the .vanilla-bak back over if present.
 /// If no backup exists (meaning the vanilla slot was empty before the
 /// install), the modded .gpk is simply removed.
-pub fn uninstall_legacy_gpk(
-    game_root: &Path,
-    target_filename: &str,
-) -> Result<(), String> {
+pub fn uninstall_legacy_gpk(game_root: &Path, target_filename: &str) -> Result<(), String> {
     if !is_safe_gpk_container_filename(target_filename) {
         return Err(format!(
             "Refusing to uninstall - '{target_filename}' is not a safe filename."
@@ -1191,29 +1225,34 @@ pub fn uninstall_legacy_gpk(
     let backup = cooked_pc.join(format!("{target_filename}.vanilla-bak"));
 
     if backup.exists() {
-        fs::copy(&backup, &dest)
-            .map_err(|e| format!("Failed to restore vanilla .gpk: {}", e))?;
+        fs::copy(&backup, &dest).map_err(|e| format!("Failed to restore vanilla .gpk: {}", e))?;
         fs::remove_file(&backup)
             .map_err(|e| format!("Failed to remove backup after restore: {}", e))?;
     } else if dest.exists() {
-        fs::remove_file(&dest)
-            .map_err(|e| format!("Failed to remove modded .gpk: {}", e))?;
+        fs::remove_file(&dest).map_err(|e| format!("Failed to remove modded .gpk: {}", e))?;
     }
 
     // Restore composite mapper entries from .clean if possible.
-    let folder_name = target_filename.strip_suffix(".gpk").unwrap_or(target_filename);
+    let folder_name = target_filename
+        .strip_suffix(".gpk")
+        .unwrap_or(target_filename);
     let suffix = format!(".{folder_name}");
     let clean_mapper = backup_path(game_root);
     let current_mapper = mapper_path(game_root);
 
     if clean_mapper.exists() && current_mapper.exists() {
-        if let (Ok(clean_bytes), Ok(current_bytes)) = (fs::read(&clean_mapper), fs::read(&current_mapper)) {
+        if let (Ok(clean_bytes), Ok(current_bytes)) =
+            (fs::read(&clean_mapper), fs::read(&current_mapper))
+        {
             let clean_map = parse_mapper(&String::from_utf8_lossy(&decrypt_mapper(&clean_bytes)));
-            let mut current_map = parse_mapper(&String::from_utf8_lossy(&decrypt_mapper(&current_bytes)));
+            let mut current_map =
+                parse_mapper(&String::from_utf8_lossy(&decrypt_mapper(&current_bytes)));
             let mut rewritten = 0;
 
             for (composite_name, current_entry) in current_map.iter_mut() {
-                if current_entry.object_path.ends_with(&suffix) || current_entry.object_path == folder_name {
+                if current_entry.object_path.ends_with(&suffix)
+                    || current_entry.object_path == folder_name
+                {
                     if let Some(clean_entry) = clean_map.get(composite_name) {
                         current_entry.filename = clean_entry.filename.clone();
                         current_entry.offset = clean_entry.offset;
@@ -1227,7 +1266,11 @@ pub fn uninstall_legacy_gpk(
                 let new_plain = serialize_mapper(&current_map);
                 let new_encrypted = encrypt_mapper(new_plain.as_bytes());
                 let _ = fs::write(&current_mapper, &new_encrypted);
-                log::info!("Restored {} mapper entries for legacy mod {}", rewritten, target_filename);
+                log::info!(
+                    "Restored {} mapper entries for legacy mod {}",
+                    rewritten,
+                    target_filename
+                );
             }
         }
     }
@@ -1252,7 +1295,10 @@ pub fn install_gpk(game_root: &Path, source_gpk: &Path) -> Result<ModFile, Strin
     let gpk_bytes = fs::read(source_gpk).map_err(|e| format!("Failed to read mod file: {}", e))?;
     let modfile = parse_mod_file(&gpk_bytes)?;
     if modfile.container.is_empty() {
-        return Err("Mod file has no embedded container metadata — falling back to filename-based install.".into());
+        return Err(
+            "Mod file has no embedded container metadata — falling back to filename-based install."
+                .into(),
+        );
     }
     if !is_safe_gpk_container_filename(&modfile.container) {
         return Err(format!(
@@ -2296,14 +2342,15 @@ mod tests {
         let fixtures: Vec<Vec<u8>> = vec![
             vec![0u8; 16],
             vec![0xFFu8; 16],
-            b"compName/objPath.gpk".to_vec(),       // 20 bytes: 16 + 4 tail
-            (0u8..48).collect(),                     // 48 bytes = 3 blocks
-            b"abcdefghijklmnopqrs".to_vec(),         // 19 bytes: 16 + 3 tail
+            b"compName/objPath.gpk".to_vec(), // 20 bytes: 16 + 4 tail
+            (0u8..48).collect(),              // 48 bytes = 3 blocks
+            b"abcdefghijklmnopqrs".to_vec(),  // 19 bytes: 16 + 3 tail
         ];
         for (i, plain) in fixtures.iter().enumerate() {
             let back = decrypt_mapper(&encrypt_mapper(plain));
             assert_eq!(
-                &back, plain,
+                &back,
+                plain,
                 "encrypt→decrypt must be identity (fixture #{i}, len={})",
                 plain.len()
             );
@@ -2312,7 +2359,8 @@ mod tests {
             // decrypt — same math).
             let forward = encrypt_mapper(&decrypt_mapper(plain));
             assert_eq!(
-                &forward, plain,
+                &forward,
+                plain,
                 "decrypt→encrypt must be identity (fixture #{i}, len={})",
                 plain.len()
             );
@@ -2359,7 +2407,7 @@ mod tests {
     //      would confuse users and break TMM-compat golden output for
     //      every user whose mod list is non-alphabetical.
     //
-   //   2. OVERLAPPING mods (same slot) are last-install-wins. PRD
+    //   2. OVERLAPPING mods (same slot) are last-install-wins. PRD
     //      3.3.3 explicitly ships this as the behaviour (with
     //      detect_conflicts surfacing the overwrite for user
     //      confirmation). Pinning this stops a refactor from silently
@@ -2370,9 +2418,7 @@ mod tests {
     /// Helper: cheap deep-equality on two mapper states. HashMap !=
     /// preserves nothing about iteration order; we compare by
     /// sorted (composite_name, MapperEntry) pairs.
-    fn sorted_entries(
-        map: &HashMap<String, MapperEntry>,
-    ) -> Vec<(String, MapperEntry)> {
+    fn sorted_entries(map: &HashMap<String, MapperEntry>) -> Vec<(String, MapperEntry)> {
         let mut v: Vec<(String, MapperEntry)> =
             map.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
         v.sort_by(|a, b| a.0.cmp(&b.0));
@@ -2653,11 +2699,8 @@ mod tests {
         let bytes = fake_header(&fstr);
         let source_gpk = Path::new("foglio1024.ui-remover-flight-gauge.gpk");
 
-        let resolved = resolve_legacy_target_filename(
-            &bytes,
-            source_gpk,
-            Some("S1UI_ProgressBar.gpk"),
-        );
+        let resolved =
+            resolve_legacy_target_filename(&bytes, source_gpk, Some("S1UI_ProgressBar.gpk"));
 
         assert_eq!(resolved.as_deref(), Some("S1UI_ProgressBar.gpk"));
     }
@@ -2699,7 +2742,7 @@ mod tests {
         //   entry2 — object_path = "Other.Foo"              (does NOT match)
         let vanilla_map = mapper_with(&[
             ("S1UI_Gauge", "SomePackage.S1UI_Gauge", "S1Data1.gpk"),
-            ("Other",      "Other.Foo",              "S1Data2.gpk"),
+            ("Other", "Other.Foo", "S1Data2.gpk"),
         ]);
         write_mapper_at(game_root, &vanilla_map);
 
@@ -2724,14 +2767,20 @@ mod tests {
         let matched = patched_map
             .get("S1UI_Gauge")
             .expect("matched entry must still exist by composite key");
-        assert_eq!(matched.filename, "S1UI_Gauge.gpk", "filename must be rewritten");
+        assert_eq!(
+            matched.filename, "S1UI_Gauge.gpk",
+            "filename must be rewritten"
+        );
         assert_eq!(matched.offset, 0, "offset must be zeroed");
         assert!(matched.size > 0, "size must match the installed file");
 
         let unmatched = patched_map
             .get("Other")
             .expect("non-matching entry must remain");
-        assert_eq!(unmatched.filename, "S1Data2.gpk", "non-matching entry must be untouched");
+        assert_eq!(
+            unmatched.filename, "S1Data2.gpk",
+            "non-matching entry must be untouched"
+        );
     }
 
     #[test]
@@ -2741,17 +2790,18 @@ mod tests {
 
         // Mapper has no entry ending in `.UnknownPkg`.
         // Standalone files are natively overridden just by dropping them in CookedPC.
-        let map = mapper_with(&[
-            ("Other", "Other.Foo", "S1Data.gpk"),
-        ]);
+        let map = mapper_with(&[("Other", "Other.Foo", "S1Data.gpk")]);
         write_mapper_at(game_root, &map);
 
         let source_gpk = write_fake_gpk(game_root, "mod-orphan.gpk", "UnknownPkg");
         let target_name = install_legacy_gpk(game_root, &source_gpk, None)
             .expect("install must succeed as standalone file");
-        
+
         assert_eq!(target_name, "UnknownPkg.gpk");
-        assert!(game_root.join(COOKED_PC_DIR).join("UnknownPkg.gpk").exists());
+        assert!(game_root
+            .join(COOKED_PC_DIR)
+            .join("UnknownPkg.gpk")
+            .exists());
     }
 
     #[test]
@@ -2759,9 +2809,11 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let game_root = tmp.path();
 
-        let vanilla_map = mapper_with(&[
-            ("S1UI_ProgressBar", "SomePackage.S1UI_ProgressBar", "S1Data1.gpk"),
-        ]);
+        let vanilla_map = mapper_with(&[(
+            "S1UI_ProgressBar",
+            "SomePackage.S1UI_ProgressBar",
+            "S1Data1.gpk",
+        )]);
         write_mapper_at(game_root, &vanilla_map);
 
         let source_gpk = write_fake_gpk(game_root, "S1UI_ProgressBar.gpk", "None");
@@ -2795,7 +2847,8 @@ mod tests {
             ]),
         );
 
-        let source_gpk = write_fake_gpk(game_root, "foglio1024.ui-remover-flight-gauge.gpk", "None");
+        let source_gpk =
+            write_fake_gpk(game_root, "foglio1024.ui-remover-flight-gauge.gpk", "None");
         let target_name = install_legacy_gpk(game_root, &source_gpk, Some("S1UI_ProgressBar.gpk"))
             .expect("standalone install must succeed");
 
@@ -2805,7 +2858,10 @@ mod tests {
         assert!(!text.contains("S1UI_ProgressBar.ProgressBar_IF"));
         assert!(!text.contains("S1UI_ProgressBar.ProgressBar_IC"));
         assert!(text.contains("S1UI_Chat2.Chat2"));
-        assert!(game_root.join(COOKED_PC_DIR).join(PKG_MAPPER_BACKUP_FILE).exists());
+        assert!(game_root
+            .join(COOKED_PC_DIR)
+            .join(PKG_MAPPER_BACKUP_FILE)
+            .exists());
     }
 
     #[test]
@@ -2869,8 +2925,16 @@ mod tests {
             ("S1UI_ProgressBar.ProgressBar_IC", "uid_ic"),
             ("S1UI_Chat2.Chat2", "uid_chat"),
         ]);
-        fs::write(cooked.join(PKG_MAPPER_FILE), encrypt_mapper(current_pkg.as_bytes())).unwrap();
-        fs::write(cooked.join(PKG_MAPPER_BACKUP_FILE), encrypt_mapper(backup_pkg.as_bytes())).unwrap();
+        fs::write(
+            cooked.join(PKG_MAPPER_FILE),
+            encrypt_mapper(current_pkg.as_bytes()),
+        )
+        .unwrap();
+        fs::write(
+            cooked.join(PKG_MAPPER_BACKUP_FILE),
+            encrypt_mapper(backup_pkg.as_bytes()),
+        )
+        .unwrap();
         fs::write(cooked.join("S1UI_ProgressBar.gpk"), b"MODDED").unwrap();
 
         uninstall_legacy_gpk(game_root, "S1UI_ProgressBar.gpk")

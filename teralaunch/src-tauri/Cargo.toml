@@ -4,6 +4,7 @@ version = "0.1.20"
 description = "TERA Europe Classic+ Launcher"
 authors = ["TNC97"]
 edition = "2021"
+default-run = "tera-europe-classicplus-launcher"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -49,6 +50,8 @@ chrono = { version = "0.4", features = ["clock"] }
 semver = "1"
 faster-hex = "0.9"
 netstat2 = "0.9"
+flate2 = "1.1.8"
+lzokay = { version = "2.0.1", default-features = false, features = ["compress", "decompress", "std"] }
 zip = { version = "2.3", default-features = false, features = ["deflate"] }
 sysinfo = { version = "0.32", default-features = false, features = ["system"] }
 tauri-plugin-process = "2"

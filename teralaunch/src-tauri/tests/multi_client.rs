@@ -104,8 +104,8 @@ fn last_close_terminates_overlays() {
 /// all the predicate tests would still pass.
 #[test]
 fn game_rs_gates_overlay_stop_on_decide_overlay_action() {
-    let body = std::fs::read_to_string("src/commands/game.rs")
-        .expect("commands/game.rs must exist");
+    let body =
+        std::fs::read_to_string("src/commands/game.rs").expect("commands/game.rs must exist");
 
     let predicate_pos = body.find("decide_overlay_action(").expect(
         "commands/game.rs must call decide_overlay_action — wiring missing (fix.overlay-lifecycle-wiring)",
@@ -718,8 +718,7 @@ fn guard_source_byte_bounds() {
 
 #[test]
 fn guard_source_cites_prd_3_2_11_and_3_2_12() {
-    let body = std::fs::read_to_string(GUARD_FILE)
-        .expect("guard must exist");
+    let body = std::fs::read_to_string(GUARD_FILE).expect("guard must exist");
     let header = &body[..body.len().min(1500)];
     assert!(
         header.contains("PRD 3.2.11"),
@@ -736,8 +735,7 @@ fn guard_source_cites_prd_3_2_11_and_3_2_12() {
 
 #[test]
 fn spawn_decision_variants_pinned_in_source() {
-    let src = std::fs::read_to_string(EXTERNAL_APP_RS)
-        .expect("external_app.rs must exist");
+    let src = std::fs::read_to_string(EXTERNAL_APP_RS).expect("external_app.rs must exist");
     assert!(
         src.contains("enum SpawnDecision"),
         "PRD 3.2.11 (iter 280): {EXTERNAL_APP_RS} must define `enum \

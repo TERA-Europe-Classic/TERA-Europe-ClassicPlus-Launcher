@@ -2,7 +2,7 @@
 //! `commands::mods::preview_mod_install_conflicts`.
 //!
 //! Pure predicate tests live inline in
-//! `src/services/mods/tmm.rs::tests` (six detect_conflicts cases
+//! `src/services/mods/gpk.rs::tests` (six detect_conflicts cases
 //! covering vanilla / self-reinstall / mixed / multi-slot / missing).
 //! This file only guards the Tauri command layer + the bundle helper
 //! `preview_conflicts_from_bytes` that glues the fs/decrypt/parse path
@@ -12,12 +12,11 @@ use std::fs;
 
 /// The Tauri command must be annotated `#[tauri::command]` with the
 /// attribute directly adjacent to the fn decl, delegate to
-/// `tmm::preview_conflicts_from_bytes`, resolve the game root via the
+/// `gpk::preview_conflicts_from_bytes`, resolve the game root via the
 /// shared helper, and return `Vec<ModConflict>`.
 #[test]
-fn preview_mod_install_conflicts_is_a_tauri_command_and_delegates_to_tmm() {
-    let mods_rs =
-        fs::read_to_string("src/commands/mods.rs").expect("commands/mods.rs must exist");
+fn preview_mod_install_conflicts_is_a_tauri_command_and_delegates_to_gpk() {
+    let mods_rs = fs::read_to_string("src/commands/mods.rs").expect("commands/mods.rs must exist");
 
     let decl_pos = mods_rs
         .find("pub async fn preview_mod_install_conflicts")
@@ -41,9 +40,9 @@ fn preview_mod_install_conflicts_is_a_tauri_command_and_delegates_to_tmm() {
     // than re-implementing the path inline.
     let body_window = &mods_rs[decl_pos..decl_pos.saturating_add(1200)];
     assert!(
-        body_window.contains("tmm::preview_conflicts_from_bytes"),
+        body_window.contains("gpk::preview_conflicts_from_bytes"),
         "preview_mod_install_conflicts must delegate to \
-         tmm::preview_conflicts_from_bytes (bundle helper)"
+         gpk::preview_conflicts_from_bytes (bundle helper)"
     );
     assert!(
         body_window.contains("resolve_game_root"),
@@ -76,16 +75,16 @@ fn preview_mod_install_conflicts_is_registered_in_main_generate_handler() {
 /// Guard against someone dropping the derive during a refactor.
 #[test]
 fn mod_conflict_is_serializable_across_the_ipc_boundary() {
-    let tmm_rs =
-        fs::read_to_string("src/services/mods/tmm.rs").expect("services/mods/tmm.rs must exist");
+    let gpk_rs =
+        fs::read_to_string("src/services/mods/gpk.rs").expect("services/mods/gpk.rs must exist");
 
-    let decl_pos = tmm_rs
+    let decl_pos = gpk_rs
         .find("pub struct ModConflict")
-        .expect("tmm.rs must still define ModConflict");
+        .expect("gpk.rs must still define ModConflict");
 
     // Look back 400 chars for the derive attribute (doc comment +
     // derive line together fit comfortably in that window).
-    let pre = &tmm_rs[decl_pos.saturating_sub(400)..decl_pos];
+    let pre = &gpk_rs[decl_pos.saturating_sub(400)..decl_pos];
     assert!(
         pre.contains("Serialize"),
         "ModConflict must derive serde::Serialize so Tauri can return \
@@ -99,18 +98,18 @@ fn mod_conflict_is_serializable_across_the_ipc_boundary() {
 /// instead of the best-effort preview — degrading UX.
 #[test]
 fn preview_conflicts_from_bytes_is_best_effort_on_missing_backup() {
-    let tmm_rs =
-        fs::read_to_string("src/services/mods/tmm.rs").expect("services/mods/tmm.rs must exist");
+    let gpk_rs =
+        fs::read_to_string("src/services/mods/gpk.rs").expect("services/mods/gpk.rs must exist");
 
-    let decl_pos = tmm_rs
+    let decl_pos = gpk_rs
         .find("pub fn preview_conflicts_from_bytes")
-        .expect("tmm.rs must define preview_conflicts_from_bytes");
+        .expect("gpk.rs must define preview_conflicts_from_bytes");
 
     // The "return Ok(Vec::new())" on missing backup must appear in the
     // first ~500 chars of the body — i.e. as an early-return before any
     // potentially-erroring I/O. Guards against a refactor that moves
     // the check after a fallible `fs::read(&backup)` call.
-    let body_window = &tmm_rs[decl_pos..decl_pos.saturating_add(500)];
+    let body_window = &gpk_rs[decl_pos..decl_pos.saturating_add(500)];
     let backup_exists_pos = body_window
         .find("backup.exists()")
         .expect("preview_conflicts_from_bytes must check backup.exists() before reading");
@@ -137,10 +136,10 @@ fn preview_conflicts_from_bytes_is_best_effort_on_missing_backup() {
 // positives over-reporting slots, false negatives missing real
 // collisions).
 
-const TMM_RS: &str = "src/services/mods/tmm.rs";
+const GPK_RS: &str = "src/services/mods/gpk.rs";
 
-fn tmm_src() -> String {
-    fs::read_to_string(TMM_RS).unwrap_or_else(|e| panic!("{TMM_RS} must be readable: {e}"))
+fn gpk_src() -> String {
+    fs::read_to_string(GPK_RS).unwrap_or_else(|e| panic!("{GPK_RS} must be readable: {e}"))
 }
 
 /// Returns the body of `detect_conflicts` as a slice — from the `pub fn`
@@ -162,7 +161,7 @@ fn detect_conflicts_body(src: &str) -> &str {
 /// site and hide the no-conflict case.
 #[test]
 fn detect_conflicts_signature_is_two_maps_plus_modfile_to_vec() {
-    let src = tmm_src().replace("\r\n", "\n");
+    let src = gpk_src().replace("\r\n", "\n");
     assert!(
         src.contains(
             "pub fn detect_conflicts(\n    vanilla_map: &HashMap<String, MapperEntry>,\n    current_map: &HashMap<String, MapperEntry>,\n    incoming: &ModFile,\n) -> Vec<ModConflict>"
@@ -181,7 +180,7 @@ fn detect_conflicts_signature_is_two_maps_plus_modfile_to_vec() {
 /// would still return items but the UI would show an incomplete row.
 #[test]
 fn mod_conflict_has_three_string_fields_for_ui() {
-    let src = tmm_src();
+    let src = gpk_src();
     let decl_pos = src
         .find("pub struct ModConflict")
         .expect("ModConflict struct must exist");
@@ -209,7 +208,7 @@ fn mod_conflict_has_three_string_fields_for_ui() {
 /// foreign-mod conflict, forcing a confusing modal on legit reinstalls.
 #[test]
 fn detect_conflicts_uses_case_insensitive_filename_compare() {
-    let src = tmm_src();
+    let src = gpk_src();
     let body = detect_conflicts_body(&src);
     // Both checks must use `.eq_ignore_ascii_case(` — one for vanilla
     // baseline, one for the self-reinstall short-circuit.
@@ -234,7 +233,7 @@ fn detect_conflicts_uses_case_insensitive_filename_compare() {
 /// a mod collision.
 #[test]
 fn detect_conflicts_skips_missing_current_slots() {
-    let src = tmm_src();
+    let src = gpk_src();
     let body = detect_conflicts_body(&src);
     // The match must have a None arm that short-circuits with continue.
     assert!(
@@ -253,7 +252,7 @@ fn detect_conflicts_skips_missing_current_slots() {
 /// and silently mis-identify vanilla-unchanged slots.
 #[test]
 fn detect_conflicts_gates_lookup_on_region_lock_both_sides() {
-    let src = tmm_src();
+    let src = gpk_src();
     let body = detect_conflicts_body(&src);
     let region_lock_branches = body.matches("if incoming.region_lock {").count();
     assert!(
@@ -379,7 +378,7 @@ fn preview_command_short_circuits_for_non_gpk_entries() {
 /// wrong set.
 #[test]
 fn detect_conflicts_iterates_over_incoming_packages() {
-    let src = tmm_src();
+    let src = gpk_src();
     let body = detect_conflicts_body(&src);
     assert!(
         body.contains("for pkg in &incoming.packages"),
@@ -390,8 +389,7 @@ fn detect_conflicts_iterates_over_incoming_packages() {
     );
     // And must not loop over the alternative maps (negative pin).
     assert!(
-        !body.contains("for pkg in current_map")
-            && !body.contains("for pkg in vanilla_map"),
+        !body.contains("for pkg in current_map") && !body.contains("for pkg in vanilla_map"),
         "fix.conflict-modal-wiring (iter 193): detect_conflicts must \
          NOT iterate `current_map` / `vanilla_map` — those maps are \
          lookup targets, not iteration sources. Body:\n{body}"
@@ -405,7 +403,7 @@ fn detect_conflicts_iterates_over_incoming_packages() {
 /// the frontend destructure misses or aliases keys).
 #[test]
 fn mod_conflict_has_exactly_three_public_fields() {
-    let src = tmm_src();
+    let src = gpk_src();
     let decl_pos = src
         .find("pub struct ModConflict")
         .expect("ModConflict struct must exist");
@@ -438,7 +436,7 @@ fn mod_conflict_has_exactly_three_public_fields() {
 // command-name rename that breaks the IPC contract without CI trip.
 // --------------------------------------------------------------------
 
-/// Iter 235: `TMM_RS`, `COMMANDS_MODS_RS`, `GUARD_SOURCE` constants
+/// Iter 235: `GPK_RS`, `COMMANDS_MODS_RS`, `GUARD_SOURCE` constants
 /// must stay canonical. Every source-inspection pin in this guard
 /// reads through one of these; drift renders header/body checks
 /// inert with a misleading `file not found` panic.
@@ -446,10 +444,10 @@ fn mod_conflict_has_exactly_three_public_fields() {
 fn guard_path_constants_are_canonical() {
     let body = fs::read_to_string(GUARD_SOURCE).expect("guard source must exist");
     assert!(
-        body.contains(r#"const TMM_RS: &str = "src/services/mods/tmm.rs";"#),
+        body.contains(r#"const GPK_RS: &str = "src/services/mods/gpk.rs";"#),
         "fix.conflict-modal-wiring (iter 235): {GUARD_SOURCE} must \
-         keep `const TMM_RS: &str = \"src/services/mods/tmm.rs\";` \
-         verbatim. A rename leaves every tmm_src() with file-not-found."
+         keep `const GPK_RS: &str = \"src/services/mods/gpk.rs\";` \
+         verbatim. A rename leaves every gpk_src() with file-not-found."
     );
     assert!(
         body.contains(r#"const COMMANDS_MODS_RS: &str = "src/commands/mods.rs";"#),
@@ -474,7 +472,7 @@ fn guard_path_constants_are_canonical() {
 /// _on_missing_backup`).
 #[test]
 fn detect_conflicts_return_type_is_vec_not_option() {
-    let src = tmm_src();
+    let src = gpk_src();
     let body = detect_conflicts_body(&src);
     // Find the return type in the signature line.
     let sig_end = body
@@ -507,7 +505,7 @@ fn detect_conflicts_return_type_is_vec_not_option() {
 /// slot. Pinning the order guards against both cases.
 #[test]
 fn mod_conflict_first_field_is_composite_name() {
-    let src = tmm_src();
+    let src = gpk_src();
     let decl_pos = src
         .find("pub struct ModConflict")
         .expect("ModConflict struct must exist");
@@ -542,7 +540,7 @@ fn mod_conflict_first_field_is_composite_name() {
 /// command.
 #[test]
 fn detect_conflicts_short_circuits_on_empty_incoming() {
-    let src = tmm_src();
+    let src = gpk_src();
     let body = detect_conflicts_body(&src);
     // The fn must iterate `incoming.packages` (covered by iter-193).
     // An empty packages iterator trivially produces an empty Vec.
@@ -575,8 +573,8 @@ fn detect_conflicts_short_circuits_on_empty_incoming() {
 /// mods page's try/catch swallows it into a toast).
 #[test]
 fn preview_command_name_is_pinned_verbatim() {
-    let commands_body = fs::read_to_string(COMMANDS_MODS_RS)
-        .expect("commands/mods.rs must be readable");
+    let commands_body =
+        fs::read_to_string(COMMANDS_MODS_RS).expect("commands/mods.rs must be readable");
     assert!(
         commands_body.contains("pub async fn preview_mod_install_conflicts")
             || commands_body.contains("pub fn preview_mod_install_conflicts"),
@@ -638,17 +636,15 @@ fn commands_mods_byte_size_has_sane_bounds() {
     );
 }
 
-/// Iter 271: tmm.rs byte bounds (pure predicate lives there).
+/// Iter 271: gpk.rs byte bounds (pure predicate lives there).
 #[test]
 fn tmm_rs_byte_size_has_sane_bounds() {
     const MIN_BYTES: usize = 5000;
     const MAX_BYTES: usize = 200_000;
-    let bytes = std::fs::metadata(TMM_RS)
-        .expect("tmm.rs must exist")
-        .len() as usize;
+    let bytes = std::fs::metadata(GPK_RS).expect("gpk.rs must exist").len() as usize;
     assert!(
         (MIN_BYTES..=MAX_BYTES).contains(&bytes),
-        "fix.conflict-modal-wiring (iter 271): {TMM_RS} is {bytes} \
+        "fix.conflict-modal-wiring (iter 271): {GPK_RS} is {bytes} \
          bytes; expected [{MIN_BYTES}, {MAX_BYTES}]."
     );
 }
@@ -656,8 +652,7 @@ fn tmm_rs_byte_size_has_sane_bounds() {
 /// Iter 271: guard header must cite fix-plan slot.
 #[test]
 fn guard_source_cites_fix_conflict_modal_wiring_slot() {
-    let body = std::fs::read_to_string(GUARD_SOURCE)
-        .expect("guard must exist");
+    let body = std::fs::read_to_string(GUARD_SOURCE).expect("guard must exist");
     let header = &body[..body.len().min(500)];
     assert!(
         header.contains("fix.conflict-modal-wiring"),
@@ -671,8 +666,7 @@ fn guard_source_cites_fix_conflict_modal_wiring_slot() {
 /// with `command not found`.
 #[test]
 fn preview_mod_install_conflicts_is_registered_in_main() {
-    let main = std::fs::read_to_string("src/main.rs")
-        .expect("main.rs must exist");
+    let main = std::fs::read_to_string("src/main.rs").expect("main.rs must exist");
     assert!(
         main.contains("preview_mod_install_conflicts"),
         "fix.conflict-modal-wiring (iter 271): src/main.rs must \

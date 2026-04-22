@@ -160,9 +160,7 @@ fn mods_state_is_process_global_rwlock() {
 #[test]
 fn mutate_takes_write_lock_not_read() {
     let body = mods_state_src();
-    let fn_pos = body
-        .find("pub fn mutate<F, T>")
-        .expect("mutate must exist");
+    let fn_pos = body.find("pub fn mutate<F, T>").expect("mutate must exist");
     let rest = &body[fn_pos..];
     let end = rest.find("\n}\n").unwrap_or(rest.len().min(1200));
     let fn_body = &rest[..end];
@@ -192,9 +190,7 @@ fn mutate_takes_write_lock_not_read() {
 #[test]
 fn mutate_saves_registry_write_through() {
     let body = mods_state_src();
-    let fn_pos = body
-        .find("pub fn mutate<F, T>")
-        .expect("mutate must exist");
+    let fn_pos = body.find("pub fn mutate<F, T>").expect("mutate must exist");
     let rest = &body[fn_pos..];
     let end = rest.find("\n}\n").unwrap_or(rest.len().min(1200));
     let fn_body = &rest[..end];
@@ -310,9 +306,7 @@ fn guard_file_header_cites_prd_and_parallel_install_name() {
 #[test]
 fn mutate_closure_err_short_circuits_before_save() {
     let body = mods_state_src();
-    let fn_pos = body
-        .find("pub fn mutate<F, T>")
-        .expect("mutate must exist");
+    let fn_pos = body.find("pub fn mutate<F, T>").expect("mutate must exist");
     let rest = &body[fn_pos..];
     let end = rest.find("\n}\n").unwrap_or(rest.len().min(1200));
     let fn_body = &rest[..end];
@@ -349,9 +343,7 @@ fn mutate_closure_err_short_circuits_before_save() {
 #[test]
 fn mutate_calls_ensure_loaded_before_write_lock() {
     let body = mods_state_src();
-    let fn_pos = body
-        .find("pub fn mutate<F, T>")
-        .expect("mutate must exist");
+    let fn_pos = body.find("pub fn mutate<F, T>").expect("mutate must exist");
     let rest = &body[fn_pos..];
     let end = rest.find("\n}\n").unwrap_or(rest.len().min(1200));
     let fn_body = &rest[..end];
@@ -420,9 +412,7 @@ fn try_claim_installing_upserts_row_on_success() {
 #[test]
 fn mutate_surfaces_poisoned_lock_error_explicitly() {
     let body = mods_state_src();
-    let fn_pos = body
-        .find("pub fn mutate<F, T>")
-        .expect("mutate must exist");
+    let fn_pos = body.find("pub fn mutate<F, T>").expect("mutate must exist");
     let rest = &body[fn_pos..];
     let end = rest.find("\n}\n").unwrap_or(rest.len().min(1200));
     let fn_body = &rest[..end];
@@ -529,9 +519,7 @@ fn mods_state_uses_std_sync_rwlock_not_tokio() {
 #[test]
 fn mutate_save_comes_after_closure_call() {
     let body = mods_state_src();
-    let fn_pos = body
-        .find("pub fn mutate<F, T>")
-        .expect("mutate must exist");
+    let fn_pos = body.find("pub fn mutate<F, T>").expect("mutate must exist");
     let rest = &body[fn_pos..];
     let end = rest.find("\n}\n").unwrap_or(rest.len().min(1200));
     let fn_body = &rest[..end];
@@ -679,8 +667,7 @@ fn guard_source_byte_size_has_sane_bounds() {
 
 #[test]
 fn guard_source_cites_prd_3_2_7_explicitly() {
-    let body = std::fs::read_to_string(GUARD_SOURCE)
-        .expect("guard must exist");
+    let body = std::fs::read_to_string(GUARD_SOURCE).expect("guard must exist");
     let header = &body[..body.len().min(500)];
     assert!(
         header.contains("PRD 3.2.7"),
@@ -691,10 +678,11 @@ fn guard_source_cites_prd_3_2_7_explicitly() {
 
 #[test]
 fn mods_state_uses_std_sync_rwlock_canonical_primitive() {
-    let src = std::fs::read_to_string(MODS_STATE_RS)
-        .expect("mods_state.rs must exist");
+    let src = std::fs::read_to_string(MODS_STATE_RS).expect("mods_state.rs must exist");
     assert!(
-        src.contains("std::sync::RwLock") || src.contains("use std::sync::{") || src.contains("sync::RwLock"),
+        src.contains("std::sync::RwLock")
+            || src.contains("use std::sync::{")
+            || src.contains("sync::RwLock"),
         "PRD 3.2.7 (iter 274): {MODS_STATE_RS} must use `std::sync::RwLock` \
          — the canonical primitive for serialisation. A swap to \
          `tokio::sync::RwLock` would change the blocking semantics and \

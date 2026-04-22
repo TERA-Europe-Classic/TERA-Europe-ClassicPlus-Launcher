@@ -221,9 +221,7 @@ pub async fn handle_launch_game(
         // them down when the last client has exited. The pure predicate
         // `decide_overlay_action` carries the policy; the wiring lives
         // here so the policy decision is colocated with the close event.
-        use crate::services::mods::external_app::{
-            decide_overlay_action, OverlayLifecycleAction,
-        };
+        use crate::services::mods::external_app::{decide_overlay_action, OverlayLifecycleAction};
         let remaining_clients = teralib::get_running_game_count();
         if decide_overlay_action(remaining_clients) == OverlayLifecycleAction::Terminate {
             crate::commands::mods::stop_auto_launched_external_apps();

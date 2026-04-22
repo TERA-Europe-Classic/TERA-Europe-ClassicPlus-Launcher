@@ -12,6 +12,7 @@
 
 pub mod catalog;
 pub mod external_app;
-pub mod registry;
 pub mod gpk;
+pub mod patch_manifest;
+pub mod registry;
 pub mod types;

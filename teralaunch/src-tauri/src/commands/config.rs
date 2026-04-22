@@ -96,11 +96,15 @@ pub async fn save_game_path_to_config(
     _app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
     let path_buf = PathBuf::from(&path);
-    let validation = game_service::validate_game_installation(&path_buf);
-    if !validation.is_valid() {
-        return Err(validation
-            .error_message()
-            .unwrap_or_else(|| "Invalid game folder".to_string()));
+
+    // Attempt to create the directory if it doesn't exist
+    if !path_buf.exists() {
+        fs::create_dir_all(&path_buf)
+            .map_err(|e| format!("Failed to create game directory: {}", e))?;
+    }
+
+    if !path_buf.is_dir() {
+        return Err("The selected path is not a directory".to_string());
     }
 
     // Capture previous path before writing, so we can detect actual changes
@@ -166,12 +170,22 @@ pub fn get_game_folder_state() -> GameFolderState {
         };
     }
 
-    let validation = game_service::validate_game_installation(Path::new(&path_string));
+    let path = Path::new(&path_string);
+    let is_dir = path.is_dir();
+    let validation = game_service::validate_game_installation(path);
+
+    // Consider the folder "valid" for configuration purposes if it is a directory.
+    // If files (like TERA.exe) are missing, the launcher's update process will
+    // detect and download them. Blocking here prevents fresh installs.
     GameFolderState {
         set: true,
-        valid: validation.is_valid(),
+        valid: is_dir,
         path: path_string,
-        error: validation.error_message(),
+        error: if is_dir {
+            None
+        } else {
+            validation.error_message()
+        },
     }
 }
 

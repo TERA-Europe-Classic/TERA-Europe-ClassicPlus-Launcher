@@ -41,10 +41,9 @@ use serde_json::Value;
 const CATALOG_FIXTURE: &str = "tests/fixtures/catalog-snapshot.json";
 
 fn load_catalog_mods() -> Vec<Value> {
-    let body = fs::read_to_string(CATALOG_FIXTURE)
-        .unwrap_or_else(|e| panic!("{CATALOG_FIXTURE}: {e}"));
-    let v: Value = serde_json::from_str(&body)
-        .expect("catalog snapshot must parse as JSON");
+    let body =
+        fs::read_to_string(CATALOG_FIXTURE).unwrap_or_else(|e| panic!("{CATALOG_FIXTURE}: {e}"));
+    let v: Value = serde_json::from_str(&body).expect("catalog snapshot must parse as JSON");
     let mods = v["mods"]
         .as_array()
         .expect("catalog must carry a top-level `mods` array")
@@ -117,7 +116,10 @@ fn check_base_invariants(entry: &Value) -> Vec<String> {
     }
     let sha = s(entry, "sha256");
     if !is_hex_64(sha) {
-        errors.push(format!("{id}: sha256 must be 64 hex chars, got {:?}", sha.len()));
+        errors.push(format!(
+            "{id}: sha256 must be 64 hex chars, got {:?}",
+            sha.len()
+        ));
     }
     let size = entry["size_bytes"].as_u64().unwrap_or(0);
     if size == 0 {
@@ -229,8 +231,7 @@ fn catalog_snapshot_carries_at_least_100_entries() {
 #[test]
 fn every_catalog_entry_has_a_unique_id() {
     let mods = load_catalog_mods();
-    let mut seen: std::collections::HashMap<String, usize> =
-        std::collections::HashMap::new();
+    let mut seen: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
     for entry in &mods {
         let id = s(entry, "id").to_string();
         *seen.entry(id).or_insert(0) += 1;
@@ -251,8 +252,7 @@ fn every_catalog_entry_has_a_unique_id() {
 #[test]
 fn catalog_carries_both_external_and_gpk_kinds() {
     let mods = load_catalog_mods();
-    let kinds: std::collections::HashSet<&str> =
-        mods.iter().map(|m| s(m, "kind")).collect();
+    let kinds: std::collections::HashSet<&str> = mods.iter().map(|m| s(m, "kind")).collect();
     assert!(
         kinds.contains("external"),
         "PRD §3.3.1: catalog must carry at least one external-kind \
@@ -272,10 +272,14 @@ fn catalog_carries_both_external_and_gpk_kinds() {
 #[test]
 fn lifecycle_predicate_helpers_self_test() {
     // is_hex_64 positives + negatives.
-    assert!(is_hex_64("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"));
+    assert!(is_hex_64(
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    ));
     assert!(!is_hex_64(""));
     assert!(!is_hex_64("short"));
-    assert!(!is_hex_64("g0000000000000000000000000000000000000000000000000000000000000000"));
+    assert!(!is_hex_64(
+        "g0000000000000000000000000000000000000000000000000000000000000000"
+    ));
 
     // Safe-container predicate positives.
     assert!(is_safe_gpk_container_filename_basename("mymod.gpk"));

@@ -164,8 +164,8 @@ async fn fetch_bytes_streaming(
         .build()
         .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
 
-    let mut current_url =
-        reqwest::Url::parse(url).map_err(|e| format!("Failed to parse download URL {}: {}", url, e))?;
+    let mut current_url = reqwest::Url::parse(url)
+        .map_err(|e| format!("Failed to parse download URL {}: {}", url, e))?;
     let mut redirects_followed = 0usize;
     let response = loop {
         let response = client
@@ -194,10 +194,7 @@ async fn fetch_bytes_streaming(
                 .map_err(|e| format!("Failed to resolve redirect target {}: {}", location, e))?;
 
             let host = next_url.host_str().ok_or_else(|| {
-                format!(
-                    "Redirect target {} has no valid host component",
-                    next_url
-                )
+                format!("Redirect target {} has no valid host component", next_url)
             })?;
 
             if !redirect_host_is_allowed(host) {
@@ -559,7 +556,9 @@ mod tests {
     #[test]
     fn redirect_host_allowlist_is_narrow_and_matches_github_release_assets() {
         assert!(redirect_host_is_allowed("github.com"));
-        assert!(redirect_host_is_allowed("release-assets.githubusercontent.com"));
+        assert!(redirect_host_is_allowed(
+            "release-assets.githubusercontent.com"
+        ));
         assert!(redirect_host_is_allowed("objects.githubusercontent.com"));
 
         assert!(!redirect_host_is_allowed("raw.githubusercontent.com"));

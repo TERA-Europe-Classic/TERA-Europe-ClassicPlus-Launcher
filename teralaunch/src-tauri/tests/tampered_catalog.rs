@@ -331,15 +331,15 @@ fn tampered_catalog_wiring_detector_self_test() {
     // string param.
     let bare_sig = "fn finalize_error(id: &str) {";
     assert!(
-        !(bare_sig.contains(": String") || bare_sig.contains(": &str ")
+        !(bare_sig.contains(": String")
+            || bare_sig.contains(": &str ")
             || bare_sig.contains(": String,")),
         "self-test: bare id-only signature must be flagged"
     );
 
     // Bad shape F: ModStatus without Error variant (a rename to
     // Failed would be the canonical regression).
-    let renamed_enum =
-        "pub enum ModStatus {\n    Installed,\n    Installing,\n    Failed,\n}\n";
+    let renamed_enum = "pub enum ModStatus {\n    Installed,\n    Installing,\n    Failed,\n}\n";
     assert!(
         !renamed_enum.contains("Error,") && !renamed_enum.contains("Error\n"),
         "self-test: enum without Error variant must be flagged"
@@ -355,7 +355,8 @@ fn tampered_catalog_wiring_detector_self_test() {
     );
 
     // Bad shape H: finalize_error without a window.emit() call.
-    let no_emit = "fn finalize_error(id: &str, err: String) {\n  slot.status = ModStatus::Error;\n}\n";
+    let no_emit =
+        "fn finalize_error(id: &str, err: String) {\n  slot.status = ModStatus::Error;\n}\n";
     assert!(
         !no_emit.contains("window.emit"),
         "self-test: finalize_error without window.emit must be flagged"
@@ -660,8 +661,7 @@ fn finalize_error_emits_state_error_event_to_window() {
          frontend listens on that specific channel."
     );
     assert!(
-        window.contains(r#""state": "error""#)
-            || window.contains(r#""state":"error""#),
+        window.contains(r#""state": "error""#) || window.contains(r#""state":"error""#),
         "tampered-catalog (iter 189): finalize_error's emit payload \
          must include `\"state\": \"error\"` — the frontend branches \
          on `state` to decide how to render the row."
@@ -709,9 +709,7 @@ fn commands_mods_rs_byte_size_has_sane_bounds() {
 fn types_rs_byte_size_has_sane_bounds() {
     const MIN_BYTES: usize = 1000;
     const MAX_BYTES: usize = 80_000;
-    let bytes = fs::metadata(TYPES_RS)
-        .expect("types.rs must exist")
-        .len() as usize;
+    let bytes = fs::metadata(TYPES_RS).expect("types.rs must exist").len() as usize;
     assert!(
         (MIN_BYTES..=MAX_BYTES).contains(&bytes),
         "tampered-catalog (iter 267): {TYPES_RS} is {bytes} bytes; \
@@ -724,9 +722,7 @@ fn types_rs_byte_size_has_sane_bounds() {
 fn guard_source_byte_size_has_sane_bounds() {
     const MIN_BYTES: usize = 5000;
     const MAX_BYTES: usize = 80_000;
-    let bytes = fs::metadata(GUARD_SOURCE)
-        .expect("guard must exist")
-        .len() as usize;
+    let bytes = fs::metadata(GUARD_SOURCE).expect("guard must exist").len() as usize;
     assert!(
         (MIN_BYTES..=MAX_BYTES).contains(&bytes),
         "tampered-catalog (iter 267): guard is {bytes} bytes; expected \
@@ -738,8 +734,7 @@ fn guard_source_byte_size_has_sane_bounds() {
 /// grep discoverability.
 #[test]
 fn guard_source_cites_adv_tampered_catalog_slot() {
-    let body = fs::read_to_string(GUARD_SOURCE)
-        .expect("guard must exist");
+    let body = fs::read_to_string(GUARD_SOURCE).expect("guard must exist");
     let header = &body[..body.len().min(500)];
     assert!(
         header.contains("adv.tampered-catalog") || header.contains("tampered-catalog"),

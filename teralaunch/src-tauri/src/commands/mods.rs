@@ -18,6 +18,7 @@ use crate::services::mods::{
     catalog::{self, CachedCatalog},
     external_app,
     gpk::{self, ModConflict},
+    patch_manifest,
     registry::{get_external_apps_dir, get_gpk_dir, get_registry_path},
     types::{Catalog, CatalogEntry, ModEntry, ModKind, ModStatus},
 };
@@ -26,7 +27,16 @@ use crate::state::mods_state;
 fn rebuild_gpk_runtime_state() -> Result<(), String> {
     let game_root = resolve_game_root()?;
     let gpk_dir = get_gpk_dir().ok_or_else(|| "Could not resolve GPK mods dir".to_string())?;
-    let items = mods_state::list_mods()?
+    let installed = mods_state::list_mods()?;
+    for entry in installed
+        .iter()
+        .filter(|entry| matches!(entry.kind, ModKind::Gpk) && entry.enabled)
+    {
+        if let Some(note) = gpk_manifest_block_note(&entry.id, &entry.name)? {
+            return Err(note);
+        }
+    }
+    let items = installed
         .into_iter()
         .filter(|entry| matches!(entry.kind, ModKind::Gpk))
         .map(|entry| gpk::RebuildItem {
@@ -111,9 +121,55 @@ fn finalize_installed_slot(
     slot.deployed_filename = deployed_filename;
 }
 
+fn finalize_blocked_gpk_slot(slot: &mut ModEntry, new_version: &str, last_error: String) {
+    slot.enabled = false;
+    slot.auto_launch = false;
+    slot.status = ModStatus::Error;
+    slot.progress = None;
+    slot.last_error = Some(last_error);
+    slot.version = new_version.to_string();
+    slot.deployed_filename = None;
+}
+
 struct GpkDeployOutcome {
     last_error: Option<String>,
     deployed_filename: Option<String>,
+    blocks_enable: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GpkPatchManifestPreflight {
+    NoManifest,
+    CuratedPatchDetected,
+}
+
+fn gpk_curated_patch_note(mod_name: &str) -> String {
+    format!(
+        "Curated patch artifacts are detected for '{mod_name}', but launcher-side patch application is not implemented yet. Legacy deployment is disabled for this mod."
+    )
+}
+
+fn gpk_invalid_manifest_error(mod_name: &str, err: &str) -> String {
+    format!(
+        "Patch manifest for '{mod_name}' is invalid, so the launcher will not fall back to legacy deployment. Details: {err}"
+    )
+}
+
+fn preflight_gpk_patch_manifest(mod_id: &str) -> Result<GpkPatchManifestPreflight, String> {
+    match patch_manifest::load_manifest_for_mod(mod_id).map(|manifest| manifest.map(|_| ()))? {
+        Some(()) => Ok(GpkPatchManifestPreflight::CuratedPatchDetected),
+        None => Ok(GpkPatchManifestPreflight::NoManifest),
+    }
+}
+
+fn gpk_manifest_block_note(mod_id: &str, mod_name: &str) -> Result<Option<String>, String> {
+    match preflight_gpk_patch_manifest(mod_id) {
+        Ok(GpkPatchManifestPreflight::CuratedPatchDetected) => {
+            Ok(Some(gpk_curated_patch_note(mod_name)))
+        }
+        Err(err) => Ok(Some(gpk_invalid_manifest_error(mod_name, &err))),
+        Ok(GpkPatchManifestPreflight::NoManifest) => Ok(None),
+    }
 }
 
 /// Installs a mod from a catalog entry: download, verify, extract, register.
@@ -312,18 +368,29 @@ async fn install_gpk_mod(entry: CatalogEntry, window: tauri::Window) -> Result<M
             // Attempt deploy through embedded metadata first, then fall back
             // to filename-based legacy install when the file lacks that
             // metadata but still maps cleanly to a known game package.
-            let deploy = try_deploy_gpk(&entry.id, &dest, Some(&entry.download_url));
+            let deploy = try_deploy_gpk(&entry.id, &entry.name, &dest, Some(&entry.download_url));
 
             let final_row = mods_state::mutate(|reg| {
                 let slot = reg.find_mut(&entry.id).ok_or_else(|| {
                     format!("Registry entry for {} disappeared mid-install", entry.id)
                 })?;
-                finalize_installed_slot(
-                    slot,
-                    &entry.version,
-                    deploy.last_error,
-                    deploy.deployed_filename,
-                );
+                if deploy.blocks_enable {
+                    finalize_blocked_gpk_slot(
+                        slot,
+                        &entry.version,
+                        deploy
+                            .last_error
+                            .clone()
+                            .unwrap_or_else(|| gpk_curated_patch_note(&entry.name)),
+                    );
+                } else {
+                    finalize_installed_slot(
+                        slot,
+                        &entry.version,
+                        deploy.last_error,
+                        deploy.deployed_filename,
+                    );
+                }
                 Ok(slot.clone())
             })?;
             let _ = window.emit(
@@ -353,11 +420,29 @@ async fn install_gpk_mod(entry: CatalogEntry, window: tauri::Window) -> Result<M
 /// `download_url` is used to extract the real game-package filename when
 /// the on-disk name is an opaque catalog ID (e.g. `foglio1024.ui-remover-flight-gauge`).
 fn try_deploy_gpk(
-    _mod_id: &str,
+    mod_id: &str,
+    mod_name: &str,
     source_gpk: &std::path::Path,
     download_url: Option<&str>,
 ) -> GpkDeployOutcome {
     use crate::services::mods::gpk;
+    match preflight_gpk_patch_manifest(mod_id) {
+        Ok(GpkPatchManifestPreflight::CuratedPatchDetected) => {
+            return GpkDeployOutcome {
+                last_error: Some(gpk_curated_patch_note(mod_name)),
+                deployed_filename: None,
+                blocks_enable: true,
+            };
+        }
+        Err(err) => {
+            return GpkDeployOutcome {
+                last_error: Some(gpk_invalid_manifest_error(mod_name, &err)),
+                deployed_filename: None,
+                blocks_enable: true,
+            };
+        }
+        Ok(GpkPatchManifestPreflight::NoManifest) => {}
+    }
     let game_root = match resolve_game_root() {
         Ok(p) => p,
         Err(e) => {
@@ -367,6 +452,7 @@ fn try_deploy_gpk(
                     e
                 )),
                 deployed_filename: None,
+                blocks_enable: false,
             };
         }
     };
@@ -375,12 +461,17 @@ fn try_deploy_gpk(
     // "foglio1024.ui-remover-flight-gauge", but the URL's last segment
     // reveals the actual target (e.g. "S1UI_ProgressBar.gpk").
     let url_hint = download_url.and_then(|url| {
-        url::Url::parse(url).ok()?.path_segments()?.last().map(str::to_string)
+        url::Url::parse(url)
+            .ok()?
+            .path_segments()?
+            .last()
+            .map(str::to_string)
     });
     match gpk::install_gpk(&game_root, source_gpk) {
         Ok(modfile) => GpkDeployOutcome {
             last_error: None,
             deployed_filename: Some(modfile.container),
+            blocks_enable: false,
         },
         Err(metadata_err) => {
             // Footer-based deploy rejected the mod. Fall back to legacy
@@ -396,6 +487,7 @@ fn try_deploy_gpk(
                     GpkDeployOutcome {
                         last_error: None,
                         deployed_filename: Some(installed_name),
+                        blocks_enable: false,
                     }
                 }
                 Err(legacy_err) => GpkDeployOutcome {
@@ -404,6 +496,7 @@ fn try_deploy_gpk(
                         source_gpk.display()
                     )),
                     deployed_filename: None,
+                    blocks_enable: false,
                 },
             }
         }
@@ -517,10 +610,14 @@ pub async fn add_mod_from_file(path: String) -> Result<ModEntry, String> {
     // Best-effort mapper deploy. If the game root isn't configured we still
     // persist the import so the user can see it; the deploy happens next
     // time they hit enable.
-    let deploy = try_deploy_gpk(&entry.id, &dest, None);
+    let deploy = try_deploy_gpk(&entry.id, &entry.name, &dest, None);
     entry.deployed_filename = deploy.deployed_filename.clone();
     entry.last_error = deploy.last_error.clone();
-    if deploy.last_error.is_none() {
+    if deploy.blocks_enable {
+        entry.enabled = false;
+        entry.auto_launch = false;
+        entry.status = ModStatus::Error;
+    } else if deploy.last_error.is_none() {
         entry.enabled = true;
         entry.auto_launch = true;
         entry.status = ModStatus::Enabled;
@@ -648,9 +745,7 @@ fn external_launch_args(id: &str) -> Result<Vec<String>, String> {
                 maps_dir.to_string_lossy().into_owned(),
             ])
         }
-        "classicplus.shinra" | "tera-europe-classic.shinra" => {
-            Ok(vec!["--toolbox".to_string()])
-        }
+        "classicplus.shinra" | "tera-europe-classic.shinra" => Ok(vec!["--toolbox".to_string()]),
         _ => Ok(Vec::new()),
     }
 }
@@ -664,6 +759,12 @@ fn external_launch_args(id: &str) -> Result<Vec<String>, String> {
 pub async fn enable_mod(id: String) -> Result<ModEntry, String> {
     let entry =
         mods_state::get_mod(&id)?.ok_or_else(|| format!("Mod '{}' is not installed", id))?;
+
+    if matches!(entry.kind, ModKind::Gpk) {
+        if let Some(note) = gpk_manifest_block_note(&entry.id, &entry.name)? {
+            return Err(note);
+        }
+    }
 
     let updated = mods_state::mutate(|reg| {
         let slot = reg
@@ -890,7 +991,11 @@ pub fn spawn_auto_launch_external_apps() {
         let args = match external_launch_args(&entry.id) {
             Ok(v) => v,
             Err(e) => {
-                log::warn!("Auto-launch: could not resolve args for {}: {}", entry.id, e);
+                log::warn!(
+                    "Auto-launch: could not resolve args for {}: {}",
+                    entry.id,
+                    e
+                );
                 continue;
             }
         };
@@ -1169,6 +1274,158 @@ mod tests {
         );
     }
 
+    #[test]
+    fn gpk_patch_manifest_preflight_loads_manifest_from_mod_id() {
+        let source = include_str!("mods.rs");
+        let fn_start = source
+            .find("fn preflight_gpk_patch_manifest")
+            .expect("preflight helper present");
+        let fn_body = &source[fn_start..];
+        assert!(
+            fn_body.contains("patch_manifest::load_manifest_for_mod(mod_id)"),
+            "preflight helper must resolve manifests from the mod id so both catalog installs and local imports use the same lookup"
+        );
+        assert!(
+            fn_body.contains("Some(()) => Ok(GpkPatchManifestPreflight::CuratedPatchDetected)"),
+            "preflight helper must treat manifest presence as a fail-closed curated patch gate"
+        );
+        assert!(
+            fn_body.contains("None => Ok(GpkPatchManifestPreflight::NoManifest)"),
+            "preflight helper must preserve legacy deploy only when no manifest exists"
+        );
+    }
+
+    #[test]
+    fn gpk_patch_manifest_preflight_returns_user_facing_curated_patch_note() {
+        let note = gpk_curated_patch_note("UI Remover: Flight Gauge");
+        assert!(note.contains("Curated patch artifacts are detected"));
+        assert!(note.contains("not implemented yet"));
+        assert!(note.contains("Legacy deployment is disabled"));
+    }
+
+    #[test]
+    fn gpk_patch_manifest_preflight_returns_user_facing_invalid_manifest_note() {
+        let err = "manifest parse failed".to_string();
+
+        let message = gpk_invalid_manifest_error("UI Remover: Flight Gauge", &err);
+        assert!(message.contains("invalid"));
+        assert!(message.contains("will not fall back to legacy deployment"));
+        assert!(message.contains("manifest parse failed"));
+    }
+
+    #[test]
+    fn try_deploy_gpk_checks_manifest_before_any_deploy_path() {
+        let source = include_str!("mods.rs");
+        let fn_start = source
+            .find("fn try_deploy_gpk")
+            .expect("try_deploy_gpk present");
+        let fn_body = &source[fn_start..];
+        let preflight_idx = fn_body
+            .find("preflight_gpk_patch_manifest(mod_id)")
+            .expect("try_deploy_gpk must preflight patch manifests");
+        let install_idx = fn_body
+            .find("gpk::install_gpk(&game_root, source_gpk)")
+            .expect("try_deploy_gpk must still attempt metadata deploy");
+
+        assert!(
+            preflight_idx < install_idx,
+            "try_deploy_gpk must gate manifest handling before any metadata or legacy deploy path"
+        );
+    }
+
+    #[test]
+    fn both_gpk_install_entry_points_flow_through_shared_deploy_gate() {
+        let source = include_str!("mods.rs");
+        assert!(
+            source.contains("let deploy = try_deploy_gpk(&entry.id, &entry.name, &dest, Some(&entry.download_url));"),
+            "install_gpk_mod must route through try_deploy_gpk with id + display name so manifest gating is centralized"
+        );
+        assert!(
+            source.contains("let deploy = try_deploy_gpk(&entry.id, &entry.name, &dest, None);"),
+            "add_mod_from_file must route through the same shared deploy gate so local imports cannot bypass manifest checks"
+        );
+    }
+
+    #[test]
+    fn blocked_gpk_deploy_does_not_mark_slot_enabled() {
+        let mut slot = disabled_slot();
+        slot.kind = ModKind::Gpk;
+        slot.status = ModStatus::Installing;
+
+        finalize_blocked_gpk_slot(
+            &mut slot,
+            "1.0.0",
+            "Curated patch artifacts are detected".to_string(),
+        );
+
+        assert!(!slot.enabled);
+        assert!(!slot.auto_launch);
+        assert!(matches!(slot.status, ModStatus::Error));
+        assert_eq!(slot.version, "1.0.0");
+        assert_eq!(slot.deployed_filename, None);
+        assert!(slot
+            .last_error
+            .unwrap_or_default()
+            .contains("Curated patch"));
+    }
+
+    #[test]
+    fn enable_mod_checks_manifest_gate_before_mutating_intent() {
+        let source = include_str!("mods.rs");
+        let fn_start = source
+            .find("pub async fn enable_mod")
+            .expect("enable_mod present");
+        let fn_body = &source[fn_start..];
+        let preflight_idx = fn_body
+            .find("gpk_manifest_block_note(&entry.id, &entry.name)")
+            .expect("enable_mod must check manifest gate");
+        let mutate_idx = fn_body
+            .find("mods_state::mutate(|reg| {")
+            .expect("enable_mod must still mutate registry on success");
+        assert!(
+            preflight_idx < mutate_idx,
+            "enable_mod must reject curated-manifest GPKs before mutating enabled intent"
+        );
+    }
+
+    #[test]
+    fn rebuild_gpk_runtime_state_checks_enabled_manifest_mods_first() {
+        let source = include_str!("mods.rs");
+        let fn_start = source
+            .find("fn rebuild_gpk_runtime_state")
+            .expect("rebuild_gpk_runtime_state present");
+        let fn_body = &source[fn_start..];
+        let gate_idx = fn_body
+            .find("gpk_manifest_block_note(&entry.id, &entry.name)")
+            .expect("rebuild must preflight enabled manifest-backed mods");
+        let rebuild_idx = fn_body
+            .find("gpk::rebuild_gpk_state(&game_root, &items)")
+            .expect("rebuild must still call service rebuild");
+        assert!(
+            gate_idx < rebuild_idx,
+            "runtime rebuild must refuse curated-manifest mods before it reaches rebuild_gpk_state"
+        );
+    }
+
+    #[test]
+    fn add_mod_from_file_respects_blocks_enable_explicitly() {
+        let source = include_str!("mods.rs");
+        let fn_start = source
+            .find("pub async fn add_mod_from_file")
+            .expect("add_mod_from_file present");
+        let fn_body = &source[fn_start..];
+        let blocks_idx = fn_body
+            .find("if deploy.blocks_enable {")
+            .expect("add_mod_from_file must branch on blocks_enable");
+        let legacy_idx = fn_body
+            .find("else if deploy.last_error.is_none() {")
+            .expect("add_mod_from_file must still handle legacy non-blocking success");
+        assert!(
+            blocks_idx < legacy_idx,
+            "local file import must treat blocks_enable as an explicit stronger gate than last_error-derived success"
+        );
+    }
+
     /// fix.resolve-game-root-wrong-assumption (iter 83).
     ///
     /// `validate_game_root` must treat the stored game path AS the install
@@ -1198,8 +1455,8 @@ mod tests {
     #[test]
     fn validate_game_root_rejects_missing_s1game() {
         let tmp = tempfile::TempDir::new().unwrap();
-        let err = validate_game_root(tmp.path().to_path_buf())
-            .expect_err("missing S1Game must err");
+        let err =
+            validate_game_root(tmp.path().to_path_buf()).expect_err("missing S1Game must err");
         assert!(
             err.contains("No S1Game folder under"),
             "error must name S1Game as the missing folder, got: {err}"
@@ -1214,8 +1471,7 @@ mod tests {
     /// next person to touch this code has to explicitly justify it.
     #[test]
     fn validate_game_root_source_has_no_parent_walk() {
-        let src = std::fs::read_to_string("src/commands/mods.rs")
-            .expect("mods.rs must exist");
+        let src = std::fs::read_to_string("src/commands/mods.rs").expect("mods.rs must exist");
         let fn_pos = src
             .find("fn validate_game_root")
             .expect("validate_game_root must exist");
