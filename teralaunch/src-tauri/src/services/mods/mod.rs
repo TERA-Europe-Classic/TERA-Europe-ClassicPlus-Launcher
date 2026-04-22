@@ -13,6 +13,8 @@
 pub mod catalog;
 pub mod external_app;
 pub mod gpk;
+pub mod gpk_package;
+pub mod gpk_patch_applier;
 pub mod patch_manifest;
 pub mod registry;
 pub mod types;
