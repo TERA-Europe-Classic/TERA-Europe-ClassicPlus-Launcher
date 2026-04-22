@@ -454,13 +454,10 @@ pub fn decide_overlay_action(remaining_clients: usize) -> OverlayLifecycleAction
 pub fn is_process_running(exe_name: &str) -> bool {
     let mut system = System::new();
     system.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
-    let target = exe_name.to_ascii_lowercase();
-    system.processes().values().any(|p| {
-        p.name()
-            .to_string_lossy()
-            .to_ascii_lowercase()
-            .contains(&target)
-    })
+    system
+        .processes()
+        .values()
+        .any(|p| process_name_matches(exe_name, &p.name().to_string_lossy()))
 }
 
 /// Sends a terminate signal to processes whose executable name matches.
@@ -468,15 +465,25 @@ pub fn is_process_running(exe_name: &str) -> bool {
 pub fn stop_process_by_name(exe_name: &str) -> Result<u32, String> {
     let mut system = System::new();
     system.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
-    let target = exe_name.to_ascii_lowercase();
     let mut killed = 0u32;
     for process in system.processes().values() {
-        let name_lower = process.name().to_string_lossy().to_ascii_lowercase();
-        if name_lower.contains(&target) && process.kill() {
+        if process_name_matches(exe_name, &process.name().to_string_lossy()) && process.kill() {
             killed += 1;
         }
     }
     Ok(killed)
+}
+
+fn process_name_matches(exe_name: &str, process_name: &str) -> bool {
+    let target = exe_name.trim().to_ascii_lowercase();
+    let process = process_name.trim().to_ascii_lowercase();
+    if process == target {
+        return true;
+    }
+
+    let target_stem = target.strip_suffix(".exe").unwrap_or(&target);
+    let process_stem = process.strip_suffix(".exe").unwrap_or(&process);
+    process_stem == target_stem
 }
 
 /// Joins the extracted root + a relative executable path from the catalog
@@ -551,6 +558,14 @@ mod tests {
     fn is_process_running_returns_false_for_garbage_name() {
         // A process name we're sure doesn't exist on any sane system.
         assert!(!is_process_running("zzzz_nonexistent_binary_name_qqqq.exe"));
+    }
+
+    #[test]
+    fn process_name_matches_windows_processes_with_or_without_exe_suffix() {
+        assert!(process_name_matches("TCC.exe", "TCC"));
+        assert!(process_name_matches("TCC.exe", "TCC.exe"));
+        assert!(process_name_matches("ShinraMeter.exe", "shinrameter"));
+        assert!(!process_name_matches("TCC.exe", "ShinraMeter"));
     }
 
     #[test]
