@@ -15,6 +15,21 @@ polished in the main branch.
 
 ---
 
+## 0.1.20 — TCC interop handoff and safer GPK migration groundwork
+
+- TCC launch now hands off the shared Noctenium/Agnitor map-export path,
+  which is the plumbing needed for Classic+ packet-tool compatibility
+  without relying on old Toolbox-only assumptions.
+- GPK installs are now stricter when a curated migration artifact exists.
+  If the launcher detects a managed patch manifest for a mod, it refuses
+  the older whole-file fallback path instead of silently deploying a
+  drift-prone package over your live client files.
+- Curated-manifest blocks now also stop later enable/rebuild paths for
+  launcher-managed catalog GPK mods, so the launcher does not quietly
+  fall back to the old legacy deploy path after the initial install step.
+
+---
+
 ## 0.1.14 — Update-install flow, GPK mapper patch, discovered-mods CSV
 
 - The "Check for launcher updates" button now actually installs the

@@ -328,8 +328,8 @@ fn main_rs_refusal_branch_logs_and_skips_install() {
 /// pointing at the FS, not at the constant.
 #[test]
 fn guard_path_constants_are_canonical() {
-    let guard_body = fs::read_to_string("tests/updater_downgrade.rs")
-        .expect("guard source must exist");
+    let guard_body =
+        fs::read_to_string("tests/updater_downgrade.rs").expect("guard source must exist");
     assert!(
         guard_body.contains("const GATE_RS: &str = \"src/services/updater_gate.rs\";"),
         "Iter 232: tests/updater_downgrade.rs must keep \
@@ -449,8 +449,8 @@ fn updater_gate_module_carries_inline_test_module() {
 /// floor. Pin each by name so a rename / deletion trips CI.
 #[test]
 fn symbolic_predicate_tests_enumerate_five_distinct_case_classes() {
-    let guard_body = fs::read_to_string("tests/updater_downgrade.rs")
-        .expect("guard source must exist");
+    let guard_body =
+        fs::read_to_string("tests/updater_downgrade.rs").expect("guard source must exist");
     for fn_name in [
         "fn refuses_older_latest_json()",
         "fn refuses_replay_of_same_version()",
@@ -586,8 +586,7 @@ fn guard_source_header_cites_prd_3_1_9_explicitly() {
 /// callers might use by mistake. Private helpers (`fn name`) are fine.
 #[test]
 fn gate_source_exports_only_one_public_fn() {
-    let body = fs::read_to_string("src/services/updater_gate.rs")
-        .expect("gate source must exist");
+    let body = fs::read_to_string("src/services/updater_gate.rs").expect("gate source must exist");
     // Strip the inline `#[cfg(test)] mod tests { ... }` block first —
     // test helpers within that block are fine.
     let test_mod_pos = body.find("#[cfg(test)]");
@@ -599,7 +598,11 @@ fn gate_source_exports_only_one_public_fn() {
     // A simple substring count is fine because the gate module is
     // small and focused.
     let pub_fn_count = prod_src.matches("\npub fn ").count()
-        + if prod_src.starts_with("pub fn ") { 1 } else { 0 };
+        + if prod_src.starts_with("pub fn ") {
+            1
+        } else {
+            0
+        };
     assert_eq!(
         pub_fn_count, 1,
         "PRD 3.1.9 (iter 260): src/services/updater_gate.rs must \

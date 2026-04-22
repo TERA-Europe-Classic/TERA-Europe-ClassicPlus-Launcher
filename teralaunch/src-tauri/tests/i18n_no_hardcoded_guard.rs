@@ -177,8 +177,7 @@ fn i18n_guard_detector_self_test() {
     // placeholder rules).
     let one_rule = "aria-label=\"([^\"]{2,})\"";
     assert!(
-        !one_rule.contains("\\btitle=\"")
-            && !one_rule.contains("\\bplaceholder=\""),
+        !one_rule.contains("\\btitle=\"") && !one_rule.contains("\\bplaceholder=\""),
         "self-test: a scanner with only aria-label coverage must be \
          flagged"
     );
@@ -492,9 +491,7 @@ fn scanner_attribute_regex_minimum_char_length_is_two() {
 fn scanner_file_byte_size_has_sane_bounds() {
     const MIN_BYTES: usize = 2000;
     const MAX_BYTES: usize = 50_000;
-    let bytes = fs::metadata(SCANNER)
-        .expect("scanner must exist")
-        .len() as usize;
+    let bytes = fs::metadata(SCANNER).expect("scanner must exist").len() as usize;
     assert!(
         (MIN_BYTES..=MAX_BYTES).contains(&bytes),
         "PRD 3.7.4 (iter 264): {SCANNER} is {bytes} bytes; expected \
@@ -524,9 +521,9 @@ fn guard_source_byte_size_has_sane_bounds() {
 /// English via other channels.
 #[test]
 fn mods_js_uses_translation_helper() {
-    let src = fs::read_to_string(TARGET_MODS_JS)
-        .expect("mods.js must exist");
-    let t_count = src.matches("this.t(").count() + src.matches("t('").count() + src.matches("t(\"").count();
+    let src = fs::read_to_string(TARGET_MODS_JS).expect("mods.js must exist");
+    let t_count =
+        src.matches("this.t(").count() + src.matches("t('").count() + src.matches("t(\"").count();
     assert!(
         t_count >= 5,
         "PRD 3.7.4 (iter 264): {TARGET_MODS_JS} must use translation \

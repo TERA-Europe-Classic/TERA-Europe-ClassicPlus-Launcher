@@ -222,13 +222,17 @@ fn i18n_scanner_guard_detector_self_test() {
     // Bad shape A: jargon blocklist with a term dropped.
     let short_blocklist = "const JARGON_BLOCKLIST = ['composite', 'mapper', 'sha'];";
     assert!(
-        !short_blocklist.contains("const JARGON_BLOCKLIST = ['composite', 'mapper', 'sha', 'tmm'];"),
+        !short_blocklist
+            .contains("const JARGON_BLOCKLIST = ['composite', 'mapper', 'sha', 'tmm'];"),
         "self-test: blocklist missing `tmm` must be flagged"
     );
 
     // Bad shape B: substring allowlist with a new entry.
     let with_entry = "const SUBSTRING_ALLOWLIST = [\n    'shanghai',\n];";
-    let after = with_entry.split("const SUBSTRING_ALLOWLIST = [").nth(1).unwrap();
+    let after = with_entry
+        .split("const SUBSTRING_ALLOWLIST = [")
+        .nth(1)
+        .unwrap();
     let allowlist_body = after.split("];").next().unwrap();
     assert!(
         allowlist_body.contains('\''),
@@ -458,13 +462,16 @@ fn jargon_blocklist_enumerates_all_four_canonical_terms() {
 #[test]
 fn translations_json_carries_exactly_four_canonical_locales() {
     let body = read(TRANSLATIONS);
-    let v: serde_json::Value = serde_json::from_str(&body)
-        .expect("translations.json must be valid JSON");
-    let obj = v.as_object().expect("translations.json root must be an object");
-    let actual_strings: std::collections::BTreeSet<String> =
-        obj.keys().cloned().collect();
-    let expected: std::collections::BTreeSet<String> =
-        ["EUR", "FRA", "GER", "RUS"].iter().map(|s| s.to_string()).collect();
+    let v: serde_json::Value =
+        serde_json::from_str(&body).expect("translations.json must be valid JSON");
+    let obj = v
+        .as_object()
+        .expect("translations.json root must be an object");
+    let actual_strings: std::collections::BTreeSet<String> = obj.keys().cloned().collect();
+    let expected: std::collections::BTreeSet<String> = ["EUR", "FRA", "GER", "RUS"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
     assert_eq!(
         actual_strings, expected,
         "PRD 3.7.1 (iter 241): {TRANSLATIONS} root must carry \
@@ -486,8 +493,8 @@ fn translations_json_carries_exactly_four_canonical_locales() {
 #[test]
 fn every_locale_carries_mods_keyset_floor() {
     let body = read(TRANSLATIONS);
-    let v: serde_json::Value = serde_json::from_str(&body)
-        .expect("translations.json must be valid JSON");
+    let v: serde_json::Value =
+        serde_json::from_str(&body).expect("translations.json must be valid JSON");
     let obj = v.as_object().expect("root must be an object");
     for (locale, entries) in obj {
         let entries_obj = entries
@@ -593,8 +600,7 @@ fn translations_json_byte_bounds() {
 
 #[test]
 fn guard_source_cites_both_prd_criteria() {
-    let body = std::fs::read_to_string("tests/i18n_scanner_guard.rs")
-        .expect("guard must exist");
+    let body = std::fs::read_to_string("tests/i18n_scanner_guard.rs").expect("guard must exist");
     let header = &body[..body.len().min(1500)];
     assert!(
         header.contains("PRD 3.4.7"),
@@ -608,13 +614,13 @@ fn guard_source_cites_both_prd_criteria() {
 
 #[test]
 fn translations_json_parses_as_valid_json_object() {
-    let body = std::fs::read_to_string(TRANSLATIONS)
-        .expect("translations.json must exist");
-    let v: serde_json::Value = serde_json::from_str(&body)
-        .unwrap_or_else(|e| panic!(
+    let body = std::fs::read_to_string(TRANSLATIONS).expect("translations.json must exist");
+    let v: serde_json::Value = serde_json::from_str(&body).unwrap_or_else(|e| {
+        panic!(
             "PRD 3.7.1 (iter 276): {TRANSLATIONS} must parse as \
              valid JSON. Parse error: {e}"
-        ));
+        )
+    });
     assert!(
         v.is_object(),
         "PRD 3.7.1 (iter 276): {TRANSLATIONS} must parse as a JSON \

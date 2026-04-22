@@ -185,12 +185,14 @@ fn gitleaks_allowlist_arrays_are_non_empty() {
     let body = read(CONFIG);
     // regexes array.
     let after_re = body.split("regexes = [").nth(1).unwrap_or_else(|| {
-        panic!("{CONFIG} must carry a `regexes = [` array — iter 13 \
-         audit has at least 2 test-fixture tokens allowlisted.")
+        panic!(
+            "{CONFIG} must carry a `regexes = [` array — iter 13 \
+         audit has at least 2 test-fixture tokens allowlisted."
+        )
     });
     let re_block = after_re.split(']').next().unwrap_or("");
     let re_entries = re_block.matches('\'').count() / 6; // triple-quoted strings
-    // Be liberal: count by `'''` sequences, each entry uses 2 sets.
+                                                         // Be liberal: count by `'''` sequences, each entry uses 2 sets.
     let re_count = re_block.matches("'''").count() / 2;
     assert!(
         re_count >= 1,
@@ -203,8 +205,10 @@ fn gitleaks_allowlist_arrays_are_non_empty() {
 
     // paths array.
     let after_paths = body.split("paths = [").nth(1).unwrap_or_else(|| {
-        panic!("{CONFIG} must carry a `paths = [` array — target/ at \
-         minimum.")
+        panic!(
+            "{CONFIG} must carry a `paths = [` array — target/ at \
+         minimum."
+        )
     });
     let paths_block = after_paths.split(']').next().unwrap_or("");
     let paths_count = paths_block.matches("'''").count() / 2;
@@ -312,7 +316,10 @@ fn gitleaks_config_regex_tokens_are_word_boundary_anchored() {
         .split("regexes = [")
         .nth(1)
         .expect("regexes array must exist");
-    let re_block = after_re.split(']').next().expect("regexes array must close");
+    let re_block = after_re
+        .split(']')
+        .next()
+        .expect("regexes array must close");
     // Every triple-quoted string in the block must contain `\b`.
     let mut entries: Vec<&str> = re_block.split("'''").collect();
     // First and last splits are separators / whitespace, not entries.
@@ -354,11 +361,7 @@ fn gitleaks_config_excludes_all_three_target_dirs() {
         .nth(1)
         .expect("paths array must exist");
     let block = after.split(']').next().expect("paths array must close");
-    for dir in [
-        "target/",
-        "teralaunch/src-tauri/target/",
-        "teralib/target/",
-    ] {
+    for dir in ["target/", "teralaunch/src-tauri/target/", "teralib/target/"] {
         assert!(
             block.contains(dir),
             "PRD 3.1.6: {CONFIG} `paths` array must exclude `{dir}`. \
@@ -418,8 +421,8 @@ fn guard_file_header_cites_prd_3_1_6() {
 /// constant update would break every pin with an opaque panic.
 #[test]
 fn workflow_config_audit_path_constants_are_canonical() {
-    let guard_body = fs::read_to_string("tests/secret_scan_guard.rs")
-        .expect("guard source must be readable");
+    let guard_body =
+        fs::read_to_string("tests/secret_scan_guard.rs").expect("guard source must be readable");
     for literal in [
         "const WORKFLOW: &str = \"../../.github/workflows/secret-scan.yml\";",
         "const CONFIG: &str = \"../../.gitleaks.toml\";",
@@ -444,13 +447,14 @@ fn workflow_config_audit_path_constants_are_canonical() {
 #[test]
 fn secret_leak_audit_doc_exists_and_is_non_empty() {
     let audit_path = "../../docs/PRD/audits/security/secret-leak-scan.md";
-    let body = fs::read_to_string(audit_path)
-        .unwrap_or_else(|e| panic!(
+    let body = fs::read_to_string(audit_path).unwrap_or_else(|e| {
+        panic!(
             "PRD 3.1.6 (iter 223): {audit_path} must exist. This doc \
              is the triage artefact every `.gitleaks.toml` allowlist \
              entry cites — deletion would make the allowlist \
              speculative. Error: {e}"
-        ));
+        )
+    });
     assert!(
         body.len() > 500,
         "PRD 3.1.6 (iter 223): {audit_path} must carry substantive \
@@ -610,9 +614,7 @@ fn secret_scan_guard_detector_self_test() {
 fn workflow_file_byte_size_has_sane_bounds() {
     const MIN_BYTES: usize = 200;
     const MAX_BYTES: usize = 10_000;
-    let bytes = fs::metadata(WORKFLOW)
-        .expect("workflow must exist")
-        .len() as usize;
+    let bytes = fs::metadata(WORKFLOW).expect("workflow must exist").len() as usize;
     assert!(
         (MIN_BYTES..=MAX_BYTES).contains(&bytes),
         "PRD 3.1.6 (iter 266): {WORKFLOW} is {bytes} bytes; expected \
@@ -666,8 +668,7 @@ fn audit_doc_still_exists() {
          at it; without the doc, readers chasing the triage history \
          via that pointer hit a dead link."
     );
-    let body = fs::read_to_string(path)
-        .unwrap_or_else(|e| panic!("{path}: {e}"));
+    let body = fs::read_to_string(path).unwrap_or_else(|e| panic!("{path}: {e}"));
     assert!(
         body.len() > 500,
         "PRD 3.1.6 (iter 266): {path} must be > 500 bytes. A stub \
@@ -679,8 +680,7 @@ fn audit_doc_still_exists() {
 /// Iter 266: guard header must cite PRD 3.1.6 explicitly.
 #[test]
 fn guard_source_cites_prd_3_1_6_explicitly() {
-    let body = fs::read_to_string("tests/secret_scan_guard.rs")
-        .expect("guard must exist");
+    let body = fs::read_to_string("tests/secret_scan_guard.rs").expect("guard must exist");
     let header = &body[..body.len().min(500)];
     assert!(
         header.contains("PRD 3.1.6"),

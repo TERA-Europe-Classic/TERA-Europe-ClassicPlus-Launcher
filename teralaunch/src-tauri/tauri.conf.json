@@ -43,7 +43,7 @@
   "app": {
     "withGlobalTauri": true,
     "security": {
-      "csp": "default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src ipc: http://ipc.localhost 'self' https://*.tera-europe.net https://*.tera-germany.de https://*.crazy-esports.com https://web.tera-germany.de https://helpdesk.crazy-esports.com https://tera-europe-classic.com http://192.168.1.128:8090; base-uri 'self'; form-action 'self'"
+      "csp": "default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src ipc: http://ipc.localhost 'self' https://*.tera-europe.net https://*.tera-germany.de https://*.crazy-esports.com https://web.tera-germany.de https://helpdesk.crazy-esports.com https://tera-europe-classic.com http://157.90.107.2:8090; base-uri 'self'; form-action 'self'"
     },
     "windows": [
       {

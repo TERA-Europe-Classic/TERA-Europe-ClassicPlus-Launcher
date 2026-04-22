@@ -19,9 +19,7 @@ const MIN_SECTION_LINES: usize = 30;
 
 fn claude_body() -> String {
     fs::read_to_string(CLAUDE_MD).unwrap_or_else(|e| {
-        panic!(
-            "CLAUDE.md must be readable from src-tauri/ via {CLAUDE_MD}: {e}"
-        )
+        panic!("CLAUDE.md must be readable from src-tauri/ via {CLAUDE_MD}: {e}")
     })
 }
 
@@ -42,7 +40,11 @@ fn mod_manager_section(body: &str) -> Option<Vec<&str>> {
             out.push(line);
         }
     }
-    if in_section { Some(out) } else { None }
+    if in_section {
+        Some(out)
+    } else {
+        None
+    }
 }
 
 /// PRD 3.8.1 — section exists + line count >= threshold.
@@ -78,7 +80,10 @@ fn mod_manager_section_covers_state_build_and_deploy() {
         .to_lowercase();
 
     for (label, needles) in &[
-        ("feature state", &["feature state", "shipped", "state"] as &[&str]),
+        (
+            "feature state",
+            &["feature state", "shipped", "state"] as &[&str],
+        ),
         ("build", &["build", "cargo", "tauri dev"] as &[&str]),
         ("deploy", &["deploy", "nsis", "release"] as &[&str]),
     ] {
@@ -154,9 +159,9 @@ fn v100_api_section_documents_four_endpoints() {
     // incorrect value, the misdocumentation would mislead every
     // future contributor.
     assert!(
-        body.contains("192.168.1.128:8090"),
+        body.contains("157.90.107.2:8090"),
         "CLAUDE.md `## v100 API` must cite the LAN dev base URL \
-         `http://192.168.1.128:8090`. The 3.1.13.portal-https gate \
+         `http://157.90.107.2:8090`. The 3.1.13.portal-https gate \
          tracks the production FQDN migration; until then, this URL \
          is the documented source-of-truth for local testing."
     );
@@ -201,10 +206,7 @@ fn testing_section_cites_test_paths() {
     let idx = body.find("## Testing").expect("section must exist");
     let rest = &body[idx..];
     // Scan up to the next top-level heading.
-    let section_end = rest[2..]
-        .find("\n## ")
-        .map(|i| i + 2)
-        .unwrap_or(rest.len());
+    let section_end = rest[2..].find("\n## ").map(|i| i + 2).unwrap_or(rest.len());
     let section = &rest[..section_end];
     assert!(
         section.contains("teralaunch/tests"),
@@ -244,10 +246,7 @@ fn build_section_documents_core_commands() {
         .find("## Build & Development Commands")
         .expect("build section must exist — iter 137 pin");
     let rest = &body[idx..];
-    let section_end = rest[3..]
-        .find("\n## ")
-        .map(|i| i + 3)
-        .unwrap_or(rest.len());
+    let section_end = rest[3..].find("\n## ").map(|i| i + 3).unwrap_or(rest.len());
     let section = &rest[..section_end];
     for cmd in [
         "npm install",
@@ -368,15 +367,12 @@ fn known_gaps_section_names_specific_gaps() {
         .find("## Known Gaps")
         .expect("section must exist — iter 137 pin");
     let rest = &body[idx..];
-    let section_end = rest[3..]
-        .find("\n## ")
-        .map(|i| i + 3)
-        .unwrap_or(rest.len());
+    let section_end = rest[3..].find("\n## ").map(|i| i + 3).unwrap_or(rest.len());
     let section = &rest[..section_end];
     for gap in [
-        "XML",          // Server list XML parsing
-        "hash file",    // Updater hash file absence
-        "removed",      // Removed-command JS errors
+        "XML",       // Server list XML parsing
+        "hash file", // Updater hash file absence
+        "removed",   // Removed-command JS errors
     ] {
         assert!(
             section.contains(gap),
@@ -440,8 +436,8 @@ fn guard_file_header_cites_prd_3_8_1() {
 /// the root cause.
 #[test]
 fn claude_md_path_constant_is_canonical() {
-    let guard_body = fs::read_to_string("tests/claude_md_guard.rs")
-        .expect("guard source must be readable");
+    let guard_body =
+        fs::read_to_string("tests/claude_md_guard.rs").expect("guard source must be readable");
     assert!(
         guard_body.contains("const CLAUDE_MD: &str = \"../../CLAUDE.md\";"),
         "PRD 3.8.1 (iter 214): tests/claude_md_guard.rs must retain \
@@ -458,8 +454,8 @@ fn claude_md_path_constant_is_canonical() {
 /// vacuous pass — every empty section would satisfy `len >= 0`.
 #[test]
 fn min_section_lines_constant_is_thirty() {
-    let guard_body = fs::read_to_string("tests/claude_md_guard.rs")
-        .expect("guard source must be readable");
+    let guard_body =
+        fs::read_to_string("tests/claude_md_guard.rs").expect("guard source must be readable");
     assert!(
         guard_body.contains("const MIN_SECTION_LINES: usize = 30;"),
         "PRD 3.8.1 (iter 214): tests/claude_md_guard.rs must retain \
@@ -557,8 +553,8 @@ fn running_perfection_loop_subsection_cites_fix_plan_md() {
 /// message without identifying the constant as root cause.
 #[test]
 fn section_heading_constant_is_canonical() {
-    let guard_body = fs::read_to_string("tests/claude_md_guard.rs")
-        .expect("guard source must be readable");
+    let guard_body =
+        fs::read_to_string("tests/claude_md_guard.rs").expect("guard source must be readable");
     assert!(
         guard_body.contains("const SECTION_HEADING: &str = \"## Mod Manager\";"),
         "PRD 3.8.1 (iter 252): tests/claude_md_guard.rs must retain \
@@ -625,10 +621,7 @@ fn v100_api_key_differences_table_meets_row_floor() {
         .find("### Key Differences from Classic API")
         .expect("subsection must exist (iter 175 pin)");
     let rest = &body[idx..];
-    let end = rest[3..]
-        .find("\n## ")
-        .map(|i| i + 3)
-        .unwrap_or(rest.len());
+    let end = rest[3..].find("\n## ").map(|i| i + 3).unwrap_or(rest.len());
     let subsection = &rest[..end];
     // Count table rows: lines starting with `| ` that are NOT the
     // header `| Classic | Classic+ (v100) |` or the separator line.
@@ -741,8 +734,7 @@ fn claude_md_detector_self_test() {
 
     // Bad shape G (iter 137): Cargo Feature Flags section missing
     // the skip-updates flag doc.
-    let no_skip =
-        "## Cargo Feature Flags\n\n- `custom-protocol` required\n";
+    let no_skip = "## Cargo Feature Flags\n\n- `custom-protocol` required\n";
     assert!(
         !no_skip.contains("skip-updates"),
         "self-test: feature-flags section missing skip-updates must \

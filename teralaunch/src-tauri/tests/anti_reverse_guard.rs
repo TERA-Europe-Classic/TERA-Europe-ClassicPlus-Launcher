@@ -459,8 +459,7 @@ fn anti_reverse_guard_detector_self_test() {
     );
 
     // Bad shape E: release profile with debug = true.
-    let with_debug =
-        "[profile.release]\nopt-level = 3\nlto = true\nstrip = true\ndebug = true\n";
+    let with_debug = "[profile.release]\nopt-level = 3\nlto = true\nstrip = true\ndebug = true\n";
     assert!(
         with_debug.contains("debug = true"),
         "self-test: fixture must actually contain debug = true so \
@@ -495,12 +494,14 @@ fn anti_reverse_guard_detector_self_test() {
 /// found" panics.
 #[test]
 fn guard_path_constants_are_canonical() {
-    let body = fs::read_to_string("tests/anti_reverse_guard.rs")
-        .expect("guard source must exist");
+    let body = fs::read_to_string("tests/anti_reverse_guard.rs").expect("guard source must exist");
     for (name, expected) in [
         ("CARGO_TOML", "Cargo.toml"),
         ("BUILD_RS", "build.rs"),
-        ("AUDIT_DOC", "../../docs/PRD/audits/security/anti-reverse.md"),
+        (
+            "AUDIT_DOC",
+            "../../docs/PRD/audits/security/anti-reverse.md",
+        ),
     ] {
         let line = format!("const {name}: &str = \"{expected}\";");
         assert!(
@@ -687,8 +688,7 @@ fn audit_doc_byte_bounds_iter_282() {
 
 #[test]
 fn cargo_toml_declares_lto_and_strip_for_release() {
-    let toml = std::fs::read_to_string(CARGO_TOML)
-        .expect("Cargo.toml must exist");
+    let toml = std::fs::read_to_string(CARGO_TOML).expect("Cargo.toml must exist");
     assert!(
         toml.contains("lto"),
         "PRD 3.1.8 (iter 282): Cargo.toml must declare `lto` in \

@@ -143,15 +143,13 @@ fn every_guard_carries_a_detector_self_test() {
     for path in discovered_guards() {
         let body = read(&path);
         // Scan for fn names that carry the self-test idiom.
-        let has_self_test = body
-            .lines()
-            .any(|l| {
-                let t = l.trim_start();
-                t.starts_with("fn ")
-                    && (l.contains("_self_test")
-                        || l.contains("detector_self_test")
-                        || l.contains("_detector("))
-            });
+        let has_self_test = body.lines().any(|l| {
+            let t = l.trim_start();
+            t.starts_with("fn ")
+                && (l.contains("_self_test")
+                    || l.contains("detector_self_test")
+                    || l.contains("_detector("))
+        });
         assert!(
             has_self_test,
             "{} must carry at least one detector self-test fn \
@@ -771,8 +769,7 @@ fn every_guard_contains_at_least_fifteen_assertions() {
 
 #[test]
 fn meta_hygiene_guard_header_cites_iter_285_evolution() {
-    let body = fs::read_to_string("tests/meta_hygiene_guard.rs")
-        .expect("must exist");
+    let body = fs::read_to_string("tests/meta_hygiene_guard.rs").expect("must exist");
     assert!(
         body.contains("iter 285"),
         "meta-guard contract (iter 285): body must cite `iter 285` \

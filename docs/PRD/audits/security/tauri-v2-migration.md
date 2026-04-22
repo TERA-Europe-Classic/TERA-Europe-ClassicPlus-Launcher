@@ -35,7 +35,7 @@ tauri-build = "1"
 - `shell`: open + one `cmd /C start {validator:\S+}` scope.
 - `window`: close, hide, show, minimize, maximize, unmaximize, startDragging.
 - `process`: exit, relaunch.
-- `http`: request — scope 8 hosts (6 prod HTTPS + 1 dev HTTP at `192.168.1.128:8090` tracked by 3.1.13).
+- `http`: request — scope 8 hosts (6 prod HTTPS + 1 dev HTTP at `157.90.107.2:8090` tracked by 3.1.13).
 - `notification`: all.
 
 **Command surface**: **40 `#[tauri::command]` fns** across 7 modules (auth: 5, config: 6, download: 4, game: 4, hash: 6, mods: 9, util: 6). All registered in a single global `invoke_handler`.
@@ -44,7 +44,7 @@ tauri-build = "1"
 
 **CSP**: single global string —
 ```
-default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' ...; connect-src 'self' https://*.tera-europe.net https://*.tera-germany.de https://*.crazy-esports.com https://web.tera-germany.de https://helpdesk.crazy-esports.com https://tera-europe-classic.com http://192.168.1.128:8090
+default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' ...; connect-src 'self' https://*.tera-europe.net https://*.tera-germany.de https://*.crazy-esports.com https://web.tera-germany.de https://helpdesk.crazy-esports.com https://tera-europe-classic.com http://157.90.107.2:8090
 ```
 `'unsafe-inline'` on `script-src` tracked separately by 3.1.12.
 

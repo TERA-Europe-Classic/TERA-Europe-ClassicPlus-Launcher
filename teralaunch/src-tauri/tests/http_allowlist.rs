@@ -185,8 +185,8 @@ fn host_of_strips_scheme_and_port() {
         Some("example.com".into())
     );
     assert_eq!(
-        host_of("http://192.168.1.128:8090/"),
-        Some("192.168.1.128".into())
+        host_of("http://157.90.107.2:8090/"),
+        Some("157.90.107.2".into())
     );
     assert_eq!(
         host_of("https://raw.githubusercontent.com/a/b/c.json"),
@@ -237,7 +237,7 @@ fn test_hosts_is_exactly_pinned_set() {
 /// (iter 152). When §3.1.13 portal-https flips to the production FQDN,
 /// this constant updates atomically with the CSP pin + config so the
 /// three surfaces can't drift out of sync.
-const LAN_DEV_HTTP_SCOPE: &str = "http://192.168.1.128:8090/*";
+const LAN_DEV_HTTP_SCOPE: &str = "http://157.90.107.2:8090/*";
 
 /// Every production allowlist scope MUST use `https://`. An `http://`
 /// entry for an unintended host permits cleartext outbound — even
@@ -483,13 +483,13 @@ fn url_extraction_regex_handles_common_literal_shapes() {
     assert_eq!(trimmed, "https://example.com/path");
 
     // Sanity: the regex matches http:// too (for the LAN dev portal).
-    let lan = r#"base: "http://192.168.1.128:8090","#;
+    let lan = r#"base: "http://157.90.107.2:8090","#;
     let m = url_re.find(lan).expect("must match http URL");
     let trimmed = m
         .as_str()
         .trim_end_matches(['"', '\'', ',', '.', ';', '`'])
         .to_string();
-    assert_eq!(trimmed, "http://192.168.1.128:8090");
+    assert_eq!(trimmed, "http://157.90.107.2:8090");
 
     // Sanity: the regex stops at whitespace (doesn't gobble the rest
     // of the line).
@@ -542,7 +542,7 @@ fn guard_source_and_lan_scope_constants_are_canonical() {
          a pointer at the actual drift."
     );
     assert!(
-        body.contains(r#"const LAN_DEV_HTTP_SCOPE: &str = "http://192.168.1.128:8090/*";"#),
+        body.contains(r#"const LAN_DEV_HTTP_SCOPE: &str = "http://157.90.107.2:8090/*";"#),
         "PRD §3.1.5 (iter 234): {GUARD_SOURCE} must keep the LAN dev \
          scope constant verbatim. A drift splits the pairing: the \
          https-only guard's exception would name a different literal \
@@ -766,8 +766,7 @@ fn guard_source_byte_size_has_sane_bounds() {
 
 #[test]
 fn guard_source_cites_prd_3_1_5_explicitly() {
-    let body = std::fs::read_to_string(GUARD_SOURCE)
-        .expect("guard must exist");
+    let body = std::fs::read_to_string(GUARD_SOURCE).expect("guard must exist");
     let header = &body[..body.len().min(500)];
     assert!(
         header.contains("PRD §3.1.5") || header.contains("PRD 3.1.5"),
@@ -778,12 +777,11 @@ fn guard_source_cites_prd_3_1_5_explicitly() {
 
 #[test]
 fn lan_dev_http_scope_constant_is_canonical() {
-    let body = std::fs::read_to_string(GUARD_SOURCE)
-        .expect("guard must exist");
+    let body = std::fs::read_to_string(GUARD_SOURCE).expect("guard must exist");
     assert!(
-        body.contains("http://192.168.1.128:8090"),
+        body.contains("http://157.90.107.2:8090"),
         "PRD §3.1.5 (iter 273): guard must retain the LAN dev HTTP \
-         scope `http://192.168.1.128:8090` — used to validate the \
+         scope `http://157.90.107.2:8090` — used to validate the \
          portal endpoint URL is on the allowlist."
     );
 }

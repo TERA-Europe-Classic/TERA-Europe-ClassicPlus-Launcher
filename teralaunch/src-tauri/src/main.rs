@@ -97,6 +97,41 @@ fn should_auto_install_updater() -> bool {
     )
 }
 
+/// Installs a panic hook that appends crash details to a local log file.
+///
+/// This is primarily for release-mode "window flashes then closes" reports
+/// where no console is visible. The hook is best-effort and never panics.
+fn install_panic_file_hook() {
+    std::panic::set_hook(Box::new(|panic_info| {
+        use std::fs::OpenOptions;
+        use std::io::Write;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let ts = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        let location = panic_info
+            .location()
+            .map(|loc| format!("{}:{}", loc.file(), loc.line()))
+            .unwrap_or_else(|| "unknown-location".to_string());
+
+        let payload = if let Some(s) = panic_info.payload().downcast_ref::<&str>() {
+            (*s).to_string()
+        } else if let Some(s) = panic_info.payload().downcast_ref::<String>() {
+            s.clone()
+        } else {
+            "non-string panic payload".to_string()
+        };
+
+        let log_path = std::env::temp_dir().join("tera-launcher-crash.log");
+        if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&log_path) {
+            let _ = writeln!(file, "[{}] panic at {}: {}", ts, location, payload);
+        }
+    }));
+}
+
 /// Runs the self-integrity check against a sidecar baseline. Designed so the
 /// dev path (no sidecar present) is a WARN, not an error, while production
 /// mismatch triggers a native Windows MessageBox and terminates the process
@@ -195,6 +230,7 @@ fn show_integrity_failure_dialog(_message: &str) {
 #[cfg(not(tarpaulin_include))]
 fn main() {
     dotenv().ok();
+    install_panic_file_hook();
 
     // Windows: relaunch elevated via UAC using ShellExecute with "runas" verb.
     // This shows proper UAC dialog and admin shield icon without command prompt flash.

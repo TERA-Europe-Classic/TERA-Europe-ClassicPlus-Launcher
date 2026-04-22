@@ -141,8 +141,10 @@ fn scanner_pins_idempotent_retry_wiring() {
 fn scanner_pins_translation_keys_across_four_locales() {
     let body = read(SCANNER);
     assert!(
-        body.contains("FRA") && body.contains("EUR")
-            && body.contains("RUS") && body.contains("GER"),
+        body.contains("FRA")
+            && body.contains("EUR")
+            && body.contains("RUS")
+            && body.contains("GER"),
         "{SCANNER} must check OFFLINE_BANNER_* in all 4 locales \
          (FRA, EUR, RUS, GER). Skipping any locale lets that \
          locale's UI ship a raw key string."
@@ -229,8 +231,14 @@ fn offline_banner_scanner_guard_detector_self_test() {
     // Bad shape F: app.js ready flip AFTER first await.
     let bad_order = "async init() {\n  await fetch('/x');\n  mainpage.classList.add('ready');\n}\n";
     let init_pos = bad_order.find("async init()").unwrap();
-    let await_pos = bad_order[init_pos..].find("await ").map(|p| init_pos + p).unwrap();
-    let ready_pos = bad_order[init_pos..].find("classList.add('ready')").map(|p| init_pos + p).unwrap();
+    let await_pos = bad_order[init_pos..]
+        .find("await ")
+        .map(|p| init_pos + p)
+        .unwrap();
+    let ready_pos = bad_order[init_pos..]
+        .find("classList.add('ready')")
+        .map(|p| init_pos + p)
+        .unwrap();
     assert!(
         ready_pos > await_pos,
         "self-test: synthetic bad-order source must have ready AFTER \
@@ -326,9 +334,7 @@ fn translations_json_has_offline_banner_keys_in_all_four_locales() {
         // string length. Clamping prevents an out-of-range slice on
         // small translations.json variants.
         let remaining = &translations[locale_pos + 1..];
-        let next_rel = remaining
-            .find("\n    \"")
-            .unwrap_or(remaining.len());
+        let next_rel = remaining.find("\n    \"").unwrap_or(remaining.len());
         let end = (locale_pos + 1 + next_rel).min(translations.len());
         let window = &translations[locale_pos..end];
         for key in [
@@ -655,8 +661,7 @@ fn strip_js_comments_preserves_string_literal_contents() {
     // Scan for `"//` or `"/*` patterns that would be mis-parsed.
     // If any exist, strip_js_comments needs upgrading — fail this
     // pin with a pointer to the limitation.
-    let has_string_with_comment_opener =
-        window.contains("\"//") || window.contains("\"/*");
+    let has_string_with_comment_opener = window.contains("\"//") || window.contains("\"/*");
     assert!(
         !has_string_with_comment_opener,
         "fix.offline-empty-state (iter 255): src/app.js init() \
@@ -777,19 +782,15 @@ fn app_js_ready_flip_precedes_first_await_in_init() {
     let end = init_pos.saturating_add(15_000).min(src.len());
     let window_raw = &src[init_pos..end];
     let window = strip_js_comments(window_raw);
-    let ready_pos = window
-        .find("classList.add('ready')")
-        .expect(
-            "fix.offline-empty-state (iter 182): src/app.js init() \
+    let ready_pos = window.find("classList.add('ready')").expect(
+        "fix.offline-empty-state (iter 182): src/app.js init() \
              must keep the `classList.add('ready')` flip",
-        );
-    let first_await = window
-        .find("await ")
-        .expect(
-            "fix.offline-empty-state (iter 182): src/app.js init() \
+    );
+    let first_await = window.find("await ").expect(
+        "fix.offline-empty-state (iter 182): src/app.js init() \
              must contain at least one `await` — the invariant is \
              that ready-flip precedes it",
-        );
+    );
     assert!(
         ready_pos < first_await,
         "fix.offline-empty-state (iter 182): in src/app.js init(), \

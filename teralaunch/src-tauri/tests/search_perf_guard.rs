@@ -258,8 +258,7 @@ fn search_perf_guard_detector_self_test() {
 fn perf_test_exercises_production_filter_matches() {
     let body = read(SCANNER);
     assert!(
-        body.contains("import('../src/mods.js')")
-            || body.contains("from '../src/mods.js'"),
+        body.contains("import('../src/mods.js')") || body.contains("from '../src/mods.js'"),
         "PRD 3.6.4 (iter 181): {SCANNER} must import from \
          `../src/mods.js` so it exercises the production \
          filterMatches; redefining the function locally would \
@@ -331,7 +330,14 @@ fn perf_test_has_at_least_three_it_blocks() {
 #[test]
 fn perf_test_carries_no_only_or_skip_markers() {
     let body = read(SCANNER);
-    for forbidden in ["it.only(", "describe.only(", "it.skip(", "describe.skip(", "xit(", "xdescribe("] {
+    for forbidden in [
+        "it.only(",
+        "describe.only(",
+        "it.skip(",
+        "describe.skip(",
+        "xit(",
+        "xdescribe(",
+    ] {
         assert!(
             !body.contains(forbidden),
             "PRD 3.6.4 (iter 181): {SCANNER} must not carry \
@@ -355,13 +361,7 @@ fn perf_fixture_entries_have_full_field_shape() {
         .find("function makeCatalogEntries")
         .expect("makeCatalogEntries must exist");
     let window = &body[make_pos..make_pos.saturating_add(1500)];
-    for field in [
-        "id:",
-        "kind:",
-        "name:",
-        "description:",
-        "category:",
-    ] {
+    for field in ["id:", "kind:", "name:", "description:", "category:"] {
         assert!(
             window.contains(field),
             "PRD 3.6.4 (iter 181): makeCatalogEntries must populate \
@@ -421,8 +421,8 @@ fn guard_file_header_cites_prd_3_6_4() {
 /// readable" message that doesn't point at the constant.
 #[test]
 fn scanner_path_constant_is_canonical() {
-    let guard_body = fs::read_to_string("tests/search_perf_guard.rs")
-        .expect("guard source must be readable");
+    let guard_body =
+        fs::read_to_string("tests/search_perf_guard.rs").expect("guard source must be readable");
     assert!(
         guard_body.contains("const SCANNER: &str = \"../tests/search-perf.test.js\";"),
         "PRD 3.6.4 (iter 216): tests/search_perf_guard.rs must retain \
@@ -465,8 +465,7 @@ fn perf_test_is_referenced_in_prd_path_drift_guard() {
     let drift_body = fs::read_to_string("tests/prd_path_drift_guard.rs")
         .expect("tests/prd_path_drift_guard.rs must exist");
     assert!(
-        drift_body.contains("search-perf.test.js")
-            && drift_body.contains("under_one_frame"),
+        drift_body.contains("search-perf.test.js") && drift_body.contains("under_one_frame"),
         "PRD 3.6.4 (iter 216): tests/prd_path_drift_guard.rs must \
          cite `search-perf.test.js` + `under_one_frame` (the JS_PIN \
          entry for §3.6.4). Without the cross-ref, a rename of the \
@@ -623,8 +622,7 @@ fn perf_budget_is_not_reduced_below_sixteen() {
 #[test]
 fn scanner_imports_from_vitest() {
     let body = read(SCANNER);
-    let has_import = body.contains("from 'vitest'")
-        || body.contains("from \"vitest\"");
+    let has_import = body.contains("from 'vitest'") || body.contains("from \"vitest\"");
     assert!(
         has_import,
         "PRD 3.6.4 (iter 256): {SCANNER} must import from `vitest` \
@@ -669,8 +667,7 @@ fn perf_budget_is_literal_16_not_arithmetic() {
 
 #[test]
 fn mods_js_defines_filter_matches_function() {
-    let src = std::fs::read_to_string("../src/mods.js")
-        .expect("mods.js must exist");
+    let src = std::fs::read_to_string("../src/mods.js").expect("mods.js must exist");
     assert!(
         src.contains("filterMatches"),
         "PRD 3.6.4 (iter 287): src/mods.js must define `filterMatches` \
@@ -697,8 +694,7 @@ fn vitest_config_exists() {
 
 #[test]
 fn scanner_describe_block_exists() {
-    let body = std::fs::read_to_string(SCANNER)
-        .expect("scanner must exist");
+    let body = std::fs::read_to_string(SCANNER).expect("scanner must exist");
     assert!(
         body.contains("describe("),
         "PRD 3.6.4 (iter 287): {SCANNER} must wrap tests in a \
@@ -710,8 +706,7 @@ fn scanner_describe_block_exists() {
 fn scanner_sorts_samples_before_taking_median() {
     // Median-of-N requires sorting first. A regression to mean or
     // min would skip the sort. Pin the sort call explicitly.
-    let body = std::fs::read_to_string(SCANNER)
-        .expect("scanner must exist");
+    let body = std::fs::read_to_string(SCANNER).expect("scanner must exist");
     assert!(
         body.contains(".sort("),
         "PRD 3.6.4 (iter 287): {SCANNER} must call `.sort(` on the \
@@ -722,8 +717,8 @@ fn scanner_sorts_samples_before_taking_median() {
 
 #[test]
 fn drift_guard_contains_this_scanner_entry() {
-    let drift = std::fs::read_to_string("tests/prd_path_drift_guard.rs")
-        .expect("drift guard must exist");
+    let drift =
+        std::fs::read_to_string("tests/prd_path_drift_guard.rs").expect("drift guard must exist");
     assert!(
         drift.contains("search-perf.test.js") && drift.contains("under_one_frame"),
         "PRD 3.6.4 (iter 287): prd_path_drift_guard.rs must reference \

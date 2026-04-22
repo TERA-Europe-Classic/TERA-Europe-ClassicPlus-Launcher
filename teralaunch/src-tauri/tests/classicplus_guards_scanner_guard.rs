@@ -76,7 +76,12 @@ fn urls_fixture_covers_every_disabled_feature() {
          (no news endpoints on Classic+)."
     );
     // External: 4 empty, 2 present.
-    for field in ["register: \"\"", "forum: \"\"", "privacy: \"\"", "profile: \"\""] {
+    for field in [
+        "register: \"\"",
+        "forum: \"\"",
+        "privacy: \"\"",
+        "profile: \"\"",
+    ] {
         assert!(
             body.contains(field),
             "{SCANNER} URLS.external must keep `{field}` — that is \
@@ -199,7 +204,8 @@ fn classicplus_guards_scanner_guard_detector_self_test() {
     // Bad shape B: URLS.leaderboard present (even as empty).
     let leaderboard_present = "leaderboard: { submit: \"\" }";
     assert!(
-        !(leaderboard_present.contains("URLS.leaderboard") && leaderboard_present.contains("toBeUndefined")),
+        !(leaderboard_present.contains("URLS.leaderboard")
+            && leaderboard_present.contains("toBeUndefined")),
         "self-test: URLS with a leaderboard section present must \
          be flagged"
     );
@@ -224,7 +230,7 @@ fn classicplus_guards_scanner_guard_detector_self_test() {
     // Bad shape E: URLs fixture containing an unapproved host.
     let leaked_url = r#"forum: "https://forum.en.tera.gameforge.com","#;
     assert!(
-        !leaked_url.contains("192.168.1.128")
+        !leaked_url.contains("157.90.107.2")
             && !leaked_url.contains("discord.com")
             && !leaked_url.contains("helpdesk.crazy-esports.com"),
         "self-test: unapproved URL host in fixture must be flagged"
@@ -286,7 +292,7 @@ fn classicplus_scanner_carries_no_only_or_skip_markers() {
 }
 
 /// Iter 183: the URLs fixture in the scanner must only contain URLs
-/// with approved hosts — 192.168.1.128 (LAN dev portal), discord.com,
+/// with approved hosts — 157.90.107.2 (LAN dev portal), discord.com,
 /// helpdesk.crazy-esports.com. Anything else is a stale Classic URL
 /// that slipped through and would pass the "URL is non-empty" check
 /// trivially.
@@ -298,7 +304,9 @@ fn classicplus_scanner_urls_fixture_contains_only_allowed_hosts() {
         .find("const URLS = {")
         .expect("scanner URLS declaration missing");
     let remaining = &body[start..];
-    let end_rel = remaining.find("};").expect("URLS block must close with `};`");
+    let end_rel = remaining
+        .find("};")
+        .expect("URLS block must close with `};`");
     let block = &remaining[..end_rel];
     // Find every quoted URL-like string in the block.
     let mut in_quote = false;
@@ -321,11 +329,7 @@ fn classicplus_scanner_urls_fixture_contains_only_allowed_hosts() {
     }
     // Every quoted non-empty string that is clearly a URL (contains
     // "://") must carry one of the allowed hosts.
-    const ALLOWED: &[&str] = &[
-        "192.168.1.128",
-        "discord.com",
-        "helpdesk.crazy-esports.com",
-    ];
+    const ALLOWED: &[&str] = &["157.90.107.2", "discord.com", "helpdesk.crazy-esports.com"];
     for url in &urls {
         if !url.contains("://") {
             continue; // not a URL — path fragment or key
@@ -584,7 +588,7 @@ fn allowed_hosts_list_count_is_three() {
     let window = &guard_body[pos..end];
 
     // Each of the 3 expected hosts must appear in the slice literal.
-    for host in ["192.168.1.128", "discord.com", "helpdesk.crazy-esports.com"] {
+    for host in ["157.90.107.2", "discord.com", "helpdesk.crazy-esports.com"] {
         assert!(
             window.contains(&format!("\"{host}\"")),
             "Classic+ contract (iter 218): ALLOWED hosts list must \

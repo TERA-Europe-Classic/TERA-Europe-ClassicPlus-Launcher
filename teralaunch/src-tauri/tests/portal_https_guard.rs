@@ -6,7 +6,7 @@
 //! `docs/PRD/audits/security/portal-https-migration.md`.
 //!
 //! **Current state (iter 119)**: config.json still points at the LAN
-//! dev endpoint `http://192.168.1.128:8090`. This is a KNOWN and
+//! dev endpoint `http://157.90.107.2:8090`. This is a KNOWN and
 //! DOCUMENTED pre-production state — Classic+ has no public HTTPS
 //! portal yet. The audit doc carries this status explicitly.
 //!
@@ -17,7 +17,7 @@
 //! or (b) trivially let MitM hijack the `AuthKey`.
 //!
 //! This guard accepts either the known LAN dev endpoint
-//! (`192.168.1.128`), the `https://` scheme, or an empty string
+//! (`157.90.107.2`), the `https://` scheme, or an empty string
 //! (since `HASH_FILE_URL` + `FILE_SERVER_URL` are empty placeholders
 //! until an endpoint ships), and refuses anything else.
 
@@ -29,7 +29,7 @@ const AUDIT_DOC: &str = "../../docs/PRD/audits/security/portal-https-migration.m
 /// The pre-production LAN dev endpoint host. Keeping this a constant
 /// so a future production cutover doesn't accidentally drift into a
 /// test-fixture copy.
-const LAN_DEV_HOST: &str = "192.168.1.128";
+const LAN_DEV_HOST: &str = "157.90.107.2";
 
 fn read(path: &str) -> String {
     fs::read_to_string(path).unwrap_or_else(|e| panic!("{path}: {e}"))
@@ -40,8 +40,8 @@ fn read(path: &str) -> String {
 #[test]
 fn config_urls_are_https_or_lan_dev_or_empty() {
     let body = read(CONFIG_JSON);
-    let cfg: serde_json::Value = serde_json::from_str(&body)
-        .unwrap_or_else(|e| panic!("config.json must parse: {e}"));
+    let cfg: serde_json::Value =
+        serde_json::from_str(&body).unwrap_or_else(|e| panic!("config.json must parse: {e}"));
 
     let obj = cfg
         .as_object()
@@ -56,9 +56,7 @@ fn config_urls_are_https_or_lan_dev_or_empty() {
             // things that look URL-ish.
             continue;
         }
-        let ok = s.is_empty()
-            || s.starts_with("https://")
-            || s.contains(LAN_DEV_HOST);
+        let ok = s.is_empty() || s.starts_with("https://") || s.contains(LAN_DEV_HOST);
         if !ok {
             offenders.push(format!("{k} = {s}"));
         }
@@ -117,14 +115,11 @@ const EXPECTED_KEYS: &[&str] = &[
 #[test]
 fn config_json_has_exact_expected_key_set() {
     let body = read(CONFIG_JSON);
-    let cfg: serde_json::Value =
-        serde_json::from_str(&body).expect("config.json must parse");
+    let cfg: serde_json::Value = serde_json::from_str(&body).expect("config.json must parse");
     let obj = cfg.as_object().expect("top-level object");
 
-    let got: std::collections::BTreeSet<&str> =
-        obj.keys().map(String::as_str).collect();
-    let want: std::collections::BTreeSet<&str> =
-        EXPECTED_KEYS.iter().copied().collect();
+    let got: std::collections::BTreeSet<&str> = obj.keys().map(String::as_str).collect();
+    let want: std::collections::BTreeSet<&str> = EXPECTED_KEYS.iter().copied().collect();
 
     let extra: Vec<_> = got.difference(&want).collect();
     let missing: Vec<_> = want.difference(&got).collect();
@@ -152,8 +147,7 @@ fn config_json_has_exact_expected_key_set() {
 #[test]
 fn action_urls_share_api_base_prefix() {
     let body = read(CONFIG_JSON);
-    let cfg: serde_json::Value =
-        serde_json::from_str(&body).expect("config.json must parse");
+    let cfg: serde_json::Value = serde_json::from_str(&body).expect("config.json must parse");
     let obj = cfg.as_object().expect("top-level object");
 
     let base = obj
@@ -173,8 +167,7 @@ fn action_urls_share_api_base_prefix() {
         "MAINTENANCE_STATUS_URL",
         "SERVER_LIST_URL",
     ] {
-        let Some(v) = obj.get(*action_key).and_then(|v| v.as_str())
-        else {
+        let Some(v) = obj.get(*action_key).and_then(|v| v.as_str()) else {
             panic!("{action_key} must exist — covered by the key-set test");
         };
         assert!(
@@ -195,15 +188,16 @@ fn action_urls_share_api_base_prefix() {
 #[test]
 fn updater_urls_remain_empty_until_endpoint_ships() {
     let body = read(CONFIG_JSON);
-    let cfg: serde_json::Value =
-        serde_json::from_str(&body).expect("config.json must parse");
+    let cfg: serde_json::Value = serde_json::from_str(&body).expect("config.json must parse");
     let obj = cfg.as_object().expect("top-level object");
 
     for empty_key in &["HASH_FILE_URL", "FILE_SERVER_URL"] {
-        let v = obj.get(*empty_key).and_then(|v| v.as_str()).unwrap_or("__missing__");
+        let v = obj
+            .get(*empty_key)
+            .and_then(|v| v.as_str())
+            .unwrap_or("__missing__");
         assert_eq!(
-            v,
-            "",
+            v, "",
             "{empty_key} must remain empty until the Classic+ updater \
              endpoint ships. Populating silently turns on the self-\
              update pipeline, which relies on a hash-file baseline \
@@ -287,8 +281,7 @@ fn audit_doc_has_all_seven_migration_plan_sections() {
 #[test]
 fn api_base_url_has_no_trailing_slash() {
     let body = read(CONFIG_JSON);
-    let cfg: serde_json::Value =
-        serde_json::from_str(&body).expect("config.json must parse");
+    let cfg: serde_json::Value = serde_json::from_str(&body).expect("config.json must parse");
     let base = cfg["API_BASE_URL"]
         .as_str()
         .expect("API_BASE_URL must be a string");
@@ -309,8 +302,7 @@ fn api_base_url_has_no_trailing_slash() {
 #[test]
 fn all_portal_action_urls_share_base_port() {
     let body = read(CONFIG_JSON);
-    let cfg: serde_json::Value =
-        serde_json::from_str(&body).expect("config.json must parse");
+    let cfg: serde_json::Value = serde_json::from_str(&body).expect("config.json must parse");
     let base = cfg["API_BASE_URL"]
         .as_str()
         .expect("API_BASE_URL must be a string");
@@ -351,8 +343,7 @@ fn all_portal_action_urls_share_base_port() {
 #[test]
 fn server_list_url_carries_no_query_string() {
     let body = read(CONFIG_JSON);
-    let cfg: serde_json::Value =
-        serde_json::from_str(&body).expect("config.json must parse");
+    let cfg: serde_json::Value = serde_json::from_str(&body).expect("config.json must parse");
     let url = cfg["SERVER_LIST_URL"]
         .as_str()
         .expect("SERVER_LIST_URL must be a string");
@@ -420,9 +411,10 @@ fn guard_file_header_cites_prd_3_1_13() {
 #[test]
 fn csp_connect_src_admits_current_api_base_host() {
     let cfg_body = read(CONFIG_JSON);
-    let cfg: serde_json::Value =
-        serde_json::from_str(&cfg_body).expect("config.json must parse");
-    let base = cfg["API_BASE_URL"].as_str().expect("API_BASE_URL must be string");
+    let cfg: serde_json::Value = serde_json::from_str(&cfg_body).expect("config.json must parse");
+    let base = cfg["API_BASE_URL"]
+        .as_str()
+        .expect("API_BASE_URL must be string");
 
     let tauri_conf_body = read("tauri.conf.json");
     let tauri_conf: serde_json::Value =
@@ -446,7 +438,9 @@ fn csp_connect_src_admits_current_api_base_host() {
         .expect("API_BASE_URL must carry `scheme://` prefix");
     let after_scheme_start = scheme_end + 3;
     let rest_after_scheme = &base[after_scheme_start..];
-    let path_start = rest_after_scheme.find('/').unwrap_or(rest_after_scheme.len());
+    let path_start = rest_after_scheme
+        .find('/')
+        .unwrap_or(rest_after_scheme.len());
     let origin = &base[..after_scheme_start + path_start];
 
     assert!(
@@ -467,8 +461,7 @@ fn csp_connect_src_admits_current_api_base_host() {
 #[test]
 fn action_urls_use_tera_path_namespace() {
     let body = read(CONFIG_JSON);
-    let cfg: serde_json::Value =
-        serde_json::from_str(&body).expect("config.json must parse");
+    let cfg: serde_json::Value = serde_json::from_str(&body).expect("config.json must parse");
     for action_key in &[
         "LOGIN_ACTION_URL",
         "GET_ACCOUNT_INFO_URL",
@@ -476,9 +469,9 @@ fn action_urls_use_tera_path_namespace() {
         "MAINTENANCE_STATUS_URL",
         "SERVER_LIST_URL",
     ] {
-        let v = cfg[action_key].as_str().unwrap_or_else(|| {
-            panic!("{action_key} must be a string")
-        });
+        let v = cfg[action_key]
+            .as_str()
+            .unwrap_or_else(|| panic!("{action_key} must be a string"));
         // Locate the path component after the host:port segment.
         let scheme_end = v.find("://").unwrap_or(0) + 3;
         let path_start = v[scheme_end..].find('/').map(|i| scheme_end + i);
@@ -503,8 +496,7 @@ fn action_urls_use_tera_path_namespace() {
 #[test]
 fn action_urls_carry_canonical_endpoint_names() {
     let body = read(CONFIG_JSON);
-    let cfg: serde_json::Value =
-        serde_json::from_str(&body).expect("config.json must parse");
+    let cfg: serde_json::Value = serde_json::from_str(&body).expect("config.json must parse");
 
     for (key, endpoint) in [
         ("LOGIN_ACTION_URL", "LauncherLoginAction"),
@@ -537,8 +529,7 @@ fn action_urls_carry_canonical_endpoint_names() {
 #[test]
 fn lan_dev_host_constant_matches_api_base_host() {
     let body = read(CONFIG_JSON);
-    let cfg: serde_json::Value =
-        serde_json::from_str(&body).expect("config.json must parse");
+    let cfg: serde_json::Value = serde_json::from_str(&body).expect("config.json must parse");
     let base = cfg["API_BASE_URL"]
         .as_str()
         .expect("API_BASE_URL must be a string");
@@ -576,7 +567,7 @@ fn portal_https_detector_self_test() {
     let bad = serde_json::json!({
         "API_BASE_URL": "http://evil.example.com/api",
         "LOGIN_URL": "https://legit.example.com/login",
-        "LAN_URL": "http://192.168.1.128:8090/dev",
+        "LAN_URL": "http://157.90.107.2:8090/dev",
         "EMPTY_URL": "",
     });
 
@@ -587,9 +578,7 @@ fn portal_https_detector_self_test() {
         if !s.starts_with("http://") && !s.starts_with("https://") && !s.is_empty() {
             continue;
         }
-        let ok = s.is_empty()
-            || s.starts_with("https://")
-            || s.contains(LAN_DEV_HOST);
+        let ok = s.is_empty() || s.starts_with("https://") || s.contains(LAN_DEV_HOST);
         if !ok {
             offenders.push(format!("{k} = {s}"));
         }
@@ -607,7 +596,7 @@ fn portal_https_detector_self_test() {
 
     // Bad shape B (iter 142): config with an extra unexpected key.
     let extra_key_config = serde_json::json!({
-        "API_BASE_URL": "http://192.168.1.128:8090",
+        "API_BASE_URL": "http://157.90.107.2:8090",
         "ROGUE_NEW_URL": "https://attacker.example.com/",
     });
     let got: std::collections::BTreeSet<&str> = extra_key_config
@@ -616,8 +605,7 @@ fn portal_https_detector_self_test() {
         .keys()
         .map(String::as_str)
         .collect();
-    let want: std::collections::BTreeSet<&str> =
-        EXPECTED_KEYS.iter().copied().collect();
+    let want: std::collections::BTreeSet<&str> = EXPECTED_KEYS.iter().copied().collect();
     let extra: Vec<_> = got.difference(&want).collect();
     assert!(
         !extra.is_empty(),
@@ -626,7 +614,7 @@ fn portal_https_detector_self_test() {
 
     // Bad shape C: action URL that drifted from API_BASE_URL prefix.
     let drift_cfg = serde_json::json!({
-        "API_BASE_URL": "http://192.168.1.128:8090",
+        "API_BASE_URL": "http://157.90.107.2:8090",
         "LOGIN_ACTION_URL": "http://different-host:9000/tera/LauncherLoginAction",
     });
     let base = drift_cfg
@@ -668,12 +656,14 @@ fn portal_https_detector_self_test() {
 /// drift silently breaks multiple pins.
 #[test]
 fn guard_path_and_host_constants_are_canonical() {
-    let body = fs::read_to_string("tests/portal_https_guard.rs")
-        .expect("guard source must exist");
+    let body = fs::read_to_string("tests/portal_https_guard.rs").expect("guard source must exist");
     for (name, expected) in [
         ("CONFIG_JSON", "../../teralib/src/config/config.json"),
-        ("AUDIT_DOC", "../../docs/PRD/audits/security/portal-https-migration.md"),
-        ("LAN_DEV_HOST", "192.168.1.128"),
+        (
+            "AUDIT_DOC",
+            "../../docs/PRD/audits/security/portal-https-migration.md",
+        ),
+        ("LAN_DEV_HOST", "157.90.107.2"),
     ] {
         let line = format!("const {name}: &str = \"{expected}\";");
         assert!(
@@ -692,8 +682,7 @@ fn guard_path_and_host_constants_are_canonical() {
 #[test]
 fn lan_dev_port_is_eight_zero_nine_zero() {
     let body = read(CONFIG_JSON);
-    let config: serde_json::Value =
-        serde_json::from_str(&body).expect("config.json must parse");
+    let config: serde_json::Value = serde_json::from_str(&body).expect("config.json must parse");
     let obj = config.as_object().expect("config must be an object");
     // Find any URL value mentioning the LAN host; the port after `:`
     // must be `8090`.
@@ -701,10 +690,7 @@ fn lan_dev_port_is_eight_zero_nine_zero() {
         if let Some(s) = v.as_str() {
             if s.contains(LAN_DEV_HOST) {
                 // Extract port.
-                let after_host = s
-                    .split(LAN_DEV_HOST)
-                    .nth(1)
-                    .unwrap_or("");
+                let after_host = s.split(LAN_DEV_HOST).nth(1).unwrap_or("");
                 if let Some(port_str) = after_host.strip_prefix(':') {
                     let port: String = port_str
                         .chars()
@@ -751,7 +737,9 @@ fn expected_keys_count_stays_bounded() {
     // divergence.
     for k in EXPECTED_KEYS {
         assert!(
-            !k.is_empty() && k.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_'),
+            !k.is_empty()
+                && k.chars()
+                    .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_'),
             "PRD 3.1.13 (iter 244): EXPECTED_KEYS entry `{k}` must \
              be UPPER_SNAKE_CASE. Lowercase or kebab-case signals a \
              convention drift."
@@ -809,12 +797,11 @@ fn audit_doc_documents_dormant_status_and_preconditions() {
 #[test]
 fn config_root_is_an_object_with_url_valued_entries() {
     let body = read(CONFIG_JSON);
-    let config: serde_json::Value =
-        serde_json::from_str(&body).expect("config.json must parse");
-    let obj = config
-        .as_object()
-        .expect("PRD 3.1.13 (iter 244): config.json root must be an \
-                 object (not an array or primitive)");
+    let config: serde_json::Value = serde_json::from_str(&body).expect("config.json must parse");
+    let obj = config.as_object().expect(
+        "PRD 3.1.13 (iter 244): config.json root must be an \
+                 object (not an array or primitive)",
+    );
     assert!(
         !obj.is_empty(),
         "PRD 3.1.13 (iter 244): config.json root object must not be \
@@ -883,8 +870,7 @@ fn guard_source_byte_bounds() {
 
 #[test]
 fn guard_source_cites_prd_3_1_13_explicitly() {
-    let body = std::fs::read_to_string("tests/portal_https_guard.rs")
-        .expect("guard must exist");
+    let body = std::fs::read_to_string("tests/portal_https_guard.rs").expect("guard must exist");
     let header = &body[..body.len().min(500)];
     assert!(
         header.contains("PRD 3.1.13"),

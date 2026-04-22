@@ -76,7 +76,7 @@ https://dl.tera-europe.net/*
 https://web.tera-germany.de/*
 https://tera-europe-classic.com/*
 https://raw.githubusercontent.com/*
-http://192.168.1.128:8090/*   ← LAN dev portal (3.1.13 dormant)
+http://157.90.107.2:8090/*   ← LAN dev portal (3.1.13 dormant)
 ```
 
 M1 carries these into the capability file. M2 regression check: scope still enforces `tauri-plugin-http` in-process before reqwest leaves the allowlist.

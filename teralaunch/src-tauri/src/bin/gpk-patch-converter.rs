@@ -378,6 +378,20 @@ fn build_manifest_candidate(
     Ok(manifest)
 }
 
+fn write_manifest_candidate(
+    layout: &patch_manifest::PatchArtifactLayout,
+    manifest: &patch_manifest::PatchManifest,
+) -> Result<(), String> {
+    std::fs::create_dir_all(&layout.bundle_dir)
+        .map_err(|e| format!("Failed to create bundle dir {}: {e}", layout.bundle_dir.display()))?;
+    std::fs::create_dir_all(&layout.payload_dir)
+        .map_err(|e| format!("Failed to create payload dir {}: {e}", layout.payload_dir.display()))?;
+    let json = serde_json::to_string_pretty(manifest)
+        .map_err(|e| format!("Failed to serialize manifest candidate: {e}"))?;
+    std::fs::write(&layout.manifest_path, json)
+        .map_err(|e| format!("Failed to write manifest candidate {}: {e}", layout.manifest_path.display()))
+}
+
 fn hex_lower(bytes: &[u8]) -> String {
     let mut out = String::with_capacity(bytes.len() * 2);
     for b in bytes {

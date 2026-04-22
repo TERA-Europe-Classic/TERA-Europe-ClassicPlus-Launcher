@@ -34,9 +34,7 @@ const REQUIRED_SUBSYSTEMS: &[&str] = &[
 
 fn doc_body() -> String {
     fs::read_to_string(DOC).unwrap_or_else(|e| {
-        panic!(
-            "ARCHITECTURE.md must be readable from src-tauri/ via {DOC}: {e}"
-        )
+        panic!("ARCHITECTURE.md must be readable from src-tauri/ via {DOC}: {e}")
     })
 }
 
@@ -66,10 +64,7 @@ fn every_required_subsystem_has_doc_coverage() {
 #[test]
 fn doc_has_structural_section_headings() {
     let body = doc_body();
-    let heading_count = body
-        .lines()
-        .filter(|l| l.starts_with("## "))
-        .count();
+    let heading_count = body.lines().filter(|l| l.starts_with("## ")).count();
     assert!(
         heading_count >= REQUIRED_SUBSYSTEMS.len(),
         "ARCHITECTURE.md has only {heading_count} `## ` headings but \
@@ -140,10 +135,7 @@ fn cross_subsystem_guarantees_section_names_core_invariants() {
         .expect("section must exist");
     // Scan to the next ## heading.
     let rest = &body[idx..];
-    let section_end = rest[2..]
-        .find("\n## ")
-        .map(|i| i + 2)
-        .unwrap_or(rest.len());
+    let section_end = rest[2..].find("\n## ").map(|i| i + 2).unwrap_or(rest.len());
     let section = &rest[..section_end];
     // Core invariants named in the section header list. Each is a
     // criterion the Rust integration tests enforce separately — the
@@ -232,24 +224,13 @@ fn every_numbered_section_names_owning_file() {
     // Sections 1-8 are subsystem pages (3a is the in-memory guard
     // sibling of 3). Sections 9+ are cross-cutting — no owning file.
     for section_prefix in [
-        "## 1. ",
-        "## 2. ",
-        "## 3. ",
-        "## 3a. ",
-        "## 4. ",
-        "## 5. ",
-        "## 6. ",
-        "## 7. ",
-        "## 8. ",
+        "## 1. ", "## 2. ", "## 3. ", "## 3a. ", "## 4. ", "## 5. ", "## 6. ", "## 7. ", "## 8. ",
     ] {
         let idx = body
             .find(section_prefix)
             .unwrap_or_else(|| panic!("section `{section_prefix}...` must exist"));
         let rest = &body[idx..];
-        let section_end = rest[5..]
-            .find("\n## ")
-            .map(|i| i + 5)
-            .unwrap_or(rest.len());
+        let section_end = rest[5..].find("\n## ").map(|i| i + 5).unwrap_or(rest.len());
         let section = &rest[..section_end];
         assert!(
             section.contains("**File:**"),
@@ -273,10 +254,7 @@ fn mods_state_section_documents_rwlock_primitive() {
         .find("## 3a. Mods state")
         .expect("section 3a must exist");
     let rest = &body[idx..];
-    let section_end = rest[5..]
-        .find("\n## ")
-        .map(|i| i + 5)
-        .unwrap_or(rest.len());
+    let section_end = rest[5..].find("\n## ").map(|i| i + 5).unwrap_or(rest.len());
     let section = &rest[..section_end];
     assert!(
         section.contains("RwLock"),
@@ -298,10 +276,7 @@ fn self_integrity_section_documents_sidecar_and_verify() {
         .find("## 6. Self-integrity")
         .expect("section 6 must exist");
     let rest = &body[idx..];
-    let section_end = rest[5..]
-        .find("\n## ")
-        .map(|i| i + 5)
-        .unwrap_or(rest.len());
+    let section_end = rest[5..].find("\n## ").map(|i| i + 5).unwrap_or(rest.len());
     let section = &rest[..section_end];
     assert!(
         section.contains("self_hash.sha256"),
@@ -341,24 +316,13 @@ fn every_numbered_section_exceeds_minimum_content_lines() {
     const MIN_LINES_PER_SECTION: usize = 8;
     let body = doc_body();
     for section_prefix in [
-        "## 1. ",
-        "## 2. ",
-        "## 3. ",
-        "## 3a. ",
-        "## 4. ",
-        "## 5. ",
-        "## 6. ",
-        "## 7. ",
-        "## 8. ",
+        "## 1. ", "## 2. ", "## 3. ", "## 3a. ", "## 4. ", "## 5. ", "## 6. ", "## 7. ", "## 8. ",
     ] {
         let idx = body
             .find(section_prefix)
             .unwrap_or_else(|| panic!("section `{section_prefix}...` must exist"));
         let rest = &body[idx..];
-        let section_end = rest[5..]
-            .find("\n## ")
-            .map(|i| i + 5)
-            .unwrap_or(rest.len());
+        let section_end = rest[5..].find("\n## ").map(|i| i + 5).unwrap_or(rest.len());
         let section = &rest[..section_end];
         let line_count = section.lines().count();
         assert!(
@@ -445,9 +409,7 @@ fn expected_sections_count_meets_floor() {
 #[test]
 fn registry_section_documents_registry_json_and_installing_recovery() {
     let body = doc_body();
-    let idx = body
-        .find("## 3. Registry")
-        .expect("section 3 must exist");
+    let idx = body.find("## 3. Registry").expect("section 3 must exist");
     let rest = &body[idx..];
     // Walk to next ## heading (but skip ## 3a).
     let after_header = &rest[5..];
@@ -498,10 +460,7 @@ fn external_app_section_documents_attach_once_and_overlay_lifecycle() {
         .find("## 4. External-app")
         .expect("section 4 must exist");
     let rest = &body[idx..];
-    let section_end = rest[5..]
-        .find("\n## ")
-        .map(|i| i + 5)
-        .unwrap_or(rest.len());
+    let section_end = rest[5..].find("\n## ").map(|i| i + 5).unwrap_or(rest.len());
     let section = &rest[..section_end];
     assert!(
         section.contains("SpawnDecision") || section.contains("decide_spawn"),
@@ -530,14 +489,9 @@ fn external_app_section_documents_attach_once_and_overlay_lifecycle() {
 #[test]
 fn tmm_section_documents_composite_package_mapper() {
     let body = doc_body();
-    let idx = body
-        .find("## 5. TMM mapper")
-        .expect("section 5 must exist");
+    let idx = body.find("## 5. TMM mapper").expect("section 5 must exist");
     let rest = &body[idx..];
-    let section_end = rest[5..]
-        .find("\n## ")
-        .map(|i| i + 5)
-        .unwrap_or(rest.len());
+    let section_end = rest[5..].find("\n## ").map(|i| i + 5).unwrap_or(rest.len());
     let section = &rest[..section_end];
     assert!(
         section.contains("CompositePackageMapper"),
@@ -582,10 +536,7 @@ fn architecture_doc_detector_self_test() {
                        services/mods/catalog.rs, services/mods/external_app.rs, \
                        services/mods/registry.rs, state/mods_state.rs, \
                        mods.js.\n";
-    let heading_count = no_headings
-        .lines()
-        .filter(|l| l.starts_with("## "))
-        .count();
+    let heading_count = no_headings.lines().filter(|l| l.starts_with("## ")).count();
     assert!(
         heading_count < REQUIRED_SUBSYSTEMS.len(),
         "self-test: no-heading doc must trip the structural check"
@@ -629,8 +580,8 @@ fn architecture_doc_detector_self_test() {
 /// wrong file with misleading "file not found" panics.
 #[test]
 fn guard_doc_path_constant_is_canonical() {
-    let body = fs::read_to_string("tests/architecture_doc_guard.rs")
-        .expect("guard source must exist");
+    let body =
+        fs::read_to_string("tests/architecture_doc_guard.rs").expect("guard source must exist");
     assert!(
         body.contains(r#"const DOC: &str = "../../docs/mod-manager/ARCHITECTURE.md";"#),
         "PRD 3.8.3 (iter 246): tests/architecture_doc_guard.rs must \
@@ -686,8 +637,7 @@ fn expected_sections_count_is_exactly_eleven() {
 /// in 200 bytes) but the body-per-section would be a few words.
 #[test]
 fn doc_body_meets_minimum_byte_floor() {
-    let body = fs::read_to_string(DOC)
-        .unwrap_or_else(|e| panic!("{DOC} must be readable: {e}"));
+    let body = fs::read_to_string(DOC).unwrap_or_else(|e| panic!("{DOC} must be readable: {e}"));
     let n = body.len();
     assert!(
         n >= 10_000,
@@ -714,8 +664,7 @@ fn doc_body_meets_minimum_byte_floor() {
 /// keys off the title string.
 #[test]
 fn doc_h1_title_is_canonical() {
-    let body = fs::read_to_string(DOC)
-        .unwrap_or_else(|e| panic!("{DOC} must be readable: {e}"));
+    let body = fs::read_to_string(DOC).unwrap_or_else(|e| panic!("{DOC} must be readable: {e}"));
     // Find the first `# ` line (H1).
     let h1_line = body
         .lines()
@@ -767,8 +716,8 @@ fn guard_source_byte_bounds_iter_283() {
 
 #[test]
 fn guard_source_cites_prd_3_8_4_explicitly() {
-    let body = std::fs::read_to_string("tests/architecture_doc_guard.rs")
-        .expect("guard must exist");
+    let body =
+        std::fs::read_to_string("tests/architecture_doc_guard.rs").expect("guard must exist");
     let header = &body[..body.len().min(500)];
     assert!(
         header.contains("PRD 3.8.4"),
@@ -779,12 +728,7 @@ fn guard_source_cites_prd_3_8_4_explicitly() {
 
 #[test]
 fn required_subsystems_carries_all_canonical_entries() {
-    for expected in [
-        "tmm.rs",
-        "catalog.rs",
-        "external_app.rs",
-        "registry.rs",
-    ] {
+    for expected in ["tmm.rs", "catalog.rs", "external_app.rs", "registry.rs"] {
         assert!(
             REQUIRED_SUBSYSTEMS.iter().any(|s| s.contains(expected)),
             "PRD 3.8.4 (iter 283): REQUIRED_SUBSYSTEMS must contain \
@@ -796,8 +740,7 @@ fn required_subsystems_carries_all_canonical_entries() {
 
 #[test]
 fn doc_h1_title_is_at_top_within_first_five_lines() {
-    let body = std::fs::read_to_string(DOC)
-        .expect("architecture doc must exist");
+    let body = std::fs::read_to_string(DOC).expect("architecture doc must exist");
     let h1_line_num = body
         .lines()
         .enumerate()

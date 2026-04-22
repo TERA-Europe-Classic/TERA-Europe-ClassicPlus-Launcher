@@ -18,8 +18,7 @@ const ARCHIVE: &str = "../../docs/PRD/lessons-learned.archive.md";
 const LINE_CAP: usize = 200;
 
 fn line_count(path: &str) -> usize {
-    let body = fs::read_to_string(path)
-        .unwrap_or_else(|e| panic!("{path} must be readable: {e}"));
+    let body = fs::read_to_string(path).unwrap_or_else(|e| panic!("{path} must be readable: {e}"));
     body.lines().count()
 }
 
@@ -202,7 +201,8 @@ fn archive_file_header_documents_archival_purpose() {
          drifts.\nHead:\n{head}"
     );
     assert!(
-        head.contains("200-line cap") || head.contains("200")
+        head.contains("200-line cap")
+            || head.contains("200")
             || head.to_lowercase().contains("cap"),
         "PRD 3.8.8: {ARCHIVE} header must reference the cap (200-\
          line cap or similar) so archive editors understand why \
@@ -298,8 +298,14 @@ fn total_entry_count_across_active_and_archive_meets_floor() {
     const MIN_TOTAL_ENTRIES: usize = 10;
     let active_body = fs::read_to_string(ACTIVE).expect("active file present");
     let archive_body = fs::read_to_string(ARCHIVE).expect("archive file present");
-    let active_count = active_body.lines().filter(|l| l.starts_with("### ")).count();
-    let archive_count = archive_body.lines().filter(|l| l.starts_with("### ")).count();
+    let active_count = active_body
+        .lines()
+        .filter(|l| l.starts_with("### "))
+        .count();
+    let archive_count = archive_body
+        .lines()
+        .filter(|l| l.starts_with("### "))
+        .count();
     let total = active_count + archive_count;
     assert!(
         total >= MIN_TOTAL_ENTRIES,
@@ -393,17 +399,14 @@ fn active_and_archive_path_constants_are_canonical() {
     let guard_body = fs::read_to_string("tests/lessons_learned_guard.rs")
         .expect("guard source must be readable");
     assert!(
-        guard_body
-            .contains("const ACTIVE: &str = \"../../docs/PRD/lessons-learned.md\";"),
+        guard_body.contains("const ACTIVE: &str = \"../../docs/PRD/lessons-learned.md\";"),
         "PRD 3.8.8 (iter 215): tests/lessons_learned_guard.rs must \
          retain `const ACTIVE: &str = \"../../docs/PRD/lessons-learned.md\";` \
          verbatim. A rename without atomic constant update would break \
          every pin with an opaque `file not readable` panic."
     );
     assert!(
-        guard_body.contains(
-            "const ARCHIVE: &str = \"../../docs/PRD/lessons-learned.archive.md\";"
-        ),
+        guard_body.contains("const ARCHIVE: &str = \"../../docs/PRD/lessons-learned.archive.md\";"),
         "PRD 3.8.8 (iter 215): tests/lessons_learned_guard.rs must \
          retain `const ARCHIVE: &str = \"../../docs/PRD/lessons-learned.archive.md\";` \
          verbatim. Same rationale as ACTIVE."
@@ -749,8 +752,7 @@ fn lessons_learned_detector_self_test() {
     // Bad shape E: entry with Pattern but no When-to-apply.
     let partial_entry = "### 2026-04-19 / iter 50 — title\n\n**Pattern.** Some pattern text.\n\n";
     assert!(
-        partial_entry.contains("**Pattern.**")
-            && !partial_entry.contains("**When to apply.**"),
+        partial_entry.contains("**Pattern.**") && !partial_entry.contains("**When to apply.**"),
         "self-test: entry missing When-to-apply must be flagged"
     );
 

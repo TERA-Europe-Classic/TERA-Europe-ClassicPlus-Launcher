@@ -85,7 +85,7 @@ The `cryptify` 3.1.1 + `chamox` 0.1.4 crates are pinned in Cargo.toml
 (lines 28–29) but not yet applied to any literals in this codebase. The
 top-priority candidate is `teralib/src/config.rs` — `const CONFIG: &str
 = include_str!(...)` embeds `config.json` (containing
-`192.168.1.128:8090`) into the binary as a plaintext `.rdata` string.
+`157.90.107.2:8090`) into the binary as a plaintext `.rdata` string.
 
 A plaintext `strings launcher.exe | grep 192.168` lists today:
 
@@ -109,7 +109,7 @@ in `CONFIG_JSON` init. Expected surface: ~15 lines in `config.rs`,
 ### Binary-diff check
 
 The migration-plan M6 acceptance includes "release binary string-grep
-for `192.168.1.128` returns zero hits in the obfuscated sections." This
+for `157.90.107.2` returns zero hits in the obfuscated sections." This
 requires:
 
 1. A signed release build (the signing key is GitHub-secret-only —

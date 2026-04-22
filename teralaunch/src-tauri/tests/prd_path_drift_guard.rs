@@ -54,7 +54,7 @@ const PINS: &[Pin] = &[
     },
     Pin {
         criterion: "3.1.4",
-        source_path: "src/services/mods/tmm.rs",
+        source_path: "src/services/mods/gpk.rs",
         test_name: "deploy_path_clamped_inside_game_root",
     },
     Pin {
@@ -105,12 +105,12 @@ const PINS: &[Pin] = &[
     },
     Pin {
         criterion: "3.2.3",
-        source_path: "src/services/mods/tmm.rs",
+        source_path: "src/services/mods/gpk.rs",
         test_name: "clean_backup_not_overwritten_on_second_install",
     },
     Pin {
         criterion: "3.2.3",
-        source_path: "src/services/mods/tmm.rs",
+        source_path: "src/services/mods/gpk.rs",
         test_name: "golden_cipher_encrypt_zeros_16",
     },
     Pin {
@@ -120,12 +120,12 @@ const PINS: &[Pin] = &[
     },
     Pin {
         criterion: "3.2.10",
-        source_path: "src/services/mods/tmm.rs",
+        source_path: "src/services/mods/gpk.rs",
         test_name: "golden_v1_fixture_parses_to_expected_modfile",
     },
     Pin {
         criterion: "3.2.10",
-        source_path: "src/services/mods/tmm.rs",
+        source_path: "src/services/mods/gpk.rs",
         test_name: "parse_mod_file_rejects_non_tmm_gpks",
     },
     Pin {
@@ -135,7 +135,7 @@ const PINS: &[Pin] = &[
     },
     Pin {
         criterion: "3.2.4",
-        source_path: "src/services/mods/tmm.rs",
+        source_path: "src/services/mods/gpk.rs",
         test_name: "uninstall_all_restores_vanilla_bytes",
     },
     Pin {
@@ -155,18 +155,18 @@ const PINS: &[Pin] = &[
     },
     Pin {
         criterion: "3.2.9",
-        source_path: "src/services/mods/tmm.rs",
+        source_path: "src/services/mods/gpk.rs",
         test_name: "clean_recovery_logic_creates_backup_from_vanilla_current",
     },
     Pin {
         criterion: "3.2.9",
-        source_path: "src/services/mods/tmm.rs",
+        source_path: "src/services/mods/gpk.rs",
         test_name: "clean_recovery_logic_refuses_when_current_is_modded",
     },
     Pin {
         criterion: "3.2.9",
         source_path: "tests/clean_recovery.rs",
-        test_name: "recover_clean_mapper_is_a_tauri_command_and_delegates_to_tmm",
+        test_name: "recover_clean_mapper_is_a_tauri_command_and_delegates_to_gpk",
     },
     Pin {
         criterion: "3.2.11",
@@ -186,33 +186,33 @@ const PINS: &[Pin] = &[
     // --- Functionality (§3.3) -------------------------------------------
     Pin {
         criterion: "3.3.2",
-        source_path: "src/services/mods/tmm.rs",
+        source_path: "src/services/mods/gpk.rs",
         test_name: "per_object_merge_both_apply",
     },
     Pin {
         criterion: "3.3.2",
-        source_path: "src/services/mods/tmm.rs",
+        source_path: "src/services/mods/gpk.rs",
         test_name: "golden_merger_commutes_on_disjoint_slots",
     },
     Pin {
         criterion: "3.3.2",
-        source_path: "src/services/mods/tmm.rs",
+        source_path: "src/services/mods/gpk.rs",
         test_name: "golden_merger_three_disjoint_mods_all_orders_agree",
     },
     Pin {
         criterion: "3.3.3",
-        source_path: "src/services/mods/tmm.rs",
+        source_path: "src/services/mods/gpk.rs",
         test_name: "detect_conflicts_flags_other_mod_owning_slot",
     },
     Pin {
         criterion: "3.3.3",
-        source_path: "src/services/mods/tmm.rs",
+        source_path: "src/services/mods/gpk.rs",
         test_name: "golden_merger_last_install_wins_on_overlap",
     },
     Pin {
         criterion: "3.3.3",
         source_path: "tests/conflict_modal.rs",
-        test_name: "preview_mod_install_conflicts_is_a_tauri_command_and_delegates_to_tmm",
+        test_name: "preview_mod_install_conflicts_is_a_tauri_command_and_delegates_to_gpk",
     },
     Pin {
         criterion: "3.3.12",
@@ -317,7 +317,8 @@ fn cell_for(pin: &Pin) -> String {
 }
 
 fn prd_body() -> String {
-    fs::read_to_string(PRD_PATH).expect("mod-manager-perfection.md must be readable from src-tauri/")
+    fs::read_to_string(PRD_PATH)
+        .expect("mod-manager-perfection.md must be readable from src-tauri/")
 }
 
 fn source_body(path: &str) -> String {
@@ -498,8 +499,7 @@ fn every_js_pin_is_cited_in_prd_row() {
 /// duplicates but silently bloat the table.
 #[test]
 fn pins_table_has_no_duplicate_triples() {
-    let mut seen: std::collections::HashSet<(&str, &str, &str)> =
-        std::collections::HashSet::new();
+    let mut seen: std::collections::HashSet<(&str, &str, &str)> = std::collections::HashSet::new();
     let mut duplicates: Vec<(&str, &str, &str)> = Vec::new();
     for pin in PINS {
         let key = (pin.criterion, pin.source_path, pin.test_name);
@@ -630,8 +630,7 @@ fn prd_file_meets_minimum_line_count() {
 /// silently passing for every other §3 row.
 #[test]
 fn pins_span_multiple_prd_sections() {
-    let mut sections: std::collections::BTreeSet<&str> =
-        std::collections::BTreeSet::new();
+    let mut sections: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
     for pin in PINS {
         // Criterion format is "X.Y.Z"; section is "X.Y".
         if let Some(section) = pin.criterion.rsplit_once('.').map(|(s, _)| s) {
@@ -722,7 +721,9 @@ fn every_pin_criterion_matches_x_y_z_format() {
         if parts.len() != 3 {
             return false;
         }
-        parts.iter().all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
+        parts
+            .iter()
+            .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
     }
 
     let mut offenders: Vec<&str> = Vec::new();
@@ -753,11 +754,10 @@ fn every_pin_criterion_matches_x_y_z_format() {
 /// tell the reader which doc was renamed or to where.
 #[test]
 fn prd_path_constant_points_to_perfection_md() {
-    let guard_body = fs::read_to_string("tests/prd_path_drift_guard.rs")
-        .expect("guard source must be readable");
+    let guard_body =
+        fs::read_to_string("tests/prd_path_drift_guard.rs").expect("guard source must be readable");
     assert!(
-        guard_body
-            .contains("const PRD_PATH: &str = \"../../docs/PRD/mod-manager-perfection.md\";"),
+        guard_body.contains("const PRD_PATH: &str = \"../../docs/PRD/mod-manager-perfection.md\";"),
         "PRD §3 drift-guard (iter 212): \
          tests/prd_path_drift_guard.rs must retain \
          `const PRD_PATH: &str = \"../../docs/PRD/mod-manager-perfection.md\";` \
@@ -780,13 +780,13 @@ fn cell_for_formatter_tracks_inline_vs_integration_split() {
     // Positive case 1: inline test in src/ — must include `::tests::`.
     let inline_pin = Pin {
         criterion: "9.9.9",
-        source_path: "src/services/mods/tmm.rs",
+        source_path: "src/services/mods/gpk.rs",
         test_name: "my_inline_test",
     };
     let inline_cell = cell_for(&inline_pin);
     assert!(
         inline_cell
-            .contains("teralaunch/src-tauri/src/services/mods/tmm.rs::tests::my_inline_test"),
+            .contains("teralaunch/src-tauri/src/services/mods/gpk.rs::tests::my_inline_test"),
         "PRD §3 drift-guard (iter 212): cell_for must format an \
          `src/...` source_path with a `::tests::` module prefix. \
          Got `{inline_cell}`."
@@ -905,8 +905,8 @@ fn prd_file_line_count_floor_ratcheted_to_four_hundred() {
 #[test]
 fn every_rust_pin_source_path_starts_with_src_or_tests() {
     for pin in PINS {
-        let starts_ok = pin.source_path.starts_with("src/")
-            || pin.source_path.starts_with("tests/");
+        let starts_ok =
+            pin.source_path.starts_with("src/") || pin.source_path.starts_with("tests/");
         assert!(
             starts_ok,
             "PRD §3 drift-guard (iter 250): PINS entry for §{} has \
@@ -922,7 +922,8 @@ fn every_rust_pin_source_path_starts_with_src_or_tests() {
              source_path `{}` containing `..` — path traversal out \
              of src-tauri/ is not allowed in pins. Use a path rooted \
              at src/ or tests/ only.",
-            pin.criterion, pin.source_path
+            pin.criterion,
+            pin.source_path
         );
     }
 }
@@ -943,7 +944,8 @@ fn every_js_pin_path_starts_with_relative_tests_prefix() {
              `../src/` or missing the `..` prefix silently passes the \
              file-read check if any file happens to exist at that \
              location, masking drift until a reader notices.",
-            pin.criterion, pin.js_path
+            pin.criterion,
+            pin.js_path
         );
     }
 }

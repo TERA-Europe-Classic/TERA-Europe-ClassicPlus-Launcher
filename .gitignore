@@ -29,3 +29,4 @@ teralaunch/src-tauri/src/TERA/Binaries/
 
 # Playwright HTML reports (generated locally; contents are binary screenshots)
 teralaunch/playwright-report/
+/.omx

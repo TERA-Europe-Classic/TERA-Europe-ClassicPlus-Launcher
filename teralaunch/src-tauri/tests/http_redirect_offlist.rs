@@ -414,7 +414,8 @@ fn builder_detector_rejects_commented_redirect_calls() {
     // Positive sanity: uncommented redirect in a builder chain
     // matches (existing iter-104 self-test covers this; restate
     // for full coverage).
-    let good = "let c = reqwest::Client::builder().redirect(reqwest::redirect::Policy::none()).build();";
+    let good =
+        "let c = reqwest::Client::builder().redirect(reqwest::redirect::Policy::none()).build();";
     assert!(builder_has_redirect_none(good));
 
     // Known weakness: a `//`-commented redirect call currently
@@ -534,10 +535,7 @@ fn mods_rs_no_reqwest_get_free_function_shortcut() {
     let mut violations: Vec<String> = Vec::new();
     for path in mods_rs_files() {
         let body = fs::read_to_string(&path).expect("read rs file");
-        for bad in [
-            "reqwest::get(",
-            "reqwest::blocking::get(",
-        ] {
+        for bad in ["reqwest::get(", "reqwest::blocking::get("] {
             if body.contains(bad) {
                 violations.push(format!(
                     "{}: contains `{bad}` — constructs a default \
@@ -609,7 +607,7 @@ fn detector_honors_cursor_advance_between_builders() {
 
 /// Iter 230: the `mods_rs_files()` walker must include BOTH of the
 /// known HTTP-client-carrying files (external_app.rs + catalog.rs)
-/// AND the TMM parser (tmm.rs, no HTTP but a peer security-critical
+/// AND the GPK parser (`gpk.rs`, no HTTP but a peer security-critical
 /// module). If the filter drifts in a way that excludes any of
 /// these three, every mods-wide scanner silently skips a file whose
 /// absence is supposed to be impossible.
@@ -623,21 +621,21 @@ fn mods_rs_files_walker_includes_three_critical_files() {
         .iter()
         .filter_map(|p| p.file_name().and_then(|n| n.to_str()).map(String::from))
         .collect();
-    for expected in ["external_app.rs", "catalog.rs", "tmm.rs"] {
+    for expected in ["external_app.rs", "catalog.rs", "gpk.rs"] {
         assert!(
             names.iter().any(|n| n == expected),
             "PRD §3.1.5 (iter 230): mods_rs_files() must include \
              `{expected}`. Got: {names:?}. A walker filter that drops \
              any of these would silently skip a critical security \
              module — external_app.rs (download path), catalog.rs \
-             (remote fetch), tmm.rs (GPK / mapper crypto)."
+             (remote fetch), gpk.rs (GPK / mapper crypto)."
         );
     }
 }
 
 // --------------------------------------------------------------------
 // Iter 263 structural pins — reqwest+rustls Cargo dep + Policy::none
-// canonical token + tmm.rs no HTTP + guard byte bounds + timeout
+// canonical token + gpk.rs no HTTP + guard byte bounds + timeout
 // duration sanity.
 // --------------------------------------------------------------------
 
@@ -679,9 +677,11 @@ fn reqwest_is_declared_with_json_and_stream_features() {
 /// reject gracefully.
 #[test]
 fn builders_use_policy_none_canonical_token() {
-    for path in ["src/services/mods/catalog.rs", "src/services/mods/external_app.rs"] {
-        let src = fs::read_to_string(path)
-            .unwrap_or_else(|e| panic!("{path}: {e}"));
+    for path in [
+        "src/services/mods/catalog.rs",
+        "src/services/mods/external_app.rs",
+    ] {
+        let src = fs::read_to_string(path).unwrap_or_else(|e| panic!("{path}: {e}"));
         assert!(
             src.contains("Policy::none()"),
             "adv.http-redirect-offlist (iter 263): {path} must call \
@@ -693,20 +693,19 @@ fn builders_use_policy_none_canonical_token() {
     }
 }
 
-/// Iter 263: `src/services/mods/tmm.rs` must not reference `reqwest`.
-/// TMM handles GPK parsing + mapper crypto — it has no business
-/// doing HTTP. A reqwest import in tmm.rs signals scope creep.
+/// Iter 263: `src/services/mods/gpk.rs` must not reference `reqwest`.
+/// GPK services handle GPK parsing + mapper crypto — they have no business
+/// doing HTTP. A reqwest import in gpk.rs signals scope creep.
 #[test]
-fn tmm_rs_does_not_reference_reqwest() {
-    let src = fs::read_to_string("src/services/mods/tmm.rs")
-        .expect("tmm.rs must exist");
+fn gpk_rs_does_not_reference_reqwest() {
+    let src = fs::read_to_string("src/services/mods/gpk.rs").expect("gpk.rs must exist");
     assert!(
         !src.contains("reqwest"),
-        "adv.http-redirect-offlist (iter 263): src/services/mods/tmm.rs \
-         must not reference `reqwest` — TMM handles GPK parsing + \
+        "adv.http-redirect-offlist (iter 263): src/services/mods/gpk.rs \
+         must not reference `reqwest` — GPK services handle GPK parsing + \
          mapper crypto, not HTTP. Any reqwest use would bypass this \
          guard's builder scanner (which walks all 3 mods files but \
-         tmm.rs is expected to be HTTP-free)."
+         gpk.rs is expected to be HTTP-free)."
     );
 }
 
@@ -734,9 +733,11 @@ fn guard_source_byte_size_has_sane_bounds() {
 fn mods_services_timeout_durations_are_within_reasonable_bounds() {
     const MIN_SECS: u64 = 5;
     const MAX_SECS: u64 = 600;
-    for path in ["src/services/mods/catalog.rs", "src/services/mods/external_app.rs"] {
-        let src = fs::read_to_string(path)
-            .unwrap_or_else(|e| panic!("{path}: {e}"));
+    for path in [
+        "src/services/mods/catalog.rs",
+        "src/services/mods/external_app.rs",
+    ] {
+        let src = fs::read_to_string(path).unwrap_or_else(|e| panic!("{path}: {e}"));
         // Scan for `Duration::from_secs(N)` within `.timeout(` calls.
         let needle = "Duration::from_secs(";
         let mut cursor = 0;

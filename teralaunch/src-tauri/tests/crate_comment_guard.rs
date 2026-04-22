@@ -62,11 +62,13 @@ fn every_mods_source_file_has_crate_level_doc() {
     );
 
     for path in &files {
-        let body = fs::read_to_string(path).unwrap_or_else(|e| {
-            panic!("failed to read {}: {e}", path.display())
-        });
+        let body = fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
         let first = first_non_empty_line(&body).unwrap_or_else(|| {
-            panic!("{} is empty — must have a crate-level //! doc", path.display())
+            panic!(
+                "{} is empty — must have a crate-level //! doc",
+                path.display()
+            )
         });
         assert!(
             first.starts_with("//!"),
@@ -119,9 +121,8 @@ fn crate_doc_body_chars(body: &str) -> usize {
 fn every_mods_source_file_has_substantive_doc_body() {
     let files = rs_files_in_mods_dir();
     for path in &files {
-        let body = fs::read_to_string(path).unwrap_or_else(|e| {
-            panic!("failed to read {}: {e}", path.display())
-        });
+        let body = fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
         let chars = crate_doc_body_chars(&body);
         assert!(
             chars >= MIN_DOC_BODY_CHARS,
@@ -298,9 +299,8 @@ const MIN_DOC_LINES: usize = 2;
 fn every_mods_source_file_has_multi_line_doc_block() {
     let files = rs_files_in_mods_dir();
     for path in &files {
-        let body = fs::read_to_string(path).unwrap_or_else(|e| {
-            panic!("failed to read {}: {e}", path.display())
-        });
+        let body = fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
         let lines = count_leading_doc_lines(&body);
         assert!(
             lines >= MIN_DOC_LINES,
@@ -319,9 +319,8 @@ fn every_mods_source_file_has_multi_line_doc_block() {
 fn no_crate_doc_contains_wip_marker() {
     let files = rs_files_in_mods_dir();
     for path in &files {
-        let body = fs::read_to_string(path).unwrap_or_else(|e| {
-            panic!("failed to read {}: {e}", path.display())
-        });
+        let body = fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
         if let Some(marker) = crate_doc_contains_forbidden_marker(&body) {
             panic!(
                 "PRD 3.8.2 (iter 179): {} `//!` block contains \
@@ -342,9 +341,8 @@ fn no_crate_doc_contains_wip_marker() {
 fn every_mods_source_file_has_doc_at_top_of_file() {
     let files = rs_files_in_mods_dir();
     for path in &files {
-        let body = fs::read_to_string(path).unwrap_or_else(|e| {
-            panic!("failed to read {}: {e}", path.display())
-        });
+        let body = fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
         assert!(
             crate_doc_is_at_top_of_file(&body),
             "PRD 3.8.2 (iter 179): {} has code/use before the `//!` \
@@ -364,9 +362,10 @@ fn expected_mods_filename_set_is_present() {
     const EXPECTED: &[&str] = &[
         "catalog.rs",
         "external_app.rs",
+        "gpk.rs",
         "mod.rs",
+        "patch_manifest.rs",
         "registry.rs",
-        "tmm.rs",
         "types.rs",
     ];
     let files = rs_files_in_mods_dir();
@@ -394,20 +393,14 @@ fn every_mods_doc_first_line_has_nonempty_summary() {
     const MIN_SUMMARY_CHARS: usize = 20;
     let files = rs_files_in_mods_dir();
     for path in &files {
-        let body = fs::read_to_string(path).unwrap_or_else(|e| {
-            panic!("failed to read {}: {e}", path.display())
-        });
+        let body = fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
         let first_doc = body
             .lines()
             .map(str::trim_start)
             .find(|l| l.starts_with("//!"))
-            .unwrap_or_else(|| {
-                panic!("{} has no `//!` line", path.display())
-            });
-        let content = first_doc
-            .strip_prefix("//!")
-            .unwrap_or("")
-            .trim();
+            .unwrap_or_else(|| panic!("{} has no `//!` line", path.display()));
+        let content = first_doc.strip_prefix("//!").unwrap_or("").trim();
         assert!(
             content.len() >= MIN_SUMMARY_CHARS,
             "PRD 3.8.2 (iter 179): {} first `//!` line is only \
@@ -662,9 +655,13 @@ fn detector_self_test_covers_both_iter_eras() {
     let mut fn_end = bytes.len();
     for (i, &c) in bytes.iter().enumerate().skip(brace_start) {
         if in_str {
-            if escape { escape = false; }
-            else if c == b'\\' { escape = true; }
-            else if c == b'"' { in_str = false; }
+            if escape {
+                escape = false;
+            } else if c == b'\\' {
+                escape = true;
+            } else if c == b'"' {
+                in_str = false;
+            }
             continue;
         }
         match c {
@@ -682,9 +679,9 @@ fn detector_self_test_covers_both_iter_eras() {
     }
     let self_test = &body[fn_pos..fn_end];
     for helper in [
-        "crate_doc_body_chars",               // iter 143
-        "count_leading_doc_lines",            // iter 179
-        "crate_doc_is_at_top_of_file",        // iter 179
+        "crate_doc_body_chars",                // iter 143
+        "count_leading_doc_lines",             // iter 179
+        "crate_doc_is_at_top_of_file",         // iter 179
         "crate_doc_contains_forbidden_marker", // iter 179
     ] {
         assert!(
@@ -784,8 +781,8 @@ fn mods_dir_has_no_nested_subdirectories() {
 #[test]
 fn mod_rs_re_exports_every_sibling_module() {
     let mod_rs_path = format!("{MODS_DIR}/mod.rs");
-    let mod_body = fs::read_to_string(&mod_rs_path)
-        .unwrap_or_else(|e| panic!("{mod_rs_path}: {e}"));
+    let mod_body =
+        fs::read_to_string(&mod_rs_path).unwrap_or_else(|e| panic!("{mod_rs_path}: {e}"));
     for path in rs_files_in_mods_dir() {
         let stem = path
             .file_stem()
@@ -842,8 +839,8 @@ fn guard_file_header_cites_prd_3_8_2_explicitly() {
 fn every_mods_file_ends_with_newline() {
     let mut offenders: Vec<String> = Vec::new();
     for path in rs_files_in_mods_dir() {
-        let body = fs::read_to_string(&path)
-            .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+        let body =
+            fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
         if !body.ends_with('\n') {
             offenders.push(path.display().to_string());
         }

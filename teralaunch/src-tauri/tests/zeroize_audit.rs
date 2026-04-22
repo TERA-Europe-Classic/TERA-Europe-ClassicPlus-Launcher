@@ -114,9 +114,9 @@ fn derive_line_for<'a>(src: &'a str, name: &str) -> &'a str {
     let struct_pos = src
         .find(&struct_decl)
         .unwrap_or_else(|| panic!("struct {name} must exist"));
-    let preamble_start = src[..struct_pos].rfind("#[derive(").unwrap_or_else(|| {
-        panic!("struct {name} must be preceded by #[derive(...)]")
-    });
+    let preamble_start = src[..struct_pos]
+        .rfind("#[derive(")
+        .unwrap_or_else(|| panic!("struct {name} must be preceded by #[derive(...)]"));
     &src[preamble_start..struct_pos]
 }
 
@@ -493,7 +493,8 @@ fn guard_path_constants_are_canonical() {
 #[test]
 fn cargo_toml_declares_zeroize_with_derive_feature() {
     let body = read(CARGO_TOML);
-    let has_derive_feature = body.contains(r#"zeroize = { version = "1.7", features = ["zeroize_derive"] }"#)
+    let has_derive_feature = body
+        .contains(r#"zeroize = { version = "1.7", features = ["zeroize_derive"] }"#)
         || body.contains(r#"zeroize = { version = "1", features = ["zeroize_derive"] }"#)
         || (body.contains("zeroize = {") && body.contains(r#""zeroize_derive""#));
     assert!(
@@ -546,10 +547,17 @@ fn auth_rs_imports_zeroizing_via_explicit_use() {
 fn auth_rs_does_not_log_password_variable() {
     let body = read(AUTH_RS);
     for (fn_name, macros_to_ban) in [
-        ("async fn login_with_client", ["{password}", "{password:?}", ":?password"]),
-        ("async fn register_with_client", ["{password}", "{password:?}", ":?password"]),
+        (
+            "async fn login_with_client",
+            ["{password}", "{password:?}", ":?password"],
+        ),
+        (
+            "async fn register_with_client",
+            ["{password}", "{password:?}", ":?password"],
+        ),
     ] {
-        let fn_pos = body.find(fn_name)
+        let fn_pos = body
+            .find(fn_name)
             .unwrap_or_else(|| panic!("{fn_name} must exist in auth.rs"));
         let window = &body[fn_pos..fn_pos.saturating_add(1500)];
         for pat in macros_to_ban {
@@ -575,8 +583,12 @@ fn auth_rs_does_not_log_password_variable() {
 #[test]
 fn auth_rs_does_not_clone_zeroizing_password() {
     let body = read(AUTH_RS);
-    for fn_name in ["async fn login_with_client", "async fn register_with_client"] {
-        let fn_pos = body.find(fn_name)
+    for fn_name in [
+        "async fn login_with_client",
+        "async fn register_with_client",
+    ] {
+        let fn_pos = body
+            .find(fn_name)
             .unwrap_or_else(|| panic!("{fn_name} must exist"));
         let window = &body[fn_pos..fn_pos.saturating_add(1500)];
         assert!(
@@ -666,8 +678,7 @@ fn guard_source_byte_bounds() {
 
 #[test]
 fn guard_source_cites_prd_3_1_7_explicitly() {
-    let body = std::fs::read_to_string(GUARD_FILE)
-        .expect("guard must exist");
+    let body = std::fs::read_to_string(GUARD_FILE).expect("guard must exist");
     let header = &body[..body.len().min(500)];
     assert!(
         header.contains("PRD 3.1.7"),

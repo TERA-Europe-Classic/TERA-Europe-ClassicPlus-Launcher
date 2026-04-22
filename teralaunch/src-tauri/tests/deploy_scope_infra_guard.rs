@@ -63,11 +63,13 @@ fn scope_gate_step_precedes_upload() {
     let scope_idx = body.find("node teralaunch/tests/deploy_scope.spec.js");
     // Upload steps use ftp / ftps / curl-upload / FTPS. Look for common
     // upload-invocation markers that appear in the YAML body.
-    let upload_markers = ["lftp ", "curl --upload-file", "ftps_upload", "ftp://${SFTP_HOST}"];
-    let upload_idx = upload_markers
-        .iter()
-        .filter_map(|m| body.find(m))
-        .min();
+    let upload_markers = [
+        "lftp ",
+        "curl --upload-file",
+        "ftps_upload",
+        "ftp://${SFTP_HOST}",
+    ];
+    let upload_idx = upload_markers.iter().filter_map(|m| body.find(m)).min();
 
     match (scope_idx, upload_idx) {
         (Some(s), Some(u)) => assert!(
@@ -514,7 +516,8 @@ fn deploy_yml_ftp_upload_target_is_under_classicplus() {
 #[test]
 fn deploy_scope_guard_detector_self_test() {
     // Bad shape A: workflow missing the step.
-    let no_step = "steps:\n  - name: Build\n    run: echo build\n  - name: Upload\n    run: lftp something\n";
+    let no_step =
+        "steps:\n  - name: Build\n    run: echo build\n  - name: Upload\n    run: lftp something\n";
     assert!(
         !no_step.contains("node teralaunch/tests/deploy_scope.spec.js"),
         "self-test: workflow without scope-gate step must be flagged"
@@ -523,7 +526,9 @@ fn deploy_scope_guard_detector_self_test() {
     // Bad shape B: step present but AFTER upload (wrong order).
     let wrong_order =
         "- name: Upload\n  run: lftp something\n- name: Scope gate\n  run: node teralaunch/tests/deploy_scope.spec.js\n";
-    let scope_idx = wrong_order.find("node teralaunch/tests/deploy_scope.spec.js").unwrap();
+    let scope_idx = wrong_order
+        .find("node teralaunch/tests/deploy_scope.spec.js")
+        .unwrap();
     let upload_idx = wrong_order.find("lftp ").unwrap();
     assert!(
         scope_idx > upload_idx,
@@ -573,8 +578,8 @@ fn deploy_scope_guard_detector_self_test() {
 
 #[test]
 fn guard_source_cites_prd_3_1_14_explicitly() {
-    let body = fs::read_to_string("tests/deploy_scope_infra_guard.rs")
-        .expect("guard source must exist");
+    let body =
+        fs::read_to_string("tests/deploy_scope_infra_guard.rs").expect("guard source must exist");
     let header = &body[..body.len().min(500)];
     assert!(
         header.contains("PRD 3.1.14"),
@@ -644,8 +649,8 @@ fn guard_source_byte_size_has_sane_bounds() {
 
 #[test]
 fn deploy_yml_workflow_dispatch_declares_inputs() {
-    let body = fs::read_to_string("../../.github/workflows/deploy.yml")
-        .expect("deploy.yml must exist");
+    let body =
+        fs::read_to_string("../../.github/workflows/deploy.yml").expect("deploy.yml must exist");
     assert!(
         body.contains("workflow_dispatch:"),
         "PRD 3.1.14 (iter 262): deploy.yml must keep \

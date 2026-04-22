@@ -10,12 +10,12 @@
 
 | Key | URL |
 |---|---|
-| `API_BASE_URL` | `http://192.168.1.128:8090` |
-| `LOGIN_ACTION_URL` | `http://192.168.1.128:8090/tera/LauncherLoginAction` |
-| `GET_ACCOUNT_INFO_URL` | `http://192.168.1.128:8090/tera/GetAccountInfoByUserNo` |
-| `REGISTER_ACTION_URL` | `http://192.168.1.128:8090/tera/LauncherSignupAction` |
-| `MAINTENANCE_STATUS_URL` | `http://192.168.1.128:8090/tera/LauncherMaintenanceStatus` |
-| `SERVER_LIST_URL` | `http://192.168.1.128:8090/tera/ServerList` |
+| `API_BASE_URL` | `http://157.90.107.2:8090` |
+| `LOGIN_ACTION_URL` | `http://157.90.107.2:8090/tera/LauncherLoginAction` |
+| `GET_ACCOUNT_INFO_URL` | `http://157.90.107.2:8090/tera/GetAccountInfoByUserNo` |
+| `REGISTER_ACTION_URL` | `http://157.90.107.2:8090/tera/LauncherSignupAction` |
+| `MAINTENANCE_STATUS_URL` | `http://157.90.107.2:8090/tera/LauncherMaintenanceStatus` |
+| `SERVER_LIST_URL` | `http://157.90.107.2:8090/tera/ServerList` |
 
 This is the developer's LAN. It is not externally routable. Every request carries the launcher's `AuthKey` and password plaintext over the wire.
 
@@ -40,7 +40,7 @@ Deploy the portal behind TLS. Minimum viable:
 
 ## Launcher-side migration steps (once the endpoint is up)
 
-1. Update `teralib/src/config/config.json` — replace every `http://192.168.1.128:8090` with `https://<fqdn>`.
+1. Update `teralib/src/config/config.json` — replace every `http://157.90.107.2:8090` with `https://<fqdn>`.
 2. Run full auth flow (login → account info → server list → maintenance status → registration) against the new endpoint. Each must return the documented `Return: true, ReturnCode: 0` shape.
 3. Verify `reqwest` in `teralaunch/src-tauri` actually terminates TLS (no custom `danger_accept_invalid_certs(true)` in the codepath — grep confirmed none today).
 4. Optional but recommended: add a CI gate that fails `cargo build --release` if any URL in `config.json` starts with `http://` (rg-based check in `.github/workflows/deploy.yml`). Tracked separately as a candidate polish.

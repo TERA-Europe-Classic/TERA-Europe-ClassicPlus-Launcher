@@ -92,7 +92,7 @@ Each milestone is **one commit** on the `tauri-v2-migration` worktree branch. Th
 - Apply release-profile flags per PRD §3.1.8: LTO (already on), strip (already on), CFG (/guard:cf in build.rs linker args for Windows), stack-canary.
 - `cryptify` or `chamox` string obfuscation on the small set of sensitive literals: portal URLs, AuthKey-adjacent code paths, updater URL, deploy paths.
 - Author `docs/PRD/audits/security/anti-reverse.md` with build-output inspection evidence.
-- **Acceptance:** audit doc signed off; release binary string-grep for `192.168.1.128` returns zero hits in the obfuscated sections.
+- **Acceptance:** audit doc signed off; release binary string-grep for `157.90.107.2` returns zero hits in the obfuscated sections.
 
 ### M7 — Updater-downgrade refusal (3.1.9)
 

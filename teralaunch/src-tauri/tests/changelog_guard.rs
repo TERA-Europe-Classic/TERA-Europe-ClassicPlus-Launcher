@@ -46,9 +46,7 @@ const BANNED_PREFIXES: &[&str] = &[
 
 fn changelog_body() -> String {
     fs::read_to_string(CHANGELOG).unwrap_or_else(|e| {
-        panic!(
-            "CHANGELOG.md must be readable from src-tauri/ via {CHANGELOG}: {e}"
-        )
+        panic!("CHANGELOG.md must be readable from src-tauri/ via {CHANGELOG}: {e}")
     })
 }
 
@@ -148,7 +146,10 @@ fn release_sections_follow_semver_em_dash_shape() {
         let looks_semver_ok = {
             let first_token = tail.split_whitespace().next().unwrap_or("");
             let parts: Vec<&str> = first_token.split('.').collect();
-            parts.len() == 3 && parts.iter().all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
+            parts.len() == 3
+                && parts
+                    .iter()
+                    .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
         };
         let has_em_dash = tail.contains(" \u{2014} ");
         if !(looks_semver_ok && has_em_dash) {
@@ -280,10 +281,7 @@ fn preamble_advertises_player_facing_purpose() {
 fn release_sections_are_separated_by_hr_lines() {
     let body = changelog_body();
     let hr_count = body.lines().filter(|l| l.trim() == "---").count();
-    let release_heading_count = body
-        .lines()
-        .filter(|l| l.starts_with("## "))
-        .count();
+    let release_heading_count = body.lines().filter(|l| l.starts_with("## ")).count();
     // At least as many HR lines as release headings (one before each
     // section is the approved layout).
     assert!(
@@ -356,7 +354,10 @@ fn unreleased_section_precedes_numbered_releases() {
         let tail = l.trim_start_matches("## ");
         let first = tail.split_whitespace().next().unwrap_or("");
         let parts: Vec<&str> = first.split('.').collect();
-        parts.len() == 3 && parts.iter().all(|p| p.chars().all(|c| c.is_ascii_digit()) && !p.is_empty())
+        parts.len() == 3
+            && parts
+                .iter()
+                .all(|p| p.chars().all(|c| c.is_ascii_digit()) && !p.is_empty())
     });
     if let Some(first) = first_numbered_line {
         assert!(
@@ -480,8 +481,8 @@ fn guard_file_header_cites_prd_3_8_5() {
 /// as the root cause.
 #[test]
 fn changelog_path_constant_is_canonical() {
-    let guard_body = fs::read_to_string("tests/changelog_guard.rs")
-        .expect("guard source must be readable");
+    let guard_body =
+        fs::read_to_string("tests/changelog_guard.rs").expect("guard source must be readable");
     assert!(
         guard_body.contains("const CHANGELOG: &str = \"../../docs/CHANGELOG.md\";"),
         "PRD 3.8.5 (iter 213): tests/changelog_guard.rs must retain \
@@ -500,8 +501,8 @@ fn changelog_path_constant_is_canonical() {
 #[test]
 fn banned_prefixes_covers_all_conventional_types_both_forms() {
     const REQUIRED_TYPES: &[&str] = &[
-        "feat", "fix", "chore", "docs", "refactor",
-        "test", "build", "ci", "perf", "style", "revert",
+        "feat", "fix", "chore", "docs", "refactor", "test", "build", "ci", "perf", "style",
+        "revert",
     ];
     let mut missing: Vec<String> = Vec::new();
     for ty in REQUIRED_TYPES {
@@ -537,8 +538,7 @@ fn banned_prefixes_covers_all_conventional_types_both_forms() {
 /// auto-update pipeline ships a build with stale release notes.
 #[test]
 fn newest_release_matches_cargo_toml_version() {
-    let cargo = fs::read_to_string(CARGO_TOML)
-        .expect("Cargo.toml must be readable");
+    let cargo = fs::read_to_string(CARGO_TOML).expect("Cargo.toml must be readable");
     // Extract the first `version = "X.Y.Z"` line — this is the
     // package version (the workspace/dep versions live elsewhere).
     let version_line = cargo
@@ -570,7 +570,9 @@ fn newest_release_matches_cargo_toml_version() {
             let first_tok = tail.split_whitespace().next()?;
             let parts: Vec<&str> = first_tok.split('.').collect();
             if parts.len() == 3
-                && parts.iter().all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
+                && parts
+                    .iter()
+                    .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
             {
                 Some(first_tok.to_string())
             } else {
@@ -620,7 +622,9 @@ fn every_numbered_release_has_substantive_body() {
         let first_tok = tail.split_whitespace().next().unwrap_or("");
         let parts: Vec<&str> = first_tok.split('.').collect();
         let is_semver = parts.len() == 3
-            && parts.iter().all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()));
+            && parts
+                .iter()
+                .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()));
         if !is_semver {
             i += 1;
             continue;
@@ -693,8 +697,8 @@ fn every_numbered_release_has_substantive_body() {
 /// "file not readable" panic that doesn't point at the constant.
 #[test]
 fn cargo_toml_path_constant_is_canonical() {
-    let guard_body = fs::read_to_string("tests/changelog_guard.rs")
-        .expect("guard source must be readable");
+    let guard_body =
+        fs::read_to_string("tests/changelog_guard.rs").expect("guard source must be readable");
     assert!(
         guard_body.contains("const CARGO_TOML: &str = \"Cargo.toml\";"),
         "PRD 3.8.5 (iter 251): tests/changelog_guard.rs must retain \
@@ -840,7 +844,10 @@ fn changelog_detector_self_test() {
             }
         }
     }
-    assert_eq!(hits, 2, "self-test: bulleted conv-commit lines must be flagged");
+    assert_eq!(
+        hits, 2,
+        "self-test: bulleted conv-commit lines must be flagged"
+    );
 
     // Good: player-facing prose should NOT trigger.
     let good = "Your mods now know when a new version is out.\n\
@@ -884,8 +891,5 @@ fn changelog_detector_self_test() {
     // Positive: descending versions pass.
     let newer = (0u32, 1u32, 12u32);
     let older = (0u32, 1u32, 11u32);
-    assert!(
-        newer > older,
-        "self-test: descending pair must pass"
-    );
+    assert!(newer > older, "self-test: descending pair must pass");
 }

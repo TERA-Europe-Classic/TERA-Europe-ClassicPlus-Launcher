@@ -43,8 +43,8 @@ fn directive_tokens<'a>(csp: &'a str, directive: &str) -> Option<Vec<&'a str>> {
 #[test]
 fn csp_denies_inline_scripts() {
     let csp = load_csp();
-    let tokens = directive_tokens(&csp, "script-src")
-        .expect("CSP must define a script-src directive");
+    let tokens =
+        directive_tokens(&csp, "script-src").expect("CSP must define a script-src directive");
     assert!(
         !tokens.contains(&"'unsafe-inline'"),
         "CSP script-src must NOT contain 'unsafe-inline' (PRD 3.1.12). Found: {:?}",
@@ -55,8 +55,8 @@ fn csp_denies_inline_scripts() {
 #[test]
 fn csp_still_allows_self_and_cdnjs_for_scripts() {
     let csp = load_csp();
-    let tokens = directive_tokens(&csp, "script-src")
-        .expect("CSP must define a script-src directive");
+    let tokens =
+        directive_tokens(&csp, "script-src").expect("CSP must define a script-src directive");
     assert!(
         tokens.contains(&"'self'"),
         "CSP script-src must keep 'self' so bundled scripts still load"
@@ -86,8 +86,8 @@ fn directive_tokens_does_not_match_prefix() {
 #[test]
 fn csp_script_src_has_no_wildcard_or_data() {
     let csp = load_csp();
-    let tokens = directive_tokens(&csp, "script-src")
-        .expect("CSP must define a script-src directive");
+    let tokens =
+        directive_tokens(&csp, "script-src").expect("CSP must define a script-src directive");
     for bad in ["*", "data:", "'unsafe-eval'", "blob:"] {
         assert!(
             !tokens.contains(&bad),
@@ -106,8 +106,8 @@ fn csp_script_src_has_no_wildcard_or_data() {
 #[test]
 fn csp_default_src_is_self() {
     let csp = load_csp();
-    let tokens = directive_tokens(&csp, "default-src")
-        .expect("CSP must define a default-src directive");
+    let tokens =
+        directive_tokens(&csp, "default-src").expect("CSP must define a default-src directive");
     assert!(
         tokens.contains(&"'self'"),
         "PRD 3.1.12 (iter-152 extension): CSP default-src must \
@@ -130,8 +130,8 @@ fn csp_default_src_is_self() {
 #[test]
 fn csp_connect_src_permits_tauri_v2_ipc() {
     let csp = load_csp();
-    let tokens = directive_tokens(&csp, "connect-src")
-        .expect("CSP must define a connect-src directive");
+    let tokens =
+        directive_tokens(&csp, "connect-src").expect("CSP must define a connect-src directive");
     assert!(
         tokens.contains(&"ipc:"),
         "PRD 3.1.12 (iter-152 extension): CSP connect-src must \
@@ -148,7 +148,7 @@ fn csp_connect_src_permits_tauri_v2_ipc() {
 }
 
 /// iter 152 — connect-src must include the documented LAN dev
-/// portal endpoint (`http://192.168.1.128:8090`). Without it, the
+/// portal endpoint (`http://157.90.107.2:8090`). Without it, the
 /// launcher can't reach the portal at all; CSP would block every
 /// portal fetch. Complements §3.1.13 portal-https migration (which
 /// tracks the future prod FQDN cutover) — until then, this LAN
@@ -156,12 +156,12 @@ fn csp_connect_src_permits_tauri_v2_ipc() {
 #[test]
 fn csp_connect_src_permits_lan_portal_endpoint() {
     let csp = load_csp();
-    let tokens = directive_tokens(&csp, "connect-src")
-        .expect("CSP must define a connect-src directive");
+    let tokens =
+        directive_tokens(&csp, "connect-src").expect("CSP must define a connect-src directive");
     assert!(
-        tokens.contains(&"http://192.168.1.128:8090"),
+        tokens.contains(&"http://157.90.107.2:8090"),
         "PRD 3.1.12 (iter-152 extension): CSP connect-src must \
-         include `http://192.168.1.128:8090` (LAN dev portal) — \
+         include `http://157.90.107.2:8090` (LAN dev portal) — \
          dropping it blocks every portal fetch. When §3.1.13 flips \
          to https://<prod-fqdn>, update this guard atomically with \
          the config + CSP change. Got: {tokens:?}"
@@ -207,8 +207,8 @@ fn guard_file_header_cites_prd_and_style_src_tradeoff() {
 #[test]
 fn csp_defines_style_src_with_documented_shape() {
     let csp = load_csp();
-    let tokens = directive_tokens(&csp, "style-src")
-        .expect("CSP must define a style-src directive");
+    let tokens =
+        directive_tokens(&csp, "style-src").expect("CSP must define a style-src directive");
     assert!(
         tokens.contains(&"'self'"),
         "PRD 3.1.12 (iter 197): CSP style-src must contain `'self'` \
@@ -238,8 +238,7 @@ fn csp_defines_style_src_with_documented_shape() {
 #[test]
 fn csp_defines_img_src_without_unsafe_inline() {
     let csp = load_csp();
-    let tokens = directive_tokens(&csp, "img-src")
-        .expect("CSP must define an img-src directive");
+    let tokens = directive_tokens(&csp, "img-src").expect("CSP must define an img-src directive");
     assert!(
         tokens.contains(&"'self'"),
         "PRD 3.1.12 (iter 197): CSP img-src must contain `'self'`. \
@@ -268,12 +267,11 @@ fn csp_defines_img_src_without_unsafe_inline() {
 #[test]
 fn csp_defines_font_src_explicitly() {
     let csp = load_csp();
-    let tokens = directive_tokens(&csp, "font-src")
-        .expect(
-            "CSP must define a `font-src` directive explicitly. \
+    let tokens = directive_tokens(&csp, "font-src").expect(
+        "CSP must define a `font-src` directive explicitly. \
              Relying on default-src means a future default-src \
              tightening silently breaks font loading.",
-        );
+    );
     assert!(
         tokens.contains(&"'self'"),
         "PRD 3.1.12 (iter 197): CSP font-src must contain `'self'`. \
@@ -293,8 +291,7 @@ fn csp_defines_font_src_explicitly() {
 /// panic; the canonical literal anchors the diff.
 #[test]
 fn guard_path_constant_is_canonical() {
-    let src = fs::read_to_string("tests/csp_audit.rs")
-        .expect("tests/csp_audit.rs must exist");
+    let src = fs::read_to_string("tests/csp_audit.rs").expect("tests/csp_audit.rs must exist");
     assert!(
         src.contains(r#"const GUARD_SOURCE: &str = "tests/csp_audit.rs";"#),
         "canonical path constant missing: \
@@ -312,8 +309,8 @@ fn guard_path_constant_is_canonical() {
 #[test]
 fn csp_connect_src_carries_self_baseline() {
     let csp = load_csp();
-    let tokens = directive_tokens(&csp, "connect-src")
-        .expect("CSP must define a connect-src directive");
+    let tokens =
+        directive_tokens(&csp, "connect-src").expect("CSP must define a connect-src directive");
     assert!(
         tokens.contains(&"'self'"),
         "PRD 3.1.12 (iter 228): CSP connect-src must contain `'self'` \
@@ -347,12 +344,14 @@ fn csp_defines_exactly_eight_canonical_directives() {
         "form-action",
     ];
     assert_eq!(
-        names.len(), expected.len(),
+        names.len(),
+        expected.len(),
         "PRD 3.1.12 (iter 229): CSP must define exactly 8 canonical \
          directives (the 6 + base-uri + form-action). Got {} \
          directive(s): {:?}. A stealth addition of object-src / \
          frame-src / worker-src widens attack surface.",
-        names.len(), names
+        names.len(),
+        names
     );
     for expected_name in expected {
         assert!(
@@ -371,8 +370,7 @@ fn csp_defines_exactly_eight_canonical_directives() {
 #[test]
 fn csp_base_uri_is_self() {
     let csp = load_csp();
-    let tokens = directive_tokens(&csp, "base-uri")
-        .expect("CSP must define a base-uri directive");
+    let tokens = directive_tokens(&csp, "base-uri").expect("CSP must define a base-uri directive");
     assert!(
         tokens.contains(&"'self'"),
         "PRD 3.1.12 (iter 229): CSP base-uri must contain `'self'`. \
@@ -397,8 +395,8 @@ fn csp_base_uri_is_self() {
 #[test]
 fn csp_form_action_is_self() {
     let csp = load_csp();
-    let tokens = directive_tokens(&csp, "form-action")
-        .expect("CSP must define a form-action directive");
+    let tokens =
+        directive_tokens(&csp, "form-action").expect("CSP must define a form-action directive");
     assert!(
         tokens.contains(&"'self'"),
         "PRD 3.1.12 (iter 229): CSP form-action must contain \
@@ -424,10 +422,8 @@ fn csp_form_action_is_self() {
 /// update rather than a mystery panic.
 #[test]
 fn csp_field_lives_at_app_security_csp_json_path() {
-    let body = fs::read_to_string("tauri.conf.json")
-        .expect("tauri.conf.json must exist");
-    let v: Value = serde_json::from_str(&body)
-        .expect("tauri.conf.json must parse");
+    let body = fs::read_to_string("tauri.conf.json").expect("tauri.conf.json must exist");
+    let v: Value = serde_json::from_str(&body).expect("tauri.conf.json must parse");
     assert!(
         v.get("app").is_some(),
         "PRD 3.1.12 (iter 228): tauri.conf.json must carry a top-\
@@ -453,8 +449,7 @@ fn csp_field_lives_at_app_security_csp_json_path() {
 /// pass that strips the iter attributions loses the changelog.
 #[test]
 fn guard_header_cites_both_extension_iters_152_and_197() {
-    let src = fs::read_to_string("tests/csp_audit.rs")
-        .expect("tests/csp_audit.rs must exist");
+    let src = fs::read_to_string("tests/csp_audit.rs").expect("tests/csp_audit.rs must exist");
     for iter_marker in ["iter 152", "Iter 197"] {
         assert!(
             src.contains(iter_marker),
@@ -533,8 +528,7 @@ fn tauri_conf_json_byte_size_has_sane_bounds() {
 
 #[test]
 fn guard_source_cites_prd_3_1_12_explicitly() {
-    let body = std::fs::read_to_string(GUARD_SOURCE)
-        .expect("guard must exist");
+    let body = std::fs::read_to_string(GUARD_SOURCE).expect("guard must exist");
     let header = &body[..body.len().min(500)];
     assert!(
         header.contains("PRD 3.1.12"),
@@ -545,10 +539,8 @@ fn guard_source_cites_prd_3_1_12_explicitly() {
 
 #[test]
 fn script_src_rejects_wildcard_and_data_uris() {
-    let conf = std::fs::read_to_string("tauri.conf.json")
-        .expect("tauri.conf.json must exist");
-    let v: serde_json::Value = serde_json::from_str(&conf)
-        .expect("tauri.conf.json must parse");
+    let conf = std::fs::read_to_string("tauri.conf.json").expect("tauri.conf.json must exist");
+    let v: serde_json::Value = serde_json::from_str(&conf).expect("tauri.conf.json must parse");
     let csp = v
         .pointer("/app/security/csp")
         .and_then(|x| x.as_str())
@@ -566,10 +558,8 @@ fn script_src_rejects_wildcard_and_data_uris() {
 
 #[test]
 fn csp_string_is_non_empty_and_structured() {
-    let conf = std::fs::read_to_string("tauri.conf.json")
-        .expect("tauri.conf.json must exist");
-    let v: serde_json::Value = serde_json::from_str(&conf)
-        .expect("tauri.conf.json must parse");
+    let conf = std::fs::read_to_string("tauri.conf.json").expect("tauri.conf.json must exist");
+    let v: serde_json::Value = serde_json::from_str(&conf).expect("tauri.conf.json must parse");
     let csp = v
         .pointer("/app/security/csp")
         .and_then(|x| x.as_str())

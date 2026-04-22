@@ -159,20 +159,16 @@ fn shell_open_has_no_scope_override() {
 #[test]
 fn detector_self_test_rejects_bad_shapes() {
     // Missing plugins.shell.open
-    let bad_missing: serde_json::Value = serde_json::from_str(
-        r#"{ "plugins": { "updater": {} } }"#,
-    )
-    .unwrap();
+    let bad_missing: serde_json::Value =
+        serde_json::from_str(r#"{ "plugins": { "updater": {} } }"#).unwrap();
     assert!(
         bad_missing.pointer("/plugins/shell/open").is_none(),
         "self-test: detector must see the missing-pin case"
     );
 
     // plugins.shell.open = false (endpoint disabled — not what we want)
-    let bad_false: serde_json::Value = serde_json::from_str(
-        r#"{ "plugins": { "shell": { "open": false } } }"#,
-    )
-    .unwrap();
+    let bad_false: serde_json::Value =
+        serde_json::from_str(r#"{ "plugins": { "shell": { "open": false } } }"#).unwrap();
     assert_eq!(
         bad_false.pointer("/plugins/shell/open").unwrap(),
         &serde_json::Value::Bool(false),
@@ -180,12 +176,13 @@ fn detector_self_test_rejects_bad_shapes() {
     );
 
     // plugins.shell.open = "^https?:" (regex — admits custom schemes)
-    let bad_regex: serde_json::Value = serde_json::from_str(
-        r#"{ "plugins": { "shell": { "open": "^https?:" } } }"#,
-    )
-    .unwrap();
+    let bad_regex: serde_json::Value =
+        serde_json::from_str(r#"{ "plugins": { "shell": { "open": "^https?:" } } }"#).unwrap();
     assert!(
-        bad_regex.pointer("/plugins/shell/open").unwrap().is_string(),
+        bad_regex
+            .pointer("/plugins/shell/open")
+            .unwrap()
+            .is_string(),
         "self-test: detector must see the regex-string case as non-boolean"
     );
 
@@ -194,17 +191,19 @@ fn detector_self_test_rejects_bad_shapes() {
         r#"{ "plugins": { "shell": { "open": true, "execute": { "scope": [{ "name": "test" }] } } } }"#,
     )
     .unwrap();
-    let shell_extra = bad_extra.pointer("/plugins/shell").and_then(|v| v.as_object()).unwrap();
+    let shell_extra = bad_extra
+        .pointer("/plugins/shell")
+        .and_then(|v| v.as_object())
+        .unwrap();
     assert!(
         shell_extra.len() > 1,
         "self-test: shell stanza with extra keys must have >1 key"
     );
 
     // Bad shape E: open becomes an object with a scope regex list.
-    let bad_scope: serde_json::Value = serde_json::from_str(
-        r#"{ "plugins": { "shell": { "open": { "scope": [".*"] } } } }"#,
-    )
-    .unwrap();
+    let bad_scope: serde_json::Value =
+        serde_json::from_str(r#"{ "plugins": { "shell": { "open": { "scope": [".*"] } } } }"#)
+            .unwrap();
     let open_obj = bad_scope.pointer("/plugins/shell/open").unwrap();
     assert!(
         open_obj.is_object(),
@@ -235,18 +234,24 @@ fn detector_self_test_rejects_bad_shapes() {
         r#"{ "plugins": { "shell": {"open": true}, "updater": {}, "process": { "exec": ["*"] } } }"#,
     )
     .unwrap();
-    let plugins_obj = bad_plugins.pointer("/plugins").and_then(|v| v.as_object()).unwrap();
+    let plugins_obj = bad_plugins
+        .pointer("/plugins")
+        .and_then(|v| v.as_object())
+        .unwrap();
     assert!(
         plugins_obj.len() > 2,
         "self-test: plugins object with unexpected key must be flagged by count"
     );
 
     // Bad shape I: window URL set to a remote endpoint.
-    let remote_url: serde_json::Value = serde_json::from_str(
-        r#"{ "app": { "windows": [{ "url": "https://example.com" }] } }"#,
-    )
-    .unwrap();
-    let url = remote_url.pointer("/app/windows/0/url").unwrap().as_str().unwrap();
+    let remote_url: serde_json::Value =
+        serde_json::from_str(r#"{ "app": { "windows": [{ "url": "https://example.com" }] } }"#)
+            .unwrap();
+    let url = remote_url
+        .pointer("/app/windows/0/url")
+        .unwrap()
+        .as_str()
+        .unwrap();
     assert!(
         url.starts_with("http"),
         "self-test: remote window URL must be flagged"
@@ -434,9 +439,11 @@ fn capabilities_shell_permissions_are_narrow() {
     let identifiers: Vec<String> = perms
         .iter()
         .filter_map(|p| {
-            p.as_str()
-                .map(String::from)
-                .or_else(|| p.pointer("/identifier").and_then(|v| v.as_str()).map(String::from))
+            p.as_str().map(String::from).or_else(|| {
+                p.pointer("/identifier")
+                    .and_then(|v| v.as_str())
+                    .map(String::from)
+            })
         })
         .collect();
 
@@ -725,10 +732,9 @@ fn csp_default_src_rejects_opaque_schemes() {
 /// deliberate test update.
 #[test]
 fn capabilities_permissions_count_stays_bounded() {
-    let body = fs::read_to_string(CAPABILITIES_JSON)
-        .expect("capabilities/migrated.json must exist");
-    let cap: serde_json::Value =
-        serde_json::from_str(&body).expect("capability JSON must parse");
+    let body =
+        fs::read_to_string(CAPABILITIES_JSON).expect("capabilities/migrated.json must exist");
+    let cap: serde_json::Value = serde_json::from_str(&body).expect("capability JSON must parse");
     let perms = cap
         .pointer("/permissions")
         .and_then(|v| v.as_array())
@@ -853,8 +859,7 @@ fn guard_source_byte_bounds() {
 
 #[test]
 fn guard_header_cites_iter_86_provenance() {
-    let body = std::fs::read_to_string(GUARD_SOURCE)
-        .expect("guard must exist");
+    let body = std::fs::read_to_string(GUARD_SOURCE).expect("guard must exist");
     let header = &body[..body.len().min(500)];
     assert!(
         header.contains("iter 86"),

@@ -96,12 +96,14 @@ fn callsite_scanner_covers_both_sink_shapes() {
 fn callsite_scanner_safe_identifiers_are_documented() {
     let body = read(SCANNER);
     // Extract the SAFE_IDENTIFIERS block and inspect entry shape.
-    let after = body.split("const SAFE_IDENTIFIERS = [").nth(1).unwrap_or_else(
-        || panic!("{SCANNER} missing SAFE_IDENTIFIERS declaration"),
-    );
-    let block = after.split("];").next().unwrap_or_else(
-        || panic!("{SCANNER} SAFE_IDENTIFIERS not closed with `];`"),
-    );
+    let after = body
+        .split("const SAFE_IDENTIFIERS = [")
+        .nth(1)
+        .unwrap_or_else(|| panic!("{SCANNER} missing SAFE_IDENTIFIERS declaration"));
+    let block = after
+        .split("];")
+        .next()
+        .unwrap_or_else(|| panic!("{SCANNER} SAFE_IDENTIFIERS not closed with `];`"));
     // Count quoted entries (crude but enough — every entry must have
     // at least one `,` separating it from a provenance comment on
     // the same line).
@@ -118,10 +120,7 @@ fn callsite_scanner_safe_identifiers_are_documented() {
     // Each entry line should carry a `//` comment (provenance). Split
     // by newlines and check every line that contains a quoted string
     // also contains `//`.
-    let comma_separated_lines: Vec<&str> = block
-        .lines()
-        .filter(|l| l.contains('\''))
-        .collect();
+    let comma_separated_lines: Vec<&str> = block.lines().filter(|l| l.contains('\'')).collect();
     for line in &comma_separated_lines {
         assert!(
             line.contains("//"),
@@ -486,15 +485,16 @@ fn all_path_constants_are_canonical() {
 #[test]
 fn sister_scope_guard_still_present() {
     let path = "tests/shell_scope_pinned.rs";
-    let body = fs::read_to_string(path)
-        .unwrap_or_else(|e| panic!(
+    let body = fs::read_to_string(path).unwrap_or_else(|e| {
+        panic!(
             "sec.shell-open-call-sites-pinned (iter 219): {path} \
              (the SCOPE half of the CVE-2025-31477 defence) must \
              still exist. Deleting it breaks defence-in-depth: the \
              call-site scanner (this guard's target) is only half \
              the story — the scope-level config pin is the other \
              half. Error: {e}"
-        ));
+        )
+    });
     assert!(
         body.len() > 1000,
         "sec.shell-open-call-sites-pinned (iter 219): {path} must \
@@ -519,13 +519,11 @@ fn sister_scope_guard_still_present() {
 #[test]
 fn app_js_openexternal_wrapper_exists_and_calls_shell_open() {
     let src = read(APP_JS);
-    let fn_pos = src
-        .find("openExternal(url) {")
-        .expect(
-            "sec.shell-open-call-sites-pinned (iter 219): src/app.js \
+    let fn_pos = src.find("openExternal(url) {").expect(
+        "sec.shell-open-call-sites-pinned (iter 219): src/app.js \
              must define `openExternal(url) {` method — the funnel \
              every app-side external-link call flows through.",
-        );
+    );
     // Window covers the method body.
     let window = &src[fn_pos..fn_pos.saturating_add(800)];
     assert!(
@@ -741,9 +739,13 @@ fn scanner_safe_identifiers_reject_dom_input_patterns() {
     // line. Split by newlines, look at only the `'...'` quoted literal.
     for line in block.lines() {
         // Extract the first `'...'` on the line if present.
-        let Some(first_quote) = line.find('\'') else { continue };
+        let Some(first_quote) = line.find('\'') else {
+            continue;
+        };
         let rest = &line[first_quote + 1..];
-        let Some(end_quote) = rest.find('\'') else { continue };
+        let Some(end_quote) = rest.find('\'') else {
+            continue;
+        };
         let entry = &rest[..end_quote];
         for dangerous in [
             ".value",
@@ -776,9 +778,7 @@ fn scanner_safe_identifiers_reject_dom_input_patterns() {
 fn app_js_byte_bounds() {
     const MIN: usize = 50_000;
     const MAX: usize = 1_000_000;
-    let bytes = std::fs::metadata(APP_JS)
-        .expect("app.js must exist")
-        .len() as usize;
+    let bytes = std::fs::metadata(APP_JS).expect("app.js must exist").len() as usize;
     assert!(
         (MIN..=MAX).contains(&bytes),
         "sec.shell-open-call-sites-pinned (iter 289): {APP_JS} is \
@@ -788,8 +788,7 @@ fn app_js_byte_bounds() {
 
 #[test]
 fn cargo_toml_declares_tauri_plugin_shell() {
-    let toml = std::fs::read_to_string("Cargo.toml")
-        .expect("Cargo.toml must exist");
+    let toml = std::fs::read_to_string("Cargo.toml").expect("Cargo.toml must exist");
     assert!(
         toml.contains("tauri-plugin-shell"),
         "sec.shell-open-call-sites-pinned (iter 289): Cargo.toml \
@@ -800,23 +799,18 @@ fn cargo_toml_declares_tauri_plugin_shell() {
 
 #[test]
 fn capabilities_permissions_include_shell_allow_open() {
-    let cap = std::fs::read_to_string(CAPABILITIES)
-        .expect("capabilities/migrated.json must exist");
-    let v: serde_json::Value = serde_json::from_str(&cap)
-        .expect("capabilities JSON must parse");
+    let cap = std::fs::read_to_string(CAPABILITIES).expect("capabilities/migrated.json must exist");
+    let v: serde_json::Value = serde_json::from_str(&cap).expect("capabilities JSON must parse");
     let perms = v
         .pointer("/permissions")
         .and_then(|x| x.as_array())
         .expect("capabilities must carry `permissions` array");
-    let has_shell_open = perms.iter().any(|p| {
-        match p {
-            serde_json::Value::String(s) => s == "shell:allow-open",
-            serde_json::Value::Object(o) => o
-                .get("identifier")
-                .and_then(|v| v.as_str())
-                == Some("shell:allow-open"),
-            _ => false,
+    let has_shell_open = perms.iter().any(|p| match p {
+        serde_json::Value::String(s) => s == "shell:allow-open",
+        serde_json::Value::Object(o) => {
+            o.get("identifier").and_then(|v| v.as_str()) == Some("shell:allow-open")
         }
+        _ => false,
     });
     assert!(
         has_shell_open,
@@ -828,8 +822,7 @@ fn capabilities_permissions_include_shell_allow_open() {
 
 #[test]
 fn capabilities_json_is_well_formed_at_top_level() {
-    let cap = std::fs::read_to_string(CAPABILITIES)
-        .expect("capabilities/migrated.json must exist");
+    let cap = std::fs::read_to_string(CAPABILITIES).expect("capabilities/migrated.json must exist");
     let parsed: Result<serde_json::Value, _> = serde_json::from_str(&cap);
     assert!(
         parsed.is_ok(),

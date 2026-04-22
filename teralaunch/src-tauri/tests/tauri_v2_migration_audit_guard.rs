@@ -331,8 +331,7 @@ fn validation_doc_has_rollback_pointer_section() {
     // The pointer must actually reference the plan doc, otherwise
     // it's a stub heading.
     assert!(
-        body.contains("tauri-v2-migration-plan.md")
-            || body.contains("Rollback strategy"),
+        body.contains("tauri-v2-migration-plan.md") || body.contains("Rollback strategy"),
         "Rollback pointer section must reference the plan doc \
          (either `tauri-v2-migration-plan.md` or `Rollback \
          strategy`). A heading without the cross-ref is a stub."
@@ -398,10 +397,7 @@ fn tauri_v2_audit_guard_detector_self_test() {
                 && cleaned.chars().any(|c| c.is_ascii_alphabetic())
         })
     });
-    assert!(
-        !has_sha,
-        "self-test: baseline without SHA must be flagged"
-    );
+    assert!(!has_sha, "self-test: baseline without SHA must be flagged");
 }
 
 // --------------------------------------------------------------------

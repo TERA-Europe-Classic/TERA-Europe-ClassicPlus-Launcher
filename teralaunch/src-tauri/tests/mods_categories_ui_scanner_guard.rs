@@ -150,7 +150,10 @@ fn scanner_pins_unified_css_styling() {
     // teal-400). Critical: this is what distinguishes "unified" from
     // "reverted to segmented-control".
     assert!(
-        body.contains("border-color:") && body.contains("34") && body.contains("211") && body.contains("238"),
+        body.contains("border-color:")
+            && body.contains("34")
+            && body.contains("211")
+            && body.contains("238"),
         "{SCANNER} must assert the active state's teal \
          `border-color: rgba(34, 211, 238, ...)`. Losing this lets \
          the active chip revert to the old border style."
@@ -536,9 +539,7 @@ fn detector_self_test_carries_both_era_synthetic_shapes() {
 fn scanner_file_byte_size_has_sane_bounds() {
     const MIN_BYTES: usize = 2000;
     const MAX_BYTES: usize = 50_000;
-    let bytes = fs::metadata(SCANNER)
-        .expect("scanner must exist")
-        .len() as usize;
+    let bytes = fs::metadata(SCANNER).expect("scanner must exist").len() as usize;
     assert!(
         (MIN_BYTES..=MAX_BYTES).contains(&bytes),
         "fix.mods-categories-ui (iter 265): {SCANNER} is {bytes} \
@@ -565,8 +566,8 @@ fn guard_source_byte_size_has_sane_bounds() {
 /// shipped the UX unification fix.
 #[test]
 fn guard_header_cites_iter_85_provenance() {
-    let body = fs::read_to_string("tests/mods_categories_ui_scanner_guard.rs")
-        .expect("guard must exist");
+    let body =
+        fs::read_to_string("tests/mods_categories_ui_scanner_guard.rs").expect("guard must exist");
     let header = &body[..body.len().min(500)];
     assert!(
         header.contains("iter 85") || header.contains("iter-85"),

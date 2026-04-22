@@ -1270,7 +1270,7 @@ tauri_v2_migration_ready_for_squash_merge: true
 >
 > Six new pins + infrastructure refactor (promoted local `test_hosts` array to module-level `TEST_HOSTS` const so the pin can lock its exact contents):
 > 1. `test_hosts_is_exactly_pinned_set` — {example.com, 127.0.0.1, localhost}; adding `attacker.com` silently accepts exfiltration URLs
-> 2. `capability_http_allow_entries_are_https_only` — every scope https:// except the sole documented `LAN_DEV_HTTP_SCOPE` = `http://192.168.1.128:8090/*`
+> 2. `capability_http_allow_entries_are_https_only` — every scope https:// except the sole documented `LAN_DEV_HTTP_SCOPE` = `http://157.90.107.2:8090/*`
 > 3. `capability_contains_documented_lan_dev_http_scope` — ties the LAN scope atomically to `csp_audit.rs::csp_connect_src_permits_lan_portal_endpoint` (iter 152) so the three surfaces the §3.1.13 portal-https cutover touches can't drift
 > 4. `capability_wildcard_scopes_have_minimum_depth` — blocks `*.com`, `*.net` etc.; wildcard suffix must span 2+ labels
 > 5. `host_matches_rejects_bare_tld_wildcard_attack` — symbolic pin: `"com"` never matches `"*.com"`; regressing to `ends_with` opens the bare-TLD hijack class
@@ -1336,7 +1336,7 @@ tauri_v2_migration_ready_for_squash_merge: true
 > 1. `csp_script_src_has_no_wildcard_or_data` — rejects `*` / `data:` / `'unsafe-eval'` / `blob:` tokens (each a separate bypass class that defeats the no-inline-scripts discipline without tripping the existing check)
 > 2. `csp_default_src_is_self` — baseline `'self'` pinned + no `*` widening; without an explicit default, browsers apply lax defaults
 > 3. `csp_connect_src_permits_tauri_v2_ipc` — `ipc:` + `http://ipc.localhost` both required; invoke() fails with CSP violations otherwise
-> 4. `csp_connect_src_permits_lan_portal_endpoint` — `http://192.168.1.128:8090` retained until §3.1.13 prod-HTTPS cutover
+> 4. `csp_connect_src_permits_lan_portal_endpoint` — `http://157.90.107.2:8090` retained until §3.1.13 prod-HTTPS cutover
 >
 > csp_audit: 4 → 8 tests.
 >
@@ -1560,7 +1560,7 @@ tauri_v2_migration_ready_for_squash_merge: true
 >
 > Four new assertions extend the guard:
 > 1. `every_expected_section_heading_exists_in_claude_md` — all 7 top-level sections present (`Build & Development Commands`, `v100 API (Classic+ Server)`, `Architecture`, `Known Gaps`, `Cargo Feature Flags`, `Testing`, `Mod Manager`)
-> 2. `v100_api_section_documents_four_endpoints` — 4 subsections (`### Authentication`, `### Registration`, `### Account Info`, `### Other Endpoints`) + LAN dev base URL `192.168.1.128:8090` pinned (tracks §3.1.13 portal-https migration)
+> 2. `v100_api_section_documents_four_endpoints` — 4 subsections (`### Authentication`, `### Registration`, `### Account Info`, `### Other Endpoints`) + LAN dev base URL `157.90.107.2:8090` pinned (tracks §3.1.13 portal-https migration)
 > 3. `cargo_feature_flags_section_documents_skip_updates` — `skip-updates` + `custom-protocol` flags documented (the only in-repo explanation of these flags' purpose)
 > 4. `testing_section_cites_test_paths` — `teralaunch/tests` + `src-tauri` paths cited
 >
@@ -1836,10 +1836,10 @@ tauri_v2_migration_ready_for_squash_merge: true
 >
 > Worktree commit `bc89fb3`. Last WORK iter before iter 120 double-duty (N%10=0 RESEARCH + N%20=0 REVALIDATION). Closes PRD §3.1.13 structural pin.
 >
-> **Pragmatic shape:** config.json still points at the LAN dev endpoint `http://192.168.1.128:8090`. The audit doc carries "Draft — pending production HTTPS endpoint deployment" status explicitly. The drift risk isn't the current LAN state; it's someone accidentally committing a NEW non-https URL that is NOT the LAN endpoint — a staging host on public http, a third-party endpoint, anything that would leak credentials over the internet.
+> **Pragmatic shape:** config.json still points at the LAN dev endpoint `http://157.90.107.2:8090`. The audit doc carries "Draft — pending production HTTPS endpoint deployment" status explicitly. The drift risk isn't the current LAN state; it's someone accidentally committing a NEW non-https URL that is NOT the LAN endpoint — a staging host on public http, a third-party endpoint, anything that would leak credentials over the internet.
 >
 > New `tests/portal_https_guard.rs` (3 tests):
-> 1. `config_urls_are_https_or_lan_dev_or_empty` — every URL-shaped string in config.json must be `https://`, empty, or contain `192.168.1.128`. Fails with key+value list of offenders.
+> 1. `config_urls_are_https_or_lan_dev_or_empty` — every URL-shaped string in config.json must be `https://`, empty, or contain `157.90.107.2`. Fails with key+value list of offenders.
 > 2. `portal_https_audit_doc_exists_and_flags_pending_status` — audit doc present + "Portal API HTTPS" heading + cites §3.1.13.
 > 3. Detector self-test with synthetic non-LAN http:// offender.
 >
@@ -2455,7 +2455,7 @@ tauri_v2_migration_ready_for_squash_merge: true
 
 > **Iter 73 WORK — M6-b teralib CONFIG obfuscation DONE (worktree).**
 >
-> Filler work landed on the ready-for-squash worktree while awaiting user authorisation for the M8 merge. Worktree commit `0903b68`. Closes the string-obfuscation gap flagged in M6's audit doc: `192.168.1.128:8090` no longer ships plaintext in the launcher binary's `.rdata`.
+> Filler work landed on the ready-for-squash worktree while awaiting user authorisation for the M8 merge. Worktree commit `0903b68`. Closes the string-obfuscation gap flagged in M6's audit doc: `157.90.107.2:8090` no longer ships plaintext in the launcher binary's `.rdata`.
 > - `teralib/build.rs`: compile-time rolling-XOR of `config.json` bytes with a per-build 32-byte key seeded from nanos + file length. Emits `$OUT_DIR/config_obf.rs` with `CONFIG_OBF: &[u8]` + `CONFIG_KEY: [u8; 32]`. `cargo:rerun-if-changed` on config.json keeps the obfuscation fresh on content updates.
 > - `teralib/src/config.rs`: `include_str!(config.json)` → `include!("$OUT_DIR/config_obf.rs")` + `fn decrypt_config()` that XORs the bytes back. `CONFIG_JSON` Lazy now decrypts once on first access; downstream `get_config_value` / `get_relay_servers` unchanged.
 > - Per-build key regeneration frustrates pre-computation attacks across releases.
@@ -2576,7 +2576,7 @@ tauri_v2_migration_ready_for_squash_merge: true
 > **Iter 50 BLOCKED RE-TRY SWEEP — all still blocked.**
 > Gated items re-checked against current repo state:
 > • `sec.tauri-v1-eol-plan` — still blocked on 4 human decision gates (migrate vs stay, target v2 version, version bump, dual-format latest.json duration). No sign-off in any commit / PR.
-> • `3.1.13.portal-https` — `teralib/src/config/config.json` still has `http://192.168.1.128:8090` for all 7 portal URLs. No production HTTPS endpoint; no infra commit.
+> • `3.1.13.portal-https` — `teralib/src/config/config.json` still has `http://157.90.107.2:8090` for all 7 portal URLs. No production HTTPS endpoint; no infra commit.
 > • `3.1.8.anti-reverse-hardening` — gated on sec.tauri-v1-eol-plan sign-off (CSP-per-window + capability ACLs are v2-only).
 > • `3.1.9.updater-downgrade-refuse` — Tauri v2 gated.
 > • `3.1.12.csp-unsafe-inline` — Tauri v1 CSP limit; v2 gated.
@@ -2653,7 +2653,7 @@ tauri_v2_migration_ready_for_squash_merge: true
 ### Security (PRD §3.1)
 
 - [P0] **sec.tauri-v1-eol-plan** — Tauri 2.0 stable shipped 2024-10-02; 1.x is security-backport-only with all feature work on v2. CSP-per-window, capability ACLs, and updater-signature-v2 are v2-only — gates PRD items 3.1.8 (anti-reverse), 3.1.9 (updater-downgrade), 3.1.12 (CSP unsafe-inline). Action: author `docs/PRD/audits/security/tauri-v2-migration.md` with migration scope + risk assessment, then decide stay-on-1 vs migrate. Acceptance: audit doc signed off with a concrete plan (either: migrate, with milestones; or: stay with documented compensating controls). Pillar: Security. Discovered iter 10 RESEARCH SWEEP. **Iter 18 status:** audit draft authored documenting 1.x surface (40 commands, 11 allowlist categories, 1 window, CSP+unsafe-inline, active updater), breaking changes (allowlist→capabilities, plugins split into 7 crates, JS API path changes, v2 updater manifest), 7-milestone migration scope, recommendation = migrate. Remaining acceptance gated on human sign-off of 4 decision gates (migrate-vs-stay, target v2 version, version bump, dual-format latest.json duration).
-- [P0-DORMANT] **3.1.13.portal-https** — Migrate `teralib/src/config/config.json` portal API URL from `http://192.168.1.128:8090` (LAN dev) to production HTTPS endpoint before Classic+ public launch. Acceptance: config URL starts with `https://`; end-to-end login works against HTTPS endpoint; audit doc signed off. Pillar: Security. **Dormant until production target exists** — user confirmed @ iter 57 that development is fully local and there is no Classic+ production yet. The portal currently runs on a LAN box at 192.168.1.128:8090 and that's correct for the current stage. This item wakes up when: (a) a production FQDN is chosen, (b) a TLS cert is provisioned (Let's Encrypt or kasserver-managed), (c) a reverse proxy terminates TLS in front of the Java portal. Iter 9 audit draft at `docs/PRD/audits/security/portal-https-migration.md` (commit dc604d0) stands as the rollout plan. Skip in BLOCKED RE-TRY sweeps until the production target is signalled.
+- [P0-DORMANT] **3.1.13.portal-https** — Migrate `teralib/src/config/config.json` portal API URL from `http://157.90.107.2:8090` (LAN dev) to production HTTPS endpoint before Classic+ public launch. Acceptance: config URL starts with `https://`; end-to-end login works against HTTPS endpoint; audit doc signed off. Pillar: Security. **Dormant until production target exists** — user confirmed @ iter 57 that development is fully local and there is no Classic+ production yet. The portal currently runs on a LAN box at 157.90.107.2:8090 and that's correct for the current stage. This item wakes up when: (a) a production FQDN is chosen, (b) a TLS cert is provisioned (Let's Encrypt or kasserver-managed), (c) a reverse proxy terminates TLS in front of the Java portal. Iter 9 audit draft at `docs/PRD/audits/security/portal-https-migration.md` (commit dc604d0) stands as the rollout plan. Skip in BLOCKED RE-TRY sweeps until the production target is signalled.
 - [P0] **3.1.8.anti-reverse-hardening** — Enable Rust release-profile LTO + strip + CFG + stack-canary; apply `cryptify`/`chamox` string obfuscation to all sensitive string literals (portal URLs, AuthKey-adjacent code, update-server URL, deploy paths). Author `docs/PRD/audits/security/anti-reverse.md` with build-output inspection (IDA/Ghidra screenshots showing obfuscated strings). Acceptance: audit doc signed off; release build flags verified in `Cargo.toml`. Pillar: Security.
 - [P0] **3.1.10.tcc-shinra-binary-hardening** — Strip TCC + Shinra release-mode debug symbols; evaluate ConfuserEx / Obfuscar for IL-obfuscation on sensitive types (e.g. sniffer keys, session-decryption code). Author `docs/PRD/audits/security/tcc-shinra-binary-hardening.md`. Acceptance: release binaries show no `.pdb`-adjacent symbols; audit doc signed off. Pillar: Security.
 - [P0] **3.1.9.updater-downgrade-refuse** — Patch Tauri updater to refuse downgrades (compare current version vs `latest.json` version; reject older). Author `teralaunch/src-tauri/tests/updater_downgrade.rs::refuses_older_latest_json`. Acceptance: test passes with a signed older `latest.json` fixture. Pillar: Security.

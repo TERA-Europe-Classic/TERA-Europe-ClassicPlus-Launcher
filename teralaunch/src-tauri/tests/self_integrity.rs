@@ -255,8 +255,7 @@ fn mismatch_branch_exits_with_nonzero_code() {
     let arm_window = &window[mismatch_idx..mismatch_idx.saturating_add(400)];
     // Must contain exit(2) or another explicitly non-zero literal.
     assert!(
-        arm_window.contains("std::process::exit(2)")
-            || arm_window.contains("process::exit(2)"),
+        arm_window.contains("std::process::exit(2)") || arm_window.contains("process::exit(2)"),
         "PRD 3.1.11 (iter 198): Mismatch branch must call \
          `std::process::exit(2)`. Zero exit signals success; an \
          arbitrary non-specific integer makes the tamper-detected \
@@ -264,8 +263,7 @@ fn mismatch_branch_exits_with_nonzero_code() {
     );
     // And must NOT be exit(0).
     assert!(
-        !arm_window.contains("std::process::exit(0)")
-            && !arm_window.contains("process::exit(0)"),
+        !arm_window.contains("std::process::exit(0)") && !arm_window.contains("process::exit(0)"),
         "PRD 3.1.11 (iter 198): Mismatch branch must NOT call \
          `std::process::exit(0)` — zero exit signals success to \
          wrapping scripts/orchestrators, defeating the tamper-\
@@ -322,11 +320,7 @@ fn sidecar_bailouts_warn_and_return_early() {
     let window = &body[fn_pos..fn_pos.saturating_add(3000)];
     // Each bailout must be signalled with a distinct warn message
     // fragment so logs are actionable.
-    for needle in [
-        "exe has no parent dir",
-        "sidecar",
-        "skipping",
-    ] {
+    for needle in ["exe has no parent dir", "sidecar", "skipping"] {
         assert!(
             window.contains(needle),
             "PRD 3.1.11 (iter 198): run_self_integrity_check must \
@@ -654,8 +648,7 @@ fn self_integrity_service_byte_size_has_sane_bounds() {
 /// Iter 268: guard header must cite PRD 3.1.11 explicitly.
 #[test]
 fn guard_source_cites_prd_3_1_11_explicitly() {
-    let body = std::fs::read_to_string("tests/self_integrity.rs")
-        .expect("guard must exist");
+    let body = std::fs::read_to_string("tests/self_integrity.rs").expect("guard must exist");
     let header = &body[..body.len().min(500)];
     assert!(
         header.contains("PRD 3.1.11"),

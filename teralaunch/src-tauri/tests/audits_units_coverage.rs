@@ -124,12 +124,9 @@ fn tcc_audit_doc_floor_is_met() {
 
 #[test]
 fn total_audit_doc_count_progresses_toward_110() {
-    let total = count_md_in("external")
-        + count_md_in("gpk")
-        + count_md_in("launcher")
-        + count_md_in("tcc");
-    let floor =
-        FLOOR_EXTERNAL + FLOOR_GPK + FLOOR_LAUNCHER + FLOOR_TCC;
+    let total =
+        count_md_in("external") + count_md_in("gpk") + count_md_in("launcher") + count_md_in("tcc");
+    let floor = FLOOR_EXTERNAL + FLOOR_GPK + FLOOR_LAUNCHER + FLOOR_TCC;
     assert!(
         total >= floor,
         "PRD §3.8.7: total audit-doc count is {total}; current floor \
