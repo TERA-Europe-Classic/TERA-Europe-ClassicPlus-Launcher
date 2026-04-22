@@ -9,9 +9,12 @@ const APP_JS = path.join(REPO_ROOT, 'teralaunch/src/app.js');
 describe('launcher update toast', () => {
     it('uses stable numeric subtitle styling for download progress', () => {
         const html = fs.readFileSync(INDEX_HTML, 'utf8');
+        expect(html).toMatch(/\.update-toast\s*\{[^}]*width:\s*344px/i);
+        expect(html).toMatch(/\.update-toast\s*\{[^}]*max-width:\s*calc\(100vw\s*-\s*32px\)/i);
         expect(html).toContain('.update-toast-subtitle');
         expect(html).toMatch(/\.update-toast-subtitle\s*\{[^}]*font-variant-numeric:\s*tabular-nums/i);
-        expect(html).toMatch(/\.update-toast-subtitle\s*\{[^}]*min-width:\s*\d+ch/i);
+        expect(html).toMatch(/\.update-toast-subtitle\s*\{[^}]*width:\s*\d+ch/i);
+        expect(html).toMatch(/\.update-toast-subtitle\s*\{[^}]*overflow:\s*hidden/i);
         expect(html).toMatch(/\.update-toast-text\s*\{[^}]*flex:\s*1/i);
     });
 
