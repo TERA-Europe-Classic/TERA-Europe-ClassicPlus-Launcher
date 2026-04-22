@@ -3,23 +3,7 @@
     <div class="mods-container">
         <!-- Premium Workspace Header Redesign -->
         <section class="mods-workspace-header">
-            <!-- Row 1: Brand & Global Search -->
-            <div class="mods-toolbar-row">
-                <h1 class="mods-title" data-translate="MODS_TITLE">Mods</h1>
-                
-                <div class="mods-search-wrap" id="mods-search-wrap">
-                    <input type="text" id="mods-search" class="mods-search" placeholder="Search by name, author, or category" data-translate-placeholder="MODS_SEARCH" />
-                    <button type="button" id="mods-search-clear" class="mods-search-clear" aria-label="Clear search" data-translate-aria-label="MODS_SEARCH_CLEAR">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    </button>
-                </div>
-
-                <button class="mods-titlebar-close" id="mods-titlebar-close" aria-label="Close" data-translate-aria-label="MODS_ARIA_CLOSE" title="Close (Esc)" data-translate-title="MODS_CLOSE_TITLE">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-            </div>
-
-            <!-- Row 2: Navigation & Contextual Actions -->
+            <!-- Row 1: Navigation & Contextual Actions -->
             <div class="mods-nav-row">
                 <div class="mods-tabs" role="tablist">
                     <button class="mods-tab active" data-tab="installed" role="tab" aria-selected="true">
@@ -29,6 +13,22 @@
                     <button class="mods-tab" data-tab="browse" role="tab" aria-selected="false">
                         <span data-translate="MODS_TAB_BROWSE">Browse</span>
                         <span class="mods-tab-count" id="mods-count-browse">0</span>
+                    </button>
+                </div>
+
+                <button class="mods-titlebar-close" id="mods-titlebar-close" aria-label="Close" data-translate-aria-label="MODS_ARIA_CLOSE" title="Close (Esc)" data-translate-title="MODS_CLOSE_TITLE">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+
+            <!-- Row 2: Brand, Search & Secondary Actions -->
+            <div class="mods-toolbar-row">
+                <h1 class="mods-title" data-translate="MODS_TITLE">Mods</h1>
+
+                <div class="mods-search-wrap" id="mods-search-wrap">
+                    <input type="text" id="mods-search" class="mods-search" placeholder="Search by name, author, or category" data-translate-placeholder="MODS_SEARCH" />
+                    <button type="button" id="mods-search-clear" class="mods-search-clear" aria-label="Clear search" data-translate-aria-label="MODS_SEARCH_CLEAR">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
                 </div>
 
