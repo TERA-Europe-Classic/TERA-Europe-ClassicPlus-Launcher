@@ -1,0 +1,35 @@
+{
+  "schema_version": 2,
+  "mod_id": "foglio1024.ui-remover-bosswindow",
+  "title": "UI Remover: Boss Window",
+  "target_package": "S1UI_GageBoss.gpk",
+  "patch_family": "ui_layout",
+  "reference": {
+    "source_patch_label": "v100.02-review-draft",
+    "package_fingerprint": "review-pending:boss-window-v100",
+    "provenance": "https://raw.githubusercontent.com/foglio1024/UI-Remover/master/remove_BossWindow/S1UI_GageBoss.gpk"
+  },
+  "compatibility": {
+    "require_exact_package_fingerprint": true,
+    "require_all_exports_present": false,
+    "forbid_name_or_import_expansion": false
+  },
+  "exports": [
+    {
+      "object_path": "GageBoss.GageBoss_I1C",
+      "class_name": "Core.ObjectRedirector",
+      "reference_export_fingerprint": "review-pending:redirector-fingerprint",
+      "target_export_fingerprint": null,
+      "operation": "remove_export",
+      "new_class_name": null,
+      "replacement_payload_hex": ""
+    }
+  ],
+  "import_patches": [],
+  "name_patches": [],
+  "notes": [
+    "Draft reviewed candidate bundle for the first Wave A proving case.",
+    "Hand-authored from the Boss Window v100 review because the current parser still blocks on the live package layout.",
+    "Do not ship until package fingerprint and export fingerprint are replaced with parser-derived values."
+  ]
+}

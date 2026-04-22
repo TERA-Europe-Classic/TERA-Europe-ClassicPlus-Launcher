@@ -172,6 +172,70 @@ pub fn artifact_layout_for_mod(mod_id: &str) -> Option<PatchArtifactLayout> {
     get_manifest_root().map(|root| artifact_layout_for_mod_at_root(&root, mod_id))
 }
 
+pub fn validate_bundle_layout(layout: &PatchArtifactLayout, mod_id: &str) -> Result<(), String> {
+    let expected = manifest_bundle_name_for_mod(mod_id);
+    let actual = layout
+        .bundle_dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| {
+            format!(
+                "Patch artifact bundle dir {} has no valid final path component",
+                layout.bundle_dir.display()
+            )
+        })?;
+    if actual != expected {
+        return Err(format!(
+            "Patch artifact bundle dir name '{}' does not match sanitized mod id '{}'",
+            actual, expected
+        ));
+    }
+    if !layout.bundle_dir.exists() {
+        return Err(format!(
+            "Patch artifact bundle dir does not exist: {}",
+            layout.bundle_dir.display()
+        ));
+    }
+    if !layout.bundle_dir.is_dir() {
+        return Err(format!(
+            "Patch artifact bundle path is not a directory: {}",
+            layout.bundle_dir.display()
+        ));
+    }
+    if !layout.manifest_path.exists() {
+        return Err(format!(
+            "Patch artifact bundle is missing manifest.json at {}",
+            layout.manifest_path.display()
+        ));
+    }
+    if !layout.payload_dir.exists() {
+        return Err(format!(
+            "Patch artifact bundle is missing payloads dir at {}",
+            layout.payload_dir.display()
+        ));
+    }
+    if !layout.payload_dir.is_dir() {
+        return Err(format!(
+            "Patch artifact payload path is not a directory: {}",
+            layout.payload_dir.display()
+        ));
+    }
+    for entry in fs::read_dir(&layout.bundle_dir)
+        .map_err(|e| format!("Failed to read patch artifact bundle {}: {}", layout.bundle_dir.display(), e))?
+    {
+        let entry = entry.map_err(|e| format!("Failed to enumerate patch artifact bundle {}: {}", layout.bundle_dir.display(), e))?;
+        let path = entry.path();
+        if path == layout.manifest_path || path == layout.payload_dir {
+            continue;
+        }
+        return Err(format!(
+            "Patch artifact bundle contains unsupported top-level path outside manifest.json/payloads: {}",
+            path.display()
+        ));
+    }
+    Ok(())
+}
+
 pub fn load_manifest(path: &Path) -> Result<PatchManifest, String> {
     let raw = fs::read_to_string(path)
         .map_err(|e| format!("Failed to read patch manifest {}: {}", path.display(), e))?;
@@ -185,11 +249,11 @@ pub fn load_manifest_for_mod(mod_id: &str) -> Result<Option<PatchManifest>, Stri
     let Some(layout) = artifact_layout_for_mod(mod_id) else {
         return Ok(None);
     };
-    let path = layout.manifest_path;
-    if !path.exists() {
+    if !layout.manifest_path.exists() {
         return Ok(None);
     }
-    load_manifest(&path).map(Some)
+    validate_bundle_layout(&layout, mod_id)?;
+    load_manifest(&layout.manifest_path).map(Some)
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -425,6 +489,30 @@ mod tests {
         assert_eq!(layout.bundle_dir, bundle_dir);
         assert_eq!(layout.manifest_path, bundle_dir.join("manifest.json"));
         assert_eq!(layout.payload_dir, bundle_dir.join("payloads"));
+    }
+
+    #[test]
+    fn validate_bundle_layout_accepts_manifest_and_payload_dir_only() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let layout = artifact_layout_for_mod_at_root(temp.path(), "foglio1024.ui-remover-bosswindow");
+        fs::create_dir_all(&layout.payload_dir).expect("create payload dir");
+        fs::write(&layout.manifest_path, serde_json::to_string(&sample_manifest()).unwrap()).expect("write manifest");
+
+        validate_bundle_layout(&layout, "foglio1024.ui-remover-bosswindow")
+            .expect("bundle layout should validate");
+    }
+
+    #[test]
+    fn validate_bundle_layout_rejects_unexpected_top_level_paths() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let layout = artifact_layout_for_mod_at_root(temp.path(), "foglio1024.ui-remover-bosswindow");
+        fs::create_dir_all(&layout.payload_dir).expect("create payload dir");
+        fs::write(&layout.manifest_path, serde_json::to_string(&sample_manifest()).unwrap()).expect("write manifest");
+        fs::write(layout.bundle_dir.join("notes.txt"), "oops").expect("write unexpected top-level file");
+
+        let err = validate_bundle_layout(&layout, "foglio1024.ui-remover-bosswindow")
+            .expect_err("extra top-level paths must fail closed");
+        assert!(err.contains("unsupported top-level path"));
     }
 
     #[test]
