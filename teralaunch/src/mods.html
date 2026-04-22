@@ -1,65 +1,64 @@
-<!-- mods.html is now injected into #mods-modal-content in index.html, not
-     rendered as a full-page route. The <main> wrapper stays so page-level
-     queries inside mods.js still work; it just sits inside the modal. -->
 <link rel="stylesheet" href="./mods.css">
 <main class="content" id="mods-page">
     <div class="mods-container">
-        <!-- Titlebar: title on the left, close button on the far right like a
-             Windows window. Action buttons live on the next row so they can't
-             clash with the X. -->
-        <header class="mods-titlebar">
-            <h1 class="mods-title" data-translate="MODS_TITLE">Mods</h1>
-            <button class="mods-titlebar-close" id="mods-titlebar-close" aria-label="Close" data-translate-aria-label="MODS_ARIA_CLOSE" title="Close (Esc)" data-translate-title="MODS_TITLE_CLOSE_ESC">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-            </button>
-        </header>
-
+        <!-- Premium Workspace Header Redesign -->
         <section class="mods-workspace-header">
+            <!-- Row 1: Brand & Global Search -->
             <div class="mods-toolbar-row">
-                <div class="mods-actions">
-                    <button id="mods-import-btn" class="mods-secondary-btn" data-translate="MODS_IMPORT">Add mod from file…</button>
-                    <button id="mods-folder-btn" class="mods-secondary-btn" data-translate="MODS_OPEN_FOLDER">Open mods folder</button>
-                </div>
-            </div>
-
-            <div class="mods-tabs" role="tablist">
-                <button class="mods-tab active" data-tab="installed" role="tab" aria-selected="true">
-                    <span data-translate="MODS_TAB_INSTALLED">Installed</span>
-                    <span class="mods-tab-count" id="mods-count-installed">0</span>
-                </button>
-                <button class="mods-tab" data-tab="browse" role="tab" aria-selected="false">
-                    <span data-translate="MODS_TAB_BROWSE">Browse</span>
-                    <span class="mods-tab-count" id="mods-count-browse">0</span>
-                </button>
-            </div>
-
-            <div class="mods-toolbar">
+                <h1 class="mods-title" data-translate="MODS_TITLE">Mods</h1>
+                
                 <div class="mods-search-wrap" id="mods-search-wrap">
                     <input type="text" id="mods-search" class="mods-search" placeholder="Search by name, author, or category" data-translate-placeholder="MODS_SEARCH" />
                     <button type="button" id="mods-search-clear" class="mods-search-clear" aria-label="Clear search" data-translate-aria-label="MODS_SEARCH_CLEAR">
-                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                            <path d="M8 8l8 8M16 8l-8 8" />
-                        </svg>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+
+                <button class="mods-titlebar-close" id="mods-titlebar-close" aria-label="Close" data-translate-aria-label="MODS_ARIA_CLOSE" title="Close (Esc)" data-translate-title="MODS_CLOSE_TITLE">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+
+            <!-- Row 2: Navigation & Contextual Actions -->
+            <div class="mods-nav-row">
+                <div class="mods-tabs" role="tablist">
+                    <button class="mods-tab active" data-tab="installed" role="tab" aria-selected="true">
+                        <span data-translate="MODS_TAB_INSTALLED">Installed</span>
+                        <span class="mods-tab-count" id="mods-count-installed">0</span>
+                    </button>
+                    <button class="mods-tab" data-tab="browse" role="tab" aria-selected="false">
+                        <span data-translate="MODS_TAB_BROWSE">Browse</span>
+                        <span class="mods-tab-count" id="mods-count-browse">0</span>
+                    </button>
+                </div>
+
+                <div class="mods-actions">
+                    <button id="mods-import-btn" class="mods-secondary-btn" data-translate="MODS_IMPORT">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+                        Add mod from file…
+                    </button>
+                    <button id="mods-folder-btn" class="mods-secondary-btn" data-translate="MODS_OPEN_FOLDER">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                        Open mods folder
                     </button>
                 </div>
             </div>
 
+            <!-- Row 3: Refined Filters -->
             <div class="mods-filters-row" role="group" aria-label="Filters">
-                <div class="mods-filter-group" role="group" aria-label="Kind filter" data-translate-aria-label="MODS_ARIA_KIND_FILTER">
+                <div class="mods-filter-group">
                     <button class="mods-filter-chip active" data-filter="all" data-translate="MODS_FILTER_ALL">All</button>
                     <button class="mods-filter-chip" data-filter="external" data-translate="MODS_FILTER_EXTERNAL">External</button>
                     <button class="mods-filter-chip" data-filter="gpk" data-translate="MODS_FILTER_GPK">GPK</button>
                 </div>
-                <span class="mods-filters-divider" aria-hidden="true"></span>
-                <div class="mods-category-row" id="mods-category-row" role="group" aria-label="Category filter" data-translate-aria-label="MODS_ARIA_CATEGORY_FILTER">
+                <div class="mods-filters-divider" aria-hidden="true"></div>
+                <div class="mods-category-row" id="mods-category-row">
                     <button class="mods-filter-chip active" data-category="all" data-translate="MODS_CATEGORY_ALL">All categories</button>
                 </div>
             </div>
         </section>
 
+        <!-- Scrollable Content Area -->
         <section class="mods-pane active" data-pane="installed">
             <div class="mods-group" data-kind="external">
                 <h2 class="mods-group-title">
@@ -87,6 +86,7 @@
             </div>
         </section>
 
+        <!-- Floating Feedback Tray -->
         <div class="mods-download-tray" id="mods-download-tray" hidden>
             <div class="mods-download-tray-header">
                 <span data-translate="MODS_DOWNLOADS">Downloads</span>
@@ -95,10 +95,7 @@
             <div class="mods-download-tray-items" id="mods-download-tray-items"></div>
         </div>
 
-        <!-- Detail panel — opens on row click (outside the action button).
-             Populates from the clicked ModEntry/CatalogEntry. Credits,
-             license, source link, and screenshots are the core attribution
-             surface. -->
+        <!-- Detail Drill-down (Slide-over) -->
         <div class="mods-detail-backdrop" id="mods-detail-backdrop" hidden>
             <aside class="mods-detail" id="mods-detail" role="dialog" aria-modal="true" aria-labelledby="mods-detail-name">
                 <header class="mods-detail-header">

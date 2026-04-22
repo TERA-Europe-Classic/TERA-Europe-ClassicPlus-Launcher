@@ -1,469 +1,349 @@
-/* Mods view — dark theme, matches the launcher's token palette. */
+/* 
+ * Mods view — premium "Glassmorphism" overhaul.
+ * Optimized for clarity, stability, and high-end visual feedback.
+ */
+
+:root {
+    --mods-radius-lg: 24px;
+    --mods-radius-md: 14px;
+    --mods-radius-sm: 8px;
+    --mods-glass-bg: rgba(13, 17, 23, 0.85);
+    --mods-glass-border: rgba(255, 255, 255, 0.08);
+    --mods-accent: #22d3ee;
+    --mods-accent-glow: rgba(34, 211, 238, 0.35);
+    --mods-text-dim: rgba(255, 255, 255, 0.5);
+}
+
+/* --- ROOT CONSTRAINTS (Fix: Ensure chain for scrolling) --- */
+.mods-modal-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
 
 #mods-page {
-    --mods-inline-inset: 18px;
-    --mods-filter-gap: 6px;
-    --mods-scrollbar-size: 14px;
-    --mods-scrollbar-thumb: rgba(148, 163, 184, 0.34);
-    --mods-scrollbar-track: rgba(15, 23, 42, 0.58);
-    --mods-scrollbar-track-edge: rgba(255, 255, 255, 0.05);
-    color: var(--text, #ffffff);
-    padding: 32px 40px 80px;
-    max-width: 1100px;
-    margin: 0 auto;
-    -webkit-app-region: no-drag;
-}
-
-.mods-modal,
-.mods-modal-shell,
-.mods-modal-content,
-.mods-container,
-.mods-toolbar,
-.mods-filters-row,
-.mods-pane,
-.mods-rows,
-.mods-detail,
-.mods-detail-body {
-    -webkit-app-region: no-drag;
-}
-
-/* Styled scrollbar inside the mods view. It sits visually inside the panel,
-   uses the same smoky glass palette as the rest of the launcher, and only
-   picks up the cyan accent while hovered/dragged.
-
-   Chromium exposes ::-webkit-scrollbar; Firefox uses scrollbar-color /
-   scrollbar-width. Tauri ships WebView2 (Chromium) on Windows so the
-   Firefox fallback is belt-and-braces. */
-#mods-page .mods-modal-content,
-#mods-page .mods-pane,
-#mods-page .mods-rows,
-#mods-page .mods-detail-body,
-#mods-page .mods-detail-description,
-#mods-page .mods-category-row {
-    scrollbar-width: thin;
-    scrollbar-color: var(--mods-scrollbar-thumb) var(--mods-scrollbar-track);
-    scrollbar-gutter: stable both-edges;
-    scroll-behavior: smooth;
-    overscroll-behavior: contain;
-    -webkit-app-region: no-drag;
-}
-
-#mods-page .mods-modal-content::-webkit-scrollbar,
-#mods-page .mods-pane::-webkit-scrollbar,
-#mods-page .mods-rows::-webkit-scrollbar,
-#mods-page .mods-detail-body::-webkit-scrollbar,
-#mods-page .mods-detail-description::-webkit-scrollbar,
-#mods-page .mods-category-row::-webkit-scrollbar {
-    width: var(--mods-scrollbar-size);
-    height: var(--mods-scrollbar-size);
-}
-
-#mods-page .mods-modal-content::-webkit-scrollbar-track,
-#mods-page .mods-pane::-webkit-scrollbar-track,
-#mods-page .mods-rows::-webkit-scrollbar-track,
-#mods-page .mods-detail-body::-webkit-scrollbar-track,
-#mods-page .mods-detail-description::-webkit-scrollbar-track,
-#mods-page .mods-category-row::-webkit-scrollbar-track {
-    background: linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(15, 23, 42, 0.44));
-    border: 1px solid var(--mods-scrollbar-track-edge);
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.015);
-    border-radius: 999px;
-}
-
-#mods-page .mods-modal-content::-webkit-scrollbar-thumb,
-#mods-page .mods-pane::-webkit-scrollbar-thumb,
-#mods-page .mods-rows::-webkit-scrollbar-thumb,
-#mods-page .mods-detail-body::-webkit-scrollbar-thumb,
-#mods-page .mods-detail-description::-webkit-scrollbar-thumb,
-#mods-page .mods-category-row::-webkit-scrollbar-thumb {
-    min-height: 36px;
-    background: linear-gradient(180deg, rgba(148, 163, 184, 0.55), rgba(100, 116, 139, 0.34));
-    border: 3px solid rgba(15, 23, 42, 0.08);
-    background-clip: padding-box;
-    border-radius: 999px;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.12);
-    transition: background 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
-}
-
-#mods-page .mods-modal-content:hover::-webkit-scrollbar-thumb,
-#mods-page .mods-pane:hover::-webkit-scrollbar-thumb,
-#mods-page .mods-rows:hover::-webkit-scrollbar-thumb,
-#mods-page .mods-detail-body:hover::-webkit-scrollbar-thumb,
-#mods-page .mods-detail-description:hover::-webkit-scrollbar-thumb,
-#mods-page .mods-category-row:hover::-webkit-scrollbar-thumb,
-#mods-page .mods-modal-content::-webkit-scrollbar-thumb:hover,
-#mods-page .mods-pane::-webkit-scrollbar-thumb:hover,
-#mods-page .mods-rows::-webkit-scrollbar-thumb:hover,
-#mods-page .mods-detail-body::-webkit-scrollbar-thumb:hover,
-#mods-page .mods-detail-description::-webkit-scrollbar-thumb:hover,
-#mods-page .mods-category-row::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, rgba(103, 232, 249, 0.78), rgba(34, 211, 238, 0.46));
-    border-color: rgba(8, 47, 73, 0.22);
-    box-shadow: inset 0 0 0 1px rgba(186, 230, 253, 0.2), 0 0 10px rgba(34, 211, 238, 0.14);
-}
-
-#mods-page .mods-modal-content::-webkit-scrollbar-thumb:active,
-#mods-page .mods-pane::-webkit-scrollbar-thumb:active,
-#mods-page .mods-rows::-webkit-scrollbar-thumb:active,
-#mods-page .mods-detail-body::-webkit-scrollbar-thumb:active,
-#mods-page .mods-detail-description::-webkit-scrollbar-thumb:active,
-#mods-page .mods-category-row::-webkit-scrollbar-thumb:active {
-    background: linear-gradient(180deg, rgba(34, 211, 238, 0.78), rgba(14, 165, 233, 0.54));
-    border-color: rgba(8, 47, 73, 0.32);
-}
-
-#mods-page .mods-modal-content::-webkit-scrollbar-corner,
-#mods-page .mods-pane::-webkit-scrollbar-corner,
-#mods-page .mods-rows::-webkit-scrollbar-corner,
-#mods-page .mods-detail-body::-webkit-scrollbar-corner,
-#mods-page .mods-detail-description::-webkit-scrollbar-corner,
-#mods-page .mods-category-row::-webkit-scrollbar-corner {
-    background: transparent;
-}
-
-.mods-container {
+    color: #fff;
+    padding: 0;
+    margin: 0;
+    width: 100%;
+    height: 100%; /* Fill the modal content */
     display: flex;
     flex-direction: column;
-    gap: 0;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-user-select: none;
+    -webkit-app-region: no-drag;
+    min-height: 0;
+    overflow: hidden;
 }
 
-.mods-workspace-header {
-    margin: 10px 28px 0;
-    padding: 18px 20px 14px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 16px;
-    background: linear-gradient(180deg, rgba(17, 21, 27, 0.94), rgba(15, 18, 24, 0.82));
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-}
-
-/* Header */
-.mods-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 16px;
-}
-
-.mods-title {
-    font-size: 28px;
-    font-weight: 600;
-    margin: 0;
-    letter-spacing: 0.2px;
-}
-
-.mods-actions {
-    display: flex;
-    gap: 8px;
-}
-
-.mods-secondary-btn {
-    background: rgba(255, 255, 255, 0.06);
-    color: var(--text, #fff);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    padding: 8px 14px;
-    font-size: 13px;
-    cursor: pointer;
-    transition: background 120ms ease, border-color 120ms ease;
-}
-
-.mods-secondary-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.2);
-}
-
-.mods-secondary-btn:disabled,
-.mods-secondary-btn.is-disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-}
-
-.mods-secondary-btn:disabled:hover,
-.mods-secondary-btn.is-disabled:hover {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.1);
-}
-
-/* Tabs */
-.mods-tabs {
-    display: flex;
-    gap: 4px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    padding-bottom: 0;
-    margin-top: 6px;
-}
-
-.mods-tab {
-    background: none;
-    border: 0;
-    color: rgba(255, 255, 255, 0.6);
-    padding: 12px 18px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    transition: color 120ms ease, border-color 120ms ease;
-}
-
-.mods-tab:hover {
-    color: rgba(255, 255, 255, 0.9);
-}
-
-.mods-tab.active {
-    color: var(--text, #fff);
-    border-bottom-color: var(--primary, #22d3ee);
-}
-
-.mods-tab-count {
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.85);
-    font-size: 11px;
-    padding: 2px 7px;
-    border-radius: 10px;
-    font-weight: 600;
-}
-
-/* Toolbar */
-.mods-toolbar {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    flex-wrap: wrap;
-    position: relative;
-    margin-top: 12px;
-}
-
-.mods-search-wrap {
-    flex: 1 1 240px;
-    min-width: 200px;
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-
-.mods-search-wrap .mods-search {
-    flex: 1 1 auto;
-    padding-right: 40px;
-}
-
-.mods-search-clear {
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 24px;
-    height: 24px;
-    border: 0;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.62);
-    cursor: pointer;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    line-height: 0;
-    transition: background 120ms ease, color 120ms ease, transform 120ms ease;
-}
-
-.mods-search-clear:hover {
-    background: rgba(255, 255, 255, 0.14);
-    color: var(--text, #fff);
-}
-
-.mods-search-wrap.has-query .mods-search-clear {
-    display: inline-flex;
-}
-
-.mods-search-clear svg {
+/* --- Visibility: Scrollbar (High Contrast & Width) --- */
+#mods-page ::-webkit-scrollbar {
     width: 12px;
-    height: 12px;
-    display: block;
-    stroke: currentColor;
-    stroke-width: 2.25;
-    stroke-linecap: round;
-    fill: none;
 }
 
-.mods-search {
-    flex: 1 1 240px;
-    min-width: 200px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    color: var(--text, #fff);
-    padding: 10px 14px;
-    border-radius: 8px;
-    font-size: 13px;
-    outline: none;
-    transition: border-color 120ms ease;
+#mods-page ::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    margin: 4px;
 }
 
-.mods-search:focus {
-    border-color: var(--primary, #22d3ee);
+#mods-page ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 10px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+    transition: background 0.2s ease;
 }
 
-/* fix.mods-categories-ui (iter 85): unified filter strip.
-   Kind chips (All/External/GPK) and category chips share one row
-   with a vertical divider between them. Both now use .mods-filter-chip
-   with identical pill geometry — same padding, same font-size, same
-   border-radius (999px). The segmented-control wrapper around kind
-   chips was dropped so nothing looks container-boxed while categories
-   float free. */
-.mods-filters-row {
-    display: grid;
-    grid-template-columns: max-content 88px minmax(0, 1fr);
-    align-items: center;
-    row-gap: var(--mods-filter-gap);
-    column-gap: 0;
-    padding: 0 var(--mods-inline-inset) 4px;
-    margin-top: 10px;
+#mods-page ::-webkit-scrollbar-thumb:hover {
+    background: var(--mods-accent);
+    background-clip: content-box;
 }
 
-.mods-filter-group {
-    display: inline-flex;
-    flex-wrap: wrap;
-    gap: var(--mods-filter-gap);
-    align-items: center;
-}
-
-.mods-filters-divider {
-    display: inline-block;
-    justify-self: center;
-    width: 1px;
-    height: 20px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.06));
-    margin: 0;
-}
-
-.mods-filter-chip {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.65);
-    padding: 4px 10px;
-    font-size: 11px;
-    letter-spacing: 0.02em;
-    cursor: pointer;
-    border-radius: 999px;
-    transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
-}
-
-.mods-filter-chip:hover {
-    color: var(--text, #fff);
-    border-color: rgba(255, 255, 255, 0.16);
-}
-
-.mods-filter-chip.active {
-    background: rgba(34, 211, 238, 0.18);
-    border-color: rgba(34, 211, 238, 0.4);
-    color: var(--primary, #22d3ee);
-}
-
-/* Category sub-group inside .mods-filters-row. Plain inline-flex so it
-   wraps with the kind chips around it. The row-level spacing + padding
-   is owned by the parent .mods-filters-row. */
-.mods-category-row {
-    display: inline-flex;
-    flex-wrap: wrap;
-    gap: var(--mods-filter-gap);
-    align-items: center;
-    min-width: 0;
-    justify-self: start;
-    margin-left: 0;
-    padding-left: 12px;
-}
-
-/* Panes */
+/* Fix: Scrollable pane must have explicit height restriction */
 .mods-pane {
     display: none;
-    flex-direction: column;
-    gap: 18px;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto !important;
+    scrollbar-gutter: stable;
+    padding: 32px 40px;
 }
 
 .mods-pane.active {
     display: flex;
-    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 32px;
+}
+
+/* --- Root Layout --- */
+.mods-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
     min-height: 0;
+    width: 100%;
     overflow: hidden;
+    background: var(--mods-glass-bg);
+    backdrop-filter: blur(32px);
+}
+
+/* --- Header Redesign --- */
+.mods-workspace-header {
+    display: flex;
+    flex-direction: column;
+    padding: 28px 40px 20px;
+    border-bottom: 1px solid var(--mods-glass-border);
+    background: rgba(255, 255, 255, 0.03);
+    flex-shrink: 0;
+}
+
+.mods-toolbar-row {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    margin-bottom: 24px;
+}
+
+.mods-title {
+    font-size: 24px;
+    font-weight: 800;
+    margin: 0;
+    letter-spacing: -0.01em;
+    flex-shrink: 0;
+}
+
+.mods-search-wrap {
+    position: relative;
+    flex: 1;
+}
+
+.mods-search {
+    width: 100%;
+    height: 42px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 0 44px 0 16px;
+    color: #fff;
+    font-size: 14px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mods-search:focus {
+    border-color: var(--mods-accent);
+    background: rgba(0, 0, 0, 0.4);
+    box-shadow: 0 0 15px rgba(34, 211, 238, 0.15);
+}
+
+.mods-search-clear {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--mods-text-dim);
+    display: none;
+    cursor: pointer;
+}
+
+.mods-search-wrap.has-query .mods-search-clear {
+    display: block;
+}
+
+.mods-nav-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.mods-tabs {
+    display: flex;
+    gap: 28px;
+}
+
+.mods-tab {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--mods-text-dim);
+    padding: 10px 0;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: none;
+    border: none;
+}
+
+.mods-tab:hover { color: #fff; }
+.mods-tab.active {
+    color: var(--mods-accent);
+    border-bottom-color: var(--mods-accent);
+}
+
+.mods-tab-count {
+    font-size: 10px;
+    background: rgba(34, 211, 238, 0.1);
+    color: var(--mods-accent);
+    padding: 1px 6px;
+    border-radius: 6px;
+    font-weight: 800;
+}
+
+.mods-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.mods-secondary-btn {
+    height: 34px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 0 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.mods-secondary-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.mods-titlebar-close {
+    width: 36px;
+    height: 36px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--mods-text-dim);
+    cursor: pointer;
+}
+
+.mods-titlebar-close:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #f87171;
+}
+
+.mods-filters-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 4px 0;
+}
+
+.mods-filter-group,
+.mods-category-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.mods-filter-chip {
+    height: 28px;
+    padding: 4px 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    color: var(--mods-text-dim);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.mods-filter-chip:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+.mods-filter-chip.active {
+    background: var(--mods-accent);
+    color: #000;
+    border-color: rgba(34, 211, 238, 0.95);
+    box-shadow: 0 4px 10px var(--mods-accent-glow);
 }
 
 .mods-group {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 16px;
 }
 
 .mods-group-title {
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    color: rgba(255, 255, 255, 0.5);
-    margin: 0 0 4px;
+    letter-spacing: 0.1em;
+    color: var(--mods-text-dim);
+    margin: 0;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
+}
+
+.mods-group-title::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.05);
 }
 
 .mods-group-count {
-    background: rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.05);
+    padding: 2px 8px;
+    border-radius: 6px;
     font-size: 10px;
-    padding: 1px 6px;
-    border-radius: 8px;
-    font-weight: 500;
-    letter-spacing: 0;
 }
 
+/* --- Mod Rows --- */
 .mods-rows {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 12px;
 }
 
-.mods-pane[data-pane="browse"] .mods-rows {
-    flex: 1 1 auto;
-    min-height: 0;
-}
-
-/* Row */
 .mods-row {
     display: grid;
-    grid-template-columns: 48px 1fr minmax(160px, auto) 40px;
-    gap: 14px;
+    grid-template-columns: 56px minmax(0, 1fr) auto auto;
+    gap: 20px;
     align-items: center;
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 10px;
-    padding: 12px 14px;
-    transition: background 120ms ease, border-color 120ms ease;
-}
-
-/* When the catalog entry doesn't advertise an icon (most community GPK
-   mods don't), drop the 48px column entirely so the row compacts rather
-   than showing a placeholder. */
-.mods-row.no-icon {
-    grid-template-columns: 1fr minmax(160px, auto) 40px;
+    border-radius: 16px;
+    padding: 16px 20px;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
 }
 
 .mods-row:hover {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.mods-row.no-icon {
+    grid-template-columns: minmax(0, 1fr) auto auto;
 }
 
 .mods-row-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
+    width: 56px;
+    height: 56px;
+    background: #000;
+    border-radius: 10px;
     overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(34, 211, 238, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .mods-row-icon-img {
@@ -472,1005 +352,394 @@
     object-fit: cover;
 }
 
-.mods-row-icon-fallback {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--primary, #22d3ee);
-    letter-spacing: 0.5px;
-}
-
-.mods-row-body {
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.mods-row-title {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-    min-width: 0;
-}
-
-.mods-row-name {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text, #fff);
+.mods-row-body { min-width: 0; }
+.mods-row-name { font-size: 16px; font-weight: 700; color: #fff; }
+.mods-row-author { font-size: 12px; color: var(--mods-text-dim); margin-left: 8px; }
+.mods-row-desc { 
+    font-size: 13px; 
+    color: rgba(255, 255, 255, 0.6); 
+    margin-top: 4px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-
-.mods-row-author {
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.5);
-    white-space: nowrap;
-}
-
-.mods-row-desc {
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.65);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.mods-row-error {
-    font-size: 11px;
-    color: #fca5a5;
-    margin-top: 2px;
 }
 
 .mods-row-status {
+    min-width: 110px;
     display: flex;
-    align-items: center;
     justify-content: flex-end;
-    gap: 8px;
+    align-items: center;
+    gap: 12px;
 }
 
-/* Primary action button variants */
 .mods-row-primary {
-    background: var(--primary, #22d3ee);
-    color: #041520;
-    border: 0;
-    padding: 7px 14px;
+    height: 34px;
+    min-width: 90px;
+    padding: 0 16px;
+    background: var(--mods-accent);
+    color: #000;
+    border: none;
+    border-radius: 8px;
     font-size: 12px;
-    font-weight: 600;
-    border-radius: 6px;
+    font-weight: 800;
     cursor: pointer;
-    letter-spacing: 0.3px;
-    transition: filter 120ms ease;
+    text-transform: uppercase;
+    transition: all 0.2s ease;
 }
 
 .mods-row-primary:hover {
     filter: brightness(1.1);
+    box-shadow: 0 0 12px var(--mods-accent-glow);
 }
 
-.mods-row-primary.enabled {
-    background: #10b981;
-    color: #041510;
-}
-
-.mods-row-primary.update {
-    background: #f59e0b;
-    color: #1a1005;
-}
-
-.mods-row-primary.error {
-    background: #ef4444;
-    color: #fff;
-}
-
-.mods-row-secondary {
-    background: rgba(255, 255, 255, 0.08);
-    color: var(--text, #fff);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 7px 12px;
-    font-size: 12px;
-    font-weight: 500;
-    border-radius: 6px;
+.mods-row-overflow {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--mods-text-dim);
     cursor: pointer;
-    transition: background 120ms ease;
+    border-radius: 8px;
+    transition: background 0.2s;
+    background: none;
+    border: none;
+    font-size: 18px;
 }
 
-.mods-row-secondary:hover {
-    background: rgba(255, 255, 255, 0.14);
-}
+.mods-row-overflow:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
 
-/* Status badges */
-.mods-row-badge {
+/* --- "Active" Status (Premium Redesign) --- */
+.mods-row-running-pill {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    padding: 5px 10px;
-    border-radius: 12px;
-    font-weight: 500;
-}
-
-.mods-row-badge.running {
-    background: rgba(16, 185, 129, 0.14);
-    color: #6ee7b7;
-}
-
-.mods-row-badge.starting {
-    background: rgba(245, 158, 11, 0.14);
-    color: #fcd34d;
-}
-
-.mods-row-badge.installed {
-    background: rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.7);
+    gap: 8px;
+    padding: 4px 14px;
+    background: rgba(34, 211, 238, 0.1);
+    border: 1px solid rgba(34, 211, 238, 0.2);
+    border-radius: 99px;
+    color: var(--mods-accent);
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    box-shadow: 0 0 10px rgba(34, 211, 238, 0.1);
 }
 
 .mods-row-running-dot {
     width: 8px;
     height: 8px;
-    background: #10b981;
+    background: var(--mods-accent);
     border-radius: 50%;
-    box-shadow: 0 0 6px #10b981;
-    animation: mods-pulse 1.5s ease-in-out infinite;
+    box-shadow: 0 0 12px var(--mods-accent);
+    animation: modsStatusPulse 2s infinite ease-in-out;
 }
 
-@keyframes mods-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.55; }
+@keyframes modsStatusPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(1.4); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-    .mods-row-running-dot {
-        animation: none;
-    }
-}
-
-.mods-row-progress {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--primary, #22d3ee);
-    font-variant-numeric: tabular-nums;
-}
-
-/* Overflow menu */
-.mods-row-menu {
-    display: flex;
-    justify-content: flex-end;
-}
-
-.mods-row-overflow {
-    background: none;
-    border: 0;
-    color: rgba(255, 255, 255, 0.5);
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 18px;
-    line-height: 1;
-    transition: background 120ms ease, color 120ms ease;
-}
-
-.mods-row-overflow:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: var(--text, #fff);
-}
-
-/* Empty states */
-.mods-empty {
-    text-align: center;
-    padding: 48px 24px;
-    color: rgba(255, 255, 255, 0.5);
-    font-size: 13px;
-}
-
-/* Download tray */
-.mods-download-tray {
-    position: fixed;
-    bottom: 16px;
-    right: 16px;
-    width: 340px;
-    background: rgba(20, 25, 34, 0.97);
-    border: 1px solid rgba(34, 211, 238, 0.25);
-    border-radius: 10px;
-    padding: 12px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-    z-index: 40;
-    backdrop-filter: blur(8px);
-}
-
-.mods-download-tray-header {
-    display: flex;
-    justify-content: space-between;
-    font-size: 12px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.85);
-    margin-bottom: 8px;
-}
-
-.mods-download-tray-count {
-    background: var(--primary, #22d3ee);
-    color: #041520;
-    padding: 1px 7px;
-    border-radius: 10px;
-    font-size: 11px;
-}
-
-.mods-download-tray-items {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.mods-download-tray-item {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    grid-template-rows: auto auto;
-    gap: 2px 8px;
-    font-size: 12px;
-}
-
-.mods-download-tray-name {
-    grid-column: 1;
-    grid-row: 1;
-    color: rgba(255, 255, 255, 0.85);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.mods-download-tray-progress {
-    grid-column: 2;
-    grid-row: 1;
-    color: var(--primary, #22d3ee);
-    font-variant-numeric: tabular-nums;
-}
-
-.mods-download-tray-bar {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    height: 3px;
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 2px;
-    overflow: hidden;
-}
-
-.mods-download-tray-bar-fill {
-    height: 100%;
-    background: var(--primary, #22d3ee);
-    transition: width 150ms ease;
-}
-
-/* Detail panel — slide-over from the right edge with a scrim. */
-.mods-detail-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.55);
-    backdrop-filter: blur(2px);
-    display: flex;
-    justify-content: flex-end;
-    z-index: 50;
-    animation: modsDetailFade 160ms ease-out;
-}
-
-/* The HTML `hidden` attribute normally sets display:none via the user-agent
-   stylesheet, but the .mods-detail-backdrop class's display:flex wins by
-   specificity. Re-assert display:none when hidden so the panel stays closed
-   until openDetail() clears the attribute. */
-.mods-detail-backdrop[hidden] {
-    display: none;
-}
-
-/* Any mods-view element whose CSS class sets a non-block display
-   (grid/flex) also needs the hidden attribute re-asserted. Covers
-   mods-detail-fact (grid), mods-detail-actions, mods-detail-screenshots
-   (grid), and the two fact rows toggled by openDetail. */
-.mods-detail-fact[hidden],
-.mods-detail-actions[hidden],
-.mods-detail-screenshots[hidden],
-.mods-detail-section[hidden] {
-    display: none;
-}
-
-@keyframes modsDetailFade {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-.mods-detail {
-    width: min(520px, 100%);
-    height: 100%;
-    background: #15181c;
-    border-left: 1px solid rgba(255, 255, 255, 0.08);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    animation: modsDetailSlide 220ms cubic-bezier(0.2, 0.7, 0.3, 1);
-}
-
-@keyframes modsDetailSlide {
-    from { transform: translateX(40px); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
-}
-
-.mods-detail-header {
-    display: grid;
-    grid-template-columns: 48px 1fr auto;
-    gap: 12px;
-    align-items: center;
-    padding: 20px 24px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.mods-detail-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.05);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.75);
-    overflow: hidden;
-}
-
-.mods-detail-icon img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.mods-detail-name {
-    margin: 0 0 2px;
-    font-size: 18px;
-    font-weight: 600;
-    letter-spacing: 0.1px;
-}
-
-.mods-detail-byline {
-    margin: 0;
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.55);
-}
-
-.mods-detail-close {
-    background: transparent;
-    color: rgba(255, 255, 255, 0.7);
-    border: none;
-    width: 32px;
-    height: 32px;
-    font-size: 22px;
-    cursor: pointer;
-    border-radius: 8px;
-    transition: background 120ms ease, color 120ms ease;
-}
-
-.mods-detail-close:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: #fff;
-}
-
-.mods-detail-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 20px 24px 32px;
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-}
-
-.mods-detail-section-title {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: rgba(255, 255, 255, 0.55);
-    margin: 0 0 10px;
-    font-weight: 600;
-}
-
-.mods-detail-description {
-    font-size: 13.5px;
-    line-height: 1.6;
-    color: rgba(255, 255, 255, 0.82);
-    white-space: pre-wrap;
-}
-
-.mods-detail-screenshots {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 8px;
-}
-
-.mods-detail-screenshots img {
-    width: 100%;
-    aspect-ratio: 16 / 10;
-    object-fit: cover;
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.mods-detail-facts {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    margin: 0;
-}
-
-.mods-detail-fact {
-    display: grid;
-    grid-template-columns: 140px 1fr;
-    gap: 12px;
-    font-size: 13px;
-}
-
-.mods-detail-fact dt {
-    color: rgba(255, 255, 255, 0.5);
-    font-weight: 500;
-}
-
-.mods-detail-fact dd {
-    margin: 0;
-    color: rgba(255, 255, 255, 0.9);
-    word-break: break-word;
-}
-
-.mods-detail-actions {
-    margin-top: 14px;
-}
-
-.mods-detail-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
-    border-radius: 8px;
-    background: rgba(34, 211, 238, 0.12);
-    color: var(--primary, #22d3ee);
-    text-decoration: none;
-    font-size: 13px;
-    font-weight: 500;
-    transition: background 120ms ease;
-}
-
-.mods-detail-link:hover {
-    background: rgba(34, 211, 238, 0.2);
-}
-
-.mods-detail-link::after {
-    content: '→';
-    font-weight: 400;
-}
-
-/* Row body becomes clickable (outside action buttons) for drill-in. */
-.mods-row-body {
-    cursor: pointer;
-}
-
-/* Tablet and mobile: detail panel takes full width. */
-@media (max-width: 720px) {
-    .mods-detail {
-        width: 100%;
-        border-left: none;
-    }
-    .mods-detail-fact {
-        grid-template-columns: 1fr;
-        gap: 2px;
-    }
-}
-
-/* ========================================================================
-   Modal shell — mods.html is injected into #mods-modal and opened from the
-   top-right toolbar button. Matches the scrim/centered-card pattern used
-   by #add-account-modal and the leaderboard consent dialog.
-   ======================================================================== */
-
-.mods-modal {
-    position: fixed;
-    inset: 0;
-    z-index: 2800;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.72);
-    backdrop-filter: blur(8px);
-    animation: modsDetailFade 160ms ease-out;
-}
-
-.mods-modal[hidden] {
-    display: none;
-}
-
-.mods-modal-shell {
-    position: relative;
-    width: min(1100px, calc(100vw - 48px));
-    max-height: calc(100vh - 64px);
-    background: #11151b;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 14px;
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    animation: modsModalIn 220ms cubic-bezier(0.2, 0.7, 0.3, 1);
-}
-
-@keyframes modsModalIn {
-    from { transform: translateY(16px) scale(0.985); opacity: 0; }
-    to { transform: translateY(0) scale(1); opacity: 1; }
-}
-
-/* Titlebar — sits at the very top of the mods content, Windows-style:
-   title on the left, × on the right. Styled to match the main launcher's
-   window controls so the modal feels like a native sub-window. */
-.mods-titlebar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 6px 10px 6px 28px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    background: rgba(12, 16, 22, 0.6);
-}
-
-.mods-titlebar .mods-title {
-    font-size: 17px;
-    font-weight: 600;
-    margin: 0;
-    letter-spacing: 0.2px;
-}
-
-.mods-titlebar-close {
-    width: 44px;
-    height: 32px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    border: none;
-    border-radius: 6px;
-    background: transparent;
-    color: rgba(255, 255, 255, 0.75);
-    cursor: pointer;
-    transition: background 120ms ease, color 120ms ease;
-}
-
-.mods-titlebar-close svg {
-    width: 16px;
-    height: 16px;
-}
-
-.mods-titlebar-close:hover {
-    background: #e81123;
-    color: #fff;
-}
-
-/* Second row under the titlebar, containing the Add/Open buttons. */
-.mods-toolbar-row {
-    display: flex;
-    justify-content: flex-end;
-    padding: 0 28px;
-    -webkit-app-region: no-drag;
-}
-
-.mods-modal-content {
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    -webkit-app-region: no-drag;
-}
-
-/* Inside the modal, the mods page cap-width is already capped by the
-   shell; the titlebar owns its own spacing so drop the top padding. */
-.mods-modal #mods-page {
-    padding: 0 0 14px;
-    max-width: none;
-    min-height: 100%;
-}
-
-.mods-modal .mods-container {
-    gap: 0;
-    min-height: 100%;
-}
-
-/* The old mods-page headers lived at padding 32px — keep the rest of the
-   content at the same inset but no longer top-offset the titlebar. */
-.mods-modal .mods-tabs,
-.mods-modal .mods-toolbar,
-.mods-modal .mods-filters-row,
-.mods-modal .mods-pane,
-.mods-modal .mods-download-tray,
-.mods-modal .mods-empty {
-    margin-left: 28px;
-    margin-right: 28px;
-}
-
-.mods-modal .mods-workspace-header .mods-tabs,
-.mods-modal .mods-workspace-header .mods-toolbar,
-.mods-modal .mods-workspace-header .mods-filters-row {
-    margin-left: 0;
-    margin-right: 0;
-}
-
-.mods-modal .mods-tabs {
-    margin-top: 0;
-}
-
-.mods-modal .mods-toolbar {
-    margin-top: 12px;
-}
-
-.mods-modal .mods-filters-row {
-    margin-top: 12px;
-}
-
-@media (max-width: 900px) {
-    .mods-filters-row {
-        grid-template-columns: 1fr;
-        justify-items: start;
-    }
-
-    .mods-filters-divider {
-        display: none;
-    }
-
-    .mods-category-row {
-        padding-left: 0;
-    }
-}
-
-.mods-modal .mods-pane {
-    min-height: 0;
-    padding-right: 16px;
-    margin-right: -10px;
-    padding-top: 2px;
-}
-
-.mods-modal .mods-pane.active {
-    display: flex;
-    flex: 1 1 auto;
-    overflow-y: auto;
-    scrollbar-width: auto;
-    scrollbar-color: rgba(125, 211, 252, 0.95) rgba(13, 17, 24, 0.92);
-}
-
-.mods-modal .mods-pane.active::-webkit-scrollbar {
-    width: 22px;
-}
-
-.mods-modal .mods-pane.active::-webkit-scrollbar-track {
-    background: linear-gradient(180deg, rgba(13, 17, 24, 0.98), rgba(17, 21, 27, 0.82));
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 999px;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
-    margin-block: 4px;
-}
-
-.mods-modal .mods-pane.active::-webkit-scrollbar-thumb {
-    min-height: 56px;
-    background: linear-gradient(180deg, rgba(224, 242, 254, 1), rgba(56, 189, 248, 0.82));
-    border: 5px solid rgba(17, 21, 27, 0.78);
-    border-radius: 999px;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24), 0 0 0 1px rgba(15, 23, 42, 0.22), 0 0 16px rgba(34, 211, 238, 0.2);
-}
-
-.mods-modal .mods-pane.active::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, rgba(240, 249, 255, 1), rgba(34, 211, 238, 0.9));
-    box-shadow: inset 0 0 0 1px rgba(240, 249, 255, 0.48), 0 0 22px rgba(34, 211, 238, 0.34);
-}
-
-.mods-modal .mods-pane.active::-webkit-scrollbar-thumb:active {
-    background: linear-gradient(180deg, rgba(125, 211, 252, 1), rgba(2, 132, 199, 0.92));
-}
-
-/* ========================================================================
-   First-launch onboarding — one-shot dialog before the user's first Launch
-   after upgrading. Dismissal sets localStorage.mods_onboarding_seen=true.
-   ======================================================================== */
-
-.mods-onboarding-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 3100;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.78);
-    backdrop-filter: blur(6px);
-    animation: modsDetailFade 180ms ease-out;
-}
-
-.mods-onboarding-backdrop[hidden] {
-    display: none;
-}
-
-.mods-onboarding-card {
-    width: min(420px, calc(100vw - 48px));
-    padding: 28px 28px 22px;
-    background: #151a22;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 14px;
-    box-shadow: 0 28px 60px rgba(0, 0, 0, 0.6);
-    text-align: center;
-    animation: modsModalIn 260ms cubic-bezier(0.2, 0.7, 0.3, 1);
-}
-
-.mods-onboarding-icon {
-    width: 56px;
-    height: 56px;
-    margin: 0 auto 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(34, 211, 238, 0.12);
-    color: var(--primary, #22d3ee);
-    border-radius: 14px;
-}
-
-.mods-onboarding-icon svg {
-    width: 26px;
-    height: 26px;
-}
-
-.mods-onboarding-title {
-    margin: 0 0 8px;
-    font-size: 20px;
-    font-weight: 600;
-    color: #fff;
-}
-
-.mods-onboarding-body {
-    margin: 0 0 20px;
-    font-size: 13.5px;
-    line-height: 1.55;
-    color: rgba(255, 255, 255, 0.78);
-}
-
-.mods-onboarding-actions {
-    display: flex;
-    gap: 8px;
-    justify-content: center;
-}
-
-.mods-onboarding-btn {
-    height: 38px;
-    padding: 0 18px;
-    font-size: 13px;
-    font-weight: 500;
-    border-radius: 10px;
-    cursor: pointer;
-    transition: background 120ms ease, transform 120ms ease;
-    border: 1px solid transparent;
-}
-
-.mods-onboarding-btn.secondary {
-    background: rgba(255, 255, 255, 0.06);
-    color: rgba(255, 255, 255, 0.82);
-    border-color: rgba(255, 255, 255, 0.08);
-}
-
-.mods-onboarding-btn.secondary:hover {
-    background: rgba(255, 255, 255, 0.12);
-}
-
-.mods-onboarding-btn.primary {
-    background: var(--primary, #22d3ee);
-    color: #0b1117;
-}
-
-.mods-onboarding-btn.primary:hover {
-    filter: brightness(1.05);
-    transform: translateY(-1px);
-}
-
-.mods-onboarding-btn.danger {
-    background: #ef4444;
-    color: #fff;
-}
-
-.mods-onboarding-btn.danger:hover {
-    filter: brightness(1.05);
-    transform: translateY(-1px);
-}
-
-/* Custom confirm dialog — drops native window.confirm, which is
-   unreliable in WebView2. */
-.mods-confirm-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 4200;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.72);
-    backdrop-filter: blur(6px);
-    animation: modsDetailFade 140ms ease-out;
-}
-
-.mods-confirm-card {
-    width: min(380px, calc(100vw - 48px));
-    padding: 22px 22px 18px;
-    background: #151a22;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 12px;
-    box-shadow: 0 24px 50px rgba(0, 0, 0, 0.6);
-}
-
-.mods-confirm-title {
-    margin: 0 0 8px;
-    font-size: 16px;
-    font-weight: 600;
-    color: #fff;
-}
-
-.mods-confirm-body {
-    margin: 0 0 18px;
-    font-size: 13px;
-    line-height: 1.5;
-    color: rgba(255, 255, 255, 0.72);
-}
-
-.mods-confirm-actions {
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
-}
-
-/* Row overflow popover — appears on "..." click, floats on top of the modal. */
+/* --- OVERFLOW POPOVER --- */
 .mods-row-popover {
-    z-index: 3200;
+    position: fixed;
+    z-index: 4000;
     min-width: 180px;
-    padding: 6px;
-    background: #181d26;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 10px;
-    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5);
+    padding: 8px;
+    background: rgba(20, 25, 34, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    animation: modsDetailFade 140ms ease-out;
+    gap: 4px;
+    animation: modsPopoverIn 0.2s ease-out;
+}
+
+@keyframes modsPopoverIn {
+    from { opacity: 0; transform: translateY(-10px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .mods-row-popover-item {
     all: unset;
     display: flex;
     align-items: center;
-    padding: 8px 12px;
-    border-radius: 6px;
+    padding: 10px 14px;
+    border-radius: 8px;
     font-size: 13px;
-    color: rgba(255, 255, 255, 0.88);
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.8);
     cursor: pointer;
-    transition: background 100ms ease;
+    transition: all 0.15s ease;
 }
 
 .mods-row-popover-item:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(34, 211, 238, 0.1);
+    color: var(--mods-accent);
 }
 
-.mods-row-popover-item.danger {
-    color: #f87171;
-}
+.mods-row-popover-item.danger { color: #f87171; }
+.mods-row-popover-item.danger:hover { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
 
-.mods-row-popover-item.danger:hover {
-    background: rgba(248, 113, 113, 0.12);
-}
-
-/* ---- Row toggle (Enable/Disable) ---- */
-.mods-row-toggle {
-    display: inline-flex;
+/* --- CONFIRMATION & ONBOARDING --- */
+.mods-confirm-backdrop,
+.mods-onboarding-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 5000;
+    display: flex;
     align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(16px);
+    animation: modsFadeIn 0.2s ease;
+}
+
+.mods-confirm-backdrop[hidden],
+.mods-onboarding-backdrop[hidden] {
+    display: none !important;
+}
+
+@keyframes modsFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.mods-confirm-card,
+.mods-onboarding-card {
+    width: min(400px, calc(100vw - 40px));
+    padding: 32px;
+    background: #0f131a;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    box-shadow: 0 40px 100px rgba(0, 0, 0, 0.8);
+    text-align: center;
+    animation: modsModalIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mods-onboarding-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(34, 211, 238, 0.1);
+    color: var(--mods-accent);
+    border-radius: 16px;
+}
+
+.mods-onboarding-icon svg { width: 32px; height: 32px; }
+
+.mods-confirm-title,
+.mods-onboarding-title {
+    font-size: 20px;
+    font-weight: 800;
+    margin: 0 0 12px;
+    color: #fff;
+}
+
+.mods-confirm-body,
+.mods-onboarding-body {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--mods-text-dim);
+    margin: 0 0 24px;
+}
+
+.mods-confirm-actions,
+.mods-onboarding-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.mods-onboarding-btn {
+    height: 44px;
+    padding: 0 24px;
+    font-size: 14px;
+    font-weight: 800;
+    border-radius: 12px;
     cursor: pointer;
-    user-select: none;
-}
-
-.mods-row-toggle input {
-    position: absolute;
-    width: 0; height: 0; opacity: 0;
-    pointer-events: none;
-}
-
-.mods-row-toggle-track {
-    position: relative;
-    width: 44px;
-    height: 24px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.12);
-    transition: background 140ms ease;
-}
-
-.mods-row-toggle-thumb {
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.9);
-    transition: transform 140ms cubic-bezier(0.2, 0.7, 0.3, 1);
-}
-
-.mods-row-toggle input:checked + .mods-row-toggle-track {
-    background: var(--primary, #22d3ee);
-}
-
-.mods-row-toggle input:checked + .mods-row-toggle-track .mods-row-toggle-thumb {
-    transform: translateX(20px);
-    background: #0b1117;
-}
-
-.mods-row-running-pill {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid transparent;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    margin-left: 8px;
-    padding: 2px 10px;
-    font-size: 11px;
-    color: #22d3ee;
-    background: rgba(34, 211, 238, 0.12);
-    border-radius: 999px;
+    justify-content: center;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
-.mods-row-running-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #22d3ee;
-    box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.5);
-    animation: modsRunPulse 1.4s ease-in-out infinite;
+.mods-onboarding-btn.primary { background: var(--mods-accent); color: #000 !important; box-shadow: 0 4px 15px var(--mods-accent-glow); }
+.mods-onboarding-btn.primary:hover { filter: brightness(1.1); transform: translateY(-2px); box-shadow: 0 6px 20px var(--mods-accent-glow); }
+.mods-onboarding-btn.secondary { background: rgba(255, 255, 255, 0.1); color: #fff !important; border-color: rgba(255, 255, 255, 0.2); }
+.mods-onboarding-btn.secondary:hover { background: rgba(255, 255, 255, 0.15); border-color: rgba(255, 255, 255, 0.3); transform: translateY(-2px); }
+
+/* --- DETAIL PANEL --- */
+.mods-detail-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    display: flex;
+    justify-content: flex-end;
+    z-index: 100;
 }
 
-@keyframes modsRunPulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.5); }
-    50%      { box-shadow: 0 0 0 4px rgba(34, 211, 238, 0); }
-}
+.mods-detail-backdrop[hidden] { display: none; }
 
-/* ---- Inline progress bar in the status cell ---- */
-.mods-row-progressbar {
+.mods-detail {
+    width: 500px;
+    max-width: 100%;
+    height: 100%;
+    background: #11151c;
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    min-width: 180px;
+    box-shadow: -20px 0 60px rgba(0, 0, 0, 0.5);
+    animation: modsDetailSlide 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modsDetailSlide { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+.mods-detail-header {
+    padding: 24px 32px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mods-detail-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px;
+}
+
+/* --- Modal Shell --- */
+.mods-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 2800;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(16px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mods-modal[hidden] {
+    display: none !important;
+}
+
+.mods-modal-shell {
+    width: 1080px;
+    max-width: calc(100vw - 64px);
+    height: 800px;
+    max-height: calc(100vh - 64px);
+    background: #0b0e14;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    box-shadow: 0 40px 120px rgba(0, 0, 0, 0.7);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: modsModalIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modsModalIn {
+    from { opacity: 0; transform: scale(0.97) translateY(20px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* --- Progress bar --- */
+.mods-row-progressbar {
+    width: 160px;
 }
 
 .mods-row-progressbar-track {
     height: 6px;
-    width: 100%;
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
     overflow: hidden;
+    margin-bottom: 6px;
 }
 
 .mods-row-progressbar-fill {
     height: 100%;
-    background: var(--primary, #22d3ee);
-    border-radius: 999px;
-    /* 300ms matches the Windows copy-dialog feel; anything slower looks
-       laggy at 5% steps, anything faster reads as a flicker. */
-    transition: width 300ms cubic-bezier(0.3, 0.7, 0.3, 1);
+    background: var(--mods-accent);
+    box-shadow: 0 0 10px var(--mods-accent-glow);
+    transition: width 0.3s ease;
 }
 
 .mods-row-progressbar-label {
     font-size: 11px;
-    color: rgba(255, 255, 255, 0.75);
+    color: var(--mods-text-dim);
     text-align: right;
-    font-variant-numeric: tabular-nums;
+    display: block;
+    font-weight: 700;
 }
 
-/* Download tray items use the same visual vocabulary as the inline bar. */
-.mods-download-tray-item-header {
+/* --- Toggle --- */
+.mods-row-toggle {
     display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    font-size: 12px;
+    align-items: center;
+    cursor: pointer;
 }
 
-.mods-download-tray-bytes {
-    font-size: 10.5px;
-    color: rgba(255, 255, 255, 0.45);
-    margin-top: 2px;
-    font-variant-numeric: tabular-nums;
+.mods-row-toggle input { display: none; }
+
+.mods-row-toggle-track {
+    width: 44px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 24px;
+    position: relative;
+    transition: all 0.3s ease;
 }
 
-.mods-download-tray-bar-fill {
-    transition: width 300ms cubic-bezier(0.3, 0.7, 0.3, 1);
+.mods-row-toggle-thumb {
+    width: 18px;
+    height: 18px;
+    background: #fff;
+    border-radius: 50%;
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mods-row-toggle input:checked + .mods-row-toggle-track {
+    background: var(--mods-accent);
+    box-shadow: 0 0 10px var(--mods-accent-glow);
+}
+
+.mods-row-toggle input:checked + .mods-row-toggle-track .mods-row-toggle-thumb {
+    transform: translateX(20px);
+    background: #000;
+}
+
+/* --- Empty State --- */
+.mods-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px;
+    color: var(--mods-text-dim);
+    text-align: center;
+    gap: 12px;
+}
+
+.mods-empty[hidden] {
+    display: none !important;
+}
+
+.mods-empty::before {
+    content: "!";
+    width: 40px; height: 40px;
+    border: 2px solid currentColor;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 800; opacity: 0.2;
 }

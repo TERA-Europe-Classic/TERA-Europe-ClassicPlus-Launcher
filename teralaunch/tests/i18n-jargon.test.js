@@ -8,11 +8,12 @@ import translations from '../src/translations.json' with { type: 'json' };
 //   - "composite"  → TERA package-system internals (CompositePackageMapper)
 //   - "mapper"     → internal override table; players don't need to know it exists
 //   - "sha"        → SHA-256 is an integrity algorithm, not a user concept
+//   - "tmm"        → internal tool / file-format shorthand, not a player concept
 //
 // Case-insensitive match. If a real translated sentence genuinely needs
 // one of these words (e.g. "Shanghai" contains "sha"), add it to the
 // allowlist with a rationale — not by weakening the blocklist.
-const JARGON_BLOCKLIST = ['composite', 'mapper', 'sha'];
+const JARGON_BLOCKLIST = ['composite', 'mapper', 'sha', 'tmm'];
 
 // Full-word-ish matches would let "shape" or "shared" through `sha`. We use
 // substring match (the PRD specifies the blocklist as literal strings) and
@@ -53,7 +54,7 @@ describe('i18n jargon blocklist (PRD 3.4.7)', () => {
     it('blocklist covers the current required terms', () => {
         // If someone edits the blocklist and drops a term, this test tells
         // them the PRD contract is now weaker than it's supposed to be.
-        expect(JARGON_BLOCKLIST).toEqual(['composite', 'mapper', 'sha']);
+        expect(JARGON_BLOCKLIST).toEqual(['composite', 'mapper', 'sha', 'tmm']);
     });
 
     it('detector flags a seeded leak in test input', () => {
@@ -62,11 +63,11 @@ describe('i18n jargon blocklist (PRD 3.4.7)', () => {
         const fixture = {
             xx: {
                 real_string: 'Plain English message with no jargon.',
-                leak_string: 'Patch the composite mapper after verification.',
+                leak_string: 'Patch the composite mapper using TMM.',
             },
         };
         const leaks = findJargonLeaks(fixture);
-        expect(leaks.length).toBe(2);
-        expect(new Set(leaks.map((l) => l.term))).toEqual(new Set(['composite', 'mapper']));
+        expect(leaks.length).toBe(3);
+        expect(new Set(leaks.map((l) => l.term))).toEqual(new Set(['composite', 'mapper', 'tmm']));
     });
 });

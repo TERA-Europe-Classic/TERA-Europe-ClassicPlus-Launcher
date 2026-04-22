@@ -1147,8 +1147,8 @@ fn parse_server_list_xml(xml: &str) -> Result<ServerList, Box<dyn std::error::Er
 
         // <server_stat> is hex: 0x80000000 = offline, anything else = available
         let server_stat_str = get_text("server_stat");
-        let server_stat_val = u64::from_str_radix(server_stat_str.trim_start_matches("0x"), 16)
-            .unwrap_or(0x80000000);
+        let server_stat_val =
+            u64::from_str_radix(server_stat_str.trim_start_matches("0x"), 16).unwrap_or(0x80000000);
         let is_available = (server_stat_val & 0x80000000) == 0;
 
         let popup = get_text("popup");

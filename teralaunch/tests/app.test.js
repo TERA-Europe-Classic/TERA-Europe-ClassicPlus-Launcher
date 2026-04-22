@@ -14,10 +14,41 @@ const mockAppWindow = {
 const mockMessage = vi.fn();
 const mockAsk = vi.fn();
 
+if (!globalThis.window) {
+    globalThis.window = {};
+}
+
+if (!globalThis.document) {
+    const createClassList = () => {
+        const values = new Set();
+        return {
+            add: vi.fn((name) => values.add(name)),
+            contains: vi.fn((name) => values.has(name)),
+            toggle: vi.fn((name, force) => {
+                if (force === undefined) {
+                    if (values.has(name)) {
+                        values.delete(name);
+                        return false;
+                    }
+                    values.add(name);
+                    return true;
+                }
+                if (force) values.add(name);
+                else values.delete(name);
+                return !!force;
+            }),
+        };
+    };
+    globalThis.document = {
+        body: { classList: createClassList() },
+        createElement: vi.fn(() => ({ classList: createClassList() })),
+    };
+}
+
 // Set up global Tauri mock.
 // v2 exposes invoke under `core`; keep `tauri` alias so any lingering
 // legacy-lookup paths still resolve until M3 fully deletes them.
-global.window.__TAURI__ = {
+globalThis.window.__TAURI__ = {
     core: { invoke: mockInvoke },
     tauri: { invoke: mockInvoke },
     event: { listen: mockListen },

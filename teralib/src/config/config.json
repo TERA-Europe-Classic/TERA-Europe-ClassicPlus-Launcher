@@ -1,10 +1,10 @@
 {
-        "API_BASE_URL": "http://192.168.1.128:8090",
-        "LOGIN_ACTION_URL": "http://192.168.1.128:8090/tera/LauncherLoginAction",
-        "GET_ACCOUNT_INFO_URL": "http://192.168.1.128:8090/tera/GetAccountInfoByUserNo",
-        "REGISTER_ACTION_URL": "http://192.168.1.128:8090/tera/LauncherSignupAction",
-        "MAINTENANCE_STATUS_URL": "http://192.168.1.128:8090/tera/LauncherMaintenanceStatus",
-        "SERVER_LIST_URL": "http://192.168.1.128:8090/tera/ServerList",
+        "API_BASE_URL": "http://157.90.107.2:8090",
+        "LOGIN_ACTION_URL": "http://157.90.107.2:8090/tera/LauncherLoginAction",
+        "GET_ACCOUNT_INFO_URL": "http://157.90.107.2:8090/tera/GetAccountInfoByUserNo",
+        "REGISTER_ACTION_URL": "http://157.90.107.2:8090/tera/LauncherSignupAction",
+        "MAINTENANCE_STATUS_URL": "http://157.90.107.2:8090/tera/LauncherMaintenanceStatus",
+        "SERVER_LIST_URL": "http://157.90.107.2:8090/tera/ServerList",
         "HASH_FILE_URL": "",
         "FILE_SERVER_URL": ""
 }

@@ -37,7 +37,7 @@ const URLS = {
   content: {
     news: "",
     patchNotes: "",
-    serverStatus: "http://192.168.1.128:8090/tera/ServerList?lang=en",
+    serverStatus: "http://157.90.107.2:8090/tera/ServerList?lang=en",
   },
 
   // External links
@@ -1516,9 +1516,16 @@ const App = {
           if (success) {
             this.updateAccountDisplay();
             this.updateLaunchButtonState();
+          } else {
+            // Auth refresh failed (server change, expired session, etc.)
+            // Clear stale auth so the user sees the login screen instead of
+            // a phantom-authenticated state that blocks the UI.
+            console.warn("Silent auth refresh failed — clearing stale auth state");
+            this.clearStaleAuthState();
           }
         } catch (e) {
           console.warn("Failed to auto-refresh auth for active account:", e);
+          this.clearStaleAuthState();
         }
       } else if (activeAccount) {
         // Have account but no credentials - still update display
@@ -1777,6 +1784,14 @@ const App = {
       openMods.addEventListener("click", () => {
         this.dismissModsOnboarding();
         if (window.ModsView?.open) window.ModsView.open();
+      });
+    }
+
+    const backdrop = document.getElementById("mods-onboarding");
+    if (backdrop && !backdrop.dataset.bound) {
+      backdrop.dataset.bound = "1";
+      backdrop.addEventListener("click", (e) => {
+        if (e.target === backdrop) this.dismissModsOnboarding();
       });
     }
   },
@@ -5096,15 +5111,6 @@ const App = {
       );
     }
 
-    // Safety-net trigger: if the user has never seen the Mods onboarding,
-    // show it once the authenticated home page is in view. The primary
-    // trigger is still the Launch click (handleLaunchGame), but rendering
-    // the dialog here as well guarantees it never gets missed due to timing
-    // or a stuck launch gate. The localStorage flag prevents double-showing.
-    if (this.state?.isAuthenticated && this.maybeShowModsOnboarding) {
-      try { this.maybeShowModsOnboarding(); } catch (_) { /* non-fatal */ }
-    }
-
     const repairButton = document.getElementById("check-game-files");
     if (repairButton) {
       repairButton.addEventListener("click", async (e) => {
@@ -5946,6 +5952,24 @@ const App = {
     if (typeof window.updateHeaderAuthState === "function") {
       window.updateHeaderAuthState(isAuthenticated, userName);
     }
+  },
+
+  /**
+   * Clears stale auth state when a silent auth refresh fails.
+   * This handles the case where the server URL changed (e.g. migration)
+   * and the stored credentials are no longer valid for the new server.
+   * Keeps the account list intact so the user can re-login without
+   * re-entering their username, but resets the session so the login
+   * screen is shown instead of a phantom-authenticated state.
+   */
+  clearStaleAuthState() {
+    localStorage.removeItem("authKey");
+    localStorage.removeItem("userName");
+    localStorage.removeItem("userNo");
+    localStorage.removeItem("characterCount");
+    localStorage.removeItem("permission");
+    localStorage.removeItem("privilege");
+    this.setState({ isAuthenticated: false });
   },
 
   /**
