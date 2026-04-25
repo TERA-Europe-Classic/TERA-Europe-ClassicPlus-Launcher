@@ -16,6 +16,7 @@ pub mod external_app;
 pub mod gpk;
 pub mod gpk_package;
 pub mod gpk_patch_applier;
+pub mod manifest_store;
 pub mod patch_derivation;
 pub mod patch_manifest;
 pub mod registry;
