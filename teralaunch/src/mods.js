@@ -498,9 +498,23 @@ const ModsView = {
         row.dataset.modId = entry.id;
         row.dataset.modKind = entry.kind;
         row.dataset.context = context;
-        const icon = entry.icon_url ? `<div class="mods-row-icon"><img class="mods-row-icon-img" src="${escapeHtml(entry.icon_url)}" alt="" /></div>` : '';
-        row.innerHTML = `${icon}<div class="mods-row-body"><div class="mods-row-title"><span class="mods-row-name">${escapeHtml(entry.name)}</span><span class="mods-row-author">${escapeHtml(entry.author || '')}</span></div>
-                         <div class="mods-row-desc">${escapeHtml(entry.description || '')}</div></div>
+        const thumbUrl = entry.featured_image
+            || (entry.screenshots && entry.screenshots[0])
+            || entry.icon_url
+            || '';
+        const thumbHtml = thumbUrl
+            ? `<img class="mods-row-thumb" src="${escapeHtml(thumbUrl)}" alt="" loading="lazy" />`
+            : `<div class="mods-row-thumb">${escapeHtml(toInitials(entry.name || entry.id))}</div>`;
+        const taglineText = entry.tagline || entry.description || entry.short_description || '';
+        const allTags = entry.tags || [];
+        const firstTags = allTags.slice(0, 2);
+        const moreCount = Math.max(0, allTags.length - 2);
+        const tagsHtml = (firstTags.length === 0 && moreCount === 0)
+            ? ''
+            : `<div class="mods-row-tags">${firstTags.map(t => `<span class="mods-row-tag">${escapeHtml(t)}</span>`).join('')}${moreCount > 0 ? `<span class="mods-row-tag">+${moreCount}</span>` : ''}</div>`;
+        row.innerHTML = `${thumbHtml}<div class="mods-row-body"><div class="mods-row-title"><span class="mods-row-name">${escapeHtml(entry.name)}</span><span class="mods-row-author">${escapeHtml(entry.author || '')}</span></div>
+                         <div class="mods-row-desc">${escapeHtml(taglineText)}</div>
+                         ${tagsHtml}</div>
                          <div class="mods-row-status">${this.buildStatusCell(entry, context)}</div>
                          <div class="mods-row-menu"><button class="mods-row-overflow" data-action="overflow">⋯</button></div>`;
         return row;
