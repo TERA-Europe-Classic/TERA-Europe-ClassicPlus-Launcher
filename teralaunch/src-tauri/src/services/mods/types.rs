@@ -110,6 +110,45 @@ pub struct ModEntry {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub credits: Option<String>,
 
+    /// One-line punchy hook (≤90 chars). Row cards display this; falls
+    /// back to short_description when missing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tagline: Option<String>,
+
+    /// Hero image at the top of the detail panel. 16:9 preferred, ≥1200w.
+    /// For restyles, this is the "after" shot.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub featured_image: Option<String>,
+
+    /// Restyles only — paired "before" shot for side-by-side compare.
+    /// Side-by-side panel only renders when both before_image and
+    /// featured_image are present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub before_image: Option<String>,
+
+    /// Searchable badges. e.g. ["minimap","quality-of-life","foglio"].
+    /// Distinct from `category` (single-string filter).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+
+    /// GPK files this mod replaces, e.g. ["S1UI_Chat2.gpk"]. Power-user
+    /// info shown in Details row.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub gpk_files: Vec<String>,
+
+    /// Markdown. "Conflicts with X", "Broken on patch Y". Rendered in a
+    /// yellow-tinted callout above the screenshot strip.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compatibility_notes: Option<String>,
+
+    /// Last patch the mod was confirmed working on, e.g. "patch 113".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_verified_patch: Option<String>,
+
+    /// Stub for future telemetry. UI does NOT render this yet.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub download_count: Option<u64>,
+
     /// Long, multi-paragraph description for the detail panel. Short
     /// `description` is used in the list row; this is the full README-style
     /// body shown when the user drills in.
@@ -172,6 +211,14 @@ impl ModEntry {
             enabled: false,
             license: None,
             credits: None,
+            tagline: None,
+            featured_image: None,
+            before_image: None,
+            tags: Vec::new(),
+            gpk_files: Vec::new(),
+            compatibility_notes: None,
+            last_verified_patch: None,
+            download_count: None,
             long_description: None,
             screenshots: Vec::new(),
         }
@@ -196,6 +243,14 @@ impl ModEntry {
             enabled: false,
             license: non_empty(&catalog.license),
             credits: non_empty(&catalog.credits),
+            tagline: None,
+            featured_image: None,
+            before_image: None,
+            tags: Vec::new(),
+            gpk_files: Vec::new(),
+            compatibility_notes: None,
+            last_verified_patch: None,
+            download_count: None,
             long_description: non_empty(&catalog.long_description),
             screenshots: catalog.screenshots.clone(),
         }
@@ -210,6 +265,46 @@ pub struct CatalogEntry {
     pub kind: ModKind,
     pub name: String,
     pub author: String,
+
+    /// One-line punchy hook (≤90 chars). Row cards display this; falls
+    /// back to short_description when missing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tagline: Option<String>,
+
+    /// Hero image at the top of the detail panel. 16:9 preferred, ≥1200w.
+    /// For restyles, this is the "after" shot.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub featured_image: Option<String>,
+
+    /// Restyles only — paired "before" shot for side-by-side compare.
+    /// Side-by-side panel only renders when both before_image and
+    /// featured_image are present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub before_image: Option<String>,
+
+    /// Searchable badges. e.g. ["minimap","quality-of-life","foglio"].
+    /// Distinct from `category` (single-string filter).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+
+    /// GPK files this mod replaces, e.g. ["S1UI_Chat2.gpk"]. Power-user
+    /// info shown in Details row.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub gpk_files: Vec<String>,
+
+    /// Markdown. "Conflicts with X", "Broken on patch Y". Rendered in a
+    /// yellow-tinted callout above the screenshot strip.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compatibility_notes: Option<String>,
+
+    /// Last patch the mod was confirmed working on, e.g. "patch 113".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_verified_patch: Option<String>,
+
+    /// Stub for future telemetry. UI does NOT render this yet.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub download_count: Option<u64>,
+
     pub short_description: String,
     #[serde(default)]
     pub long_description: String,
