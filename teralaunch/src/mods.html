@@ -98,6 +98,12 @@
         <!-- Detail Drill-down (Slide-over) -->
         <div class="mods-detail-backdrop" id="mods-detail-backdrop" hidden>
             <aside class="mods-detail" id="mods-detail" role="dialog" aria-modal="true" aria-labelledby="mods-detail-name">
+                <button class="mods-detail-close" id="mods-detail-close" aria-label="Close" data-translate-aria-label="MODS_ARIA_CLOSE">×</button>
+
+                <div class="mods-detail-hero" id="mods-detail-hero" hidden>
+                    <img class="mods-detail-hero-img" id="mods-detail-hero-img" alt="" />
+                </div>
+
                 <header class="mods-detail-header">
                     <div class="mods-detail-icon" id="mods-detail-icon"></div>
                     <div class="mods-detail-title-wrap">
@@ -107,21 +113,54 @@
                             <span id="mods-detail-author">—</span>
                             ·
                             <span id="mods-detail-version">—</span>
+                            <span id="mods-detail-category-pill" class="mods-detail-category-pill" hidden></span>
+                            <span id="mods-detail-size-text"></span>
                         </p>
+                        <div class="mods-detail-tags" id="mods-detail-tags" hidden></div>
                     </div>
-                    <button class="mods-detail-close" id="mods-detail-close" aria-label="Close" data-translate-aria-label="MODS_ARIA_CLOSE">×</button>
                 </header>
+
+                <div class="mods-detail-action-row" id="mods-detail-action-row">
+                    <div id="mods-detail-primary-action"></div>
+                    <button class="mods-detail-secondary-btn" id="mods-detail-open-settings" hidden data-translate="MODS_DETAIL_OPEN_SETTINGS">Open settings folder</button>
+                    <a class="mods-detail-secondary-btn" id="mods-detail-source-link" href="#" target="_blank" rel="noopener noreferrer" hidden>
+                        <span data-translate="MODS_DETAIL_VIEW_SOURCE">View source</span>
+                        <span aria-hidden="true">↗</span>
+                    </a>
+                </div>
+
                 <div class="mods-detail-body">
+                    <section class="mods-detail-callout" id="mods-detail-callout" hidden>
+                        <div class="mods-detail-callout-title" data-translate="MODS_DETAIL_COMPAT">Compatibility</div>
+                        <div class="mods-detail-callout-body" id="mods-detail-callout-body"></div>
+                    </section>
+
                     <section class="mods-detail-section" id="mods-detail-description-section">
                         <h3 class="mods-detail-section-title" data-translate="MODS_DETAIL_ABOUT">About</h3>
                         <div class="mods-detail-description" id="mods-detail-description"></div>
                     </section>
+
+                    <section class="mods-detail-section" id="mods-detail-beforeafter-section" hidden>
+                        <h3 class="mods-detail-section-title" data-translate="MODS_DETAIL_BEFORE_AFTER">Before / After</h3>
+                        <div class="mods-detail-beforeafter">
+                            <figure class="mods-detail-ba-side">
+                                <img id="mods-detail-before-img" alt="Before" />
+                                <figcaption data-translate="MODS_DETAIL_BEFORE">Before</figcaption>
+                            </figure>
+                            <figure class="mods-detail-ba-side">
+                                <img id="mods-detail-after-img" alt="After" />
+                                <figcaption data-translate="MODS_DETAIL_AFTER">After</figcaption>
+                            </figure>
+                        </div>
+                    </section>
+
                     <section class="mods-detail-section" id="mods-detail-screenshots-section" hidden>
                         <h3 class="mods-detail-section-title" data-translate="MODS_DETAIL_SCREENSHOTS">Screenshots</h3>
                         <div class="mods-detail-screenshots" id="mods-detail-screenshots"></div>
                     </section>
+
                     <section class="mods-detail-section">
-                        <h3 class="mods-detail-section-title" data-translate="MODS_DETAIL_CREDITS">Credits &amp; source</h3>
+                        <h3 class="mods-detail-section-title" data-translate="MODS_DETAIL_DETAILS">Details</h3>
                         <dl class="mods-detail-facts">
                             <div class="mods-detail-fact">
                                 <dt data-translate="MODS_DETAIL_AUTHOR">Author</dt>
@@ -131,19 +170,28 @@
                                 <dt data-translate="MODS_DETAIL_LICENSE">License</dt>
                                 <dd id="mods-detail-fact-license">—</dd>
                             </div>
+                            <div class="mods-detail-fact" id="mods-detail-fact-patch-row" hidden>
+                                <dt data-translate="MODS_DETAIL_LAST_VERIFIED">Last verified</dt>
+                                <dd id="mods-detail-fact-patch">—</dd>
+                            </div>
+                            <div class="mods-detail-fact" id="mods-detail-fact-gpkfiles-row" hidden>
+                                <dt data-translate="MODS_DETAIL_GPK_FILES">GPK files</dt>
+                                <dd id="mods-detail-fact-gpkfiles">—</dd>
+                            </div>
                             <div class="mods-detail-fact" id="mods-detail-fact-credits-row" hidden>
                                 <dt data-translate="MODS_DETAIL_ACKS">Acknowledgments</dt>
                                 <dd id="mods-detail-fact-credits">—</dd>
                             </div>
                         </dl>
-                        <div class="mods-detail-actions" id="mods-detail-link-row" hidden>
-                            <a class="mods-detail-link" id="mods-detail-source-link" href="#" target="_blank" rel="noopener noreferrer">
-                                <span data-translate="MODS_DETAIL_VIEW_SOURCE">View source</span>
-                            </a>
-                        </div>
                     </section>
                 </div>
             </aside>
+            <div class="mods-lightbox" id="mods-lightbox" hidden>
+                <button class="mods-lightbox-close" id="mods-lightbox-close" aria-label="Close lightbox">×</button>
+                <button class="mods-lightbox-nav prev" id="mods-lightbox-prev" aria-label="Previous">‹</button>
+                <img id="mods-lightbox-img" alt="" />
+                <button class="mods-lightbox-nav next" id="mods-lightbox-next" aria-label="Next">›</button>
+            </div>
         </div>
     </div>
 </main>
