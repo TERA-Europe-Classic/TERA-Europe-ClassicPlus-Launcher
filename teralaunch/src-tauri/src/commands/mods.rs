@@ -18,34 +18,45 @@ use crate::services::mods::{
     catalog::{self, CachedCatalog},
     external_app,
     gpk::{self, ModConflict},
-    patch_manifest,
+    gpk_patch_deploy, patch_manifest,
     registry::{get_external_apps_dir, get_gpk_dir, get_registry_path},
     types::{Catalog, CatalogEntry, ModEntry, ModKind, ModStatus},
 };
 use crate::state::mods_state;
 
+/// Rebuilds the on-disk GPK deploy state to match the registry. For each
+/// GPK mod runs disable_via_patch first to revert mapper + delete any
+/// standalone, then enable_via_patch for those marked enabled. The
+/// composite mapper is hard-restored from `.clean` once up front so a
+/// removed-from-registry-but-still-on-disk standalone redirect doesn't
+/// survive into the rebuild.
 fn rebuild_gpk_runtime_state() -> Result<(), String> {
     let game_root = resolve_game_root()?;
-    let gpk_dir = get_gpk_dir().ok_or_else(|| "Could not resolve GPK mods dir".to_string())?;
+    let app_root = patch_manifest::get_manifest_root()
+        .ok_or_else(|| "Could not resolve patch-manifest root directory".to_string())?;
     let installed = mods_state::list_mods()?;
-    for entry in installed
+    let gpk_mods: Vec<&ModEntry> = installed
         .iter()
-        .filter(|entry| matches!(entry.kind, ModKind::Gpk) && entry.enabled)
-    {
-        if let Some(note) = gpk_manifest_block_note(&entry.id, &entry.name)? {
-            return Err(note);
+        .filter(|entry| matches!(entry.kind, ModKind::Gpk))
+        .collect();
+
+    gpk::restore_clean_mapper_state(&game_root)?;
+
+    for entry in &gpk_mods {
+        if let Err(err) = gpk_patch_deploy::disable_via_patch(&game_root, &app_root, &entry.id) {
+            log::warn!(
+                "rebuild_gpk_runtime_state: disable_via_patch({}) failed: {err}",
+                entry.id
+            );
         }
     }
-    let items = installed
-        .into_iter()
-        .filter(|entry| matches!(entry.kind, ModKind::Gpk))
-        .map(|entry| gpk::RebuildItem {
-            source_gpk: gpk_dir.join(format!("{}.gpk", entry.id.replace('/', "_"))),
-            enabled: entry.enabled,
-            deployed_filename: entry.deployed_filename,
-        })
-        .collect::<Vec<_>>();
-    gpk::rebuild_gpk_state(&game_root, &items)
+
+    for entry in gpk_mods.iter().filter(|e| e.enabled) {
+        gpk_patch_deploy::enable_via_patch(&game_root, &app_root, &entry.id).map_err(|err| {
+            format!("Failed to re-enable GPK mod '{}': {err}", entry.id)
+        })?;
+    }
+    Ok(())
 }
 
 /// Returns the current list of installed mods.
@@ -137,39 +148,10 @@ struct GpkDeployOutcome {
     blocks_enable: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum GpkPatchManifestPreflight {
-    NoManifest,
-    CuratedPatchDetected,
-}
-
-fn gpk_curated_patch_note(mod_name: &str) -> String {
+fn gpk_unsupported_diff_fallback(mod_name: &str) -> String {
     format!(
-        "Curated patch artifacts are detected for '{mod_name}', but launcher-side patch application is not implemented yet. Legacy deployment is disabled for this mod."
+        "Mod '{mod_name}' could not be deployed via the patch-based flow. The mod may target a diff shape the launcher does not support yet (added exports, name/import drift, compressed packages, or class changes)."
     )
-}
-
-fn gpk_invalid_manifest_error(mod_name: &str, err: &str) -> String {
-    format!(
-        "Patch manifest for '{mod_name}' is invalid, so the launcher will not fall back to legacy deployment. Details: {err}"
-    )
-}
-
-fn preflight_gpk_patch_manifest(mod_id: &str) -> Result<GpkPatchManifestPreflight, String> {
-    match patch_manifest::load_manifest_for_mod(mod_id).map(|manifest| manifest.map(|_| ()))? {
-        Some(()) => Ok(GpkPatchManifestPreflight::CuratedPatchDetected),
-        None => Ok(GpkPatchManifestPreflight::NoManifest),
-    }
-}
-
-fn gpk_manifest_block_note(mod_id: &str, mod_name: &str) -> Result<Option<String>, String> {
-    match preflight_gpk_patch_manifest(mod_id) {
-        Ok(GpkPatchManifestPreflight::CuratedPatchDetected) => {
-            Ok(Some(gpk_curated_patch_note(mod_name)))
-        }
-        Err(err) => Ok(Some(gpk_invalid_manifest_error(mod_name, &err))),
-        Ok(GpkPatchManifestPreflight::NoManifest) => Ok(None),
-    }
 }
 
 /// Installs a mod from a catalog entry: download, verify, extract, register.
@@ -381,7 +363,7 @@ async fn install_gpk_mod(entry: CatalogEntry, window: tauri::Window) -> Result<M
                         deploy
                             .last_error
                             .clone()
-                            .unwrap_or_else(|| gpk_curated_patch_note(&entry.name)),
+                            .unwrap_or_else(|| gpk_unsupported_diff_fallback(&entry.name)),
                     );
                 } else {
                     finalize_installed_slot(
@@ -403,46 +385,23 @@ async fn install_gpk_mod(entry: CatalogEntry, window: tauri::Window) -> Result<M
     }
 }
 
-/// Tries to deploy a downloaded GPK to the game via gpk.rs. On success
-/// returns None (no message to surface). On any failure returns a
-/// human-readable explanation that the caller stashes in `last_error`
-/// so the user can see why the mod won't apply in-game yet.
+/// Tries to deploy a downloaded GPK via the patch-based flow:
+///   1. Resolve the target package name from the URL hint or GPK header.
+///   2. Extract vanilla bytes via `composite_extract` + `.clean` mapper.
+///   3. Diff vanilla vs modded → derive + persist a manifest.
+///   4. Apply the manifest, write patched bytes to CookedPC, redirect
+///      the composite mapper.
 ///
-/// Two install paths:
-///   1. **Footer-based** — `.gpk` carries a TMM-style footer → patch
-///      CompositePackageMapper.dat to route composites at the new file.
-///   2. **Legacy drop-in** — no footer → read the UE3 package
-///      FolderName from the GPK header and drop the file into
-///      `<game>/CookedPC/<name>.gpk`, backing up any existing vanilla
-///      file as `<name>.gpk.vanilla-bak`. Matches the pre-toolbox community
-///      convention where users manually dropped mods in by filename.
-///
-/// `download_url` is used to extract the real game-package filename when
-/// the on-disk name is an opaque catalog ID (e.g. `foglio1024.ui-remover-flight-gauge`).
+/// Diff shapes the Phase 1 applier doesn't support (added exports, name
+/// or import drift, compressed packages, class changes) are refused at
+/// step 3 with a clear error so the user sees the failure mode up front
+/// instead of a silently broken client.
 fn try_deploy_gpk(
     mod_id: &str,
-    mod_name: &str,
+    _mod_name: &str,
     source_gpk: &std::path::Path,
     download_url: Option<&str>,
 ) -> GpkDeployOutcome {
-    use crate::services::mods::gpk;
-    match preflight_gpk_patch_manifest(mod_id) {
-        Ok(GpkPatchManifestPreflight::CuratedPatchDetected) => {
-            return GpkDeployOutcome {
-                last_error: Some(gpk_curated_patch_note(mod_name)),
-                deployed_filename: None,
-                blocks_enable: true,
-            };
-        }
-        Err(err) => {
-            return GpkDeployOutcome {
-                last_error: Some(gpk_invalid_manifest_error(mod_name, &err)),
-                deployed_filename: None,
-                blocks_enable: true,
-            };
-        }
-        Ok(GpkPatchManifestPreflight::NoManifest) => {}
-    }
     let game_root = match resolve_game_root() {
         Ok(p) => p,
         Err(e) => {
@@ -456,51 +415,105 @@ fn try_deploy_gpk(
             };
         }
     };
-    // Extract the real game-package filename from the download URL.
-    // For catalog mods the on-disk name is an opaque ID like
-    // "foglio1024.ui-remover-flight-gauge", but the URL's last segment
-    // reveals the actual target (e.g. "S1UI_ProgressBar.gpk").
-    let url_hint = download_url.and_then(|url| {
-        url::Url::parse(url)
-            .ok()?
-            .path_segments()?
-            .last()
-            .map(str::to_string)
-    });
-    match gpk::install_gpk(&game_root, source_gpk) {
-        Ok(modfile) => GpkDeployOutcome {
-            last_error: None,
-            deployed_filename: Some(modfile.container),
-            blocks_enable: false,
-        },
-        Err(metadata_err) => {
-            // Footer-based deploy rejected the mod. Fall back to legacy
-            // filename-based install if the .gpk exposes a usable target
-            // through its UE3 header or source filename.
-            match gpk::install_legacy_gpk(&game_root, source_gpk, url_hint.as_deref()) {
-                Ok(installed_name) => {
-                    log::info!(
-                        "legacy drop-in install succeeded for {} as {}",
-                        source_gpk.display(),
-                        installed_name
-                    );
-                    GpkDeployOutcome {
-                        last_error: None,
-                        deployed_filename: Some(installed_name),
-                        blocks_enable: false,
-                    }
-                }
-                Err(legacy_err) => GpkDeployOutcome {
-                    last_error: Some(format!(
-                        "Downloaded, but deploy failed — metadata-based install: {metadata_err}; filename-based install: {legacy_err}. Mod file is at {}",
-                        source_gpk.display()
-                    )),
+
+    let app_root = match patch_manifest::get_manifest_root() {
+        Some(p) => p,
+        None => {
+            return GpkDeployOutcome {
+                last_error: Some(
+                    "Could not resolve patch-manifest root directory — install aborted".into(),
+                ),
+                deployed_filename: None,
+                blocks_enable: false,
+            };
+        }
+    };
+
+    let target_package_name =
+        match resolve_target_package_name(source_gpk, download_url) {
+            Some(name) => name,
+            None => {
+                return GpkDeployOutcome {
+                    last_error: Some(
+                        "Mod's target package name is not derivable from URL or GPK header — install aborted".into(),
+                    ),
                     deployed_filename: None,
                     blocks_enable: false,
-                },
+                };
+            }
+        };
+
+    let outcome = match gpk_patch_deploy::install_via_patch(
+        &game_root,
+        &app_root,
+        mod_id,
+        source_gpk,
+        &target_package_name,
+    ) {
+        Ok(o) => o,
+        Err(err) => {
+            return GpkDeployOutcome {
+                last_error: Some(format!(
+                    "Mod can't be installed via the patch-based deploy: {err}"
+                )),
+                deployed_filename: None,
+                blocks_enable: true,
+            };
+        }
+    };
+
+    if let Err(err) = gpk_patch_deploy::enable_via_patch(&game_root, &app_root, mod_id) {
+        // Roll the manifest back so disk and registry stay consistent.
+        let _ = gpk_patch_deploy::uninstall_via_patch(&game_root, &app_root, mod_id);
+        return GpkDeployOutcome {
+            last_error: Some(format!("Patch applied OK but enable failed: {err}")),
+            deployed_filename: None,
+            blocks_enable: true,
+        };
+    }
+
+    log::info!(
+        "patch-based install succeeded for {} as {}",
+        source_gpk.display(),
+        outcome.target_filename
+    );
+    GpkDeployOutcome {
+        last_error: None,
+        deployed_filename: Some(outcome.target_filename),
+        blocks_enable: false,
+    }
+}
+
+/// Resolves the inner package name (e.g. `"S1UI_ProgressBar"`) the mod
+/// targets. Catalog download URLs end in `<package>.gpk`; the URL hint is
+/// the most reliable source for catalog mods whose on-disk filename is an
+/// opaque catalog id. Falls back to the UE3 header's PackageName when no
+/// usable URL hint is available (e.g. `add_mod_from_file`).
+fn resolve_target_package_name(
+    source_gpk: &std::path::Path,
+    download_url: Option<&str>,
+) -> Option<String> {
+    let url_hint = download_url
+        .and_then(|url| url::Url::parse(url).ok())
+        .and_then(|u| u.path_segments().and_then(|s| s.last()).map(str::to_string));
+
+    if let Some(hint) = url_hint {
+        let stripped = hint.strip_suffix(".gpk").unwrap_or(&hint);
+        let trimmed = stripped.trim();
+        if !trimmed.is_empty() && !trimmed.eq_ignore_ascii_case("none") {
+            return Some(trimmed.to_string());
+        }
+    }
+
+    if let Ok(bytes) = std::fs::read(source_gpk) {
+        if let Some(folder) = gpk::extract_package_folder_name(&bytes) {
+            let trimmed = folder.trim();
+            if !trimmed.is_empty() && !trimmed.eq_ignore_ascii_case("none") {
+                return Some(trimmed.to_string());
             }
         }
     }
+    None
 }
 
 /// Reads the game root from the launcher's config.ini via the existing
@@ -759,12 +772,6 @@ fn external_launch_args(id: &str) -> Result<Vec<String>, String> {
 pub async fn enable_mod(id: String) -> Result<ModEntry, String> {
     let entry =
         mods_state::get_mod(&id)?.ok_or_else(|| format!("Mod '{}' is not installed", id))?;
-
-    if matches!(entry.kind, ModKind::Gpk) {
-        if let Some(note) = gpk_manifest_block_note(&entry.id, &entry.name)? {
-            return Err(note);
-        }
-    }
 
     let updated = mods_state::mutate(|reg| {
         let slot = reg
@@ -1283,61 +1290,57 @@ mod tests {
     }
 
     #[test]
-    fn gpk_patch_manifest_preflight_loads_manifest_from_mod_id() {
-        let source = include_str!("mods.rs");
-        let fn_start = source
-            .find("fn preflight_gpk_patch_manifest")
-            .expect("preflight helper present");
-        let fn_body = &source[fn_start..];
+    fn gpk_unsupported_diff_fallback_message_calls_out_phase1_limits() {
+        let note = gpk_unsupported_diff_fallback("UI Remover: Flight Gauge");
+        assert!(note.contains("UI Remover: Flight Gauge"));
+        assert!(note.contains("patch-based"));
         assert!(
-            fn_body.contains("patch_manifest::load_manifest_for_mod(mod_id)"),
-            "preflight helper must resolve manifests from the mod id so both catalog installs and local imports use the same lookup"
-        );
-        assert!(
-            fn_body.contains("Some(()) => Ok(GpkPatchManifestPreflight::CuratedPatchDetected)"),
-            "preflight helper must treat manifest presence as a fail-closed curated patch gate"
-        );
-        assert!(
-            fn_body.contains("None => Ok(GpkPatchManifestPreflight::NoManifest)"),
-            "preflight helper must preserve legacy deploy only when no manifest exists"
+            note.contains("added exports")
+                && note.contains("name/import drift")
+                && note.contains("compressed packages")
+                && note.contains("class changes"),
+            "fallback must enumerate the diff shapes the Phase 1 applier refuses so the user knows what's unsupported"
         );
     }
 
     #[test]
-    fn gpk_patch_manifest_preflight_returns_user_facing_curated_patch_note() {
-        let note = gpk_curated_patch_note("UI Remover: Flight Gauge");
-        assert!(note.contains("Curated patch artifacts are detected"));
-        assert!(note.contains("not implemented yet"));
-        assert!(note.contains("Legacy deployment is disabled"));
-    }
-
-    #[test]
-    fn gpk_patch_manifest_preflight_returns_user_facing_invalid_manifest_note() {
-        let err = "manifest parse failed".to_string();
-
-        let message = gpk_invalid_manifest_error("UI Remover: Flight Gauge", &err);
-        assert!(message.contains("invalid"));
-        assert!(message.contains("will not fall back to legacy deployment"));
-        assert!(message.contains("manifest parse failed"));
-    }
-
-    #[test]
-    fn try_deploy_gpk_checks_manifest_before_any_deploy_path() {
+    fn try_deploy_gpk_routes_through_patch_based_install() {
         let source = include_str!("mods.rs");
         let fn_start = source
             .find("fn try_deploy_gpk")
             .expect("try_deploy_gpk present");
-        let fn_body = &source[fn_start..];
-        let preflight_idx = fn_body
-            .find("preflight_gpk_patch_manifest(mod_id)")
-            .expect("try_deploy_gpk must preflight patch manifests");
-        let install_idx = fn_body
-            .find("gpk::install_gpk(&game_root, source_gpk)")
-            .expect("try_deploy_gpk must still attempt metadata deploy");
+        // Scope the assertion window to just the body of try_deploy_gpk
+        // (up to the next top-level fn) so it doesn't get confused by tests
+        // or comments that mention legacy symbols by name.
+        let fn_tail = &source[fn_start..];
+        let body_end = fn_tail[1..]
+            .find("\nfn ")
+            .map(|i| i + 1)
+            .unwrap_or(fn_tail.len());
+        let body = &fn_tail[..body_end];
+
+        let install_idx = body
+            .find("gpk_patch_deploy::install_via_patch")
+            .expect("try_deploy_gpk must call install_via_patch");
+        let enable_idx = body
+            .find("gpk_patch_deploy::enable_via_patch")
+            .expect("try_deploy_gpk must enable after install so the patched bytes land in CookedPC");
+        let rollback_idx = body
+            .find("gpk_patch_deploy::uninstall_via_patch")
+            .expect("try_deploy_gpk must roll back the manifest when enable fails so disk and registry stay consistent");
 
         assert!(
-            preflight_idx < install_idx,
-            "try_deploy_gpk must gate manifest handling before any metadata or legacy deploy path"
+            install_idx < enable_idx,
+            "install must run before enable in try_deploy_gpk"
+        );
+        assert!(
+            enable_idx < rollback_idx,
+            "uninstall fallback must come after the enable attempt"
+        );
+        assert!(
+            !body.contains("install_legacy_gpk")
+                && !body.contains("gpk::install_gpk("),
+            "try_deploy_gpk must not call the legacy whole-file install paths"
         );
     }
 
@@ -1363,7 +1366,7 @@ mod tests {
         finalize_blocked_gpk_slot(
             &mut slot,
             "1.0.0",
-            "Curated patch artifacts are detected".to_string(),
+            "patch-based deploy refused: unsupported diff shape".to_string(),
         );
 
         assert!(!slot.enabled);
@@ -1374,44 +1377,42 @@ mod tests {
         assert!(slot
             .last_error
             .unwrap_or_default()
-            .contains("Curated patch"));
+            .contains("patch-based deploy refused"));
     }
 
     #[test]
-    fn enable_mod_checks_manifest_gate_before_mutating_intent() {
-        let source = include_str!("mods.rs");
-        let fn_start = source
-            .find("pub async fn enable_mod")
-            .expect("enable_mod present");
-        let fn_body = &source[fn_start..];
-        let preflight_idx = fn_body
-            .find("gpk_manifest_block_note(&entry.id, &entry.name)")
-            .expect("enable_mod must check manifest gate");
-        let mutate_idx = fn_body
-            .find("mods_state::mutate(|reg| {")
-            .expect("enable_mod must still mutate registry on success");
-        assert!(
-            preflight_idx < mutate_idx,
-            "enable_mod must reject curated-manifest GPKs before mutating enabled intent"
-        );
-    }
-
-    #[test]
-    fn rebuild_gpk_runtime_state_checks_enabled_manifest_mods_first() {
+    fn rebuild_gpk_runtime_state_uses_per_mod_disable_then_enable() {
         let source = include_str!("mods.rs");
         let fn_start = source
             .find("fn rebuild_gpk_runtime_state")
             .expect("rebuild_gpk_runtime_state present");
         let fn_body = &source[fn_start..];
-        let gate_idx = fn_body
-            .find("gpk_manifest_block_note(&entry.id, &entry.name)")
-            .expect("rebuild must preflight enabled manifest-backed mods");
-        let rebuild_idx = fn_body
-            .find("gpk::rebuild_gpk_state(&game_root, &items)")
-            .expect("rebuild must still call service rebuild");
+
+        // Function body ends at the first top-level `fn` after our function start.
+        let body_end = fn_body[1..]
+            .find("\nfn ")
+            .or_else(|| fn_body[1..].find("\npub fn "))
+            .map(|i| i + 1)
+            .unwrap_or(fn_body.len());
+        let body = &fn_body[..body_end];
+
         assert!(
-            gate_idx < rebuild_idx,
-            "runtime rebuild must refuse curated-manifest mods before it reaches rebuild_gpk_state"
+            body.contains("restore_clean_mapper_state"),
+            "rebuild must hard-restore the mapper from .clean before per-mod operations"
+        );
+        let disable_idx = body
+            .find("gpk_patch_deploy::disable_via_patch")
+            .expect("rebuild must per-mod disable before enabling");
+        let enable_idx = body
+            .find("gpk_patch_deploy::enable_via_patch")
+            .expect("rebuild must per-mod enable after disabling");
+        assert!(
+            disable_idx < enable_idx,
+            "per-mod disable must run before per-mod enable in rebuild"
+        );
+        assert!(
+            !body.contains("rebuild_gpk_state(&game_root"),
+            "rebuild_gpk_runtime_state must not call the legacy rebuild_gpk_state"
         );
     }
 
