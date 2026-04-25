@@ -141,6 +141,7 @@ mod tests {
             download_count: None,
             long_description: None,
             screenshots: vec![],
+            compatible_arch: None,
         }
     }
 

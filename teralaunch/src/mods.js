@@ -538,7 +538,17 @@ const ModsView = {
     },
 
     buildStatusCell(entry, context) {
-        if (context === 'browse') return `<button class="mods-row-primary install" data-action="install">Install</button>`;
+        if (context === 'browse') {
+            // Catalog has confirmed this GPK is x32 (FileVersion 610) — old
+            // Classic 32-bit. Classic+ is v100.02 (x64). The byte layouts
+            // don't correspond and the engine's loader rejects them. Don't
+            // offer an Install button that the backend would refuse anyway;
+            // surface incompatibility up front.
+            if (entry.compatible_arch === 'x32') {
+                return `<span class="mods-row-state-pill incompatible" title="Authored for old TERA Classic (32-bit). Classic+ is v100.02 (64-bit). Mod is binary-incompatible — needs an x64 rebuild from the author.">32-bit only</span>`;
+            }
+            return `<button class="mods-row-primary install" data-action="install">Install</button>`;
+        }
         const download = this.state.downloads.get(entry.id);
         if (download) return this.buildProgressBar(download.progress || 0);
         if (this.isCuratedPatchBlocked(entry)) {

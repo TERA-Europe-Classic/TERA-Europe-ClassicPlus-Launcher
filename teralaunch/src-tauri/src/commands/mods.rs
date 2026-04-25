@@ -1185,6 +1185,7 @@ mod tests {
             download_count: None,
             long_description: None,
             screenshots: Vec::new(),
+            compatible_arch: None,
         }
     }
 

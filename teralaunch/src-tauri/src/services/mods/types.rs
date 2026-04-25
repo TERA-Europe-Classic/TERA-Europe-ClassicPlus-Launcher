@@ -159,6 +159,13 @@ pub struct ModEntry {
     /// catalog base.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub screenshots: Vec<String>,
+
+    /// `Some("x32")` (FileVersion 610, old Classic) or `Some("x64")` (897,
+    /// v100.02) when the catalog has confirmed the binary arch of the GPK,
+    /// `None` when unknown. The Browse-tab UI surfaces an "incompatible"
+    /// badge when this disagrees with the client's arch (Classic+ is x64).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compatible_arch: Option<String>,
 }
 
 impl ModEntry {
@@ -221,6 +228,7 @@ impl ModEntry {
             download_count: None,
             long_description: None,
             screenshots: Vec::new(),
+            compatible_arch: None,
         }
     }
 
@@ -253,6 +261,7 @@ impl ModEntry {
             download_count: catalog.download_count,
             long_description: non_empty(&catalog.long_description),
             screenshots: catalog.screenshots.clone(),
+            compatible_arch: catalog.compatible_arch.clone(),
         }
     }
 }
@@ -304,6 +313,12 @@ pub struct CatalogEntry {
     /// Stub for future telemetry. UI does NOT render this yet.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub download_count: Option<u64>,
+
+    /// `Some("x32")` (FileVersion 610) or `Some("x64")` (897); `None` when
+    /// the catalog hasn't confirmed it. Lets the launcher refuse / warn on
+    /// arch mismatch before download.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compatible_arch: Option<String>,
 
     pub short_description: String,
     #[serde(default)]
@@ -470,6 +485,7 @@ mod tests {
             settings_folder: None,
             target_patch: None,
             composite_flag: None,
+            compatible_arch: None,
             updated_at: "".into(),
         };
         let entry = ModEntry::from_catalog(&catalog);
@@ -481,6 +497,25 @@ mod tests {
         assert_eq!(entry.compatibility_notes.as_deref(), Some("note"));
         assert_eq!(entry.last_verified_patch.as_deref(), Some("patch 113"));
         assert_eq!(entry.download_count, Some(100));
+    }
+
+    #[test]
+    fn catalog_entry_round_trips_compatible_arch() {
+        let json = r#"{
+            "id": "test.x32",
+            "kind": "gpk",
+            "name": "x32 mod",
+            "author": "old-author",
+            "short_description": "Old Classic GPK",
+            "version": "1.0.0",
+            "download_url": "https://example.com/x.gpk",
+            "sha256": "abcd",
+            "compatible_arch": "x32"
+        }"#;
+        let entry: CatalogEntry = serde_json::from_str(json).unwrap();
+        assert_eq!(entry.compatible_arch.as_deref(), Some("x32"));
+        let mod_entry = ModEntry::from_catalog(&entry);
+        assert_eq!(mod_entry.compatible_arch.as_deref(), Some("x32"));
     }
 
     #[test]
@@ -515,6 +550,7 @@ mod tests {
             settings_folder: None,
             target_patch: Some("v100.02".into()),
             composite_flag: Some(true),
+            compatible_arch: Some("x64".into()),
             updated_at: "2026-04-18".into(),
         };
         let entry = ModEntry::from_catalog(&catalog);
@@ -556,6 +592,7 @@ mod tests {
             settings_folder: None,
             target_patch: None,
             composite_flag: None,
+            compatible_arch: None,
             updated_at: "".into(),
         };
         let entry = ModEntry::from_catalog(&catalog);
