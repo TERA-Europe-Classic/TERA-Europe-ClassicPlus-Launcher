@@ -53,17 +53,17 @@ def fetch(url: str) -> Optional[GithubMeta]:
     )
     last_commit_date = last_commit.stdout.strip() if last_commit.returncode == 0 and last_commit.stdout else ""
 
-    # Try main, then master
+    # GH's /readme endpoint resolves the README regardless of branch or
+    # filename casing (Readme.md, readme.MD, README.rst all work). Returns
+    # base64-encoded content; jq decodes it.
     readme = ""
-    for branch in ("main", "master"):
-        r = subprocess.run(
-            ["curl", "-fsSL",
-             f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/README.md"],
-            capture_output=True, text=True, encoding="utf-8", errors="replace"
-        )
-        if r.returncode == 0 and r.stdout:
-            readme = r.stdout
-            break
+    api_readme = subprocess.run(
+        ["gh", "api", f"repos/{owner}/{repo}/readme",
+         "--jq", ".content | @base64d"],
+        capture_output=True, text=True, encoding="utf-8", errors="replace"
+    )
+    if api_readme.returncode == 0 and api_readme.stdout:
+        readme = api_readme.stdout
 
     images = extract_image_urls(readme, owner, repo)
 
