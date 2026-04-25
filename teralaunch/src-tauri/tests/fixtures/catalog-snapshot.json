@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "updated_at": "2026-04-25T15:40:04Z",
   "mods": [
     {
@@ -3442,6 +3442,735 @@
         "classic-era",
         "cosmetic",
         "artexlib"
+      ]
+    },
+    {
+      "id": "foglio1024.modern-ui-community-window",
+      "kind": "gpk",
+      "name": "Modern UI: Community Window",
+      "author": "foglio1024",
+      "short_description": "Modernized friends and guild list community window with a cleaner layout.",
+      "long_description": "Modernized friends and guild list community window with a cleaner layout.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by foglio1024 at https://github.com/Foglio1024/tera-modern-ui. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/Foglio1024/tera-modern-ui/master/Modern_CommunityWindow/S1UI_CommunityWindow.gpk",
+      "sha256": "3428cd77b090f040d614ae81b1635b4d9a8762864c73eb01292b527d95d1bbf2",
+      "size_bytes": 625592,
+      "source_url": "https://github.com/Foglio1024/tera-modern-ui",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/Foglio1024/tera-modern-ui",
+      "gpk_files": [
+        "S1UI_CommunityWindow.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "foglio1024.modern-ui-ep-window",
+      "kind": "gpk",
+      "name": "Modern UI: EP Window",
+      "author": "foglio1024",
+      "short_description": "Modernized Elite Status (EP) window with refined visuals.",
+      "long_description": "Modernized Elite Status (EP) window with refined visuals.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by foglio1024 at https://github.com/Foglio1024/tera-modern-ui. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/Foglio1024/tera-modern-ui/master/Modern_EpWindow/S1UI_EpWindow.gpk",
+      "sha256": "622a400570ff60ab9050acf413d123c156550a4a23f3edbce16348a89b392ff4",
+      "size_bytes": 999310,
+      "source_url": "https://github.com/Foglio1024/tera-modern-ui",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/Foglio1024/tera-modern-ui",
+      "gpk_files": [
+        "S1UI_EpWindow.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "foglio1024.modern-ui-equipment-combine",
+      "kind": "gpk",
+      "name": "Modern UI: Equipment Combine",
+      "author": "foglio1024",
+      "short_description": "Modernized equipment combination popup.",
+      "long_description": "Modernized equipment combination popup.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by foglio1024 at https://github.com/Foglio1024/tera-modern-ui. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/Foglio1024/tera-modern-ui/master/Modern_EquipmentCombine/S1UI_EquipmentCombine.gpk",
+      "sha256": "4bee2c234ac07e28143ce8b687e3cf720d14a5607e365645851781fc576418e2",
+      "size_bytes": 1000867,
+      "source_url": "https://github.com/Foglio1024/tera-modern-ui",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/Foglio1024/tera-modern-ui",
+      "gpk_files": [
+        "S1UI_EquipmentCombine.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "foglio1024.modern-ui-equipment-upgrade",
+      "kind": "gpk",
+      "name": "Modern UI: Equipment Upgrade",
+      "author": "foglio1024",
+      "short_description": "Modernized equipment upgrade window.",
+      "long_description": "Modernized equipment upgrade window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by foglio1024 at https://github.com/Foglio1024/tera-modern-ui. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/Foglio1024/tera-modern-ui/master/Modern_EquipmentUpgrade/S1UI_EquipmentUpgrade.gpk",
+      "sha256": "6ec3b88a0ce9a251db5b4e49c2e172638e5402a4dd308b3175e6ce1703c04f48",
+      "size_bytes": 1471369,
+      "source_url": "https://github.com/Foglio1024/tera-modern-ui",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/Foglio1024/tera-modern-ui",
+      "gpk_files": [
+        "S1UI_EquipmentUpgrade.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "foglio1024.modern-ui-guild-window",
+      "kind": "gpk",
+      "name": "Modern UI: Guild Window",
+      "author": "foglio1024",
+      "short_description": "Modernized guild management window.",
+      "long_description": "Modernized guild management window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by foglio1024 at https://github.com/Foglio1024/tera-modern-ui. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/Foglio1024/tera-modern-ui/master/Modern_GuildWindow/S1UI_GuildWindow.gpk",
+      "sha256": "a0c9e0849c3d2b70c8778cec30f808d2ead1fd248822e457012980ed9c950fbd",
+      "size_bytes": 3646466,
+      "source_url": "https://github.com/Foglio1024/tera-modern-ui",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/Foglio1024/tera-modern-ui",
+      "gpk_files": [
+        "S1UI_GuildWindow.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "foglio1024.modern-ui-interaction-popup",
+      "kind": "gpk",
+      "name": "Modern UI: Interaction Popup",
+      "author": "foglio1024",
+      "short_description": "Modernized NPC interaction popup.",
+      "long_description": "Modernized NPC interaction popup.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by foglio1024 at https://github.com/Foglio1024/tera-modern-ui. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/Foglio1024/tera-modern-ui/master/Modern_InteractionPopup/S1UI_InteractionPopup.gpk",
+      "sha256": "d9d3c198b729cb1281e83353397185d3bbd113af2ed4447cb8a7519e1034e6bc",
+      "size_bytes": 638260,
+      "source_url": "https://github.com/Foglio1024/tera-modern-ui",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/Foglio1024/tera-modern-ui",
+      "gpk_files": [
+        "S1UI_InteractionPopup.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "foglio1024.modern-ui-minimap",
+      "kind": "gpk",
+      "name": "Modern UI: Minimap",
+      "author": "foglio1024",
+      "short_description": "Modernized minimap with cleaner visuals.",
+      "long_description": "Modernized minimap with cleaner visuals.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by foglio1024 at https://github.com/Foglio1024/tera-modern-ui. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/Foglio1024/tera-modern-ui/master/Modern_MiniMap/S1UI_MiniMap.gpk",
+      "sha256": "e1e7d7b3a670f8e54b5c0fc82dcfb0dcdbff7f89cf6ca379bdef2a8dd450fbc7",
+      "size_bytes": 811167,
+      "source_url": "https://github.com/Foglio1024/tera-modern-ui",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/Foglio1024/tera-modern-ui",
+      "gpk_files": [
+        "S1UI_MiniMap.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "foglio1024.modern-ui-parcel-post-log",
+      "kind": "gpk",
+      "name": "Modern UI: Parcel Post Log",
+      "author": "foglio1024",
+      "short_description": "Modernized parcel post (mail) log window.",
+      "long_description": "Modernized parcel post (mail) log window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by foglio1024 at https://github.com/Foglio1024/tera-modern-ui. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/Foglio1024/tera-modern-ui/master/Modern_ParcelPostLog/S1UI_ParcelPostLog.gpk",
+      "sha256": "f43c547074e7f97d3681c0bce4746dce20a4e9aa22f0614aa0c685fed036525b",
+      "size_bytes": 338633,
+      "source_url": "https://github.com/Foglio1024/tera-modern-ui",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/Foglio1024/tera-modern-ui",
+      "gpk_files": [
+        "S1UI_ParcelPostLog.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "foglio1024.modern-ui-production-create",
+      "kind": "gpk",
+      "name": "Modern UI: Production Create Popup",
+      "author": "foglio1024",
+      "short_description": "Modernized crafting and production create popup.",
+      "long_description": "Modernized crafting and production create popup.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by foglio1024 at https://github.com/Foglio1024/tera-modern-ui. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/Foglio1024/tera-modern-ui/master/Modern_ProductionCreatePopUp/S1UI_ProductionCreatePopUp.gpk",
+      "sha256": "6e7ecc2b1df76cd5cdb44df1df04bfa638ee582f7680e6d6b2437bd09a1abe3f",
+      "size_bytes": 407842,
+      "source_url": "https://github.com/Foglio1024/tera-modern-ui",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/Foglio1024/tera-modern-ui",
+      "gpk_files": [
+        "S1UI_ProductionCreatePopUp.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "foglio1024.modern-ui-production-list",
+      "kind": "gpk",
+      "name": "Modern UI: Production List",
+      "author": "foglio1024",
+      "short_description": "Modernized crafting and production list window.",
+      "long_description": "Modernized crafting and production list window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by foglio1024 at https://github.com/Foglio1024/tera-modern-ui. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/Foglio1024/tera-modern-ui/master/Modern_ProductionList/S1UI_ProductionList.gpk",
+      "sha256": "865fdc54367490fcdfc4d39ccb4594b47bfd57ba621ec3b16db2e9b345ce2cf7",
+      "size_bytes": 601049,
+      "source_url": "https://github.com/Foglio1024/tera-modern-ui",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/Foglio1024/tera-modern-ui",
+      "gpk_files": [
+        "S1UI_ProductionList.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "foglio1024.modern-ui-servant-storage",
+      "kind": "gpk",
+      "name": "Modern UI: Servant Storage Window",
+      "author": "foglio1024",
+      "short_description": "Modernized servant storage (pet inventory) window.",
+      "long_description": "Modernized servant storage (pet inventory) window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by foglio1024 at https://github.com/Foglio1024/tera-modern-ui. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/Foglio1024/tera-modern-ui/master/Modern_ServantStorageWindow/S1UI_ServantStorageWindow.gpk",
+      "sha256": "5d2e065779667af8e2cf397a97e701a7f9b00b011a36cd068c282897e28573d5",
+      "size_bytes": 1208278,
+      "source_url": "https://github.com/Foglio1024/tera-modern-ui",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/Foglio1024/tera-modern-ui",
+      "gpk_files": [
+        "S1UI_ServantStorageWindow.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "foglio1024.modern-ui-store-window",
+      "kind": "gpk",
+      "name": "Modern UI: Store Window",
+      "author": "foglio1024",
+      "short_description": "Modernized in-game store window.",
+      "long_description": "Modernized in-game store window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by foglio1024 at https://github.com/Foglio1024/tera-modern-ui. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/Foglio1024/tera-modern-ui/master/Modern_StoreWindow/S1UI_StoreWindow.gpk",
+      "sha256": "35b4ab8dc5c9e2fb8d84c60f8ee83eec01a92af00c54f18744ab36bd63203797",
+      "size_bytes": 990386,
+      "source_url": "https://github.com/Foglio1024/tera-modern-ui",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/Foglio1024/tera-modern-ui",
+      "gpk_files": [
+        "S1UI_StoreWindow.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "foglio1024.modern-ui-system-option",
+      "kind": "gpk",
+      "name": "Modern UI: System Option",
+      "author": "foglio1024",
+      "short_description": "Modernized system options window.",
+      "long_description": "Modernized system options window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by foglio1024 at https://github.com/Foglio1024/tera-modern-ui. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/Foglio1024/tera-modern-ui/master/Modern_SystemOption/S1UI_SystemOption.gpk",
+      "sha256": "a217dffb600c226150bb0044bf2fdd32c2cadcaad44f5ff45f986b6b958f91af",
+      "size_bytes": 380168,
+      "source_url": "https://github.com/Foglio1024/tera-modern-ui",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/Foglio1024/tera-modern-ui",
+      "gpk_files": [
+        "S1UI_SystemOption.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "foglio1024.modern-ui-trade-popup",
+      "kind": "gpk",
+      "name": "Modern UI: Trade Popup",
+      "author": "foglio1024",
+      "short_description": "Modernized player-to-player trade popup.",
+      "long_description": "Modernized player-to-player trade popup.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by foglio1024 at https://github.com/Foglio1024/tera-modern-ui. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/Foglio1024/tera-modern-ui/master/Modern_TradePopup/S1UI_TradePopup.gpk",
+      "sha256": "710b4ef67886070da53fb13dc193756fa249c8489e7123cbe93b426fd3439fad",
+      "size_bytes": 366270,
+      "source_url": "https://github.com/Foglio1024/tera-modern-ui",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/Foglio1024/tera-modern-ui",
+      "gpk_files": [
+        "S1UI_TradePopup.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "saltymonkey.instant-join-tba-mode",
+      "kind": "gpk",
+      "name": "Instant join - TBA mode",
+      "author": "SaltyMonkey",
+      "short_description": "Skips the game mode selection screen and joins directly into TBA (Team Battle Arena) mode.",
+      "long_description": "Skips the game mode selection screen and joins directly into TBA (Team Battle Arena) mode.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "qol",
+      "license": "Unknown",
+      "credits": "Published by SaltyMonkey at https://github.com/SaltyMonkey/tera-online-instant-join-tba-mode. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/SaltyMonkey/tera-online-instant-join-tba-mode/master/S1UI_GameModeSelectScene.gpk",
+      "sha256": "ebd96e4d899a9a983c0ab4174450271dd2459024bcf151b0f72755fadafc58dd",
+      "size_bytes": 797482,
+      "source_url": "https://github.com/SaltyMonkey/tera-online-instant-join-tba-mode",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/SaltyMonkey/tera-online-instant-join-tba-mode",
+      "gpk_files": [
+        "S1UI_GameModeSelectScene.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "saltymonkey.instant-join-tera-mode",
+      "kind": "gpk",
+      "name": "Instant join - TERA mode",
+      "author": "SaltyMonkey",
+      "short_description": "Skips the game mode selection screen and joins directly into standard TERA mode.",
+      "long_description": "Skips the game mode selection screen and joins directly into standard TERA mode.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "qol",
+      "license": "Unknown",
+      "credits": "Published by SaltyMonkey at https://github.com/SaltyMonkey/tera-online-instant-join-tera-mode. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/SaltyMonkey/tera-online-instant-join-tera-mode/master/S1UI_GameModeSelectScene.gpk",
+      "sha256": "0e8310507b8925671a55dbc0576b9179b3155dc63831b4951a770117b4a4384b",
+      "size_bytes": 797482,
+      "source_url": "https://github.com/SaltyMonkey/tera-online-instant-join-tera-mode",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/SaltyMonkey/tera-online-instant-join-tera-mode",
+      "gpk_files": [
+        "S1UI_GameModeSelectScene.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "pantypon.dyeable-housekeeper-fix",
+      "kind": "gpk",
+      "name": "Dyeable Housekeeper Fix (PC_Event_19)",
+      "author": "pantypon",
+      "short_description": "Fixes the Housekeeper outfit so it accepts dyes correctly.",
+      "long_description": "Fixes the Housekeeper outfit so it accepts dyes correctly.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "cosmetic",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Dyeable%20Housekeeper%20Fix/PC_Event_19.gpk",
+      "sha256": "38e96646c98605b0df57ce2c2dcd27e3d226513505c8ce2d06434885844788ab",
+      "size_bytes": 23576619,
+      "source_url": "https://github.com/pantypon/tera-client-mods",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/pantypon/tera-client-mods",
+      "gpk_files": [
+        "PC_Event_19.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "pantypon.elin-dyeable-raincoat-match",
+      "kind": "gpk",
+      "name": "Elin Dyeable Raincoat Match (PC_Event_42A)",
+      "author": "pantypon",
+      "short_description": "Adjusts the Elin raincoat so its colors and dyes match across pieces.",
+      "long_description": "Adjusts the Elin raincoat so its colors and dyes match across pieces.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "cosmetic",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Elin%20Dyeable%20Raincoat%20Match/PC_Event_42A.gpk",
+      "sha256": "f6e3da92a725e6630a292dea5a37952ba7fc52eefc670d07f729c0b0be9542e7",
+      "size_bytes": 3619573,
+      "source_url": "https://github.com/pantypon/tera-client-mods",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/pantypon/tera-client-mods",
+      "gpk_files": [
+        "PC_Event_42A.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "pantypon.elin-pale-writer-shoes-fix",
+      "kind": "gpk",
+      "name": "Elin Pale Writer Shoes and Socks Fix (PC_Event_09)",
+      "author": "pantypon",
+      "short_description": "Pale-tone shoes and socks fix for the Elin Writer outfit.",
+      "long_description": "Pale-tone shoes and socks fix for the Elin Writer outfit.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "cosmetic",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Elin%20Pale%20Writer%20Shoes%20and%20Socks%20Fix/PC_Event_09.gpk",
+      "sha256": "8ed3101902af48440940b3c2985be7bc2acb83b6ba52746c0aa86f2f62659c72",
+      "size_bytes": 19415294,
+      "source_url": "https://github.com/pantypon/tera-client-mods",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/pantypon/tera-client-mods",
+      "gpk_files": [
+        "PC_Event_09.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "pantypon.elin-whiter-ice-cream-social",
+      "kind": "gpk",
+      "name": "Elin Whiter Dyeable Ice Cream Social (PC_Event_46)",
+      "author": "pantypon",
+      "short_description": "Whitens the Elin Ice Cream Social outfit and improves dye behaviour.",
+      "long_description": "Whitens the Elin Ice Cream Social outfit and improves dye behaviour.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "cosmetic",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Elin%20Whiter%20Dyeable%20Ice%20Cream%20Social/PC_Event_46.gpk",
+      "sha256": "3acd3a1cf6dcf57ccfee225b58387aa3dce7e4f0312f29d7e5be9bb7524cbe51",
+      "size_bytes": 14860278,
+      "source_url": "https://github.com/pantypon/tera-client-mods",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/pantypon/tera-client-mods",
+      "gpk_files": [
+        "PC_Event_46.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "pantypon.elin-whiter-raincoat-accents",
+      "kind": "gpk",
+      "name": "Elin Whiter Dyeable Raincoat Accents (PC_Event_42A)",
+      "author": "pantypon",
+      "short_description": "Whitens the dyeable accents on the Elin raincoat.",
+      "long_description": "Whitens the dyeable accents on the Elin raincoat.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "cosmetic",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Elin%20Whiter%20Dyeable%20Raincoat%20Accents/PC_Event_42A.gpk",
+      "sha256": "d4a145747381ce2b453ccef960faacc15861c012b194b25cacac0751e1b0b2f0",
+      "size_bytes": 3624058,
+      "source_url": "https://github.com/pantypon/tera-client-mods",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/pantypon/tera-client-mods",
+      "gpk_files": [
+        "PC_Event_42A.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "pantypon.ice-cream-black-pantyhose",
+      "kind": "gpk",
+      "name": "Ice Cream Social - Black Pantyhose (PC_Event_46)",
+      "author": "pantypon",
+      "short_description": "Adds black pantyhose plus dyeable shoes to the Ice Cream Social outfit.",
+      "long_description": "Adds black pantyhose plus dyeable shoes to the Ice Cream Social outfit.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "cosmetic",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Ice%20Cream%20Social%20Dyeable%20Shoes%20and%20Black%20Pantyhose/PC_Event_46.gpk",
+      "sha256": "94dd58aa26ed8002b6d1eb0fc6055a881983fad2873bbd9155b22fb6479cb74d",
+      "size_bytes": 14859320,
+      "source_url": "https://github.com/pantypon/tera-client-mods",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/pantypon/tera-client-mods",
+      "gpk_files": [
+        "PC_Event_46.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "pantypon.ice-cream-white-pantyhose-shoes",
+      "kind": "gpk",
+      "name": "Ice Cream Social - White Pantyhose and Shoes (PC_Event_46)",
+      "author": "pantypon",
+      "short_description": "Adds white pantyhose plus dyeable shoes to the Ice Cream Social outfit.",
+      "long_description": "Adds white pantyhose plus dyeable shoes to the Ice Cream Social outfit.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "cosmetic",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Ice%20Cream%20Social%20Dyeable%20Shoes%20and%20White%20Pantyhose/PC_Event_46.gpk",
+      "sha256": "f37ee083886626f2b6a2091ee0ba7e881665ad1fcd48e37c4d1a460d89f92c89",
+      "size_bytes": 14834674,
+      "source_url": "https://github.com/pantypon/tera-client-mods",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/pantypon/tera-client-mods",
+      "gpk_files": [
+        "PC_Event_46.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "pantypon.ice-cream-white-pantyhose",
+      "kind": "gpk",
+      "name": "Ice Cream Social - White Pantyhose (PC_Event_46)",
+      "author": "pantypon",
+      "short_description": "Adds plain white pantyhose to the Ice Cream Social outfit.",
+      "long_description": "Adds plain white pantyhose to the Ice Cream Social outfit.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "cosmetic",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Ice%20Cream%20Social%20White%20Pantyhose/PC_Event_46.gpk",
+      "sha256": "edea5684f170d0751611f310afdad0c01f2e063fa8770e6b131187c5e2ce9d46",
+      "size_bytes": 14852927,
+      "source_url": "https://github.com/pantypon/tera-client-mods",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/pantypon/tera-client-mods",
+      "gpk_files": [
+        "PC_Event_46.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "pantypon.whiter-jeans-and-jacket",
+      "kind": "gpk",
+      "name": "Whiter Dyeable Jeans and Jacket (PC_Event_32)",
+      "author": "pantypon",
+      "short_description": "Whitens the dyeable jeans and jacket outfit.",
+      "long_description": "Whitens the dyeable jeans and jacket outfit.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "cosmetic",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Whiter%20Dyeable%20Jeans%20and%20Jacket/PC_Event_32.gpk",
+      "sha256": "ac99598fe9c1fbedd4ae3ace20471b5cc79ae29d5379c9a675351177f8034717",
+      "size_bytes": 29468770,
+      "source_url": "https://github.com/pantypon/tera-client-mods",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/pantypon/tera-client-mods",
+      "gpk_files": [
+        "PC_Event_32.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "deathdefying.ui-remover-quest-tracker",
+      "kind": "gpk",
+      "name": "UI Remover: Quest Tracker",
+      "author": "DeathDefying",
+      "short_description": "Hides the on-screen quest tracker by replacing it with a stub package.",
+      "long_description": "Hides the on-screen quest tracker by replacing it with a stub package.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by DeathDefying at https://github.com/DeathDefying/UI-Remover. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/DeathDefying/UI-Remover/master/remove_QuestTracker/S1UI_QuestTaskInfo.gpk",
+      "sha256": "f269f57e7889046a386ad1a6029738a30ea777402ae12ab3860fe380d018fd2f",
+      "size_bytes": 100064,
+      "source_url": "https://github.com/DeathDefying/UI-Remover",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/DeathDefying/UI-Remover",
+      "gpk_files": [
+        "S1UI_QuestTaskInfo.gpk"
+      ],
+      "tags": [
+        "gpk"
+      ]
+    },
+    {
+      "id": "deathdefying.ui-remover-tera-rewards",
+      "kind": "gpk",
+      "name": "UI Remover: TERA Rewards",
+      "author": "DeathDefying",
+      "short_description": "Hides the TERA Rewards benefits widget by replacing it with a stub package.",
+      "long_description": "Hides the TERA Rewards benefits widget by replacing it with a stub package.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by DeathDefying at https://github.com/DeathDefying/UI-Remover. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/DeathDefying/UI-Remover/master/remove_TeraRewards/S1UI_Benefit.gpk",
+      "sha256": "f269f57e7889046a386ad1a6029738a30ea777402ae12ab3860fe380d018fd2f",
+      "size_bytes": 100064,
+      "source_url": "https://github.com/DeathDefying/UI-Remover",
+      "target_patch": "v100.02",
+      "composite_flag": true,
+      "updated_at": "2026-04-25T00:00:00Z",
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/1/DeathDefying/UI-Remover",
+      "gpk_files": [
+        "S1UI_Benefit.gpk"
+      ],
+      "tags": [
+        "gpk"
       ]
     }
   ]
