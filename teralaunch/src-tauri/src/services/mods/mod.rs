@@ -11,6 +11,7 @@
 //! ([`catalog`]) and the on-disk registry of installed mods ([`registry`]).
 
 pub mod catalog;
+pub mod composite_extract;
 pub mod external_app;
 pub mod gpk;
 pub mod gpk_package;
