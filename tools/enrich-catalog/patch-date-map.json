@@ -1,0 +1,11 @@
+{
+    "ranges": [
+        {"from": "2014-01-01", "patch": "patch 80"},
+        {"from": "2017-06-01", "patch": "patch 95"},
+        {"from": "2018-06-01", "patch": "patch 100"},
+        {"from": "2020-06-01", "patch": "patch 103"},
+        {"from": "2022-01-01", "patch": "patch 110"},
+        {"from": "2024-01-01", "patch": "patch 113"},
+        {"from": "2025-06-01", "patch": "patch 115"}
+    ]
+}
