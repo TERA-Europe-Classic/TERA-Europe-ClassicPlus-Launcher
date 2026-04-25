@@ -460,18 +460,28 @@ pub fn is_process_running(exe_name: &str) -> bool {
         .any(|p| process_name_matches(exe_name, &p.name().to_string_lossy()))
 }
 
-/// Sends a terminate signal to processes whose executable name matches.
-/// Best-effort; Windows processes that deny termination silently remain.
+/// Stops processes whose executable name matches. Windows posts WM_CLOSE
+/// first so WPF apps like ShinraMeter run their Closing handler and persist
+/// window position; falls back to TerminateProcess after the timeout.
 pub fn stop_process_by_name(exe_name: &str) -> Result<u32, String> {
     let mut system = System::new();
     system.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
-    let mut killed = 0u32;
+    let target = exe_name.to_ascii_lowercase();
+    let mut stopped = 0u32;
     for process in system.processes().values() {
-        if process_name_matches(exe_name, &process.name().to_string_lossy()) && process.kill() {
-            killed += 1;
+        let proc_name = process.name().to_string_lossy().to_ascii_lowercase();
+        if !process_name_matches(&target, &proc_name) {
+            continue;
+        }
+        #[cfg(windows)]
+        let killed = graceful_stop_process(process.pid().as_u32(), GRACEFUL_CLOSE_TIMEOUT_MS);
+        #[cfg(not(windows))]
+        let killed = process.kill();
+        if killed {
+            stopped += 1;
         }
     }
-    Ok(killed)
+    Ok(stopped)
 }
 
 fn process_name_matches(exe_name: &str, process_name: &str) -> bool {
@@ -484,6 +494,94 @@ fn process_name_matches(exe_name: &str, process_name: &str) -> bool {
     let target_stem = target.strip_suffix(".exe").unwrap_or(&target);
     let process_stem = process.strip_suffix(".exe").unwrap_or(&process);
     process_stem == target_stem
+}
+
+/// Window-message timeout for graceful close before falling back to
+/// `TerminateProcess`. WPF apps like ShinraMeter persist window position
+/// and user settings in their `Closing`/`Application.Exit` handlers; a
+/// hard kill bypasses those, dropping unsaved state. 3s is enough for
+/// Settings.Save() round-trips without making auto-stop feel laggy.
+const GRACEFUL_CLOSE_TIMEOUT_MS: u32 = 3000;
+
+/// Pure decision helper: should we fall back to `TerminateProcess` after
+/// posting WM_CLOSE? Yes if no windows took the message (background
+/// services, console-only processes), or if the process didn't exit
+/// within the timeout (overlay ignored WM_CLOSE).
+fn should_force_kill_fallback(windows_messaged: u32, graceful_exit: bool) -> bool {
+    windows_messaged == 0 || !graceful_exit
+}
+
+/// Graceful Windows process stop: post `WM_CLOSE` to every top-level
+/// window the PID owns, wait `timeout_ms` for natural exit, fall back
+/// to `TerminateProcess` if needed. Returns true once the PID is gone.
+#[cfg(windows)]
+fn graceful_stop_process(pid: u32, timeout_ms: u32) -> bool {
+    use winapi::shared::minwindef::{BOOL, FALSE, LPARAM, TRUE};
+    use winapi::shared::windef::HWND;
+    use winapi::um::handleapi::CloseHandle;
+    use winapi::um::processthreadsapi::{OpenProcess, TerminateProcess};
+    use winapi::um::synchapi::WaitForSingleObject;
+    use winapi::um::winbase::WAIT_OBJECT_0;
+    use winapi::um::winnt::{PROCESS_QUERY_INFORMATION, PROCESS_TERMINATE, SYNCHRONIZE};
+    use winapi::um::winuser::{EnumWindows, GetWindowThreadProcessId, PostMessageW, WM_CLOSE};
+
+    // SYNCHRONIZE for WaitForSingleObject; PROCESS_TERMINATE for the
+    // fallback; PROCESS_QUERY_INFORMATION reserved for future exit-code
+    // checks. FALSE = don't inherit the handle.
+    let access = SYNCHRONIZE | PROCESS_TERMINATE | PROCESS_QUERY_INFORMATION;
+    let handle = unsafe { OpenProcess(access, FALSE, pid) };
+    if handle.is_null() {
+        // Either the process exited between enumeration and OpenProcess,
+        // or the launcher lacks rights. Caller treats as "already gone".
+        return false;
+    }
+
+    struct EnumCtx {
+        pid: u32,
+        posted: u32,
+    }
+    let mut ctx = EnumCtx { pid, posted: 0 };
+
+    extern "system" fn cb(hwnd: HWND, lparam: LPARAM) -> BOOL {
+        // SAFETY: lparam is the &mut EnumCtx we passed to EnumWindows;
+        // EnumWindows is synchronous so the borrow doesn't outlive us.
+        let ctx = unsafe { &mut *(lparam as *mut EnumCtx) };
+        let mut win_pid: u32 = 0;
+        unsafe {
+            GetWindowThreadProcessId(hwnd, &mut win_pid);
+        }
+        if win_pid == ctx.pid {
+            unsafe {
+                PostMessageW(hwnd, WM_CLOSE, 0, 0);
+            }
+            ctx.posted = ctx.posted.saturating_add(1);
+        }
+        TRUE
+    }
+
+    unsafe {
+        EnumWindows(Some(cb), &mut ctx as *mut _ as LPARAM);
+    }
+
+    let graceful_exit = if ctx.posted > 0 {
+        unsafe { WaitForSingleObject(handle, timeout_ms) == WAIT_OBJECT_0 }
+    } else {
+        false
+    };
+
+    if should_force_kill_fallback(ctx.posted, graceful_exit) {
+        unsafe {
+            TerminateProcess(handle, 1);
+            // Brief wait so the kernel finalises teardown before we
+            // tell the caller the PID is gone.
+            WaitForSingleObject(handle, 1000);
+        }
+    }
+
+    unsafe {
+        CloseHandle(handle);
+    }
+    true
 }
 
 /// Joins the extracted root + a relative executable path from the catalog
@@ -558,6 +656,41 @@ mod tests {
     fn is_process_running_returns_false_for_garbage_name() {
         // A process name we're sure doesn't exist on any sane system.
         assert!(!is_process_running("zzzz_nonexistent_binary_name_qqqq.exe"));
+    }
+
+    // --- Graceful close fallback (WM_CLOSE → TerminateProcess) -------------
+    //
+    // Pins the policy contract: WPF apps like ShinraMeter persist window
+    // position only when their `OnClosing`/`Application.Exit` handlers
+    // run. Force-killing via TerminateProcess bypasses those handlers,
+    // so we post WM_CLOSE first and only fall back to TerminateProcess
+    // when the app has no top-level windows or ignores the message.
+
+    #[test]
+    fn force_kill_when_no_windows_received_message() {
+        // Background services / console apps own no top-level windows;
+        // WM_CLOSE goes nowhere, so the only way to stop them is
+        // TerminateProcess.
+        assert!(should_force_kill_fallback(0, false));
+        assert!(should_force_kill_fallback(0, true));
+    }
+
+    #[test]
+    fn no_force_kill_when_app_exited_gracefully() {
+        // App acknowledged WM_CLOSE within the timeout — settings
+        // were persisted via the .NET Closing handler. Don't terminate.
+        assert!(!should_force_kill_fallback(1, true));
+        assert!(!should_force_kill_fallback(5, true));
+    }
+
+    #[test]
+    fn force_kill_when_app_ignores_wm_close() {
+        // Posted WM_CLOSE to ≥1 window but the app didn't exit within
+        // the timeout (overlay hung, modal dialog blocking shutdown).
+        // Fall back to TerminateProcess so a stuck overlay can't keep
+        // the launcher waiting forever.
+        assert!(should_force_kill_fallback(1, false));
+        assert!(should_force_kill_fallback(10, false));
     }
 
     #[test]
