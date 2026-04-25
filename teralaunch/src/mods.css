@@ -357,13 +357,17 @@
 .mods-row-body { min-width: 0; }
 .mods-row-name { font-size: 16px; font-weight: 700; color: #fff; }
 .mods-row-author { font-size: 12px; color: var(--mods-text-dim); margin-left: 8px; }
-.mods-row-desc { 
-    font-size: 13px; 
-    color: rgba(255, 255, 255, 0.6); 
+.mods-row-desc {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.6);
     margin-top: 4px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.mods-row-desc.error {
+    color: rgba(255, 138, 138, 0.85);
 }
 
 .mods-row-status {

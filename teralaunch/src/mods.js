@@ -515,6 +515,14 @@ const ModsView = {
         // `⋯` menu wraps to row 2 col 1).
         if (!thumbHtml) row.classList.add('no-icon');
         const taglineText = entry.tagline || entry.description || entry.short_description || '';
+        // When an install/enable failed, show the actual error inline
+        // instead of the marketing tagline so the user can see why the
+        // Retry button is there. The full message is also added as a
+        // title attribute so the truncated ellipsis isn't a dead end.
+        const showError = entry.status === 'error' && entry.last_error;
+        const descText = showError ? entry.last_error : taglineText;
+        const descClass = showError ? 'mods-row-desc error' : 'mods-row-desc';
+        const descTitle = showError ? ` title="${escapeHtml(entry.last_error)}"` : '';
         const allTags = entry.tags || [];
         const firstTags = allTags.slice(0, 2);
         const moreCount = Math.max(0, allTags.length - 2);
@@ -522,7 +530,7 @@ const ModsView = {
             ? ''
             : `<div class="mods-row-tags">${firstTags.map(t => `<span class="mods-row-tag">${escapeHtml(t)}</span>`).join('')}${moreCount > 0 ? `<span class="mods-row-tag">+${moreCount}</span>` : ''}</div>`;
         row.innerHTML = `${thumbHtml}<div class="mods-row-body"><div class="mods-row-title"><span class="mods-row-name">${escapeHtml(entry.name)}</span><span class="mods-row-author">${escapeHtml(entry.author || '')}</span></div>
-                         <div class="mods-row-desc">${escapeHtml(taglineText)}</div>
+                         <div class="${descClass}"${descTitle}>${escapeHtml(descText)}</div>
                          ${tagsHtml}</div>
                          <div class="mods-row-status">${this.buildStatusCell(entry, context)}</div>
                          <div class="mods-row-menu"><button class="mods-row-overflow" data-action="overflow">⋯</button></div>`;

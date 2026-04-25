@@ -99,4 +99,15 @@ describe('mods UI regression fixes', () => {
         expect(js).toContain('mods-row-state-pill curated');
         expect(js).toContain('Curated patch');
     });
+
+    it('shows last_error in the description row when an install fails', () => {
+        const js = fs.readFileSync(MODS_JS, 'utf8');
+        // Build-row branches descText on status === 'error' && last_error so
+        // the user actually sees why "Retry" is showing.
+        expect(js).toMatch(/entry\.status === ['"]error['"] && entry\.last_error/);
+        expect(js).toContain('mods-row-desc error');
+        // CSS rule for the error-tinted desc line.
+        const css = fs.readFileSync(MODS_CSS, 'utf8');
+        expect(css).toMatch(/\.mods-row-desc\.error\s*\{/);
+    });
 });
