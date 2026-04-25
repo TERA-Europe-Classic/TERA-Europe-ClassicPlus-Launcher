@@ -21,6 +21,92 @@ use super::gpk::{
     BACKUP_FILE, COOKED_PC_DIR,
 };
 
+/// Convenience entry point for callers that only know the inner *package*
+/// name (e.g. `"S1UI_ProgressBar"`, derived from the catalog's download URL
+/// or the modded GPK header). Searches the vanilla mapper for any entry
+/// whose `object_path` matches `package_name` or ends in `.<package_name>`,
+/// then extracts the bytes at that entry's `(filename, offset, size)`.
+///
+/// Multiple mapper entries can name the same composite package via
+/// different sub-objects; in TERA's classic mapper they all resolve to the
+/// same byte range, so picking the first match is correct.
+pub fn extract_vanilla_for_package_name(
+    game_root: &Path,
+    package_name: &str,
+) -> Result<Vec<u8>, String> {
+    let cooked_pc = game_root.join(COOKED_PC_DIR);
+    let clean = cooked_pc.join(BACKUP_FILE);
+    if !clean.exists() {
+        return Err(format!(
+            "CompositePackageMapper.clean missing at {} — can't resolve vanilla bytes for package '{}'. Run 'verify game files', then retry.",
+            clean.display(),
+            package_name
+        ));
+    }
+    let bytes = fs::read(&clean).map_err(|e| {
+        format!(
+            "Failed to read CompositePackageMapper.clean at {}: {e}",
+            clean.display()
+        )
+    })?;
+    let plain = String::from_utf8_lossy(&decrypt_mapper(&bytes)).to_string();
+    let map = parse_mapper(&plain);
+
+    let suffix = format!(".{package_name}");
+    let entry = map.values().find(|e| {
+        e.object_path.eq_ignore_ascii_case(package_name)
+            || e.object_path.to_ascii_lowercase().ends_with(&suffix.to_ascii_lowercase())
+    });
+    let entry = entry.ok_or_else(|| {
+        format!(
+            "Package '{package_name}' not present in vanilla CompositePackageMapper.clean — your game version may not match the mod"
+        )
+    })?;
+
+    extract_from_container_entry(&cooked_pc, entry)
+}
+
+fn extract_from_container_entry(
+    cooked_pc: &Path,
+    entry: &super::gpk::MapperEntry,
+) -> Result<Vec<u8>, String> {
+    let container_path = cooked_pc.join(&entry.filename);
+    let container = fs::read(&container_path).map_err(|e| {
+        format!(
+            "Failed to read composite container {}: {e}",
+            container_path.display()
+        )
+    })?;
+    if entry.offset < 0 {
+        return Err(format!(
+            "Vanilla mapper has a negative offset for '{}' — refusing to extract",
+            entry.object_path
+        ));
+    }
+    if entry.size < 0 {
+        return Err(format!(
+            "Vanilla mapper has a negative size for '{}' — refusing to extract",
+            entry.object_path
+        ));
+    }
+    let off = entry.offset as usize;
+    let size = entry.size as usize;
+    let end = off.checked_add(size).ok_or_else(|| {
+        format!(
+            "Vanilla mapper offset+size overflow for '{}'",
+            entry.object_path
+        )
+    })?;
+    if end > container.len() {
+        return Err(format!(
+            "Vanilla offset+size ({off}+{size}={end}) exceeds container length {} in {}",
+            container.len(),
+            container_path.display()
+        ));
+    }
+    Ok(container[off..end].to_vec())
+}
+
 pub fn extract_vanilla_for_object_path(
     game_root: &Path,
     object_path: &str,
@@ -51,38 +137,7 @@ pub fn extract_vanilla_for_object_path(
             )
         })?;
 
-    let container_path = cooked_pc.join(&entry.filename);
-    let container = fs::read(&container_path).map_err(|e| {
-        format!(
-            "Failed to read composite container {}: {e}",
-            container_path.display()
-        )
-    })?;
-    let off = if entry.offset < 0 {
-        return Err(format!(
-            "Vanilla mapper has a negative offset for '{object_path}' — refusing to extract"
-        ));
-    } else {
-        entry.offset as usize
-    };
-    let size = if entry.size < 0 {
-        return Err(format!(
-            "Vanilla mapper has a negative size for '{object_path}' — refusing to extract"
-        ));
-    } else {
-        entry.size as usize
-    };
-    let end = off.checked_add(size).ok_or_else(|| {
-        format!("Vanilla mapper offset+size overflow for '{object_path}'")
-    })?;
-    if end > container.len() {
-        return Err(format!(
-            "Vanilla offset+size ({off}+{size}={end}) exceeds container length {} in {}",
-            container.len(),
-            container_path.display()
-        ));
-    }
-    Ok(container[off..end].to_vec())
+    extract_from_container_entry(&cooked_pc, entry)
 }
 
 #[cfg(test)]
@@ -169,6 +224,50 @@ mod tests {
             err.contains("Failed to read composite container"),
             "got: {err}"
         );
+    }
+
+    #[test]
+    fn package_name_lookup_resolves_via_object_path_suffix() {
+        let tmp = TempDir::new().unwrap();
+        let game_root = tmp.path();
+        let cooked_pc = game_root.join(COOKED_PC_DIR);
+        fs::create_dir_all(&cooked_pc).unwrap();
+
+        let pkg_a = build_boss_window_test_package([0xA0, 0xA1, 0xA2, 0xA3], false);
+        let pkg_b = build_boss_window_test_package([0xB0, 0xB1, 0xB2, 0xB3], false);
+        let mut container = Vec::new();
+        container.extend_from_slice(&pkg_a);
+        let off_b = container.len() as i64;
+        let size_b = pkg_b.len() as i64;
+        container.extend_from_slice(&pkg_b);
+        fs::write(cooked_pc.join("S1UI_GageBoss.gpk"), &container).unwrap();
+
+        // Two entries — one whose object_path *equals* the package name,
+        // one whose object_path *ends with* `.<package_name>`. Both should
+        // resolve to the same vanilla bytes.
+        let mapper_text = format!(
+            "S1UI_GageBoss.gpk?S1UI_OtherOwner.S1UI_FlightBar,Comp,{off_b},{size_b},|!"
+        );
+        write_mapper(&cooked_pc.join(BACKUP_FILE), &mapper_text);
+
+        let extracted =
+            extract_vanilla_for_package_name(game_root, "S1UI_FlightBar").unwrap();
+        assert_eq!(extracted, pkg_b);
+    }
+
+    #[test]
+    fn package_name_lookup_errors_when_not_present_in_clean_mapper() {
+        let tmp = TempDir::new().unwrap();
+        let game_root = tmp.path();
+        let cooked_pc = game_root.join(COOKED_PC_DIR);
+        fs::create_dir_all(&cooked_pc).unwrap();
+        write_mapper(
+            &cooked_pc.join(BACKUP_FILE),
+            "S1UI_Other.gpk?Foo.Bar,X,0,10,|!",
+        );
+
+        let err = extract_vanilla_for_package_name(game_root, "S1UI_NotThere").unwrap_err();
+        assert!(err.contains("not present"), "got: {err}");
     }
 
     #[test]
