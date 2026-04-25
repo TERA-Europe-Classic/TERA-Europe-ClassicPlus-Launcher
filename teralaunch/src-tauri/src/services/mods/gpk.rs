@@ -722,7 +722,7 @@ fn ensure_pkg_mapper_backup(game_root: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn restore_clean_mapper_state(game_root: &Path) -> Result<(), String> {
+pub fn restore_clean_mapper_state(game_root: &Path) -> Result<(), String> {
     let clean = backup_path(game_root);
     let current = mapper_path(game_root);
     if clean.exists() {
@@ -957,6 +957,80 @@ pub fn ensure_backup(game_root: &Path) -> Result<(), String> {
     }
     fs::copy(&src, &dst).map_err(|e| format!("Failed to back up mapper: {}", e))?;
     Ok(())
+}
+
+/// Repoints every composite-mapper entry whose `object_path` ends in
+/// `.<folder_name>` (or matches `<folder_name>` exactly) at a standalone
+/// `<folder_name>.gpk` of size `file_size` at offset 0 in CookedPC. Adds
+/// the `TMM_MARKER` so downstream tooling can tell the mapper has been
+/// touched.
+///
+/// Used by the patch-based deploy flow (`gpk_patch_deploy`) after writing
+/// the patched-from-vanilla bytes to CookedPC. Independent from
+/// `install_legacy_gpk` which does the same redirect from inside the
+/// legacy whole-file-copy install path.
+///
+/// Returns the number of mapper entries that were rewritten. A zero return
+/// means no composite entry pointed at this package — the caller can
+/// decide whether that's an error (no-op deploy) or fine (mod is purely
+/// PkgMapper.dat-driven, see `install_legacy_gpk`'s standalone fallback).
+pub fn redirect_mapper_to_standalone(
+    game_root: &Path,
+    folder_name: &str,
+    file_size: i64,
+) -> Result<usize, String> {
+    if !is_safe_gpk_container_filename(&format!("{folder_name}.gpk")) {
+        return Err(format!(
+            "Refusing to redirect mapper: package name '{folder_name}' would produce an unsafe CookedPC filename"
+        ));
+    }
+
+    ensure_backup(game_root)?;
+
+    let mapper_bytes = fs::read(mapper_path(game_root))
+        .map_err(|e| format!("Failed to read mapper: {e}"))?;
+    let decrypted = decrypt_mapper(&mapper_bytes);
+    let decrypted_str = String::from_utf8_lossy(&decrypted).to_string();
+    let mut map = parse_mapper(&decrypted_str);
+
+    let suffix = format!(".{folder_name}");
+    let target_filename = format!("{folder_name}.gpk");
+    let mut rewritten = 0usize;
+    for entry in map.values_mut() {
+        if entry.object_path.eq_ignore_ascii_case(folder_name)
+            || entry
+                .object_path
+                .to_ascii_lowercase()
+                .ends_with(&suffix.to_ascii_lowercase())
+        {
+            entry.filename = target_filename.clone();
+            entry.offset = 0;
+            entry.size = file_size;
+            rewritten += 1;
+        }
+    }
+
+    if rewritten == 0 {
+        return Ok(0);
+    }
+
+    map.insert(
+        TMM_MARKER.into(),
+        MapperEntry {
+            filename: TMM_MARKER.into(),
+            object_path: TMM_MARKER.into(),
+            composite_name: TMM_MARKER.into(),
+            offset: 0,
+            size: 0,
+        },
+    );
+
+    let serialized = serialize_mapper(&map);
+    let encrypted = encrypt_mapper(serialized.as_bytes());
+    fs::write(mapper_path(game_root), &encrypted)
+        .map_err(|e| format!("Failed to write patched mapper: {e}"))?;
+
+    Ok(rewritten)
 }
 
 /// Validates that a TMM container filename from an untrusted `.gpk` is a
