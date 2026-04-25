@@ -1151,3 +1151,16 @@
     .mods-detail-screenshots img:hover { transform: none; }
     .mods-detail-secondary-btn { transition: none; }
 }
+
+/* The HTML `hidden` attribute defaults to `display: none`, but rules that
+ * set `display: flex/grid/block` on the same element trump it via cascade.
+ * Re-assert `display: none` for elements that need to honour [hidden]. */
+.mods-detail-hero[hidden],
+.mods-detail-action-row[hidden],
+.mods-detail-callout[hidden],
+.mods-detail-tags[hidden],
+.mods-detail-beforeafter[hidden],
+.mods-detail-screenshots[hidden],
+.mods-lightbox[hidden] {
+    display: none;
+}
