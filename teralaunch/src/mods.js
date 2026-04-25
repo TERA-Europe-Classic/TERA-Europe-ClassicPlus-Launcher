@@ -6,6 +6,8 @@
  * nine `commands::mods::*` Tauri commands.
  */
 
+import { renderMarkdown } from './markdown.js';
+
 const { invoke: modsInvoke } = window.__TAURI__.core || window.__TAURI__.tauri;
 const { listen: modsListen } = window.__TAURI__.event;
 
@@ -143,6 +145,25 @@ const ModsView = {
         this.$detailFactCreditsRow = document.getElementById('mods-detail-fact-credits-row');
         this.$detailLinkRow = document.getElementById('mods-detail-link-row');
         this.$detailSourceLink = document.getElementById('mods-detail-source-link');
+        this.$detailHero = document.getElementById('mods-detail-hero');
+        this.$detailHeroImg = document.getElementById('mods-detail-hero-img');
+        this.$detailCategoryPill = document.getElementById('mods-detail-category-pill');
+        this.$detailSizeText = document.getElementById('mods-detail-size-text');
+        this.$detailTags = document.getElementById('mods-detail-tags');
+        this.$detailCallout = document.getElementById('mods-detail-callout');
+        this.$detailCalloutBody = document.getElementById('mods-detail-callout-body');
+        this.$detailBeforeAfterSection = document.getElementById('mods-detail-beforeafter-section');
+        this.$detailBeforeImg = document.getElementById('mods-detail-before-img');
+        this.$detailAfterImg = document.getElementById('mods-detail-after-img');
+        this.$detailFactPatch = document.getElementById('mods-detail-fact-patch');
+        this.$detailFactPatchRow = document.getElementById('mods-detail-fact-patch-row');
+        this.$detailFactGpkFiles = document.getElementById('mods-detail-fact-gpkfiles');
+        this.$detailFactGpkFilesRow = document.getElementById('mods-detail-fact-gpkfiles-row');
+        this.$lightbox = document.getElementById('mods-lightbox');
+        this.$lightboxImg = document.getElementById('mods-lightbox-img');
+        this.$lightboxClose = document.getElementById('mods-lightbox-close');
+        this.$lightboxPrev = document.getElementById('mods-lightbox-prev');
+        this.$lightboxNext = document.getElementById('mods-lightbox-next');
     },
 
     bindEvents() {
@@ -160,6 +181,40 @@ const ModsView = {
             if (!href || href === '#') return;
             e.preventDefault();
             window.__TAURI__?.shell?.open?.(href);
+        });
+
+        // Lightbox: click on a screenshot opens overlay
+        this.$detailScreenshots?.addEventListener('click', (e) => {
+            const img = e.target.closest('img[data-shot-index]');
+            if (!img) return;
+            const idx = parseInt(img.dataset.shotIndex, 10);
+            this._openLightbox(idx);
+        });
+        this.$lightboxClose?.addEventListener('click', () => this._closeLightbox());
+        this.$lightboxPrev?.addEventListener('click', () => this._stepLightbox(-1));
+        this.$lightboxNext?.addEventListener('click', () => this._stepLightbox(1));
+        this.$lightbox?.addEventListener('click', (e) => {
+            if (e.target === this.$lightbox) this._closeLightbox();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (this.$lightbox?.hidden) return;
+            if (e.key === 'Escape') this._closeLightbox();
+            if (e.key === 'ArrowLeft') this._stepLightbox(-1);
+            if (e.key === 'ArrowRight') this._stepLightbox(1);
+        });
+
+        // Tag click → set search query to the tag (Browse tab only)
+        this.$detailTags?.addEventListener('click', (e) => {
+            const t = e.target.closest('[data-tag]');
+            if (!t) return;
+            const tag = t.dataset.tag;
+            this.closeDetail();
+            this.setTab('browse');
+            if (this.$search) {
+                this.$search.value = tag;
+                this.state.query = tag.toLowerCase();
+                this.render();
+            }
         });
 
         // Tabs
@@ -520,10 +575,101 @@ const ModsView = {
         const cat = this.state.catalog.find(m => m.id === id);
         const entry = context === 'browse' ? (cat || inst) : (inst || cat);
         if (!entry) return;
+
+        // Title block
         this.$detailName.textContent = entry.name || id;
         this.$detailAuthor.textContent = entry.author || '—';
         this.$detailVersion.textContent = entry.version ? `v${entry.version}` : '';
-        this.$detailDescription.textContent = entry.long_description || entry.description || cat?.short_description || '';
+
+        const category = entry.category || cat?.category || '';
+        if (this.$detailCategoryPill) {
+            this.$detailCategoryPill.hidden = !category;
+            this.$detailCategoryPill.textContent = category;
+        }
+        const sizeBytes = entry.size_bytes ?? cat?.size_bytes ?? 0;
+        if (this.$detailSizeText) {
+            this.$detailSizeText.textContent = sizeBytes ? ` · ${formatMB(sizeBytes)}` : '';
+        }
+
+        // Tags
+        const tags = entry.tags && entry.tags.length ? entry.tags : (cat?.tags || []);
+        if (this.$detailTags) {
+            if (tags.length === 0) {
+                this.$detailTags.hidden = true;
+                this.$detailTags.innerHTML = '';
+            } else {
+                this.$detailTags.hidden = false;
+                this.$detailTags.innerHTML = tags
+                    .map(t => `<button type="button" class="mods-detail-tag" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>`)
+                    .join('');
+            }
+        }
+
+        // Hero image
+        const hero = entry.featured_image || cat?.featured_image || '';
+        if (this.$detailHero && this.$detailHeroImg) {
+            if (hero) {
+                this.$detailHero.hidden = false;
+                this.$detailHeroImg.src = hero;
+                this.$detailHeroImg.alt = entry.name || '';
+            } else {
+                this.$detailHero.hidden = true;
+                this.$detailHeroImg.removeAttribute('src');
+            }
+        }
+
+        // Icon (small) — kept for non-hero cases and corner badge
+        this.$detailIcon.innerHTML = entry.icon_url
+            ? `<img src="${escapeHtml(entry.icon_url)}" alt="" />`
+            : toInitials(entry.name || id);
+
+        // Action row — source link
+        const sourceUrl = entry.source_url || cat?.source_url || '';
+        if (this.$detailSourceLink) {
+            this.$detailSourceLink.hidden = !sourceUrl;
+            this.$detailSourceLink.href = sourceUrl || '#';
+        }
+
+        // Compatibility callout
+        const compat = entry.compatibility_notes || cat?.compatibility_notes || '';
+        if (this.$detailCallout && this.$detailCalloutBody) {
+            if (compat) {
+                this.$detailCallout.hidden = false;
+                this.$detailCalloutBody.innerHTML = renderMarkdown(compat);
+            } else {
+                this.$detailCallout.hidden = true;
+                this.$detailCalloutBody.innerHTML = '';
+            }
+        }
+
+        // Description (markdown)
+        const longDesc = entry.long_description || entry.description || cat?.short_description || '';
+        this.$detailDescription.innerHTML = renderMarkdown(longDesc);
+
+        // Before / after panel
+        const beforeUrl = entry.before_image || cat?.before_image || '';
+        if (this.$detailBeforeAfterSection && this.$detailBeforeImg && this.$detailAfterImg) {
+            if (beforeUrl && hero) {
+                this.$detailBeforeAfterSection.hidden = false;
+                this.$detailBeforeImg.src = beforeUrl;
+                this.$detailAfterImg.src = hero;
+            } else {
+                this.$detailBeforeAfterSection.hidden = true;
+                this.$detailBeforeImg.removeAttribute('src');
+                this.$detailAfterImg.removeAttribute('src');
+            }
+        }
+
+        // Screenshots — exclude featured/before to avoid duplication
+        const allShots = entry.screenshots || cat?.screenshots || [];
+        const shots = allShots.filter(u => u !== hero && u !== beforeUrl);
+        this.$detailScreenshotsSection.hidden = (shots.length === 0);
+        this.$detailScreenshots.innerHTML = shots
+            .map((url, idx) => `<img src="${escapeHtml(url)}" alt="" loading="lazy" data-shot-index="${idx}" />`)
+            .join('');
+        this._currentShots = shots;
+
+        // Author / license / credits / patch / gpk_files in Details
         this.$detailFactAuthor.textContent = entry.author || '—';
         const license = entry.license || cat?.license || '';
         if (this.$detailFactLicenseRow) this.$detailFactLicenseRow.hidden = !license;
@@ -531,14 +677,32 @@ const ModsView = {
         const credits = entry.credits || cat?.credits || '';
         if (this.$detailFactCreditsRow) this.$detailFactCreditsRow.hidden = !credits;
         if (this.$detailFactCredits) this.$detailFactCredits.textContent = credits || '—';
-        const sourceUrl = entry.source_url || cat?.source_url || '';
-        if (this.$detailLinkRow) this.$detailLinkRow.hidden = !sourceUrl;
-        if (this.$detailSourceLink) this.$detailSourceLink.href = sourceUrl || '#';
-        this.$detailIcon.innerHTML = entry.icon_url ? `<img src="${escapeHtml(entry.icon_url)}" alt="" />` : toInitials(entry.name || id);
-        const screens = entry.screenshots || cat?.screenshots || [];
-        this.$detailScreenshotsSection.hidden = (screens.length === 0);
-        this.$detailScreenshots.innerHTML = screens.map(url => `<img src="${escapeHtml(url)}" alt="" loading="lazy" />`).join('');
+        const patch = entry.last_verified_patch || cat?.last_verified_patch || '';
+        if (this.$detailFactPatchRow) this.$detailFactPatchRow.hidden = !patch;
+        if (this.$detailFactPatch) this.$detailFactPatch.textContent = patch || '—';
+        const gpkFiles = (entry.gpk_files && entry.gpk_files.length ? entry.gpk_files : (cat?.gpk_files || []));
+        if (this.$detailFactGpkFilesRow) this.$detailFactGpkFilesRow.hidden = gpkFiles.length === 0;
+        if (this.$detailFactGpkFiles) this.$detailFactGpkFiles.textContent = gpkFiles.join(', ') || '—';
+
         this.$detailBackdrop.hidden = false;
+    },
+
+    _openLightbox(idx) {
+        if (!this.$lightbox || !this._currentShots) return;
+        if (idx < 0 || idx >= this._currentShots.length) return;
+        this._lightboxIdx = idx;
+        this.$lightboxImg.src = this._currentShots[idx];
+        this.$lightbox.hidden = false;
+    },
+    _closeLightbox() {
+        if (!this.$lightbox) return;
+        this.$lightbox.hidden = true;
+        this.$lightboxImg.removeAttribute('src');
+    },
+    _stepLightbox(delta) {
+        if (!this._currentShots || this._currentShots.length === 0) return;
+        const next = (this._lightboxIdx + delta + this._currentShots.length) % this._currentShots.length;
+        this._openLightbox(next);
     },
 
     closeDetail() { if (this.$detailBackdrop) this.$detailBackdrop.hidden = true; },
