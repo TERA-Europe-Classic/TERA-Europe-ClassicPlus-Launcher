@@ -555,7 +555,11 @@ const ModsView = {
     async handleRowClick(event) {
         const btn = event.target.closest('[data-action]');
         const row = event.target.closest('.mods-row');
-        if (!btn) { if (row && event.target.closest('.mods-row-body')) this.openDetail(row.dataset.modId, row.dataset.context); return; }
+        // Any click on the row that didn't hit an action button (toggle,
+        // install, overflow menu, etc.) opens the detail panel — clicking
+        // on the thumbnail, status pill, or padding now works the same as
+        // clicking the title.
+        if (!btn) { if (row) this.openDetail(row.dataset.modId, row.dataset.context); return; }
         if (!row) return;
         const id = row.dataset.modId;
         const action = btn.dataset.action;
