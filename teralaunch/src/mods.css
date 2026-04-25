@@ -1126,11 +1126,10 @@
 
 /* === Row card thumbnail === */
 .mods-row-thumb {
-    width: 64px;
-    height: 64px;
+    width: 56px;
+    height: 56px;
     border-radius: 6px;
     object-fit: cover;
-    flex-shrink: 0;
     background: linear-gradient(135deg, rgba(80, 80, 100, 0.5), rgba(40, 40, 60, 0.7));
 }
 .mods-row-tags {

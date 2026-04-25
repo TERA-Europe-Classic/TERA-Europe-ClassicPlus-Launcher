@@ -494,7 +494,6 @@ const ModsView = {
     buildRow(entry, context) {
         const row = document.createElement('div');
         row.className = 'mods-row';
-        if (!entry.icon_url) row.classList.add('no-icon');
         row.dataset.modId = entry.id;
         row.dataset.modKind = entry.kind;
         row.dataset.context = context;
@@ -509,6 +508,12 @@ const ModsView = {
         const thumbHtml = thumbUrl
             ? `<img class="mods-row-thumb" src="${escapeHtml(thumbUrl)}" alt="" loading="lazy" />`
             : '';
+        // The grid layout has 4 columns when a thumb is rendered and 3 when
+        // it isn't — `.no-icon` switches to the 3-column template. Derive
+        // the class from the actual thumbHtml presence so the children
+        // count always matches the column count (otherwise the trailing
+        // `⋯` menu wraps to row 2 col 1).
+        if (!thumbHtml) row.classList.add('no-icon');
         const taglineText = entry.tagline || entry.description || entry.short_description || '';
         const allTags = entry.tags || [];
         const firstTags = allTags.slice(0, 2);
