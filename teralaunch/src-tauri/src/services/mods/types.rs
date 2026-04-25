@@ -385,6 +385,105 @@ mod tests {
     }
 
     #[test]
+    fn catalog_entry_deserializes_full_enriched_shape() {
+        let json = r#"{
+            "id": "test.full",
+            "kind": "gpk",
+            "name": "Full Mod",
+            "author": "Tester",
+            "short_description": "Test",
+            "version": "1.0.0",
+            "download_url": "https://example.com/x.gpk",
+            "sha256": "abcd",
+            "tagline": "Punchy hook",
+            "featured_image": "https://example.com/hero.png",
+            "before_image": "https://example.com/before.png",
+            "tags": ["minimap","quality-of-life"],
+            "gpk_files": ["S1UI_Map.gpk"],
+            "compatibility_notes": "Conflicts with X",
+            "last_verified_patch": "patch 113",
+            "download_count": 42
+        }"#;
+        let entry: CatalogEntry = serde_json::from_str(json).unwrap();
+        assert_eq!(entry.tagline.as_deref(), Some("Punchy hook"));
+        assert_eq!(entry.featured_image.as_deref(), Some("https://example.com/hero.png"));
+        assert_eq!(entry.before_image.as_deref(), Some("https://example.com/before.png"));
+        assert_eq!(entry.tags, vec!["minimap", "quality-of-life"]);
+        assert_eq!(entry.gpk_files, vec!["S1UI_Map.gpk"]);
+        assert_eq!(entry.compatibility_notes.as_deref(), Some("Conflicts with X"));
+        assert_eq!(entry.last_verified_patch.as_deref(), Some("patch 113"));
+        assert_eq!(entry.download_count, Some(42));
+    }
+
+    #[test]
+    fn catalog_entry_minimal_shape_keeps_new_fields_default() {
+        let json = r#"{
+            "id": "test.min",
+            "kind": "external",
+            "name": "Minimal",
+            "author": "Tester",
+            "short_description": "Test",
+            "version": "1.0.0",
+            "download_url": "https://example.com/x.zip",
+            "sha256": "abcd"
+        }"#;
+        let entry: CatalogEntry = serde_json::from_str(json).unwrap();
+        assert!(entry.tagline.is_none());
+        assert!(entry.featured_image.is_none());
+        assert!(entry.before_image.is_none());
+        assert!(entry.tags.is_empty());
+        assert!(entry.gpk_files.is_empty());
+        assert!(entry.compatibility_notes.is_none());
+        assert!(entry.last_verified_patch.is_none());
+        assert!(entry.download_count.is_none());
+    }
+
+    #[test]
+    fn mod_entry_from_catalog_copies_new_fields() {
+        let catalog = CatalogEntry {
+            id: "x".into(),
+            kind: ModKind::Gpk,
+            name: "X".into(),
+            author: "A".into(),
+            tagline: Some("Hook".into()),
+            featured_image: Some("hero".into()),
+            before_image: Some("before".into()),
+            tags: vec!["t1".into(), "t2".into()],
+            gpk_files: vec!["A.gpk".into()],
+            compatibility_notes: Some("note".into()),
+            last_verified_patch: Some("patch 113".into()),
+            download_count: Some(100),
+            short_description: "s".into(),
+            long_description: "".into(),
+            category: "".into(),
+            license: "".into(),
+            credits: "".into(),
+            version: "1".into(),
+            download_url: "".into(),
+            sha256: "".into(),
+            size_bytes: 0,
+            source_url: None,
+            icon_url: None,
+            screenshots: vec![],
+            executable_relpath: None,
+            auto_launch_default: None,
+            settings_folder: None,
+            target_patch: None,
+            composite_flag: None,
+            updated_at: "".into(),
+        };
+        let entry = ModEntry::from_catalog(&catalog);
+        assert_eq!(entry.tagline.as_deref(), Some("Hook"));
+        assert_eq!(entry.featured_image.as_deref(), Some("hero"));
+        assert_eq!(entry.before_image.as_deref(), Some("before"));
+        assert_eq!(entry.tags, vec!["t1", "t2"]);
+        assert_eq!(entry.gpk_files, vec!["A.gpk"]);
+        assert_eq!(entry.compatibility_notes.as_deref(), Some("note"));
+        assert_eq!(entry.last_verified_patch.as_deref(), Some("patch 113"));
+        assert_eq!(entry.download_count, Some(100));
+    }
+
+    #[test]
     fn mod_entry_from_catalog_copies_relevant_fields() {
         let catalog = CatalogEntry {
             id: "test.mod".into(),
