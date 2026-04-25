@@ -1,6 +1,6 @@
 {
-  "version": 2,
-  "updated_at": "2026-04-22T05:22:29Z",
+  "version": 3,
+  "updated_at": "2026-04-25T15:40:04Z",
   "mods": [
     {
       "id": "classicplus.shinra",
@@ -344,8 +344,7 @@
       "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
       "last_verified_patch": "patch 110",
       "compatibility_notes": "Conflicts with other Community-window restyles. Pick one Foglio restyle per UI window — combining two restyles for the same window will leave the second-installed one effective.",
-      "before_image": "https://raw.githubusercontent.com/Foglio1024/Tera-restyle/master/preview/community-vanilla.png",
-      "featured_image": "https://raw.githubusercontent.com/Foglio1024/Tera-restyle/master/preview/community-restyled.png"
+      "featured_image": "https://opengraph.githubassets.com/2b57d5b61f04782df1d7eb4e2bbe3415f05d655a85f170e4fa36f43625a27fe2/foglio1024/tera-restyle"
     },
     {
       "id": "foglio1024.restyle-ep-window",
@@ -2368,6 +2367,1082 @@
       "tagline": "TeraMods made by TSwift",
       "last_verified_patch": "patch 100",
       "featured_image": "https://opengraph.githubassets.com/c5071f8acf3523d20d80b94baa46ff52f9c1a03eb32828cd423d901eba71c00c/TheTaylorSwiftOfModding/TeraMods"
+    },
+    {
+      "id": "pantypon.cute-crafter-icons",
+      "kind": "gpk",
+      "name": "Cute Crafter Icons (Icon_System)",
+      "author": "pantypon",
+      "short_description": "Cute icons replacement for the crafting system.",
+      "long_description": "Cute icons replacement for the crafting system.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "cosmetic",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-ui-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Cute%20Crafter%20Icons/Icon_System.gpk",
+      "sha256": "d3ec8ca0e6b502491f11d502fa6136f517a9535dc529f12cc6dee2c53132e2b1",
+      "size_bytes": 3641074,
+      "source_url": "https://github.com/pantypon/tera-client-ui-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "Icon_System.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Cute%20Crafter%20Icons/Craft%20Icons%20Model.png",
+      "tags": [
+        "classic-era",
+        "cosmetic",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.hana-reward-tier",
+      "kind": "gpk",
+      "name": "Hana Reward Tier (S1UI_Benefit)",
+      "author": "pantypon",
+      "short_description": "Hana-themed restyle of the reward tier panel.",
+      "long_description": "Hana-themed restyle of the reward tier panel.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-ui-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Hana%20Reward%20Tier/S1UI_Benefit.gpk",
+      "sha256": "f9270365bcf38503d091a636efcababfbbcff2195a1cd1b8483ba0116631264e",
+      "size_bytes": 391353,
+      "source_url": "https://github.com/pantypon/tera-client-ui-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "S1UI_Benefit.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Hana%20Reward%20Tier/Hana%20Reward%20Tier.png",
+      "tags": [
+        "classic-era",
+        "ui",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.pink-boss-hp-bar",
+      "kind": "gpk",
+      "name": "Pink Boss HP Bar (S1UI_GageBoss)",
+      "author": "pantypon",
+      "short_description": "Pink restyle of the boss HP gauge.",
+      "long_description": "Pink restyle of the boss HP gauge.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-ui-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Pink%20Boss%20HP%20Bar/S1UI_GageBoss.gpk",
+      "sha256": "5abc22517ce910382b302f753713bf1f50c7cca90b954cfa195ced4dc9cfabaa",
+      "size_bytes": 778812,
+      "source_url": "https://github.com/pantypon/tera-client-ui-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "S1UI_GageBoss.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Pink%20Boss%20HP%20Bar/Pink%20Boss%20HP%20Bar%20Model.png",
+      "tags": [
+        "classic-era",
+        "ui",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.pink-chat-window",
+      "kind": "gpk",
+      "name": "Pink Chat Window (S1UI_Chat2)",
+      "author": "pantypon",
+      "short_description": "Pink restyle of the chat window.",
+      "long_description": "Pink restyle of the chat window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-ui-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Pink%20Chat%20Window/S1UI_Chat2.gpk",
+      "sha256": "9229aac37d5065b69b398af1b3fea9d895f2f5496c3b88a06e0593617181e3e1",
+      "size_bytes": 362502,
+      "source_url": "https://github.com/pantypon/tera-client-ui-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "S1UI_Chat2.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Pink%20Chat%20Window/Pink%20Chat%20Model.png",
+      "tags": [
+        "classic-era",
+        "ui",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.pink-controller-ui",
+      "kind": "gpk",
+      "name": "Pink Controller UI (S1UI_GameControllerShortCut)",
+      "author": "pantypon",
+      "short_description": "Pink restyle of the gamepad-shortcut HUD.",
+      "long_description": "Pink restyle of the gamepad-shortcut HUD.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-ui-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Pink%20Controller%20UI/S1UI_GameControllerShortCut.gpk",
+      "sha256": "a68400bc3b68f4bc2b0953d5308beaf954c4483bba19299979ce22bb4d156373",
+      "size_bytes": 336089,
+      "source_url": "https://github.com/pantypon/tera-client-ui-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "S1UI_GameControllerShortCut.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Pink%20Controller%20UI/Playstation%20Controller%20Model.png",
+      "screenshots": [
+        "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Pink%20Controller%20UI/XBOX%20Controller%20Model.png"
+      ],
+      "tags": [
+        "classic-era",
+        "ui",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.pink-exp-bar",
+      "kind": "gpk",
+      "name": "Pink Exp Bar (S1UI_ExpBar)",
+      "author": "pantypon",
+      "short_description": "Pink restyle of the experience bar.",
+      "long_description": "Pink restyle of the experience bar.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-ui-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Pink%20Exp%20Bar/S1UI_ExpBar.gpk",
+      "sha256": "3f9ce8aa79b0d142a084404a3c89f26cf112070d627105ae74788c4437cda6fd",
+      "size_bytes": 185779,
+      "source_url": "https://github.com/pantypon/tera-client-ui-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "S1UI_ExpBar.gpk"
+      ],
+      "tags": [
+        "classic-era",
+        "ui",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.pink-heart-hp-mp",
+      "kind": "gpk",
+      "name": "Pink Heart HP MP (S1UI_CharacterWindow)",
+      "author": "pantypon",
+      "short_description": "Heart-shaped HP/MP gauges in the character window.",
+      "long_description": "Heart-shaped HP/MP gauges in the character window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-ui-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Pink%20Heart%20HP%20MP/S1UI_CharacterWindow.gpk",
+      "sha256": "3e87c8c155173de97c36a832483bea671c5d5f22d1d6205b0c1ccb5585f4ff86",
+      "size_bytes": 1407073,
+      "source_url": "https://github.com/pantypon/tera-client-ui-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "S1UI_CharacterWindow.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Pink%20Heart%20HP%20MP/Simple%20Pastel%20UI%20Model.png",
+      "tags": [
+        "classic-era",
+        "ui",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.pink-hearts-crosshair",
+      "kind": "gpk",
+      "name": "Pink Hearts Crosshair (S1UI_Crosshair)",
+      "author": "pantypon",
+      "short_description": "Pink hearts crosshair replacement.",
+      "long_description": "Pink hearts crosshair replacement.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-ui-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Pink%20Hearts%20Crosshair/S1UI_Crosshair.gpk",
+      "sha256": "ae2ca6266c195df980830c887b37b152cfbe422f21156faf3ea4ff490f792cea",
+      "size_bytes": 104699,
+      "source_url": "https://github.com/pantypon/tera-client-ui-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "S1UI_Crosshair.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Pink%20Hearts%20Crosshair/Pink%20Hearts%20Model.png",
+      "tags": [
+        "classic-era",
+        "ui",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.pink-main-menu",
+      "kind": "gpk",
+      "name": "Pink Main Menu (S1UI_MainMenu)",
+      "author": "pantypon",
+      "short_description": "Pink restyle of the main in-game menu.",
+      "long_description": "Pink restyle of the main in-game menu.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-ui-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Pink%20Main%20Menu/S1UI_MainMenu.gpk",
+      "sha256": "73eafe1e9cd39051e197ade04f12ad98acd065c7ec7117a7120a5228b3ffaa56",
+      "size_bytes": 385951,
+      "source_url": "https://github.com/pantypon/tera-client-ui-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "S1UI_MainMenu.gpk"
+      ],
+      "tags": [
+        "classic-era",
+        "ui",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.pink-party-member-hp-bar",
+      "kind": "gpk",
+      "name": "Pink Party Member HP Bar (S1UI_GageMonsterHp)",
+      "author": "pantypon",
+      "short_description": "Pink restyle of party-member HP bars.",
+      "long_description": "Pink restyle of party-member HP bars.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-ui-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Pink%20Party%20Member%20HP%20Bar/S1UI_GageMonsterHp.gpk",
+      "sha256": "2f467ad41b96055c58d90d055ac722c6c687d23deea822bf32d688112dea938c",
+      "size_bytes": 30393,
+      "source_url": "https://github.com/pantypon/tera-client-ui-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "S1UI_GageMonsterHp.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Pink%20Party%20Member%20HP%20Bar/Pink%20Party%20HP%20Bar%20Model.png",
+      "tags": [
+        "classic-era",
+        "ui",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.pink-skill-slots-main",
+      "kind": "gpk",
+      "name": "Pink Skill Slots (Main) (S1UI_TestQuickSlot)",
+      "author": "pantypon",
+      "short_description": "Pink restyle of the primary skill slot bar.",
+      "long_description": "Pink restyle of the primary skill slot bar.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-ui-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Pink%20Skill%20Slots/S1UI_TestQuickSlot.gpk",
+      "sha256": "dbf7beb80c0b6c70caf1ecf1eb83cf25459401e75e91d85565363184de185488",
+      "size_bytes": 501500,
+      "source_url": "https://github.com/pantypon/tera-client-ui-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "S1UI_TestQuickSlot.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Pink%20Skill%20Slots/Pink%20Skill%20Slots%20Model.png",
+      "tags": [
+        "classic-era",
+        "ui",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.pink-skill-slots-ex",
+      "kind": "gpk",
+      "name": "Pink Skill Slots (Ex) (S1UI_TestQuickSlotEx)",
+      "author": "pantypon",
+      "short_description": "Pink restyle of the secondary skill slot bar.",
+      "long_description": "Pink restyle of the secondary skill slot bar.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-ui-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Pink%20Skill%20Slots/S1UI_TestQuickSlotEx.gpk",
+      "sha256": "25acf5f8169258a1d8be3e8edb73125d5f65c6963e78c36b2c60d186a81d3a0c",
+      "size_bytes": 465602,
+      "source_url": "https://github.com/pantypon/tera-client-ui-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "S1UI_TestQuickSlotEx.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Pink%20Skill%20Slots/Pink%20Skill%20Slots%20Model.png",
+      "tags": [
+        "classic-era",
+        "ui",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.pink-skill-slots-ex2",
+      "kind": "gpk",
+      "name": "Pink Skill Slots (Ex2) (S1UI_TestQuickSlotEx2)",
+      "author": "pantypon",
+      "short_description": "Pink restyle of the tertiary skill slot bar.",
+      "long_description": "Pink restyle of the tertiary skill slot bar.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-ui-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Pink%20Skill%20Slots/S1UI_TestQuickSlotEx2.gpk",
+      "sha256": "1f76b8c2479d5e319cba0bb8980def119ca7a432fb6e0e8a86b5df44109bab3f",
+      "size_bytes": 472350,
+      "source_url": "https://github.com/pantypon/tera-client-ui-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "S1UI_TestQuickSlotEx2.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Pink%20Skill%20Slots/Pink%20Skill%20Slots%20Model.png",
+      "tags": [
+        "classic-era",
+        "ui",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.simplified-pastel-ui",
+      "kind": "gpk",
+      "name": "Simplified Pastel UI (S1UI_CharacterWindow)",
+      "author": "pantypon",
+      "short_description": "Pastel-color character window simplification.",
+      "long_description": "Pastel-color character window simplification.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-ui-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Simplified%20Pastel%20UI/S1UI_CharacterWindow.gpk",
+      "sha256": "7e7ef1e35249892d48ba49056af258f3b3228d664b6cf2f6be29ca33ecc7cc33",
+      "size_bytes": 1858157,
+      "source_url": "https://github.com/pantypon/tera-client-ui-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "S1UI_CharacterWindow.gpk"
+      ],
+      "tags": [
+        "classic-era",
+        "ui",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.static-heart-crosshair",
+      "kind": "gpk",
+      "name": "Static Heart Crosshair (S1UI_Crosshair)",
+      "author": "pantypon",
+      "short_description": "Static heart crosshair (no animation).",
+      "long_description": "Static heart crosshair (no animation).\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-ui-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Static%20Heart%20Crosshair/S1UI_Crosshair.gpk",
+      "sha256": "14a9bbe1ff5f98db6eb78bc62b8418bcf18374e747cb12a15f48d543df440314",
+      "size_bytes": 230624,
+      "source_url": "https://github.com/pantypon/tera-client-ui-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "S1UI_Crosshair.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Static%20Heart%20Crosshair/Static%20Heart%20Crosshair.png",
+      "tags": [
+        "classic-era",
+        "ui",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.yunicorn-defense-pop-up",
+      "kind": "gpk",
+      "name": "Yunicorn Defense Pop Up (S1UI_Message)",
+      "author": "pantypon",
+      "short_description": "Yunicorn-themed restyle of pop-up messages.",
+      "long_description": "Yunicorn-themed restyle of pop-up messages.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "ui",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-ui-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Yunicorn%20Defense%20Pop%20Up/S1UI_Message.gpk",
+      "sha256": "8272ac2eacb4d6ad97e20a8ded769dfee2f3a27acc32438fc16cc0496cacee81",
+      "size_bytes": 3746393,
+      "source_url": "https://github.com/pantypon/tera-client-ui-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "S1UI_Message.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-ui-mods/master/Yunicorn%20Defense%20Pop%20Up/Yunicorn%20Defense%20Pop%20Up%20Model.png",
+      "tags": [
+        "classic-era",
+        "ui",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.archer-pink-slingshot",
+      "kind": "gpk",
+      "name": "Archer Pink Slingshot (PC_Weapons_Event)",
+      "author": "pantypon",
+      "short_description": "Pink slingshot weapon model for Archer.",
+      "long_description": "Pink slingshot weapon model for Archer.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "weapon",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-weapon-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-weapon-mods/master/Archer%20Pink%20Slingshot/PC_Weapons_Event.gpk",
+      "sha256": "d53f0ad20fac6cddc7639693dcd08c06038fcc0c474df553acc4adad9d108fb5",
+      "size_bytes": 18755432,
+      "source_url": "https://github.com/pantypon/tera-client-weapon-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "PC_Weapons_Event.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-weapon-mods/master/Archer%20Pink%20Slingshot/Pink%20Slingshot%20Model.png",
+      "tags": [
+        "classic-era",
+        "weapon",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.berserker-dessert-fork",
+      "kind": "gpk",
+      "name": "Berserker Dessert Fork (PC_Weapons_Event04)",
+      "author": "pantypon",
+      "short_description": "Dessert-fork axe model for Berserker.",
+      "long_description": "Dessert-fork axe model for Berserker.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "weapon",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-weapon-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-weapon-mods/master/Berserker%20Dessert%20Fork/PC_Weapons_Event04.gpk",
+      "sha256": "3a939ceeaff0375b33a8575a3050e1b4d79e09758e3538af0b436f69bcd37fbd",
+      "size_bytes": 5326594,
+      "source_url": "https://github.com/pantypon/tera-client-weapon-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "PC_Weapons_Event04.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-weapon-mods/master/Berserker%20Dessert%20Fork/Desert%20Fork%20Model.png",
+      "tags": [
+        "classic-era",
+        "weapon",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.multiclass-just-plasma",
+      "kind": "gpk",
+      "name": "MultiClass Just Plasma (PC_Weapons_Event16)",
+      "author": "pantypon",
+      "short_description": "Plasma-themed weapon model usable across classes.",
+      "long_description": "Plasma-themed weapon model usable across classes.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "weapon",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-weapon-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-weapon-mods/master/MultiClass%20Just%20Plasma/PC_Weapons_Event16.gpk",
+      "sha256": "695e32c7ae5074dda0e4226528b07ef395070355c059a99a956f7b611977b51c",
+      "size_bytes": 7136231,
+      "source_url": "https://github.com/pantypon/tera-client-weapon-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "PC_Weapons_Event16.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-weapon-mods/master/MultiClass%20Just%20Plasma/Just%20Plasma%20Model.png",
+      "tags": [
+        "classic-era",
+        "weapon",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.mystic-iceglow-rod",
+      "kind": "gpk",
+      "name": "Mystic Iceglow Rod (PC_Weapons_Event03)",
+      "author": "pantypon",
+      "short_description": "Iceglow scepter model for Mystic.",
+      "long_description": "Iceglow scepter model for Mystic.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "weapon",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-weapon-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-weapon-mods/master/Mystic%20Iceglow%20Rod/PC_Weapons_Event03.gpk",
+      "sha256": "d6b664c7070267266e8d2a8db77d4e52b0d76c89d74089bcc9c8b56a028b9d7c",
+      "size_bytes": 5883432,
+      "source_url": "https://github.com/pantypon/tera-client-weapon-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "PC_Weapons_Event03.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-weapon-mods/master/Mystic%20Iceglow%20Rod/Iceglow%20Rod%20Model.png",
+      "tags": [
+        "classic-era",
+        "weapon",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.mystic-ninja-oni-removal",
+      "kind": "gpk",
+      "name": "Mystic Ninja Oni Removal (PC_Weapons_Event07)",
+      "author": "pantypon",
+      "short_description": "Mystic ninja oni-mask removal scepter.",
+      "long_description": "Mystic ninja oni-mask removal scepter.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "weapon",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-weapon-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-weapon-mods/master/Mystic%20Ninja%20Oni%20Removal/PC_Weapons_Event07.gpk",
+      "sha256": "dcf16ab804aec8f1c7648df304cfc156d8ca6031f364928eefa366c01c7f4f18",
+      "size_bytes": 12572381,
+      "source_url": "https://github.com/pantypon/tera-client-weapon-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "PC_Weapons_Event07.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-weapon-mods/master/Mystic%20Ninja%20Oni%20Removal/Oni%20Removal%20Model.png",
+      "tags": [
+        "classic-era",
+        "weapon",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.mystic-pale-pink-princess-wand",
+      "kind": "gpk",
+      "name": "Mystic Pale Pink Princess Wand (PC_Weapons_Event)",
+      "author": "pantypon",
+      "short_description": "Pale pink princess wand for Mystic.",
+      "long_description": "Pale pink princess wand for Mystic.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "weapon",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-weapon-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-weapon-mods/master/Mystic%20Pale%20Pink%20Princess%20Wand/PC_Weapons_Event.gpk",
+      "sha256": "b35ec950cea3ede5907f0149310c8d1d14161e00ca3a2382b194bdced169f5a8",
+      "size_bytes": 18744648,
+      "source_url": "https://github.com/pantypon/tera-client-weapon-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "PC_Weapons_Event.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-weapon-mods/master/Mystic%20Pale%20Pink%20Princess%20Wand/Mystic%20Wand%20Example%20Model.png",
+      "tags": [
+        "classic-era",
+        "weapon",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.mystic-strawberry-nuthatch",
+      "kind": "gpk",
+      "name": "Mystic Strawberry Nuthatch (PC_Weapons_Event09)",
+      "author": "pantypon",
+      "short_description": "Strawberry-nuthatch scepter for Mystic.",
+      "long_description": "Strawberry-nuthatch scepter for Mystic.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "weapon",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-weapon-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-weapon-mods/master/Mystic%20Strawberry%20Nuthatch/PC_Weapons_Event09.gpk",
+      "sha256": "22ebb53f7f685458e82d051eb601f73d7d97e1cc3df3af8d7633f3ea71340811",
+      "size_bytes": 4451397,
+      "source_url": "https://github.com/pantypon/tera-client-weapon-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "PC_Weapons_Event09.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-weapon-mods/master/Mystic%20Strawberry%20Nuthatch/Mystic%20Strawberry%20Model.png",
+      "tags": [
+        "classic-era",
+        "weapon",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.ninja-pink-prop-fan",
+      "kind": "gpk",
+      "name": "Ninja Pink Prop Fan (PC_Weapons_Event)",
+      "author": "pantypon",
+      "short_description": "Pink prop-fan weapon for Ninja.",
+      "long_description": "Pink prop-fan weapon for Ninja.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "weapon",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-weapon-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-weapon-mods/master/Ninja%20Pink%20Prop%20Fan/PC_Weapons_Event.gpk",
+      "sha256": "536a2e31867be7e454e9d942b8ea3dc4f64604943813a08b86b3ea4c631be43c",
+      "size_bytes": 24348123,
+      "source_url": "https://github.com/pantypon/tera-client-weapon-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "PC_Weapons_Event.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-weapon-mods/master/Ninja%20Pink%20Prop%20Fan/Pink%20Prop%20Fan%20Model.png",
+      "tags": [
+        "classic-era",
+        "weapon",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.priest-iceglow-staff",
+      "kind": "gpk",
+      "name": "Priest Iceglow Staff (PC_Weapons_Event03)",
+      "author": "pantypon",
+      "short_description": "Iceglow staff model for Priest.",
+      "long_description": "Iceglow staff model for Priest.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "weapon",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-weapon-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-weapon-mods/master/Priest%20Iceglow%20Staff/PC_Weapons_Event03.gpk",
+      "sha256": "20bc5fb0882096c7c78d695cc0c0b24349cb33521dcf6efec1de835b89cc3157",
+      "size_bytes": 5898626,
+      "source_url": "https://github.com/pantypon/tera-client-weapon-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "PC_Weapons_Event03.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-weapon-mods/master/Priest%20Iceglow%20Staff/Iceglow%20Weapon%20Skin%20Model.png",
+      "tags": [
+        "classic-era",
+        "weapon",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.sorcerer-gloomy-bear-patches",
+      "kind": "gpk",
+      "name": "Sorcerer Gloomy Bear Patches (PC_Weapons_Event)",
+      "author": "pantypon",
+      "short_description": "Gloomy bear-patch disc model for Sorcerer.",
+      "long_description": "Gloomy bear-patch disc model for Sorcerer.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "weapon",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-weapon-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-weapon-mods/master/Sorcerer%20Gloomy%20Bear%20Patches/PC_Weapons_Event.gpk",
+      "sha256": "7d297063ca6ce14e3f070dd079235791105ca309f75f83681818bb21abd7a619",
+      "size_bytes": 18624746,
+      "source_url": "https://github.com/pantypon/tera-client-weapon-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "PC_Weapons_Event.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-weapon-mods/master/Sorcerer%20Gloomy%20Bear%20Patches/Gloomy%20Bear%20Patches%20Model.png",
+      "tags": [
+        "classic-era",
+        "weapon",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.awakened-battle-bunny-gunner-mech",
+      "kind": "gpk",
+      "name": "Awakened Battle Bunny Gunner Mech (Awaken_Booster)",
+      "author": "pantypon",
+      "short_description": "Battle-bunny restyle of the awakened Gunner mech.",
+      "long_description": "Battle-bunny restyle of the awakened Gunner mech.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "cosmetic",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-special-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-special-mods/master/Awakened%20Battle%20Bunny%20Gunner%20Mech/Awaken_Booster.gpk",
+      "sha256": "8314b3238b5434a905424d5cbaaa76d4dc7445a33fc3cbf137ca4aa371d6d9c3",
+      "size_bytes": 3535315,
+      "source_url": "https://github.com/pantypon/tera-client-special-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "Awaken_Booster.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-special-mods/master/Awakened%20Battle%20Bunny%20Gunner%20Mech/Battle%20Bunny%20Model.png",
+      "tags": [
+        "classic-era",
+        "cosmetic",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.castanic-female-pink-horns-hair",
+      "kind": "gpk",
+      "name": "Castanic Female Pink Horns Hair (Castanic_F_Head)",
+      "author": "pantypon",
+      "short_description": "Pink-horn variant for Castanic female hairstyle 3.",
+      "long_description": "Pink-horn variant for Castanic female hairstyle 3.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "cosmetic",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-special-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-special-mods/master/Castanic%20Female%20Hair%203%20Pink%20Horns/Castanic_F_Head.gpk",
+      "sha256": "44d435f2f36333b5dcf0fa375fff6109c6afc75e7f5faa20d12ffb9304f12150",
+      "size_bytes": 67584944,
+      "source_url": "https://github.com/pantypon/tera-client-special-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "Castanic_F_Head.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-special-mods/master/Castanic%20Female%20Hair%203%20Pink%20Horns/Castanic%20Hair%203%20Pink%20Horns%20Model.png",
+      "tags": [
+        "classic-era",
+        "cosmetic",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.elin-brighter-new-hairstyles",
+      "kind": "gpk",
+      "name": "Elin Brighter New Hairstyles (popori_F_Head_E)",
+      "author": "pantypon",
+      "short_description": "Brighter-tone Elin hairstyle pack.",
+      "long_description": "Brighter-tone Elin hairstyle pack.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "cosmetic",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-special-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-special-mods/master/Elin%20Brighter%20New%20Hairstyles/popori_F_Head_E.gpk",
+      "sha256": "d265bfa67593f4639086a786f326625e1c3154063129da48547b23d87c493721",
+      "size_bytes": 17383140,
+      "source_url": "https://github.com/pantypon/tera-client-special-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "popori_F_Head_E.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-special-mods/master/Elin%20Brighter%20New%20Hairstyles/New%20Whiter%20Hair%20Model.png",
+      "tags": [
+        "classic-era",
+        "cosmetic",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.elin-matching-ears-and-tails",
+      "kind": "gpk",
+      "name": "Elin Matching Ears and Tails (Popori_F_Head)",
+      "author": "pantypon",
+      "short_description": "Matched ear/tail color set for Elin.",
+      "long_description": "Matched ear/tail color set for Elin.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "cosmetic",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-special-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-special-mods/master/Elin%20Matching%20Ears%20and%20Tails%20Remaster/Popori_F_Head.gpk",
+      "sha256": "7704e71415b189107e595dbe1b61091b005b5f754ed02b13d13ba91cb2af0c34",
+      "size_bytes": 65194606,
+      "source_url": "https://github.com/pantypon/tera-client-special-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "Popori_F_Head.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-special-mods/master/Elin%20Matching%20Ears%20and%20Tails%20Remaster/Matching%20Ears%20and%20Tail%20Remaster%20Model.png",
+      "tags": [
+        "classic-era",
+        "cosmetic",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.elin-prettier-skin",
+      "kind": "gpk",
+      "name": "Elin Prettier Skin (Event_BaseBody)",
+      "author": "pantypon",
+      "short_description": "Smoothed/brightened skin texture for Elin.",
+      "long_description": "Smoothed/brightened skin texture for Elin.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "cosmetic",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-special-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-special-mods/master/Elin%20Prettier%20Skin/Event_BaseBody.patched.gpk",
+      "sha256": "2d83a2e4c80e25c44d2dbea95b94ad357785492cf269968d5d5781d85a8df0e1",
+      "size_bytes": 6456833,
+      "source_url": "https://github.com/pantypon/tera-client-special-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "Event_BaseBody.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-special-mods/master/Elin%20Prettier%20Skin/Elin%20Prettier%20Skin%20Model.jpg",
+      "tags": [
+        "classic-era",
+        "cosmetic",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.fairy-stump-mount",
+      "kind": "gpk",
+      "name": "Fairy Stump Mount (Vehicle_Beetle)",
+      "author": "pantypon",
+      "short_description": "Replaces the beetle mount with a fairy-stump model.",
+      "long_description": "Replaces the beetle mount with a fairy-stump model.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "mount",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-special-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-special-mods/master/Fairy%20Stump%20Mount/Vehicle_Beetle.gpk",
+      "sha256": "a491c7a7b3a126e61a3614e395a02944aa259a89e77a78548131b4565ce433ea",
+      "size_bytes": 9483959,
+      "source_url": "https://github.com/pantypon/tera-client-special-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "Vehicle_Beetle.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-special-mods/master/Fairy%20Stump%20Mount/Fairy%20Stump%20Model.png",
+      "tags": [
+        "classic-era",
+        "mount",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.flying-pink-cushion-mount",
+      "kind": "gpk",
+      "name": "Flying Pink Cushion Mount (Vehicle_Carpet)",
+      "author": "pantypon",
+      "short_description": "Pink cushion replacement for the carpet mount.",
+      "long_description": "Pink cushion replacement for the carpet mount.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "mount",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-special-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-special-mods/master/Flying%20Pink%20Cushion%20Mount/Vehicle_Carpet.gpk",
+      "sha256": "9558ec5d2fe79a0698394d1c52c473f831db0e1e3b56b3150d55158cc1463f09",
+      "size_bytes": 1106303,
+      "source_url": "https://github.com/pantypon/tera-client-special-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "Vehicle_Carpet.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-special-mods/master/Flying%20Pink%20Cushion%20Mount/Flying%20Pink%20Cushion%20Model.png",
+      "tags": [
+        "classic-era",
+        "mount",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.pink-fishing-float",
+      "kind": "gpk",
+      "name": "Pink Fishing Float (Fishing_Float)",
+      "author": "pantypon",
+      "short_description": "Pink fishing-float model.",
+      "long_description": "Pink fishing-float model.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "cosmetic",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-special-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-special-mods/master/Pink%20Fishie%20Set/Fishing_Float.gpk",
+      "sha256": "fab4ca738d613f0ccb5bcd6de54127603928d39519b23688dedfbb9cddebac64",
+      "size_bytes": 43127,
+      "source_url": "https://github.com/pantypon/tera-client-special-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "Fishing_Float.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-special-mods/master/Pink%20Fishie%20Set/Pink%20Fishie%20Model.png",
+      "tags": [
+        "classic-era",
+        "cosmetic",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.pink-fishing-rod",
+      "kind": "gpk",
+      "name": "Pink Fishing Rod (Fishing_Flyrod)",
+      "author": "pantypon",
+      "short_description": "Pink fishing-rod model.",
+      "long_description": "Pink fishing-rod model.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "cosmetic",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-special-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-special-mods/master/Pink%20Fishie%20Set/Fishing_Flyrod.gpk",
+      "sha256": "0aa87ddd08236af5c73ff6d8bd798f7f7d164649123a9fd8a22926f49dd08cc6",
+      "size_bytes": 1333976,
+      "source_url": "https://github.com/pantypon/tera-client-special-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "Fishing_Flyrod.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-special-mods/master/Pink%20Fishie%20Set/Pink%20Fishie%20Model.png",
+      "tags": [
+        "classic-era",
+        "cosmetic",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "pantypon.pink-royal-diamond-dragon-mount",
+      "kind": "gpk",
+      "name": "Pink Royal Diamond Dragon Mount (Vehicle_Dragon)",
+      "author": "pantypon",
+      "short_description": "Pink-and-diamond restyle of the dragon mount.",
+      "long_description": "Pink-and-diamond restyle of the dragon mount.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "mount",
+      "license": "Unknown",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-special-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-special-mods/master/Pink%20Royal%20Diamond%20Dragon%20Mount/Vehicle_Dragon.gpk",
+      "sha256": "94d2dde1b4ac89f16628816873d293d819c417a9ff0f8063eeca53f8ad1443c6",
+      "size_bytes": 22890353,
+      "source_url": "https://github.com/pantypon/tera-client-special-mods",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "Vehicle_Dragon.gpk"
+      ],
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-special-mods/master/Pink%20Royal%20Diamond%20Dragon%20Mount/Pink%20Diamond%20Dragon%20Model.png",
+      "tags": [
+        "classic-era",
+        "mount",
+        "pantypon"
+      ]
+    },
+    {
+      "id": "artexlib.brawler-chad-block-animation",
+      "kind": "gpk",
+      "name": "Brawler Chad Block Animation (BrawlerChadBlocking)",
+      "author": "artexlib",
+      "short_description": "Replaces Brawler block stance with a \"Chad\" pose.",
+      "long_description": "Replaces Brawler block stance with a \"Chad\" pose.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "animation",
+      "license": "Unknown",
+      "credits": "Published by artexlib at https://github.com/artexlib/custom-gpks. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/artexlib/custom-gpks/main/BrawlerChadBlocking.gpk",
+      "sha256": "796da39fe3383acb01faaa8d14059854f50f3fb9b54ade89618434a86f8c7f4b",
+      "size_bytes": 1054677,
+      "source_url": "https://github.com/artexlib/custom-gpks",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "BrawlerChadBlocking.gpk"
+      ],
+      "tags": [
+        "classic-era",
+        "animation",
+        "artexlib"
+      ]
+    },
+    {
+      "id": "artexlib.gray-college-backpack",
+      "kind": "gpk",
+      "name": "Gray College Backpack (GucciBackpack)",
+      "author": "artexlib",
+      "short_description": "Gray college-style backpack (\"Gucci backpack\") cosmetic.",
+      "long_description": "Gray college-style backpack (\"Gucci backpack\") cosmetic.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "cosmetic",
+      "license": "Unknown",
+      "credits": "Published by artexlib at https://github.com/artexlib/custom-gpks. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/artexlib/custom-gpks/main/GucciBackpack.gpk",
+      "sha256": "65f62401e7c9b8d56b5732f3be19f8f07c724713f1b76db24229eb98f13e24a2",
+      "size_bytes": 1186667,
+      "source_url": "https://github.com/artexlib/custom-gpks",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "GucciBackpack.gpk"
+      ],
+      "tags": [
+        "classic-era",
+        "cosmetic",
+        "artexlib"
+      ]
+    },
+    {
+      "id": "artexlib.lancer-gigachad-block",
+      "kind": "gpk",
+      "name": "Lancer GigaChad Block (LancerGigaChadBlock)",
+      "author": "artexlib",
+      "short_description": "Replaces Lancer block stance with a confident pose.",
+      "long_description": "Replaces Lancer block stance with a confident pose.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "animation",
+      "license": "Unknown",
+      "credits": "Published by artexlib at https://github.com/artexlib/custom-gpks. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/artexlib/custom-gpks/main/LancerGigaChadBlock.gpk",
+      "sha256": "e1a48b4c50a389a7904e41258e861977f657ba298649ac4b3168c10cb39e49fa",
+      "size_bytes": 268245,
+      "source_url": "https://github.com/artexlib/custom-gpks",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "LancerGigaChadBlock.gpk"
+      ],
+      "tags": [
+        "classic-era",
+        "animation",
+        "artexlib"
+      ]
+    },
+    {
+      "id": "artexlib.white-valkyrie-helmet",
+      "kind": "gpk",
+      "name": "White Valkyrie Helmet (PinkValkyrieHelmet)",
+      "author": "artexlib",
+      "short_description": "White recolor of the Valkyrie helmet.",
+      "long_description": "White recolor of the Valkyrie helmet.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "category": "cosmetic",
+      "license": "Unknown",
+      "credits": "Published by artexlib at https://github.com/artexlib/custom-gpks. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
+      "version": "2026-04",
+      "download_url": "https://raw.githubusercontent.com/artexlib/custom-gpks/main/PinkValkyrieHelmet.gpk",
+      "sha256": "3cc1c560d7a11feb99e78d939cbcb51ce86fd3cd7d8976e04ba3bf369a4cd497",
+      "size_bytes": 6151436,
+      "source_url": "https://github.com/artexlib/custom-gpks",
+      "target_patch": "v32.04",
+      "composite_flag": true,
+      "gpk_files": [
+        "PinkValkyrieHelmet.gpk"
+      ],
+      "tags": [
+        "classic-era",
+        "cosmetic",
+        "artexlib"
+      ]
     }
   ]
 }
