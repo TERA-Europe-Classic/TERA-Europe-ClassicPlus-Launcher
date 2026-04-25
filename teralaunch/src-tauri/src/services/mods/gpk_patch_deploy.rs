@@ -27,7 +27,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::{
-    gpk, gpk_patch_applier, manifest_store, patch_derivation, vanilla_resolver,
+    gpk, gpk_package, gpk_patch_applier, manifest_store, patch_derivation, vanilla_resolver,
 };
 use super::manifest_store::InstallTarget;
 use super::vanilla_resolver::VanillaSource;
@@ -57,6 +57,40 @@ pub fn install_via_patch(
 
     let resolution =
         vanilla_resolver::resolve_vanilla_for_package_name(game_root, target_package_name)?;
+
+    // Refuse cleanly on x32-vs-x64 arch mismatch BEFORE attempting derivation.
+    // v100.02 vanilla files are FileVersion 897 (x64); old Classic mods are
+    // FileVersion 610 (x32). The byte structures don't correspond and the
+    // engine's loader rejects the wrong-arch file. The legacy install path
+    // produced a confusing parser error or a crashing client; this surfaces
+    // the real problem (and points at who needs to fix it).
+    let mod_version = gpk_package::read_file_version(&modded).ok_or_else(|| {
+        format!(
+            "Modded GPK at {} is malformed (no GPK magic / FileVersion)",
+            source_gpk.display()
+        )
+    })?;
+    let vanilla_version = gpk_package::read_file_version(&resolution.bytes)
+        .ok_or_else(|| "Vanilla GPK is malformed (no GPK magic / FileVersion)".to_string())?;
+    if gpk_package::is_x64_file_version(mod_version)
+        != gpk_package::is_x64_file_version(vanilla_version)
+    {
+        let arch_label = |fv: u16| {
+            if gpk_package::is_x64_file_version(fv) {
+                "x64 (v100.02 / Modern)"
+            } else {
+                "x32 (Classic / pre-patch 97)"
+            }
+        };
+        return Err(format!(
+            "Mod is {} but client is {} — incompatible. The mod was authored for the {} client and cannot run in the {} engine. Ask the mod author for a {}-rebuild.",
+            arch_label(mod_version),
+            arch_label(vanilla_version),
+            arch_label(mod_version),
+            arch_label(vanilla_version),
+            arch_label(vanilla_version),
+        ));
+    }
 
     let manifest = patch_derivation::derive_manifest(mod_id, &resolution.bytes, &modded)?;
     manifest_store::save_manifest_at_root(app_root, mod_id, &manifest)?;
@@ -333,7 +367,9 @@ mod tests {
     use super::*;
     use crate::services::mods::gpk::{encrypt_mapper, BACKUP_FILE, COOKED_PC_DIR, MAPPER_FILE};
     use crate::services::mods::gpk_package::parse_package;
-    use crate::services::mods::test_fixtures::build_boss_window_test_package;
+    use crate::services::mods::test_fixtures::{
+        build_boss_window_test_package, build_x64_boss_window_test_package,
+    };
     use tempfile::TempDir;
 
     struct Setup {
@@ -937,6 +973,102 @@ mod tests {
                 .unwrap()
                 .is_none(),
             "install_target sidecar deleted after uninstall (bundle dir removed)"
+        );
+    }
+
+    #[test]
+    fn install_refuses_x32_mod_when_vanilla_is_x64() {
+        // Realistic Classic+ scenario: vanilla file on disk is v100.02 (x64,
+        // FileVersion 897) but the catalog mod was authored for old Classic
+        // (x32, FileVersion 610). The two binary layouts don't correspond
+        // and the engine can't load an x32 package — the install must
+        // refuse cleanly with a message that names the arch mismatch.
+        let tmp = TempDir::new().unwrap();
+        let game_root = tmp.path().join("game");
+        let app_root = tmp.path().join("app");
+        let cooked_pc = game_root.join(COOKED_PC_DIR);
+        let s1ui_dir = cooked_pc.join("Art_Data").join("Packages").join("S1UI");
+        fs::create_dir_all(&s1ui_dir).unwrap();
+        fs::create_dir_all(&app_root).unwrap();
+
+        // Empty mapper backups → resolver falls through to filesystem walk.
+        fs::write(cooked_pc.join(BACKUP_FILE), encrypt_mapper(b"")).unwrap();
+        fs::write(cooked_pc.join(MAPPER_FILE), encrypt_mapper(b"")).unwrap();
+
+        // x64 vanilla on disk.
+        let vanilla_pkg = build_x64_boss_window_test_package([0x10; 4], false);
+        fs::write(s1ui_dir.join("S1UI_GageBoss.gpk"), &vanilla_pkg).unwrap();
+
+        // x32 mod (FileVersion 610) — the real-world foglio1024 case.
+        let modded_pkg = build_boss_window_test_package([0xAA; 4], false);
+        let mod_src = tmp.path().join("mod-src.gpk");
+        fs::write(&mod_src, &modded_pkg).unwrap();
+
+        let err = install_via_patch(
+            &game_root,
+            &app_root,
+            "test.mod",
+            &mod_src,
+            "S1UI_GageBoss",
+        )
+        .unwrap_err();
+
+        assert!(err.contains("incompatible"), "got: {err}");
+        assert!(err.contains("x32"), "got: {err}");
+        assert!(err.contains("x64"), "got: {err}");
+
+        // No artefacts persisted on refusal.
+        assert!(
+            manifest_store::load_manifest_at_root(&app_root, "test.mod")
+                .unwrap()
+                .is_none(),
+            "manifest must not be persisted on arch refusal"
+        );
+        assert!(
+            manifest_store::load_install_target_at_root(&app_root, "test.mod")
+                .unwrap()
+                .is_none(),
+            "install_target sidecar must not be persisted on arch refusal"
+        );
+    }
+
+    #[test]
+    fn install_accepts_x64_mod_when_vanilla_is_x64() {
+        // Sanity check the inverse: a v100.02-authored mod against v100.02
+        // vanilla must NOT be refused for arch reasons. (SaltyMonkey
+        // S1UI_Message is real-world example.)
+        let tmp = TempDir::new().unwrap();
+        let game_root = tmp.path().join("game");
+        let app_root = tmp.path().join("app");
+        let cooked_pc = game_root.join(COOKED_PC_DIR);
+        let s1ui_dir = cooked_pc.join("Art_Data").join("Packages").join("S1UI");
+        fs::create_dir_all(&s1ui_dir).unwrap();
+        fs::create_dir_all(&app_root).unwrap();
+
+        fs::write(cooked_pc.join(BACKUP_FILE), encrypt_mapper(b"")).unwrap();
+        fs::write(cooked_pc.join(MAPPER_FILE), encrypt_mapper(b"")).unwrap();
+
+        let vanilla_pkg = build_x64_boss_window_test_package([0x10; 4], false);
+        fs::write(s1ui_dir.join("S1UI_GageBoss.gpk"), &vanilla_pkg).unwrap();
+
+        let modded_pkg = build_x64_boss_window_test_package([0xAA; 4], false);
+        let mod_src = tmp.path().join("mod-src.gpk");
+        fs::write(&mod_src, &modded_pkg).unwrap();
+
+        install_via_patch(
+            &game_root,
+            &app_root,
+            "test.mod",
+            &mod_src,
+            "S1UI_GageBoss",
+        )
+        .expect("x64-vs-x64 install must succeed");
+
+        assert!(
+            manifest_store::load_manifest_at_root(&app_root, "test.mod")
+                .unwrap()
+                .is_some(),
+            "x64 install must persist a manifest"
         );
     }
 
