@@ -498,13 +498,17 @@ const ModsView = {
         row.dataset.modId = entry.id;
         row.dataset.modKind = entry.kind;
         row.dataset.context = context;
+        // Only render a thumbnail when there's a real image. Falling back to
+        // a 64×64 grey block with initials looks like a broken empty avatar
+        // for entries that don't have screenshots — better to drop the slot
+        // entirely and let the row body fill the space.
         const thumbUrl = entry.featured_image
             || (entry.screenshots && entry.screenshots[0])
             || entry.icon_url
             || '';
         const thumbHtml = thumbUrl
             ? `<img class="mods-row-thumb" src="${escapeHtml(thumbUrl)}" alt="" loading="lazy" />`
-            : `<div class="mods-row-thumb">${escapeHtml(toInitials(entry.name || entry.id))}</div>`;
+            : '';
         const taglineText = entry.tagline || entry.description || entry.short_description || '';
         const allTags = entry.tags || [];
         const firstTags = allTags.slice(0, 2);
