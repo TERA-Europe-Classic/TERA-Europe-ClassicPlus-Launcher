@@ -152,6 +152,16 @@ const ModsView = {
         document.getElementById('mods-titlebar-close')?.addEventListener('click', () => this.close());
         document.getElementById('mods-detail-close')?.addEventListener('click', () => this.closeDetail());
 
+        // Tauri webviews don't open `target="_blank"` anchors in the system
+        // browser by default — route the source-link click through the shell
+        // plugin so users land on the mod's repo / homepage.
+        this.$detailSourceLink?.addEventListener('click', (e) => {
+            const href = this.$detailSourceLink.getAttribute('href');
+            if (!href || href === '#') return;
+            e.preventDefault();
+            window.__TAURI__?.shell?.open?.(href);
+        });
+
         // Tabs
         this.$page.querySelectorAll('.mods-tab').forEach(btn => {
             btn.addEventListener('click', () => this.setTab(btn.dataset.tab));
@@ -515,6 +525,15 @@ const ModsView = {
         this.$detailVersion.textContent = entry.version ? `v${entry.version}` : '';
         this.$detailDescription.textContent = entry.long_description || entry.description || cat?.short_description || '';
         this.$detailFactAuthor.textContent = entry.author || '—';
+        const license = entry.license || cat?.license || '';
+        if (this.$detailFactLicenseRow) this.$detailFactLicenseRow.hidden = !license;
+        if (this.$detailFactLicense) this.$detailFactLicense.textContent = license || '—';
+        const credits = entry.credits || cat?.credits || '';
+        if (this.$detailFactCreditsRow) this.$detailFactCreditsRow.hidden = !credits;
+        if (this.$detailFactCredits) this.$detailFactCredits.textContent = credits || '—';
+        const sourceUrl = entry.source_url || cat?.source_url || '';
+        if (this.$detailLinkRow) this.$detailLinkRow.hidden = !sourceUrl;
+        if (this.$detailSourceLink) this.$detailSourceLink.href = sourceUrl || '#';
         this.$detailIcon.innerHTML = entry.icon_url ? `<img src="${escapeHtml(entry.icon_url)}" alt="" />` : toInitials(entry.name || id);
         const screens = entry.screenshots || cat?.screenshots || [];
         this.$detailScreenshotsSection.hidden = (screens.length === 0);
