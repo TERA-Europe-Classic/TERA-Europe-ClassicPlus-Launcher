@@ -23,7 +23,8 @@
       "updated_at": "2026-04-22T16:23:08Z",
       "tagline": "Tera DPS Meter for the Evervyn and EU Classic Private Servers",
       "last_verified_patch": "patch 115",
-      "download_count": 0
+      "download_count": 0,
+      "featured_image": "https://opengraph.githubassets.com/f74bbdae35109761fee958a44abdcd4426e2032537de0e336934dde7a336ff03/TERA-Europe-Classic/ShinraMeter"
     },
     {
       "id": "classicplus.tcc",
@@ -124,7 +125,8 @@
         "mmorpg",
         "reverse-engineering",
         "tera"
-      ]
+      ],
+      "featured_image": "https://opengraph.githubassets.com/5ed01d9ca215ad851b9adf31c1f75d0c8ac4f780abf54dc1aa66442a54ee05a7/neowutran/S1UI_chat2"
     },
     {
       "id": "saltymonkey.message-clean",
@@ -150,7 +152,8 @@
         "gpk",
         "tera-online",
         "tera-toolbox"
-      ]
+      ],
+      "featured_image": "https://opengraph.githubassets.com/bc409a747d38a43e5bc1716a97d7db7616ef5747ba0ba57bad085dd86817a71d/SaltyMonkey/tera-online-clean-onscreen-messages"
     },
     {
       "id": "saltymonkey.message-centered",
@@ -176,7 +179,8 @@
         "gpk",
         "tera-online",
         "tera-toolbox"
-      ]
+      ],
+      "featured_image": "https://opengraph.githubassets.com/f7149505b2f1b71a127bd2d6c3f1f342cb806cdf5725d9d15b59a03b517acfd3/SaltyMonkey/tera-online-centered-clean-onscreen-messages"
     },
     {
       "id": "saltymonkey.overlaymap-fixed",
@@ -202,7 +206,8 @@
         "tera-online",
         "tera-toolbox",
         "tera-toolbox-mods"
-      ]
+      ],
+      "featured_image": "https://opengraph.githubassets.com/d8a569abe5982da299c23afbdf2f908fe409628d01b39d31c0800d19bd864267/SaltyMonkey/tera-online-fixed-overlay-map"
     },
     {
       "id": "saltymonkey.gageboss-extended",
@@ -228,7 +233,8 @@
         "gpk",
         "tera-online",
         "tera-toolbox"
-      ]
+      ],
+      "featured_image": "https://opengraph.githubassets.com/e93395d33789bd10b48a45e6a625d4ad690313ba3a735d8e232c647cc55d57aa/SaltyMonkey/tera-online-extended-boss-bar"
     },
     {
       "id": "saltymonkey.characterwindow-clean",
@@ -254,7 +260,8 @@
         "gpk",
         "tera-online",
         "tera-toolbox"
-      ]
+      ],
+      "featured_image": "https://opengraph.githubassets.com/01e6de82337b9dcbd0d2375a4ded5e154954540840ebee97387c5b69f5732e38/SaltyMonkey/tera-online-clean-character-bar"
     },
     {
       "id": "teralove.partywindowraidinfo",
@@ -283,7 +290,8 @@
       "tags": [
         "tera-mods",
         "tera-online"
-      ]
+      ],
+      "featured_image": "https://opengraph.githubassets.com/b8b9a80248441563c113e3a8a9cada696241ea72476ce2db79cd55fb2918a5f9/teralove/TERA-UI-Mods"
     },
     {
       "id": "teralove.targetinfo",
@@ -312,7 +320,8 @@
       "tags": [
         "tera-mods",
         "tera-online"
-      ]
+      ],
+      "featured_image": "https://opengraph.githubassets.com/b8b9a80248441563c113e3a8a9cada696241ea72476ce2db79cd55fb2918a5f9/teralove/TERA-UI-Mods"
     },
     {
       "id": "foglio1024.restyle-community-window",
@@ -358,7 +367,8 @@
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
       "last_verified_patch": "patch 110",
-      "compatibility_notes": "Single-window mod; safe to combine with restyles for other windows but not with another EP-window restyle."
+      "compatibility_notes": "Single-window mod; safe to combine with restyles for other windows but not with another EP-window restyle.",
+      "featured_image": "https://opengraph.githubassets.com/2b57d5b61f04782df1d7eb4e2bbe3415f05d655a85f170e4fa36f43625a27fe2/foglio1024/tera-restyle"
     },
     {
       "id": "foglio1024.restyle-equipment-combine",
@@ -379,7 +389,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
-      "last_verified_patch": "patch 110"
+      "last_verified_patch": "patch 110",
+      "featured_image": "https://opengraph.githubassets.com/2b57d5b61f04782df1d7eb4e2bbe3415f05d655a85f170e4fa36f43625a27fe2/foglio1024/tera-restyle"
     },
     {
       "id": "foglio1024.restyle-equipment-upgrade",
@@ -400,7 +411,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
-      "last_verified_patch": "patch 110"
+      "last_verified_patch": "patch 110",
+      "featured_image": "https://opengraph.githubassets.com/2b57d5b61f04782df1d7eb4e2bbe3415f05d655a85f170e4fa36f43625a27fe2/foglio1024/tera-restyle"
     },
     {
       "id": "foglio1024.restyle-guild-window",
@@ -421,7 +433,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
-      "last_verified_patch": "patch 110"
+      "last_verified_patch": "patch 110",
+      "featured_image": "https://opengraph.githubassets.com/2b57d5b61f04782df1d7eb4e2bbe3415f05d655a85f170e4fa36f43625a27fe2/foglio1024/tera-restyle"
     },
     {
       "id": "foglio1024.restyle-interaction-popup",
@@ -442,7 +455,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
-      "last_verified_patch": "patch 110"
+      "last_verified_patch": "patch 110",
+      "featured_image": "https://opengraph.githubassets.com/2b57d5b61f04782df1d7eb4e2bbe3415f05d655a85f170e4fa36f43625a27fe2/foglio1024/tera-restyle"
     },
     {
       "id": "foglio1024.restyle-inventory",
@@ -463,7 +477,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
-      "last_verified_patch": "patch 110"
+      "last_verified_patch": "patch 110",
+      "featured_image": "https://opengraph.githubassets.com/2b57d5b61f04782df1d7eb4e2bbe3415f05d655a85f170e4fa36f43625a27fe2/foglio1024/tera-restyle"
     },
     {
       "id": "foglio1024.restyle-minimap",
@@ -484,7 +499,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
-      "last_verified_patch": "patch 110"
+      "last_verified_patch": "patch 110",
+      "featured_image": "https://opengraph.githubassets.com/2b57d5b61f04782df1d7eb4e2bbe3415f05d655a85f170e4fa36f43625a27fe2/foglio1024/tera-restyle"
     },
     {
       "id": "foglio1024.restyle-paperdoll",
@@ -505,7 +521,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
-      "last_verified_patch": "patch 110"
+      "last_verified_patch": "patch 110",
+      "featured_image": "https://opengraph.githubassets.com/2b57d5b61f04782df1d7eb4e2bbe3415f05d655a85f170e4fa36f43625a27fe2/foglio1024/tera-restyle"
     },
     {
       "id": "foglio1024.restyle-parcelpost",
@@ -526,7 +543,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
-      "last_verified_patch": "patch 110"
+      "last_verified_patch": "patch 110",
+      "featured_image": "https://opengraph.githubassets.com/2b57d5b61f04782df1d7eb4e2bbe3415f05d655a85f170e4fa36f43625a27fe2/foglio1024/tera-restyle"
     },
     {
       "id": "foglio1024.restyle-production-create",
@@ -547,7 +565,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
-      "last_verified_patch": "patch 110"
+      "last_verified_patch": "patch 110",
+      "featured_image": "https://opengraph.githubassets.com/2b57d5b61f04782df1d7eb4e2bbe3415f05d655a85f170e4fa36f43625a27fe2/foglio1024/tera-restyle"
     },
     {
       "id": "foglio1024.restyle-production-list",
@@ -568,7 +587,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
-      "last_verified_patch": "patch 110"
+      "last_verified_patch": "patch 110",
+      "featured_image": "https://opengraph.githubassets.com/2b57d5b61f04782df1d7eb4e2bbe3415f05d655a85f170e4fa36f43625a27fe2/foglio1024/tera-restyle"
     },
     {
       "id": "foglio1024.restyle-servant-storage",
@@ -589,7 +609,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
-      "last_verified_patch": "patch 110"
+      "last_verified_patch": "patch 110",
+      "featured_image": "https://opengraph.githubassets.com/2b57d5b61f04782df1d7eb4e2bbe3415f05d655a85f170e4fa36f43625a27fe2/foglio1024/tera-restyle"
     },
     {
       "id": "foglio1024.restyle-skill-window",
@@ -610,7 +631,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
-      "last_verified_patch": "patch 110"
+      "last_verified_patch": "patch 110",
+      "featured_image": "https://opengraph.githubassets.com/2b57d5b61f04782df1d7eb4e2bbe3415f05d655a85f170e4fa36f43625a27fe2/foglio1024/tera-restyle"
     },
     {
       "id": "foglio1024.restyle-store-window",
@@ -631,7 +653,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
-      "last_verified_patch": "patch 110"
+      "last_verified_patch": "patch 110",
+      "featured_image": "https://opengraph.githubassets.com/2b57d5b61f04782df1d7eb4e2bbe3415f05d655a85f170e4fa36f43625a27fe2/foglio1024/tera-restyle"
     },
     {
       "id": "foglio1024.restyle-system-option",
@@ -652,7 +675,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
-      "last_verified_patch": "patch 110"
+      "last_verified_patch": "patch 110",
+      "featured_image": "https://opengraph.githubassets.com/2b57d5b61f04782df1d7eb4e2bbe3415f05d655a85f170e4fa36f43625a27fe2/foglio1024/tera-restyle"
     },
     {
       "id": "foglio1024.restyle-quickslot",
@@ -673,7 +697,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
-      "last_verified_patch": "patch 110"
+      "last_verified_patch": "patch 110",
+      "featured_image": "https://opengraph.githubassets.com/2b57d5b61f04782df1d7eb4e2bbe3415f05d655a85f170e4fa36f43625a27fe2/foglio1024/tera-restyle"
     },
     {
       "id": "foglio1024.restyle-trade-popup",
@@ -694,7 +719,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
-      "last_verified_patch": "patch 110"
+      "last_verified_patch": "patch 110",
+      "featured_image": "https://opengraph.githubassets.com/2b57d5b61f04782df1d7eb4e2bbe3415f05d655a85f170e4fa36f43625a27fe2/foglio1024/tera-restyle"
     },
     {
       "id": "foglio1024.restyle-warehouse",
@@ -715,7 +741,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
-      "last_verified_patch": "patch 110"
+      "last_verified_patch": "patch 110",
+      "featured_image": "https://opengraph.githubassets.com/2b57d5b61f04782df1d7eb4e2bbe3415f05d655a85f170e4fa36f43625a27fe2/foglio1024/tera-restyle"
     },
     {
       "id": "foglio1024.modern-ui-jewels-fix-inventory",
@@ -735,7 +762,8 @@
       "target_patch": "v100.02",
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
-      "last_verified_patch": "patch 103"
+      "last_verified_patch": "patch 103",
+      "featured_image": "https://opengraph.githubassets.com/9d7d061f34c9ba80f1928446e5013bea8e05c12bdd1d8b8e01205d5a425ecabf/foglio1024/tera-modern-ui"
     },
     {
       "id": "foglio1024.modern-ui-jewels-fix-paperdoll",
@@ -755,7 +783,8 @@
       "target_patch": "v100.02",
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
-      "last_verified_patch": "patch 103"
+      "last_verified_patch": "patch 103",
+      "featured_image": "https://opengraph.githubassets.com/9d7d061f34c9ba80f1928446e5013bea8e05c12bdd1d8b8e01205d5a425ecabf/foglio1024/tera-modern-ui"
     },
     {
       "id": "foglio1024.modern-ui-jewels-fix-icons",
@@ -775,7 +804,8 @@
       "target_patch": "v100.02",
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
-      "last_verified_patch": "patch 103"
+      "last_verified_patch": "patch 103",
+      "featured_image": "https://opengraph.githubassets.com/9d7d061f34c9ba80f1928446e5013bea8e05c12bdd1d8b8e01205d5a425ecabf/foglio1024/tera-modern-ui"
     },
     {
       "id": "foglio1024.ui-remover-bosswindow",
@@ -796,7 +826,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "Replaces specifics GPK's with an empty one",
-      "last_verified_patch": "patch 103"
+      "last_verified_patch": "patch 103",
+      "featured_image": "https://opengraph.githubassets.com/bb69d3bfdb6ef42323703ce2356d6ab548704632992868e6f5b7d6f104da80fa/foglio1024/UI-Remover"
     },
     {
       "id": "foglio1024.ui-remover-targetinfo",
@@ -817,7 +848,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "Replaces specifics GPK's with an empty one",
-      "last_verified_patch": "patch 103"
+      "last_verified_patch": "patch 103",
+      "featured_image": "https://opengraph.githubassets.com/bb69d3bfdb6ef42323703ce2356d6ab548704632992868e6f5b7d6f104da80fa/foglio1024/UI-Remover"
     },
     {
       "id": "foglio1024.ui-remover-buffs",
@@ -838,7 +870,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "Replaces specifics GPK's with an empty one",
-      "last_verified_patch": "patch 103"
+      "last_verified_patch": "patch 103",
+      "featured_image": "https://opengraph.githubassets.com/bb69d3bfdb6ef42323703ce2356d6ab548704632992868e6f5b7d6f104da80fa/foglio1024/UI-Remover"
     },
     {
       "id": "foglio1024.ui-remover-character",
@@ -859,7 +892,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "Replaces specifics GPK's with an empty one",
-      "last_verified_patch": "patch 103"
+      "last_verified_patch": "patch 103",
+      "featured_image": "https://opengraph.githubassets.com/bb69d3bfdb6ef42323703ce2356d6ab548704632992868e6f5b7d6f104da80fa/foglio1024/UI-Remover"
     },
     {
       "id": "foglio1024.ui-remover-flight-gauge",
@@ -880,7 +914,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "Replaces specifics GPK's with an empty one",
-      "last_verified_patch": "patch 103"
+      "last_verified_patch": "patch 103",
+      "featured_image": "https://opengraph.githubassets.com/bb69d3bfdb6ef42323703ce2356d6ab548704632992868e6f5b7d6f104da80fa/foglio1024/UI-Remover"
     },
     {
       "id": "foglio1024.ui-remover-lfg-board",
@@ -901,7 +936,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "Replaces specifics GPK's with an empty one",
-      "last_verified_patch": "patch 103"
+      "last_verified_patch": "patch 103",
+      "featured_image": "https://opengraph.githubassets.com/bb69d3bfdb6ef42323703ce2356d6ab548704632992868e6f5b7d6f104da80fa/foglio1024/UI-Remover"
     },
     {
       "id": "foglio1024.ui-remover-lfg-member",
@@ -922,7 +958,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "Replaces specifics GPK's with an empty one",
-      "last_verified_patch": "patch 103"
+      "last_verified_patch": "patch 103",
+      "featured_image": "https://opengraph.githubassets.com/bb69d3bfdb6ef42323703ce2356d6ab548704632992868e6f5b7d6f104da80fa/foglio1024/UI-Remover"
     },
     {
       "id": "foglio1024.ui-remover-party-window",
@@ -943,7 +980,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "Replaces specifics GPK's with an empty one",
-      "last_verified_patch": "patch 103"
+      "last_verified_patch": "patch 103",
+      "featured_image": "https://opengraph.githubassets.com/bb69d3bfdb6ef42323703ce2356d6ab548704632992868e6f5b7d6f104da80fa/foglio1024/UI-Remover"
     },
     {
       "id": "foglio1024.ui-remover-raid-window",
@@ -964,7 +1002,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "Replaces specifics GPK's with an empty one",
-      "last_verified_patch": "patch 103"
+      "last_verified_patch": "patch 103",
+      "featured_image": "https://opengraph.githubassets.com/bb69d3bfdb6ef42323703ce2356d6ab548704632992868e6f5b7d6f104da80fa/foglio1024/UI-Remover"
     },
     {
       "id": "foglio1024.toolbox-gagebar-topscreen",
@@ -984,7 +1023,8 @@
       "target_patch": "v100.02",
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
-      "last_verified_patch": "patch 103"
+      "last_verified_patch": "patch 103",
+      "featured_image": "https://raw.githubusercontent.com/foglio1024/toolbox-client-mods/master/GageBar_TopScreen/image.png"
     },
     {
       "id": "foglio1024.toolbox-transparent-damage",
@@ -1004,7 +1044,8 @@
       "target_patch": "v100.02",
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
-      "last_verified_patch": "patch 103"
+      "last_verified_patch": "patch 103",
+      "featured_image": "https://opengraph.githubassets.com/2e7f1898476ab35273ed8eac9c8cfb3d6f07b69f2919837758fc5d58990ca677/foglio1024/toolbox-client-mods"
     },
     {
       "id": "foglio1024.toolbox-thinkblob",
@@ -1024,7 +1065,8 @@
       "target_patch": "v100.02",
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
-      "last_verified_patch": "patch 103"
+      "last_verified_patch": "patch 103",
+      "featured_image": "https://raw.githubusercontent.com/foglio1024/toolbox-client-mods/master/thinkblob/preview.png"
     },
     {
       "id": "foglio1024.badgui-loader",
@@ -1045,7 +1087,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "Modded GPK for badGUI",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/7d499854e270b16a57cc128c3fbc3c1808cface7866f0c6ce3b735267d972ba6/foglio1024/badGUILoader"
     },
     {
       "id": "foglio1024.s1ui-chat2-p75",
@@ -1065,7 +1108,8 @@
       "target_patch": "v100.02",
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/fbcf9c71d86813ee569475dbf028e5b378da43e7abe3d3ced455e5549008629e/foglio1024/S1UI_chat2"
     },
     {
       "id": "taorelia.restyle-community",
@@ -1086,7 +1130,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "TERA UI windows restyled usingy a modern look.",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/e84486ddab4c59857f58fd68cb397d79d539152598fde88cd2378127cb300d83/Taorelia/tera-restyle"
     },
     {
       "id": "taorelia.restyle-guild",
@@ -1107,7 +1152,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "TERA UI windows restyled usingy a modern look.",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/e84486ddab4c59857f58fd68cb397d79d539152598fde88cd2378127cb300d83/Taorelia/tera-restyle"
     },
     {
       "id": "taorelia.restyle-inventory",
@@ -1128,7 +1174,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "TERA UI windows restyled usingy a modern look.",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/e84486ddab4c59857f58fd68cb397d79d539152598fde88cd2378127cb300d83/Taorelia/tera-restyle"
     },
     {
       "id": "taorelia.restyle-paperdoll",
@@ -1149,7 +1196,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "TERA UI windows restyled usingy a modern look.",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/e84486ddab4c59857f58fd68cb397d79d539152598fde88cd2378127cb300d83/Taorelia/tera-restyle"
     },
     {
       "id": "taorelia.restyle-warehouse",
@@ -1170,7 +1218,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "TERA UI windows restyled usingy a modern look.",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/e84486ddab4c59857f58fd68cb397d79d539152598fde88cd2378127cb300d83/Taorelia/tera-restyle"
     },
     {
       "id": "taorelia.restyle-interaction-popup",
@@ -1191,7 +1240,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "TERA UI windows restyled usingy a modern look.",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/e84486ddab4c59857f58fd68cb397d79d539152598fde88cd2378127cb300d83/Taorelia/tera-restyle"
     },
     {
       "id": "taorelia.restyle-production-create",
@@ -1212,7 +1262,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "TERA UI windows restyled usingy a modern look.",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/e84486ddab4c59857f58fd68cb397d79d539152598fde88cd2378127cb300d83/Taorelia/tera-restyle"
     },
     {
       "id": "owyn.fps-pack-postprocess",
@@ -1238,7 +1289,8 @@
         "tera",
         "tera-online",
         "tera-proxy"
-      ]
+      ],
+      "featured_image": "https://opengraph.githubassets.com/d013c722385e64a0f98657bec86b5e3c4387f95eb13782001e83d79bfb8c0641/Owyn/fps-pack"
     },
     {
       "id": "owyn.fps-pack-fx-enchant",
@@ -1264,7 +1316,8 @@
         "tera",
         "tera-online",
         "tera-proxy"
-      ]
+      ],
+      "featured_image": "https://opengraph.githubassets.com/d013c722385e64a0f98657bec86b5e3c4387f95eb13782001e83d79bfb8c0641/Owyn/fps-pack"
     },
     {
       "id": "owyn.fps-pack-fx-awaken-archer",
@@ -1290,7 +1343,8 @@
         "tera",
         "tera-online",
         "tera-proxy"
-      ]
+      ],
+      "featured_image": "https://opengraph.githubassets.com/d013c722385e64a0f98657bec86b5e3c4387f95eb13782001e83d79bfb8c0641/Owyn/fps-pack"
     },
     {
       "id": "owyn.fps-pack-fx-awaken-berserker",
@@ -1316,7 +1370,8 @@
         "tera",
         "tera-online",
         "tera-proxy"
-      ]
+      ],
+      "featured_image": "https://opengraph.githubassets.com/d013c722385e64a0f98657bec86b5e3c4387f95eb13782001e83d79bfb8c0641/Owyn/fps-pack"
     },
     {
       "id": "owyn.fps-pack-fx-awaken-sorcerer",
@@ -1342,7 +1397,8 @@
         "tera",
         "tera-online",
         "tera-proxy"
-      ]
+      ],
+      "featured_image": "https://opengraph.githubassets.com/d013c722385e64a0f98657bec86b5e3c4387f95eb13782001e83d79bfb8c0641/Owyn/fps-pack"
     },
     {
       "id": "owyn.fps-pack-fx-awaken-priest",
@@ -1368,7 +1424,8 @@
         "tera",
         "tera-online",
         "tera-proxy"
-      ]
+      ],
+      "featured_image": "https://opengraph.githubassets.com/d013c722385e64a0f98657bec86b5e3c4387f95eb13782001e83d79bfb8c0641/Owyn/fps-pack"
     },
     {
       "id": "owyn.fps-pack-fx-awaken-lancer",
@@ -1394,7 +1451,8 @@
         "tera",
         "tera-online",
         "tera-proxy"
-      ]
+      ],
+      "featured_image": "https://opengraph.githubassets.com/d013c722385e64a0f98657bec86b5e3c4387f95eb13782001e83d79bfb8c0641/Owyn/fps-pack"
     },
     {
       "id": "owyn.fps-pack-fx-awaken-slayer",
@@ -1420,7 +1478,8 @@
         "tera",
         "tera-online",
         "tera-proxy"
-      ]
+      ],
+      "featured_image": "https://opengraph.githubassets.com/d013c722385e64a0f98657bec86b5e3c4387f95eb13782001e83d79bfb8c0641/Owyn/fps-pack"
     },
     {
       "id": "owyn.fps-pack-fx-awaken-warrior",
@@ -1446,7 +1505,8 @@
         "tera",
         "tera-online",
         "tera-proxy"
-      ]
+      ],
+      "featured_image": "https://opengraph.githubassets.com/d013c722385e64a0f98657bec86b5e3c4387f95eb13782001e83d79bfb8c0641/Owyn/fps-pack"
     },
     {
       "id": "catannadev.pink-crosshair",
@@ -1472,7 +1532,8 @@
         "tera-mods",
         "tera-proxy",
         "tera-ui"
-      ]
+      ],
+      "featured_image": "https://opengraph.githubassets.com/3a1e38845c1476b1076b976c77d39be317514417fc8dc3aa02cc0e5876c522ce/CatAnnaDev/Pink-crossair"
     },
     {
       "id": "catannadev.red-crosshair",
@@ -1499,7 +1560,8 @@
         "tera-online",
         "tera-proxy",
         "tera-ui"
-      ]
+      ],
+      "featured_image": "https://opengraph.githubassets.com/ad65b9e48d0cc9db7be43a35349484576db999952107ab9cd52eb002601bb7a7/CatAnnaDev/Red-crosshair"
     },
     {
       "id": "catannadev.pink-hp-bar",
@@ -1525,7 +1587,8 @@
         "tera-mods",
         "tera-proxy",
         "tera-ui"
-      ]
+      ],
+      "featured_image": "https://opengraph.githubassets.com/a949580004e33b477cb770ea2b85a5931eb60e14addd9ef80c86d6d7d6eaad0d/CatAnnaDev/Pink-Hp-bar"
     },
     {
       "id": "catannadev.colored-hp-bar",
@@ -1551,7 +1614,8 @@
         "tera-mods",
         "tera-proxy",
         "tera-ui"
-      ]
+      ],
+      "featured_image": "https://opengraph.githubassets.com/e35fe73068ddc7f5616a59aa5b6aeaf388191133bf92b085e473a42fe95a3a95/CatAnnaDev/Colored-hp-bar"
     },
     {
       "id": "catannadev.colored-hp-bar-2",
@@ -1577,7 +1641,8 @@
         "tera-mods",
         "tera-proxy",
         "tera-ui"
-      ]
+      ],
+      "featured_image": "https://opengraph.githubassets.com/8e5ba7740658edecc958f951e59d7aa182657f1841f5c6b4e4a3cdb72ae53fbf/CatAnnaDev/Colored-hp-bar-2"
     },
     {
       "id": "catannadev.yellow-orange-hp-bar",
@@ -1603,7 +1668,8 @@
         "tera-mods",
         "tera-proxy",
         "tera-ui"
-      ]
+      ],
+      "featured_image": "https://opengraph.githubassets.com/20905a1394d93f393fa8abefb63fd57d697b14861901149bd0526f2163a206d2/CatAnnaDev/Yellow-Orange-hp-bar"
     },
     {
       "id": "catannadev.pink-loading-progress",
@@ -1629,7 +1695,8 @@
         "tera-mods",
         "tera-proxy",
         "tera-ui"
-      ]
+      ],
+      "featured_image": "https://opengraph.githubassets.com/0090718ec2f3ef6cc9ea2f00b256dc62696a90eaebb6c11db6096c6afc2e992f/CatAnnaDev/Pink-LoadingProgress"
     },
     {
       "id": "catannadev.red-loading-progress",
@@ -1655,7 +1722,8 @@
         "tera-mods",
         "tera-proxy",
         "tera-ui"
-      ]
+      ],
+      "featured_image": "https://opengraph.githubassets.com/1d1c574a3b2ecab16d0cdc77eec8d0a8b84c96fd0b0c0a17b06e8c27ae815c1c/CatAnnaDev/Red-LoadingProgress"
     },
     {
       "id": "teralove.remove-artisan-icons",
@@ -1682,7 +1750,8 @@
       "last_verified_patch": "patch 95",
       "tags": [
         "tera-proxy"
-      ]
+      ],
+      "featured_image": "https://raw.githubusercontent.com/teralove/remove-artisan-icons/master/artisan_mastery_icons.png"
     },
     {
       "id": "merusira.atlas-clean-onscreen-messages",
@@ -1703,7 +1772,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "TeraAtlas",
-      "last_verified_patch": "patch 115"
+      "last_verified_patch": "patch 115",
+      "featured_image": "https://raw.githubusercontent.com/merusira/tera-toolbox-atlas/master/bin/gui/assets/banner-omni.png"
     },
     {
       "id": "pantypon.cheerleader-shorts",
@@ -1724,7 +1794,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "pantys-mods",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Cheerleader%20Shorts/Cheerleader%20Shorts%20Model.png"
     },
     {
       "id": "pantypon.elin-black-business-suit",
@@ -1745,7 +1816,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "pantys-mods",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Elin%20Black%20Business%20Suit/Black%20Business%20Suit%20Model.png"
     },
     {
       "id": "pantypon.elin-strawberry-maid",
@@ -1766,7 +1838,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "pantys-mods",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Elin%20Strawberry%20Maid/Strawberry%20Maid%20Model.png"
     },
     {
       "id": "pantypon.elin-pink-social-dress",
@@ -1787,7 +1860,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "pantys-mods",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/e69bf3fca13b0ec83d3bf85aab760092374562205369be9168465bd075114b67/pantypon/tera-client-mods"
     },
     {
       "id": "pantypon.pastel-pora-elinu-uniform",
@@ -1808,7 +1882,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "pantys-mods",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Pastel%20Pora%20Elinu%20Uniform/Pastel%20Uniform%20Model%201.png"
     },
     {
       "id": "pantypon.red-miko-costume",
@@ -1829,7 +1904,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "pantys-mods",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/e69bf3fca13b0ec83d3bf85aab760092374562205369be9168465bd075114b67/pantypon/tera-client-mods"
     },
     {
       "id": "pantypon.white-castanica-demon",
@@ -1850,7 +1926,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "pantys-mods",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/White%20Castanica%20Demon/White%20Castanica%20Demon%20Model.png"
     },
     {
       "id": "pantypon.white-pixie",
@@ -1871,7 +1948,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "pantys-mods",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/White%20Pixie/White%20Pixie%20Model.png"
     },
     {
       "id": "pantypon.better-dyeable-flight-suit",
@@ -1892,7 +1970,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "pantys-mods",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Better%20Dyeable%20Flight%20Suit/Better%20Dyeable%20Flight%20Suit%20Model.png"
     },
     {
       "id": "pantypon.castanic-sleepy-running-togs",
@@ -1913,7 +1992,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "pantys-mods",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Castanic%20Sleepy%20Running%20Togs/Castanic%20Sleepy%20Model.png"
     },
     {
       "id": "pantypon.charcoal-eldritch-no-skirt",
@@ -1934,7 +2014,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "pantys-mods",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Charcoal%20Eldritch%20No%20Skirt/Charcoal%20Eldritch%20No%20Skirt%20Model.png"
     },
     {
       "id": "pantypon.elin-sugar-alice",
@@ -1955,7 +2036,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "pantys-mods",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Elin%20Sugar%20Alice/Sugar%20Alice%20Model.png"
     },
     {
       "id": "pantypon.elin-rose-gold-raincoat",
@@ -1976,7 +2058,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "pantys-mods",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Elin%20Rose%20Gold%20Raincoat/Rose%20Gold%20Model.png"
     },
     {
       "id": "pantypon.elin-english-lavender-raincoat",
@@ -1997,7 +2080,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "pantys-mods",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Elin%20English%20Lavender%20Raincoat/English%20Lavender%20Model.png"
     },
     {
       "id": "pantypon.pink-picnic-dress",
@@ -2018,7 +2102,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "pantys-mods",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Pink%20Picnic%20Dress/Pink%20Picnic%20Elin%20Model.png"
     },
     {
       "id": "taylorswiftmodding.bear-animal-mask",
@@ -2039,7 +2124,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "TeraMods made by TSwift",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://i.gyazo.com/719877c582014af1b3cbe3cea025657c.jpg"
     },
     {
       "id": "taylorswiftmodding.happy-kitty-mask",
@@ -2060,7 +2146,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "TeraMods made by TSwift",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://i.gyazo.com/5441da094b39a707955cc173fd43be68.jpg"
     },
     {
       "id": "taylorswiftmodding.bunny-chu-mount",
@@ -2081,7 +2168,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "TeraMods made by TSwift",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/c5071f8acf3523d20d80b94baa46ff52f9c1a03eb32828cd423d901eba71c00c/TheTaylorSwiftOfModding/TeraMods"
     },
     {
       "id": "taylorswiftmodding.candied-dragon",
@@ -2102,7 +2190,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "TeraMods made by TSwift",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://i.gyazo.com/8ac77bf3f8823bf13b89e1c808f4ed8b.jpg"
     },
     {
       "id": "taylorswiftmodding.bunny-coco",
@@ -2123,7 +2212,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "TeraMods made by TSwift",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://i.gyazo.com/2bda1efb5849835daa530012a07bb308.png"
     },
     {
       "id": "taylorswiftmodding.hanbok-bubblegum-princess",
@@ -2144,7 +2234,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "TeraMods made by TSwift",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://i.gyazo.com/f95333b9a5ecba482b51fbd1e92e6a4e.png"
     },
     {
       "id": "taylorswiftmodding.peaches-and-jeans",
@@ -2165,7 +2256,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "TeraMods made by TSwift",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://i.gyazo.com/a547ad1538e2a34fdb87acb80ff94a7c.jpg"
     },
     {
       "id": "taylorswiftmodding.pikachu-raincoat",
@@ -2186,7 +2278,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "TeraMods made by TSwift",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://i.gyazo.com/de4985524a07e59ad02368dddfab6c3b.png"
     },
     {
       "id": "taylorswiftmodding.i-can-haz-backpack",
@@ -2207,7 +2300,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "TeraMods made by TSwift",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://i.gyazo.com/d52f456c0b1cca853a7fa061d0065bf6.png"
     },
     {
       "id": "taylorswiftmodding.maria-maria",
@@ -2228,7 +2322,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "TeraMods made by TSwift",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://i.gyazo.com/eddf85c2aec0280729b7bf215543a00b.png"
     },
     {
       "id": "taylorswiftmodding.pinky-kun",
@@ -2249,7 +2344,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "TeraMods made by TSwift",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://i.gyazo.com/c24c8805b32deefebcc5c0fee87a1e31.png"
     },
     {
       "id": "taylorswiftmodding.blacker-bow",
@@ -2270,7 +2366,8 @@
       "composite_flag": true,
       "updated_at": "2026-04-18T20:21:17Z",
       "tagline": "TeraMods made by TSwift",
-      "last_verified_patch": "patch 100"
+      "last_verified_patch": "patch 100",
+      "featured_image": "https://opengraph.githubassets.com/c5071f8acf3523d20d80b94baa46ff52f9c1a03eb32828cd423d901eba71c00c/TheTaylorSwiftOfModding/TeraMods"
     }
   ]
 }
