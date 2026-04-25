@@ -241,8 +241,9 @@ fn parse_header_layout(bytes: &[u8]) -> Result<HeaderLayout, String> {
     if tag != 0x9E2A83C1 {
         return Err(format!("GPK package has invalid magic {:08X}", tag));
     }
-    let _file_version = read_u16_le(bytes, &mut cursor)?;
+    let file_version = read_u16_le(bytes, &mut cursor)?;
     let _license_version = read_u16_le(bytes, &mut cursor)?;
+    let is_x64 = gpk_package::is_x64_file_version(file_version);
     let _header_size = read_u32_le(bytes, &mut cursor)?;
     let _package_name = read_fstring(bytes, &mut cursor)?;
     let _package_flags = read_u32_le(bytes, &mut cursor)?;
@@ -255,6 +256,11 @@ fn parse_header_layout(bytes: &[u8]) -> Result<HeaderLayout, String> {
     let _import_offset = read_u32_le(bytes, &mut cursor)?;
     let depends_offset_pos = cursor;
     let depends_offset = read_u32_le(bytes, &mut cursor)?;
+    if is_x64 {
+        // Skip ImportExportGuidsOffset + ImportGuidsCount + ExportGuidsCount
+        // + ThumbnailTableOffset (16 bytes) before FGuid.
+        skip_exact(bytes, &mut cursor, 16)?;
+    }
     skip_exact(bytes, &mut cursor, 16)?;
     let generation_count = read_u32_le(bytes, &mut cursor)? as usize;
     skip_exact(bytes, &mut cursor, generation_count.saturating_mul(12))?;
@@ -416,6 +422,27 @@ mod tests {
 
         let err = apply_manifest(&package_bytes, &manifest).expect_err("class changes must fail closed");
         assert!(err.contains("does not support ReplaceExportClassAndPayload yet"));
+    }
+
+    #[test]
+    fn x64_package_round_trips_through_applier() {
+        // v100.02 boss-window-shaped fixture (FileVersion 897, 16 extra
+        // header bytes). parse_header_layout must agree with the parser
+        // about where the header ends so the rebuild slice math is correct.
+        let package_bytes = super::super::test_fixtures::build_x64_boss_window_test_package(
+            [0x10, 0x11, 0x12, 0x13],
+            true,
+        );
+        let parsed = gpk_package::parse_package(&package_bytes).expect("parse x64 source");
+        let manifest = boss_window_manifest(&parsed);
+
+        let rebuilt = apply_manifest(&package_bytes, &manifest).expect("apply x64 manifest");
+        let reparsed = gpk_package::parse_package(&rebuilt).expect("parse x64 rebuilt");
+
+        assert_eq!(reparsed.summary.file_version, 897);
+        assert_eq!(reparsed.exports.len(), 1);
+        assert_eq!(reparsed.exports[0].object_path, "GageBoss");
+        assert_eq!(reparsed.exports[0].payload, vec![0x90, 0x91, 0x92, 0x93]);
     }
 
     fn boss_window_manifest(parsed: &gpk_package::GpkPackage) -> patch_manifest::PatchManifest {

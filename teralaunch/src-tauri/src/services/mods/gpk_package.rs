@@ -1,17 +1,49 @@
-//! Minimal classic TERA GPK package parser.
+//! Minimal TERA GPK package parser supporting both Classic (x32, FileVersion
+//! 610) and v100.02 (x64, FileVersion 897) layouts.
 //!
-//! This module intentionally focuses on the read-only package-analysis seam the
-//! patch converter and future patch applier both need: package summary, name
-//! table, import table, export table, object-path resolution, and export payload
-//! extraction. It does **not** write packages yet and it fails closed on shapes
-//! we do not support yet (compressed packages, x64 headers).
+//! Read-only package-analysis seam used by the patch converter and the patch
+//! applier: package summary, name table, import table, export table,
+//! object-path resolution, and export payload extraction. Does not write
+//! packages directly — the applier rebuilds via slice+concatenate so the
+//! header is preserved verbatim.
+//!
+//! x32 vs x64 differences this parser handles:
+//! - x64 inserts 16 extra header bytes after `DependsOffset` (per
+//!   TeraCoreLib FStructs.cpp: `ImportExportGuidsOffset`, `ImportGuidsCount`,
+//!   `ExportGuidsCount`, `ThumbnailTableOffset`).
+//! - x32 stores `NameCount` as `count + name_offset` when cooked; x64 stores
+//!   the raw count.
+//!
+//! Property-body differences (BoolProperty 1 vs 4 bytes, ByteProperty
+//! enumType prefix) only matter when parsing inside an export payload, which
+//! we do not do — the applier replaces payloads byte-for-byte.
 
 use sha2::{Digest, Sha256};
 use std::io::Read;
 
 const PACKAGE_MAGIC: u32 = 0x9E2A83C1;
-const X64_VERSION_THRESHOLD: u16 = 0x381;
+pub const X64_VERSION_THRESHOLD: u16 = 0x381;
 const CHUNK_BLOCK_SIGNATURE: u32 = PACKAGE_MAGIC;
+
+/// Reads the FileVersion (u16 LE at offset 4) from a GPK header. Returns
+/// `None` if the buffer is too small or doesn't start with the package
+/// magic. Used by the install flow to refuse arch-mismatched mods before
+/// attempting derivation.
+pub fn read_file_version(bytes: &[u8]) -> Option<u16> {
+    if bytes.len() < 8 {
+        return None;
+    }
+    let magic = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+    if magic != PACKAGE_MAGIC {
+        return None;
+    }
+    Some(u16::from_le_bytes([bytes[4], bytes[5]]))
+}
+
+/// Returns true for FileVersion >= 0x381 (TERA v100.02 / Modern x64).
+pub fn is_x64_file_version(file_version: u16) -> bool {
+    file_version >= X64_VERSION_THRESHOLD
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ChunkHeader {
@@ -178,11 +210,7 @@ pub fn parse_package(bytes: &[u8]) -> Result<GpkPackage, String> {
 
     let file_version = read_u16_le(bytes, &mut cursor)?;
     let license_version = read_u16_le(bytes, &mut cursor)?;
-    if file_version >= X64_VERSION_THRESHOLD {
-        return Err(format!(
-            "Unsupported x64 GPK header version {file_version}; parser currently supports classic x32 packages only"
-        ));
-    }
+    let is_x64 = is_x64_file_version(file_version);
 
     let _header_size = read_u32_le(bytes, &mut cursor)?;
     let package_name = read_fstring(bytes, &mut cursor)?;
@@ -195,6 +223,13 @@ pub fn parse_package(bytes: &[u8]) -> Result<GpkPackage, String> {
     let import_count = read_u32_le(bytes, &mut cursor)?;
     let import_offset = read_u32_le(bytes, &mut cursor)?;
     let depends_offset = read_u32_le(bytes, &mut cursor)?;
+
+    if is_x64 {
+        // x64 (v100.02) inserts 4 extra u32 fields here per TeraCoreLib
+        // FStructs.cpp: ImportExportGuidsOffset, ImportGuidsCount,
+        // ExportGuidsCount, ThumbnailTableOffset (16 bytes total).
+        skip_exact(bytes, &mut cursor, 16)?;
+    }
 
     skip_exact(bytes, &mut cursor, 16)?; // FGuid
 
@@ -217,7 +252,13 @@ pub fn parse_package(bytes: &[u8]) -> Result<GpkPackage, String> {
         }
     };
 
-    let name_count = raw_name_count.saturating_sub(name_offset);
+    // x32 (Classic) cooked packages store NameCount as `count + name_offset`;
+    // x64 (Modern) stores the raw count.
+    let name_count = if is_x64 {
+        raw_name_count
+    } else {
+        raw_name_count.saturating_sub(name_offset)
+    };
     let names = parse_names(&working_bytes, name_offset as usize, name_count as usize)?;
     let imports = parse_imports(
         &working_bytes,
@@ -806,6 +847,49 @@ mod tests {
         let bytes = build_test_package(CompressionFlavor::Unsupported(4));
         let err = parse_package(&bytes).expect_err("unsupported compression must fail closed");
         assert!(err.contains("Unsupported GPK package compression flag"));
+    }
+
+    #[test]
+    fn parses_x64_modern_package() {
+        // v100.02 vanilla files have FileVersion 897 and 16 extra header
+        // bytes between depends_offset and FGuid. The parser must accept
+        // them and produce the same logical structure as the x32 fixture.
+        let bytes = super::super::test_fixtures::build_x64_boss_window_test_package(
+            [0x10, 0x11, 0x12, 0x13],
+            true,
+        );
+        let package = parse_package(&bytes).expect("parse x64 package");
+
+        assert_eq!(package.summary.file_version, 897);
+        assert_eq!(package.names.len(), 6);
+        assert_eq!(package.imports.len(), 2);
+        assert_eq!(package.exports.len(), 2);
+        assert_eq!(package.exports[0].object_path, "GageBoss");
+        assert_eq!(package.exports[0].payload, vec![0x10, 0x11, 0x12, 0x13]);
+        assert_eq!(package.exports[1].object_path, "GageBoss.GageBoss_I1C");
+    }
+
+    #[test]
+    fn read_file_version_returns_classic_for_x32_fixture() {
+        let bytes = build_test_package(CompressionFlavor::None);
+        assert_eq!(read_file_version(&bytes), Some(610));
+        assert!(!is_x64_file_version(610));
+    }
+
+    #[test]
+    fn read_file_version_returns_modern_for_x64_fixture() {
+        let bytes = super::super::test_fixtures::build_x64_boss_window_test_package(
+            [0x10; 4],
+            false,
+        );
+        assert_eq!(read_file_version(&bytes), Some(897));
+        assert!(is_x64_file_version(897));
+    }
+
+    #[test]
+    fn read_file_version_rejects_non_gpk_bytes() {
+        assert_eq!(read_file_version(b""), None);
+        assert_eq!(read_file_version(b"not a gpk file at all"), None);
     }
 
     #[test]

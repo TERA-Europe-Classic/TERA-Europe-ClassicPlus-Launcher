@@ -12,7 +12,36 @@ const PACKAGE_MAGIC: u32 = 0x9E2A83C1;
 const IMPORT_ENTRY_LEN: u32 = 28;
 const EXPORT_ENTRY_LEN_WITH_SERIAL_OFFSET: u32 = 68;
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum FixtureArch {
+    /// Classic 32-bit (FileVersion 610). NameCount is stored as
+    /// `count + name_offset`; no extra 16-byte block before FGuid.
+    X32,
+    /// v100.02 64-bit (FileVersion 897). NameCount is the raw count;
+    /// inserts 16 zeroed bytes (ImportExportGuidsOffset + ImportGuidsCount
+    /// + ExportGuidsCount + ThumbnailTableOffset) before FGuid.
+    X64,
+}
+
+/// x32 (Classic) build of the boss-window fixture, unchanged behaviour.
 pub fn build_boss_window_test_package(
+    export0_payload: [u8; 4],
+    include_redirector_export: bool,
+) -> Vec<u8> {
+    build_boss_window_inner(FixtureArch::X32, export0_payload, include_redirector_export)
+}
+
+/// x64 (v100.02) build of the boss-window fixture for tests that need
+/// to verify the parser/applier handles modern packages.
+pub fn build_x64_boss_window_test_package(
+    export0_payload: [u8; 4],
+    include_redirector_export: bool,
+) -> Vec<u8> {
+    build_boss_window_inner(FixtureArch::X64, export0_payload, include_redirector_export)
+}
+
+fn build_boss_window_inner(
+    arch: FixtureArch,
     export0_payload: [u8; 4],
     include_redirector_export: bool,
 ) -> Vec<u8> {
@@ -26,7 +55,11 @@ pub fn build_boss_window_test_package(
     ];
     let mut bytes = Vec::new();
     bytes.extend_from_slice(&PACKAGE_MAGIC.to_le_bytes());
-    bytes.extend_from_slice(&610u16.to_le_bytes());
+    let file_version: u16 = match arch {
+        FixtureArch::X32 => 610,
+        FixtureArch::X64 => 897,
+    };
+    bytes.extend_from_slice(&file_version.to_le_bytes());
     bytes.extend_from_slice(&0u16.to_le_bytes());
     let header_size_pos = bytes.len();
     bytes.extend_from_slice(&0u32.to_le_bytes());
@@ -44,7 +77,12 @@ pub fn build_boss_window_test_package(
     bytes.extend_from_slice(&0u32.to_le_bytes());
     let depends_offset_pos = bytes.len();
     bytes.extend_from_slice(&0u32.to_le_bytes());
-    bytes.extend_from_slice(&[0u8; 16]);
+    if arch == FixtureArch::X64 {
+        // ImportExportGuidsOffset + ImportGuidsCount + ExportGuidsCount
+        // + ThumbnailTableOffset (zeroed for the test).
+        bytes.extend_from_slice(&[0u8; 16]);
+    }
+    bytes.extend_from_slice(&[0u8; 16]); // FGuid
     bytes.extend_from_slice(&1u32.to_le_bytes());
     bytes.extend_from_slice(&2u32.to_le_bytes());
     bytes.extend_from_slice(&6u32.to_le_bytes());
@@ -57,7 +95,12 @@ pub fn build_boss_window_test_package(
     let header_size = bytes.len() as u32;
     patch_u32(&mut bytes, header_size_pos, header_size);
     patch_u32(&mut bytes, name_offset_pos, header_size);
-    patch_u32(&mut bytes, raw_name_count_pos, header_size + names.len() as u32);
+    let raw_name_count_value = match arch {
+        // x32 stores count + name_offset when cooked; x64 stores raw count.
+        FixtureArch::X32 => header_size + names.len() as u32,
+        FixtureArch::X64 => names.len() as u32,
+    };
+    patch_u32(&mut bytes, raw_name_count_pos, raw_name_count_value);
 
     let mut names_blob = Vec::new();
     for name in names {

@@ -146,7 +146,9 @@ fn hex_lower(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::super::test_fixtures::build_boss_window_test_package;
+    use super::super::test_fixtures::{
+        build_boss_window_test_package, build_x64_boss_window_test_package,
+    };
     use super::super::{gpk_package, gpk_patch_applier, patch_manifest};
     use super::*;
 
@@ -236,5 +238,27 @@ mod tests {
             err.contains("Failed to parse"),
             "expected clear parse-failure prefix, got: {err}"
         );
+    }
+
+    #[test]
+    fn derives_and_applies_against_x64_modern_packages() {
+        // v100.02 vanilla + v100.02 modded. Both x64 (FileVersion 897).
+        let reference = build_x64_boss_window_test_package([0x10, 0x11, 0x12, 0x13], false);
+        let modded = build_x64_boss_window_test_package([0xAA, 0xBB, 0xCC, 0xDD], false);
+
+        let manifest = derive_manifest("test.mod", &reference, &modded).expect("derive ok");
+        assert_eq!(manifest.exports.len(), 1);
+        assert_eq!(manifest.exports[0].replacement_payload_hex, "aabbccdd");
+
+        let patched = gpk_patch_applier::apply_manifest(&reference, &manifest)
+            .expect("apply x64 manifest");
+        let parsed = gpk_package::parse_package(&patched).expect("parse patched x64");
+        assert_eq!(parsed.summary.file_version, 897);
+        let main = parsed
+            .exports
+            .iter()
+            .find(|e| e.object_path == "GageBoss")
+            .expect("GageBoss export present");
+        assert_eq!(main.payload, vec![0xAA, 0xBB, 0xCC, 0xDD]);
     }
 }

@@ -12,6 +12,14 @@ mod patch_manifest;
 #[path = "../services/mods/gpk_package.rs"]
 mod gpk_package;
 
+// gpk_package's `#[cfg(test)] mod tests` references `super::super::test_fixtures`,
+// so the bin needs the same module pulled in for `cargo test --bin gpk-patch-converter`
+// to compile.
+#[cfg(test)]
+#[allow(dead_code)]
+#[path = "../services/mods/test_fixtures.rs"]
+mod test_fixtures;
+
 use patch_manifest::artifact_layout_for_bundle_dir;
 
 const USAGE: &str = concat!(
