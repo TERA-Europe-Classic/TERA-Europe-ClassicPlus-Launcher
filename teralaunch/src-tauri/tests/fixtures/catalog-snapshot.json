@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "updated_at": "2026-04-18T22:19:20Z",
+  "version": 2,
+  "updated_at": "2026-04-22T05:22:29Z",
   "mods": [
     {
       "id": "classicplus.shinra",
@@ -12,16 +12,18 @@
       "category": "meter",
       "license": "MIT",
       "credits": "Originally created by Gothos and maintained by the ShinraMeter community. This Classic+ version is updated and maintained by TERA Europe Classic.",
-      "version": "3.0.0-classicplus",
-      "download_url": "https://github.com/TERA-Europe-Classic/ShinraMeter/releases/download/v3.0.0-classicplus/ShinraMeter-v3.0.0-classicplus.zip",
-      "sha256": "67b808d8a5cfd747c97c1a42801226cbb59c464dab2c781ae9251eaeadf309c5",
-      "size_bytes": 53875093,
+      "version": "3.0.5-classicplus",
+      "download_url": "https://github.com/TERA-Europe-Classic/ShinraMeter/releases/download/v3.0.5-classicplus/ShinraMeter-v3.0.5-classicplus.zip",
+      "sha256": "ffe6f68be4f17ce7b052f7ec98d83fb2d64cfe0db8b3c386f243e907f6145dac",
+      "size_bytes": 53874684,
       "source_url": "https://github.com/TERA-Europe-Classic/ShinraMeter",
-      "screenshots": [],
       "executable_relpath": "ShinraMeter.exe",
       "auto_launch_default": true,
       "settings_folder": "%APPDATA%/ShinraMeter",
-      "updated_at": "2026-04-18T20:30:00Z"
+      "updated_at": "2026-04-22T16:23:08Z",
+      "tagline": "Tera DPS Meter for the Evervyn and EU Classic Private Servers",
+      "last_verified_patch": "patch 115",
+      "download_count": 0
     },
     {
       "id": "classicplus.tcc",
@@ -33,16 +35,19 @@
       "category": "overlay",
       "license": "GPL-3.0-or-later",
       "credits": "Originally created by Foglio1024 and the TCC community. This Classic+ version is maintained by TERA Europe Classic with a focus on essential game features.",
-      "version": "2.0.1-classicplus",
-      "download_url": "https://github.com/TERA-Europe-Classic/TCC/releases/download/v2.0.1-classicplus/TCC-v2.0.1-classicplus.zip",
-      "sha256": "9ac52f976e1ad6f321bf96b6d571e93385f8d47b04c910cac37e796f9d3fcb7f",
-      "size_bytes": 3783229,
+      "version": "2.0.7-classicplus",
+      "download_url": "https://github.com/TERA-Europe-Classic/TCC/releases/download/v2.0.7-classicplus/TCC-v2.0.7-classicplus.zip",
+      "sha256": "9f10a9032b556a42fd2cec3df13a6c3873732002f402752cead17647c5e5c4c4",
+      "size_bytes": 6110277,
       "source_url": "https://github.com/TERA-Europe-Classic/TCC",
-      "screenshots": [],
       "executable_relpath": "TCC.exe",
       "auto_launch_default": true,
       "settings_folder": "%APPDATA%/TCC",
-      "updated_at": "2026-04-18T22:19:20Z"
+      "updated_at": "2026-04-22T08:00:00Z",
+      "featured_image": "https://img.shields.io/badge/Donate-PayPal-blue.svg",
+      "tagline": "[![Donate](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://paypal.me/foglio…",
+      "last_verified_patch": "patch 115",
+      "download_count": 0
     },
     {
       "id": "psina.postprocess",
@@ -59,10 +64,20 @@
       "sha256": "a58dfbabaab8a0abf718a9f9253703d15f379a9ad9323ca2643243e790e086da",
       "size_bytes": 10862386,
       "source_url": "https://github.com/TERA-Europe-Classic/external-mod-catalog",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:30:00Z"
+      "updated_at": "2026-04-18T20:30:00Z",
+      "tagline": "JSON catalog of external mods consumed by the Classic+ launcher",
+      "last_verified_patch": "patch 115",
+      "gpk_files": [
+        "S1UI_ExtShortCut.gpk",
+        "S1UI_GageMonsterHp.gpk",
+        "S1UI_PaperDoll.gpk",
+        "S1UI_PartyWindow.gpk",
+        "S1UI_PartyWindow_1.gpk",
+        "S1UI_PartyWindow_2.gpk",
+        "S1UI_ShortCut.gpk"
+      ]
     },
     {
       "id": "psina.gage-monster-hp",
@@ -79,10 +94,11 @@
       "sha256": "bab59cae7036659f84974a9dff3c4f8612e712ee823a0ff8308b5543fce35665",
       "size_bytes": 55542,
       "source_url": "https://www.tumblr.com/miyo-ni/688571598862794752/rainbow-hp-bar-group-uwu",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:30:00Z"
+      "updated_at": "2026-04-18T20:30:00Z",
+      "featured_image": "https://64.media.tumblr.com/67a7d4f74b817c5e3fa0b9f0baca6bc9/5ce78b0ab9e4f59d-1f/s2048x3072_c0,0,99942,100000/84e92c12207b58b35a1e8af803911162def7d05f.png",
+      "tagline": "miyo-niJul 1, 2022rainbow HP bar party uwuS1UI_GageMonsterHp.gpkПосмотреть и скачать с Ян…"
     },
     {
       "id": "neowutran.s1ui-chat2",
@@ -93,16 +109,22 @@
       "long_description": "Gives the chat window a cleaner layout with automatic support for inspecting other players.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown — repository does not declare a license. Credit the uploader and use at your own risk.",
-      "credits": "Published by neowutran at https://github.com/neowutran/S1UI_chat2. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by neowutran. If you are the author and would like to update this entry, please contact us on GitHub.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/neowutran/S1UI_chat2/master/S1UI_Chat2.gpk",
       "sha256": "2fa00b81d3168d6cec7295c80799fbf16774290259ef705bc29a9e2a61929903",
       "size_bytes": 310419,
       "source_url": "https://github.com/neowutran/S1UI_chat2",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:30:00Z"
+      "updated_at": "2026-04-18T20:30:00Z",
+      "last_verified_patch": "patch 100",
+      "tags": [
+        "mmo",
+        "mmorpg",
+        "reverse-engineering",
+        "tera"
+      ]
     },
     {
       "id": "saltymonkey.message-clean",
@@ -119,10 +141,16 @@
       "sha256": "ed4a48d70f710a1a30141f5fee5361e9169257614ae08a08352582a2e3d789a7",
       "size_bytes": 554802,
       "source_url": "https://github.com/SaltyMonkey/tera-online-clean-onscreen-messages",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:30:00Z"
+      "updated_at": "2026-04-18T20:30:00Z",
+      "tagline": "GPK mod. Can remove annoying on screen messages from glyphs and etc",
+      "last_verified_patch": "patch 103",
+      "tags": [
+        "gpk",
+        "tera-online",
+        "tera-toolbox"
+      ]
     },
     {
       "id": "saltymonkey.message-centered",
@@ -130,19 +158,25 @@
       "name": "Message window — centered + clean",
       "author": "SaltyMonkey",
       "short_description": "Centered variant of the cleaned on-screen message window.",
-      "long_description": "Centered variant of the cleaned on-screen message window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
+      "long_description": "A centered version of the cleaner on-screen message window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown — repository does not declare a license. Credit the uploader and use at your own risk.",
-      "credits": "Published by SaltyMonkey at https://github.com/SaltyMonkey/tera-online-centered-clean-onscreen-messages. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by SaltyMonkey. If you are the author and would like to update this entry, please contact us on GitHub.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/SaltyMonkey/tera-online-centered-clean-onscreen-messages/master/S1UI_Message.gpk",
       "sha256": "e4d38e7ab1d912861066ccb0bbc78737b372354129a7fe73ad2246d6d86d0b13",
       "size_bytes": 508083,
       "source_url": "https://github.com/SaltyMonkey/tera-online-centered-clean-onscreen-messages",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:30:00Z"
+      "updated_at": "2026-04-18T20:30:00Z",
+      "tagline": "tera-online-centered-clean-onscreen-messages",
+      "last_verified_patch": "patch 103",
+      "tags": [
+        "gpk",
+        "tera-online",
+        "tera-toolbox"
+      ]
     },
     {
       "id": "saltymonkey.overlaymap-fixed",
@@ -159,10 +193,16 @@
       "sha256": "797efc1a981fcb683470ce73da6b03d619bc75631ee472a94edf4f9c79e9548f",
       "size_bytes": 954908,
       "source_url": "https://github.com/SaltyMonkey/tera-online-fixed-overlay-map",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:30:00Z"
+      "updated_at": "2026-04-18T20:30:00Z",
+      "tagline": "Fixed UI overlay map for Tera online which broken since p103",
+      "last_verified_patch": "patch 103",
+      "tags": [
+        "tera-online",
+        "tera-toolbox",
+        "tera-toolbox-mods"
+      ]
     },
     {
       "id": "saltymonkey.gageboss-extended",
@@ -179,10 +219,16 @@
       "sha256": "c262a79e949bc9c72891f34c1793fb0dbdd541fc84e9e04062cf8951230b7818",
       "size_bytes": 293018,
       "source_url": "https://github.com/SaltyMonkey/tera-online-extended-boss-bar",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:30:00Z"
+      "updated_at": "2026-04-18T20:30:00Z",
+      "tagline": "Default boss bar GPK with additional QoL features",
+      "last_verified_patch": "patch 103",
+      "tags": [
+        "gpk",
+        "tera-online",
+        "tera-toolbox"
+      ]
     },
     {
       "id": "saltymonkey.characterwindow-clean",
@@ -199,10 +245,16 @@
       "sha256": "2832bdc46ceed61493cd44b43f9da450ada494894bec4f2c126f81b5c56cb3dc",
       "size_bytes": 438833,
       "source_url": "https://github.com/SaltyMonkey/tera-online-clean-character-bar",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:30:00Z"
+      "updated_at": "2026-04-18T20:30:00Z",
+      "tagline": "Default character window GPK with removed elements and animations",
+      "last_verified_patch": "patch 103",
+      "tags": [
+        "gpk",
+        "tera-online",
+        "tera-toolbox"
+      ]
     },
     {
       "id": "teralove.partywindowraidinfo",
@@ -219,10 +271,19 @@
       "sha256": "3b1233a2f981721bca1db16d2dbab375fa9529fc619ba9aa4221d3b31b389aac",
       "size_bytes": 334315,
       "source_url": "https://github.com/teralove/TERA-UI-Mods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:30:00Z"
+      "updated_at": "2026-04-18T20:30:00Z",
+      "tagline": "TERA UI Mods",
+      "last_verified_patch": "patch 100",
+      "gpk_files": [
+        "S1UI_PartyWindowRaidInfo.gpk",
+        "S1UI_TargetInfo.gpk"
+      ],
+      "tags": [
+        "tera-mods",
+        "tera-online"
+      ]
     },
     {
       "id": "teralove.targetinfo",
@@ -239,10 +300,19 @@
       "sha256": "d2bb679f3d7f5a4ce3db0be58ad1a503e581145bff51f9bda0f0de3f5bb5a521",
       "size_bytes": 481500,
       "source_url": "https://github.com/teralove/TERA-UI-Mods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:30:00Z"
+      "updated_at": "2026-04-18T20:30:00Z",
+      "tagline": "TERA UI Mods",
+      "last_verified_patch": "patch 100",
+      "gpk_files": [
+        "S1UI_PartyWindowRaidInfo.gpk",
+        "S1UI_TargetInfo.gpk"
+      ],
+      "tags": [
+        "tera-mods",
+        "tera-online"
+      ]
     },
     {
       "id": "foglio1024.restyle-community-window",
@@ -253,16 +323,20 @@
       "long_description": "A modern restyled version of the friends and guild window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/tera-restyle/master/CommunityWindow/p90/S1UI_CommunityWindow.gpk",
       "sha256": "bb5633f2103e8c6d480fc15a4554bbd52fcee073bc1c409fd108ee43116d282e",
       "size_bytes": 1158441,
       "source_url": "https://github.com/foglio1024/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
+      "last_verified_patch": "patch 110",
+      "compatibility_notes": "Conflicts with other Community-window restyles. Pick one Foglio restyle per UI window — combining two restyles for the same window will leave the second-installed one effective.",
+      "before_image": "https://raw.githubusercontent.com/Foglio1024/Tera-restyle/master/preview/community-vanilla.png",
+      "featured_image": "https://raw.githubusercontent.com/Foglio1024/Tera-restyle/master/preview/community-restyled.png"
     },
     {
       "id": "foglio1024.restyle-ep-window",
@@ -273,16 +347,18 @@
       "long_description": "A restyled version of the Essence Points window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/tera-restyle/master/EpWindow/p90/S1UI_EpWindow.gpk",
       "sha256": "4faacaac8d28cc96512ee65975afc480c4b5c6b03d1b7edc8c2c651b2ec823aa",
       "size_bytes": 999310,
       "source_url": "https://github.com/foglio1024/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
+      "last_verified_patch": "patch 110",
+      "compatibility_notes": "Single-window mod; safe to combine with restyles for other windows but not with another EP-window restyle."
     },
     {
       "id": "foglio1024.restyle-equipment-combine",
@@ -293,16 +369,17 @@
       "long_description": "A restyled version of the equipment combination window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/tera-restyle/master/EquipmentCombine/p93/S1UI_EquipmentCombine.gpk",
       "sha256": "4bee2c234ac07e28143ce8b687e3cf720d14a5607e365645851781fc576418e2",
       "size_bytes": 1000867,
       "source_url": "https://github.com/foglio1024/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
+      "last_verified_patch": "patch 110"
     },
     {
       "id": "foglio1024.restyle-equipment-upgrade",
@@ -313,16 +390,17 @@
       "long_description": "A restyled version of the equipment upgrade window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/tera-restyle/master/EquipmentUpgrade/p93/S1UI_EquipmentUpgrade.gpk",
       "sha256": "6ec3b88a0ce9a251db5b4e49c2e172638e5402a4dd308b3175e6ce1703c04f48",
       "size_bytes": 1471369,
       "source_url": "https://github.com/foglio1024/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
+      "last_verified_patch": "patch 110"
     },
     {
       "id": "foglio1024.restyle-guild-window",
@@ -333,16 +411,17 @@
       "long_description": "A restyled version of the guild window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/tera-restyle/master/GuildWindow/p93/S1UI_GuildWindow.gpk",
       "sha256": "a0c9e0849c3d2b70c8778cec30f808d2ead1fd248822e457012980ed9c950fbd",
       "size_bytes": 3646466,
       "source_url": "https://github.com/foglio1024/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
+      "last_verified_patch": "patch 110"
     },
     {
       "id": "foglio1024.restyle-interaction-popup",
@@ -353,16 +432,17 @@
       "long_description": "A restyled version of the interaction window for NPCs and objects.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/tera-restyle/master/InteractionPopup/p90/S1UI_InteractionPopup.gpk",
       "sha256": "96559921c08f9d80c1442dd28c72d4de575a14af6947ccc7be6bb6d7ed9dff63",
       "size_bytes": 530012,
       "source_url": "https://github.com/foglio1024/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
+      "last_verified_patch": "patch 110"
     },
     {
       "id": "foglio1024.restyle-inventory",
@@ -373,16 +453,17 @@
       "long_description": "A restyled version of the inventory window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/tera-restyle/master/InventoryWindow/p95/S1UI_InventoryWindow.gpk",
       "sha256": "69d4f66826fbf8611cea93103f0029401480f1cfb6a304afacc02b9f4ef3eda7",
       "size_bytes": 1027946,
       "source_url": "https://github.com/foglio1024/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
+      "last_verified_patch": "patch 110"
     },
     {
       "id": "foglio1024.restyle-minimap",
@@ -393,16 +474,17 @@
       "long_description": "A restyled version of the minimap.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/tera-restyle/master/MiniMap/p90/S1UI_MiniMap.gpk",
       "sha256": "e4afc7afdb125a9ed1afee8a2202e1680356e45b2dda4f2576dac7dad6b667f9",
       "size_bytes": 778634,
       "source_url": "https://github.com/foglio1024/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
+      "last_verified_patch": "patch 110"
     },
     {
       "id": "foglio1024.restyle-paperdoll",
@@ -413,16 +495,17 @@
       "long_description": "A restyled version of the character equipment window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/tera-restyle/master/PaperDoll/p95/S1UI_PaperDoll.gpk",
       "sha256": "7f890f4b3fff3f7b12f617063c909f4868b8e648d26b93abcc21c110f656c4e1",
       "size_bytes": 1245088,
       "source_url": "https://github.com/foglio1024/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
+      "last_verified_patch": "patch 110"
     },
     {
       "id": "foglio1024.restyle-parcelpost",
@@ -433,16 +516,17 @@
       "long_description": "A restyled version of the mailbox and mail log.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/tera-restyle/master/ParcelPostLog/p90/S1UI_ParcelPostLog.gpk",
       "sha256": "3706bcb7960bf2f9dddce7bfa9772331ea89f3bb218da792162b510a7c440c80",
       "size_bytes": 350021,
       "source_url": "https://github.com/foglio1024/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
+      "last_verified_patch": "patch 110"
     },
     {
       "id": "foglio1024.restyle-production-create",
@@ -453,16 +537,17 @@
       "long_description": "A restyled version of the crafting window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/tera-restyle/master/ProductionCreatePopUp/p90/S1UI_ProductionCreatePopUp.gpk",
       "sha256": "34b098acac26778abe215b6540c32d91760914ba9b88b295fc4171c924be8708",
       "size_bytes": 409137,
       "source_url": "https://github.com/foglio1024/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
+      "last_verified_patch": "patch 110"
     },
     {
       "id": "foglio1024.restyle-production-list",
@@ -473,16 +558,17 @@
       "long_description": "Restyled crafting production list.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/tera-restyle/master/ProductionList/S1UI_ProductionList.gpk",
       "sha256": "865fdc54367490fcdfc4d39ccb4594b47bfd57ba621ec3b16db2e9b345ce2cf7",
       "size_bytes": 601049,
       "source_url": "https://github.com/foglio1024/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
+      "last_verified_patch": "patch 110"
     },
     {
       "id": "foglio1024.restyle-servant-storage",
@@ -493,16 +579,17 @@
       "long_description": "A restyled version of the pet storage window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/tera-restyle/master/ServantStorageWindow/p90/S1UI_ServantStorageWindow.gpk",
       "sha256": "e7352ea7f36e33cb5650d714133575b02ad5a81744809ebfa9a08f1a68d6de18",
       "size_bytes": 1230089,
       "source_url": "https://github.com/foglio1024/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
+      "last_verified_patch": "patch 110"
     },
     {
       "id": "foglio1024.restyle-skill-window",
@@ -513,16 +600,17 @@
       "long_description": "Restyled Skill window (p90).\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/tera-restyle/master/SkillWindow/p90/S1UI_SkillWindow.gpk",
       "sha256": "c4754858aaf94744f7e0be66fb6512ca1f972e192d4af41c51495d814f0fea43",
       "size_bytes": 767203,
       "source_url": "https://github.com/foglio1024/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
+      "last_verified_patch": "patch 110"
     },
     {
       "id": "foglio1024.restyle-store-window",
@@ -533,16 +621,17 @@
       "long_description": "Restyled cash-shop/store window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/tera-restyle/master/StoreWindow/S1UI_StoreWindow.gpk",
       "sha256": "35b4ab8dc5c9e2fb8d84c60f8ee83eec01a92af00c54f18744ab36bd63203797",
       "size_bytes": 990386,
       "source_url": "https://github.com/foglio1024/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
+      "last_verified_patch": "patch 110"
     },
     {
       "id": "foglio1024.restyle-system-option",
@@ -553,16 +642,17 @@
       "long_description": "Restyled System/Options window (p90).\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/tera-restyle/master/SystemOption/p90/S1UI_SystemOption.gpk",
       "sha256": "53bb435cee1439545646e0276e278bc0f5d42402b6f98e9c79300b7dce76f128",
       "size_bytes": 400322,
       "source_url": "https://github.com/foglio1024/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
+      "last_verified_patch": "patch 110"
     },
     {
       "id": "foglio1024.restyle-quickslot",
@@ -573,16 +663,17 @@
       "long_description": "A restyled version of the skill bar.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/tera-restyle/master/TestQuickSlot/p90/S1UI_TestQuickSlot.gpk",
       "sha256": "9f66d8a8adadba2dece343ca0e6070233908ae7116c0d5f9300365f8a93e2ccd",
       "size_bytes": 468319,
       "source_url": "https://github.com/foglio1024/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
+      "last_verified_patch": "patch 110"
     },
     {
       "id": "foglio1024.restyle-trade-popup",
@@ -593,16 +684,17 @@
       "long_description": "Restyled player trade popup.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/tera-restyle/master/TradePopup/S1UI_TradePopup.gpk",
       "sha256": "710b4ef67886070da53fb13dc193756fa249c8489e7123cbe93b426fd3439fad",
       "size_bytes": 366270,
       "source_url": "https://github.com/foglio1024/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
+      "last_verified_patch": "patch 110"
     },
     {
       "id": "foglio1024.restyle-warehouse",
@@ -613,16 +705,17 @@
       "long_description": "A restyled version of the bank window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/tera-restyle/master/WareHouseWindow/p93/S1UI_WareHouseWindow.gpk",
       "sha256": "244d2940b39851c8f85345a6b15211cc9d3178ef1159d6231a39844f4bcca2eb",
       "size_bytes": 598922,
       "source_url": "https://github.com/foglio1024/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "READ THE WIKI BEFORE ASKING QUESTIONS -- TERA UI windows restyled using a modern look.",
+      "last_verified_patch": "patch 110"
     },
     {
       "id": "foglio1024.modern-ui-jewels-fix-inventory",
@@ -633,16 +726,16 @@
       "long_description": "Fixes jewel display in the inventory.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-modern-ui. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-modern-ui. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/tera-modern-ui/master/Modern_JewelsFix/S1UI_InventoryWindow.gpk",
       "sha256": "e0e60cf0ee8b201ad6ebb9117e22e9745348e6004596087ee81a76595506d3b6",
       "size_bytes": 1029148,
       "source_url": "https://github.com/foglio1024/tera-modern-ui",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "last_verified_patch": "patch 103"
     },
     {
       "id": "foglio1024.modern-ui-jewels-fix-paperdoll",
@@ -653,16 +746,16 @@
       "long_description": "Fixes jewel display in the character window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-modern-ui. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-modern-ui. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/tera-modern-ui/master/Modern_JewelsFix/S1UI_PaperDoll.gpk",
       "sha256": "2d98db4e2a15316379623cd17ced7a0cf22ef7f70dfc768027adc776a1b31f4a",
       "size_bytes": 1246172,
       "source_url": "https://github.com/foglio1024/tera-modern-ui",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "last_verified_patch": "patch 103"
     },
     {
       "id": "foglio1024.modern-ui-jewels-fix-icons",
@@ -673,16 +766,16 @@
       "long_description": "Updates item icons for better jewel visibility.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-modern-ui. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/tera-modern-ui. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/tera-modern-ui/master/Modern_JewelsFix/Icon_Items.gpk",
       "sha256": "8827aae172c0617ae104d1eeaf1faa26e9b0324359db2cf46650b7a43ecee374",
       "size_bytes": 11257778,
       "source_url": "https://github.com/foglio1024/tera-modern-ui",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "last_verified_patch": "patch 103"
     },
     {
       "id": "foglio1024.ui-remover-bosswindow",
@@ -693,16 +786,17 @@
       "long_description": "Hides the default boss health bar.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/UI-Remover. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/UI-Remover. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/UI-Remover/master/remove_BossWindow/S1UI_GageBoss.gpk",
       "sha256": "7e3fad36d8b96a14d2663694de6d71e7d29b34cbcee850cc700641dcf3946e6d",
       "size_bytes": 294251,
       "source_url": "https://github.com/foglio1024/UI-Remover",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "Replaces specifics GPK's with an empty one",
+      "last_verified_patch": "patch 103"
     },
     {
       "id": "foglio1024.ui-remover-targetinfo",
@@ -713,16 +807,17 @@
       "long_description": "Hides the default target information frame.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/UI-Remover. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/UI-Remover. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/UI-Remover/master/remove_BossWindow/S1UI_TargetInfo.gpk",
       "sha256": "0cca883d6a8ca8a07fc336288c5629623983b4e67dbd6292437c83cf03078d91",
       "size_bytes": 298213,
       "source_url": "https://github.com/foglio1024/UI-Remover",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "Replaces specifics GPK's with an empty one",
+      "last_verified_patch": "patch 103"
     },
     {
       "id": "foglio1024.ui-remover-buffs",
@@ -733,16 +828,17 @@
       "long_description": "Hides the default buff and debuff window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/UI-Remover. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/UI-Remover. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/UI-Remover/master/remove_BuffsWindow/S1UI_Abnormality.gpk",
       "sha256": "c80e5a537068cddc020d4182ba8d4b074c875f2bd1c30c8c29b58df4a42614b7",
       "size_bytes": 268284,
       "source_url": "https://github.com/foglio1024/UI-Remover",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "Replaces specifics GPK's with an empty one",
+      "last_verified_patch": "patch 103"
     },
     {
       "id": "foglio1024.ui-remover-character",
@@ -753,16 +849,17 @@
       "long_description": "Hides the default character health and mana frame.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/UI-Remover. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/UI-Remover. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/UI-Remover/master/remove_CharacterWindow/S1UI_CharacterWindow.gpk",
       "sha256": "8887f3934cc18ebe1d1d483980d50fbd500818c313ca3f16e016908aca03ea53",
       "size_bytes": 440884,
       "source_url": "https://github.com/foglio1024/UI-Remover",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "Replaces specifics GPK's with an empty one",
+      "last_verified_patch": "patch 103"
     },
     {
       "id": "foglio1024.ui-remover-flight-gauge",
@@ -773,16 +870,17 @@
       "long_description": "Hides the flight stamina bar.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/UI-Remover. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/UI-Remover. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/UI-Remover/master/remove_FlightGauge/S1UI_ProgressBar.gpk",
       "sha256": "f269f57e7889046a386ad1a6029738a30ea777402ae12ab3860fe380d018fd2f",
       "size_bytes": 100064,
       "source_url": "https://github.com/foglio1024/UI-Remover",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "Replaces specifics GPK's with an empty one",
+      "last_verified_patch": "patch 103"
     },
     {
       "id": "foglio1024.ui-remover-lfg-board",
@@ -793,16 +891,17 @@
       "long_description": "Hides the group search board.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/UI-Remover. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/UI-Remover. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/UI-Remover/master/remove_LfgWindow/S1UI_PartyBoard.gpk",
       "sha256": "a9143c1dfe7bac9607068ab2acda6369bcf698fd78962a430be7b17fdbff30fc",
       "size_bytes": 184727,
       "source_url": "https://github.com/foglio1024/UI-Remover",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "Replaces specifics GPK's with an empty one",
+      "last_verified_patch": "patch 103"
     },
     {
       "id": "foglio1024.ui-remover-lfg-member",
@@ -813,16 +912,17 @@
       "long_description": "Hides group member information.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/UI-Remover. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/UI-Remover. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/UI-Remover/master/remove_LfgWindow/S1UI_PartyBoardMemberInfo.gpk",
       "sha256": "61127050fbd52a686a0bdc3affc66f86795cd85ccb136f361b43511a72258f57",
       "size_bytes": 150974,
       "source_url": "https://github.com/foglio1024/UI-Remover",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "Replaces specifics GPK's with an empty one",
+      "last_verified_patch": "patch 103"
     },
     {
       "id": "foglio1024.ui-remover-party-window",
@@ -833,16 +933,17 @@
       "long_description": "Hides the party frames.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/UI-Remover. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/UI-Remover. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/UI-Remover/master/remove_PartyWindow/S1UI_PartyWindow.gpk",
       "sha256": "4d5beabb5ce39180cbbdc70f24f0584d8b1a30170dd5ff22b0fdb24e9a7de296",
       "size_bytes": 416685,
       "source_url": "https://github.com/foglio1024/UI-Remover",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "Replaces specifics GPK's with an empty one",
+      "last_verified_patch": "patch 103"
     },
     {
       "id": "foglio1024.ui-remover-raid-window",
@@ -853,16 +954,17 @@
       "long_description": "Hides the raid info window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/UI-Remover. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/UI-Remover. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/UI-Remover/master/remove_PartyWindow/S1UI_PartyWindowRaidInfo.gpk",
       "sha256": "7c68b115f5240b6f8af76685feba6439e3baf5c39013aadaf8b1ba95cbe3b0ca",
       "size_bytes": 339241,
       "source_url": "https://github.com/foglio1024/UI-Remover",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "Replaces specifics GPK's with an empty one",
+      "last_verified_patch": "patch 103"
     },
     {
       "id": "foglio1024.toolbox-gagebar-topscreen",
@@ -873,16 +975,16 @@
       "long_description": "Moves the charging-skills gage bar to top of screen.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/toolbox-client-mods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/toolbox-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/toolbox-client-mods/master/GageBar_TopScreen/S1UI_GageBar.gpk",
       "sha256": "e7f680ea4324843b442e7b1fa311ec08a9da53c0417199171c8a3c9a9479d7b5",
       "size_bytes": 85411,
       "source_url": "https://github.com/foglio1024/toolbox-client-mods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "last_verified_patch": "patch 103"
     },
     {
       "id": "foglio1024.toolbox-transparent-damage",
@@ -893,16 +995,16 @@
       "long_description": "Makes floating damage numbers semi-transparent.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "effects",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/toolbox-client-mods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/toolbox-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/toolbox-client-mods/master/TransparentDamage/TexturedFonts.gpk",
       "sha256": "2a7272e32e8e4ab014d2076409c0dd343b9493f521458f47c7c1f0cd6dbe3a56",
       "size_bytes": 1500436,
       "source_url": "https://github.com/foglio1024/toolbox-client-mods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "last_verified_patch": "patch 103"
     },
     {
       "id": "foglio1024.toolbox-thinkblob",
@@ -913,16 +1015,16 @@
       "long_description": "Replaces Awakened SpiritKing summon with think-blob meme.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "fun",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/toolbox-client-mods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/toolbox-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/toolbox-client-mods/master/thinkblob/Awaken_SpiritKing.gpk",
       "sha256": "c76a0cd5ce41bb0c3b65ac23c41e463cde89778d9f54f6aec859952a438feeba",
       "size_bytes": 2344777,
       "source_url": "https://github.com/foglio1024/toolbox-client-mods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "last_verified_patch": "patch 103"
     },
     {
       "id": "foglio1024.badgui-loader",
@@ -933,16 +1035,17 @@
       "long_description": "Modded S1UI_UpdateNotification GPK used by badGUI loader.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/badGUILoader. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/badGUILoader. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/badGUILoader/master/S1UI_UpdateNotification.gpk",
       "sha256": "ec470822e9b65924b3f8fc168c6aa5c9ac0cb0187f4962176d0296f3ed08ab85",
       "size_bytes": 189765,
       "source_url": "https://github.com/foglio1024/badGUILoader",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "Modded GPK for badGUI",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "foglio1024.s1ui-chat2-p75",
@@ -953,16 +1056,16 @@
       "long_description": "Alternate Chat2 GPK variant for p75.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by foglio1024 at https://github.com/foglio1024/S1UI_chat2. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by foglio1024 at https://github.com/foglio1024/S1UI_chat2. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/foglio1024/S1UI_chat2/master/p75/S1UI_Chat2.gpk",
       "sha256": "5e6d4efa2d8375cd7029d4d48c91fad1de6e817b64ffe889d6a88a46684a4887",
       "size_bytes": 338064,
       "source_url": "https://github.com/foglio1024/S1UI_chat2",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "taorelia.restyle-community",
@@ -973,16 +1076,17 @@
       "long_description": "Taorelia fork restyled Community window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by Taorelia at https://github.com/Taorelia/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by Taorelia at https://github.com/Taorelia/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/Taorelia/tera-restyle/master/CommunityWindow/S1UI_CommunityWindow.gpk",
       "sha256": "3428cd77b090f040d614ae81b1635b4d9a8762864c73eb01292b527d95d1bbf2",
       "size_bytes": 625592,
       "source_url": "https://github.com/Taorelia/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "TERA UI windows restyled usingy a modern look.",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "taorelia.restyle-guild",
@@ -993,16 +1097,17 @@
       "long_description": "Taorelia fork restyled Guild window.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by Taorelia at https://github.com/Taorelia/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by Taorelia at https://github.com/Taorelia/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/Taorelia/tera-restyle/master/GuildWindow/S1UI_GuildWindow.gpk",
       "sha256": "1641add4955c3487913473c9639a42e82a07639fa9beb41cff741b3ad41fbc08",
       "size_bytes": 3522540,
       "source_url": "https://github.com/Taorelia/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "TERA UI windows restyled usingy a modern look.",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "taorelia.restyle-inventory",
@@ -1013,16 +1118,17 @@
       "long_description": "Taorelia fork restyled Inventory.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by Taorelia at https://github.com/Taorelia/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by Taorelia at https://github.com/Taorelia/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/Taorelia/tera-restyle/master/InventoryWindow/S1UI_InventoryWindow.gpk",
       "sha256": "fe9e6b208ec53d1d36a41bd8e60052f7fa3a127cf862ec265725a09983374a55",
       "size_bytes": 786422,
       "source_url": "https://github.com/Taorelia/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "TERA UI windows restyled usingy a modern look.",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "taorelia.restyle-paperdoll",
@@ -1033,16 +1139,17 @@
       "long_description": "Taorelia fork restyled PaperDoll.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by Taorelia at https://github.com/Taorelia/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by Taorelia at https://github.com/Taorelia/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/Taorelia/tera-restyle/master/PaperDoll/S1UI_PaperDoll.gpk",
       "sha256": "0c1d6a22caf34c40f4ecccdd605cd700d7841268ff614ee3f1ae62e3ebb319d8",
       "size_bytes": 1237237,
       "source_url": "https://github.com/Taorelia/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "TERA UI windows restyled usingy a modern look.",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "taorelia.restyle-warehouse",
@@ -1053,16 +1160,17 @@
       "long_description": "Taorelia fork restyled warehouse.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by Taorelia at https://github.com/Taorelia/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by Taorelia at https://github.com/Taorelia/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/Taorelia/tera-restyle/master/WareHouseWindow/S1UI_WareHouseWindow.gpk",
       "sha256": "cce64de530c5d52e9e8b10730577085684f251f567a459b47c83a754ba91fd5f",
       "size_bytes": 729480,
       "source_url": "https://github.com/Taorelia/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "TERA UI windows restyled usingy a modern look.",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "taorelia.restyle-interaction-popup",
@@ -1073,16 +1181,17 @@
       "long_description": "Taorelia interaction popup restyle.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by Taorelia at https://github.com/Taorelia/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by Taorelia at https://github.com/Taorelia/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/Taorelia/tera-restyle/master/InteractionPopup/S1UI_InteractionPopup.gpk",
       "sha256": "d9d3c198b729cb1281e83353397185d3bbd113af2ed4447cb8a7519e1034e6bc",
       "size_bytes": 638260,
       "source_url": "https://github.com/Taorelia/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "TERA UI windows restyled usingy a modern look.",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "taorelia.restyle-production-create",
@@ -1093,16 +1202,17 @@
       "long_description": "Taorelia production popup restyle.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by Taorelia at https://github.com/Taorelia/tera-restyle. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by Taorelia at https://github.com/Taorelia/tera-restyle. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/Taorelia/tera-restyle/master/ProductionCreatePopUp/S1UI_ProductionCreatePopUp.gpk",
       "sha256": "a7f802ea29747154ecfbce6b24d462afc358e902b0cbf2701c504e57f1f97270",
       "size_bytes": 314045,
       "source_url": "https://github.com/Taorelia/tera-restyle",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "TERA UI windows restyled usingy a modern look.",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "owyn.fps-pack-postprocess",
@@ -1113,16 +1223,22 @@
       "long_description": "Empties post-process effects (bloom/DOF) for FPS gain.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "performance",
       "license": "Unknown",
-      "credits": "Published by Owyn at https://github.com/Owyn/fps-pack. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by Owyn at https://github.com/Owyn/fps-pack. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/Owyn/fps-pack/master/res/PostProcess.gpk",
       "sha256": "a58dfbabaab8a0abf718a9f9253703d15f379a9ad9323ca2643243e790e086da",
       "size_bytes": 10862386,
       "source_url": "https://github.com/Owyn/fps-pack",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "Full pack of effect minimizing and disabling gpk mods to increase FPS",
+      "last_verified_patch": "patch 100",
+      "tags": [
+        "tera",
+        "tera-online",
+        "tera-proxy"
+      ]
     },
     {
       "id": "owyn.fps-pack-fx-enchant",
@@ -1133,16 +1249,22 @@
       "long_description": "Removes enchant/upgrade particle effects.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "performance",
       "license": "Unknown",
-      "credits": "Published by Owyn at https://github.com/Owyn/fps-pack. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by Owyn at https://github.com/Owyn/fps-pack. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/Owyn/fps-pack/master/res/FX_Enchant.gpk",
       "sha256": "288515a45d4b35722c5dd1ce0ed101a93b3a10aa14574c2261ce475834182885",
       "size_bytes": 1063123,
       "source_url": "https://github.com/Owyn/fps-pack",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "Full pack of effect minimizing and disabling gpk mods to increase FPS",
+      "last_verified_patch": "patch 100",
+      "tags": [
+        "tera",
+        "tera-online",
+        "tera-proxy"
+      ]
     },
     {
       "id": "owyn.fps-pack-fx-awaken-archer",
@@ -1153,16 +1275,22 @@
       "long_description": "Minimized/cleared Awakened Archer class FX.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "performance",
       "license": "Unknown",
-      "credits": "Published by Owyn at https://github.com/Owyn/fps-pack. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by Owyn at https://github.com/Owyn/fps-pack. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/Owyn/fps-pack/master/res/FX_Awaken_Archer.gpk",
       "sha256": "1a76a20d6e0ccf2520a07d9777f799bc4170f6f341877c16cc031e2fb384160f",
       "size_bytes": 3804350,
       "source_url": "https://github.com/Owyn/fps-pack",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "Full pack of effect minimizing and disabling gpk mods to increase FPS",
+      "last_verified_patch": "patch 100",
+      "tags": [
+        "tera",
+        "tera-online",
+        "tera-proxy"
+      ]
     },
     {
       "id": "owyn.fps-pack-fx-awaken-berserker",
@@ -1173,16 +1301,22 @@
       "long_description": "Minimized/cleared Awakened Berserker class FX.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "performance",
       "license": "Unknown",
-      "credits": "Published by Owyn at https://github.com/Owyn/fps-pack. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by Owyn at https://github.com/Owyn/fps-pack. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/Owyn/fps-pack/master/res/FX_Awaken_Berserker.gpk",
       "sha256": "9c64dd351ef52e924dd59daca47ee7667aa3ee59873471806f2db3ff1e33ee06",
       "size_bytes": 5238079,
       "source_url": "https://github.com/Owyn/fps-pack",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "Full pack of effect minimizing and disabling gpk mods to increase FPS",
+      "last_verified_patch": "patch 100",
+      "tags": [
+        "tera",
+        "tera-online",
+        "tera-proxy"
+      ]
     },
     {
       "id": "owyn.fps-pack-fx-awaken-sorcerer",
@@ -1193,16 +1327,22 @@
       "long_description": "Minimized/cleared Awakened Sorcerer class FX.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "performance",
       "license": "Unknown",
-      "credits": "Published by Owyn at https://github.com/Owyn/fps-pack. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by Owyn at https://github.com/Owyn/fps-pack. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/Owyn/fps-pack/master/res/FX_Awaken_Sorcerer.gpk",
       "sha256": "7333152746c3245baf3901bfc5f50c7deb1fbf4e99a73689fa5e8bc5ea268525",
       "size_bytes": 8112875,
       "source_url": "https://github.com/Owyn/fps-pack",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "Full pack of effect minimizing and disabling gpk mods to increase FPS",
+      "last_verified_patch": "patch 100",
+      "tags": [
+        "tera",
+        "tera-online",
+        "tera-proxy"
+      ]
     },
     {
       "id": "owyn.fps-pack-fx-awaken-priest",
@@ -1213,16 +1353,22 @@
       "long_description": "Minimized/cleared Awakened Priest class FX.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "performance",
       "license": "Unknown",
-      "credits": "Published by Owyn at https://github.com/Owyn/fps-pack. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by Owyn at https://github.com/Owyn/fps-pack. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/Owyn/fps-pack/master/res/FX_Awaken_Priest.gpk",
       "sha256": "0c464fb81bf1adc8ad93034cd746413933afb43f4e9919248b925ef31d2de3ea",
       "size_bytes": 3748434,
       "source_url": "https://github.com/Owyn/fps-pack",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "Full pack of effect minimizing and disabling gpk mods to increase FPS",
+      "last_verified_patch": "patch 100",
+      "tags": [
+        "tera",
+        "tera-online",
+        "tera-proxy"
+      ]
     },
     {
       "id": "owyn.fps-pack-fx-awaken-lancer",
@@ -1233,16 +1379,22 @@
       "long_description": "Minimized/cleared Awakened Lancer class FX.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "performance",
       "license": "Unknown",
-      "credits": "Published by Owyn at https://github.com/Owyn/fps-pack. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by Owyn at https://github.com/Owyn/fps-pack. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/Owyn/fps-pack/master/res/FX_Awaken_Lancer.gpk",
       "sha256": "00913637a862f7f0583440e1d825340f18052b3d0198240f7fa8cdacf2106048",
       "size_bytes": 3338163,
       "source_url": "https://github.com/Owyn/fps-pack",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "Full pack of effect minimizing and disabling gpk mods to increase FPS",
+      "last_verified_patch": "patch 100",
+      "tags": [
+        "tera",
+        "tera-online",
+        "tera-proxy"
+      ]
     },
     {
       "id": "owyn.fps-pack-fx-awaken-slayer",
@@ -1253,16 +1405,22 @@
       "long_description": "Minimized/cleared Awakened Slayer class FX.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "performance",
       "license": "Unknown",
-      "credits": "Published by Owyn at https://github.com/Owyn/fps-pack. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by Owyn at https://github.com/Owyn/fps-pack. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/Owyn/fps-pack/master/res/FX_Awaken_Slayer.gpk",
       "sha256": "c676cfc69dc564d1acb3efbea8aadb0a0b5bcc69959b2317f52c7ab3e6a549a6",
       "size_bytes": 4798084,
       "source_url": "https://github.com/Owyn/fps-pack",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "Full pack of effect minimizing and disabling gpk mods to increase FPS",
+      "last_verified_patch": "patch 100",
+      "tags": [
+        "tera",
+        "tera-online",
+        "tera-proxy"
+      ]
     },
     {
       "id": "owyn.fps-pack-fx-awaken-warrior",
@@ -1273,16 +1431,22 @@
       "long_description": "Minimized/cleared Awakened Warrior class FX.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "performance",
       "license": "Unknown",
-      "credits": "Published by Owyn at https://github.com/Owyn/fps-pack. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by Owyn at https://github.com/Owyn/fps-pack. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/Owyn/fps-pack/master/res/FX_Awaken_Warrior.gpk",
       "sha256": "404c6e75c82d5ba133f1e6423545a88e05328187194e0fe5303e32c4c4a6f901",
       "size_bytes": 4016295,
       "source_url": "https://github.com/Owyn/fps-pack",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "Full pack of effect minimizing and disabling gpk mods to increase FPS",
+      "last_verified_patch": "patch 100",
+      "tags": [
+        "tera",
+        "tera-online",
+        "tera-proxy"
+      ]
     },
     {
       "id": "catannadev.pink-crosshair",
@@ -1293,16 +1457,22 @@
       "long_description": "Pink recolor of the lock-on crosshair.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by CatAnnaDev at https://github.com/CatAnnaDev/Pink-crossair. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by CatAnnaDev at https://github.com/CatAnnaDev/Pink-crossair. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/CatAnnaDev/Pink-crossair/master/S1UI_Crosshair.gpk",
       "sha256": "55d16273fe364be6652293040ee6cb0bd38a83002c26b48936189e60a5e2f149",
       "size_bytes": 1577612,
       "source_url": "https://github.com/CatAnnaDev/Pink-crossair",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "last_verified_patch": "patch 103",
+      "tags": [
+        "tera",
+        "tera-mods",
+        "tera-proxy",
+        "tera-ui"
+      ]
     },
     {
       "id": "catannadev.red-crosshair",
@@ -1313,16 +1483,23 @@
       "long_description": "Red recolor of the lock-on crosshair.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by CatAnnaDev at https://github.com/CatAnnaDev/Red-crosshair. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by CatAnnaDev at https://github.com/CatAnnaDev/Red-crosshair. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/CatAnnaDev/Red-crosshair/master/S1UI_Crosshair.gpk",
       "sha256": "5cfab1dcf0b15574104ec5d5d7187ef7da73d42029959ca44efb301ec5b3ae66",
       "size_bytes": 1577610,
       "source_url": "https://github.com/CatAnnaDev/Red-crosshair",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "last_verified_patch": "patch 103",
+      "tags": [
+        "tera",
+        "tera-mods",
+        "tera-online",
+        "tera-proxy",
+        "tera-ui"
+      ]
     },
     {
       "id": "catannadev.pink-hp-bar",
@@ -1333,16 +1510,22 @@
       "long_description": "Pink-recolored self HP/MP bar.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by CatAnnaDev at https://github.com/CatAnnaDev/Pink-Hp-bar. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by CatAnnaDev at https://github.com/CatAnnaDev/Pink-Hp-bar. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/CatAnnaDev/Pink-Hp-bar/master/S1UI_CharacterWindow.gpk",
       "sha256": "4ff8db05f1e370831cbbcb81109cbb5fa0c540e34f9f8bc680ae8066585f0ae2",
       "size_bytes": 21100,
       "source_url": "https://github.com/CatAnnaDev/Pink-Hp-bar",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "last_verified_patch": "patch 103",
+      "tags": [
+        "tera",
+        "tera-mods",
+        "tera-proxy",
+        "tera-ui"
+      ]
     },
     {
       "id": "catannadev.colored-hp-bar",
@@ -1353,16 +1536,22 @@
       "long_description": "Multi-color HP bar variant 1.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by CatAnnaDev at https://github.com/CatAnnaDev/Colored-hp-bar. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by CatAnnaDev at https://github.com/CatAnnaDev/Colored-hp-bar. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/CatAnnaDev/Colored-hp-bar/master/S1UI_CharacterWindow.gpk",
       "sha256": "2d0752a6d542dbd05f21f11698d1a1ace34700983b5dd7c9708f57cd0690e3fd",
       "size_bytes": 39829,
       "source_url": "https://github.com/CatAnnaDev/Colored-hp-bar",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "last_verified_patch": "patch 103",
+      "tags": [
+        "tera",
+        "tera-mods",
+        "tera-proxy",
+        "tera-ui"
+      ]
     },
     {
       "id": "catannadev.colored-hp-bar-2",
@@ -1373,16 +1562,22 @@
       "long_description": "Multi-color HP bar variant 2.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by CatAnnaDev at https://github.com/CatAnnaDev/Colored-hp-bar-2. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by CatAnnaDev at https://github.com/CatAnnaDev/Colored-hp-bar-2. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/CatAnnaDev/Colored-hp-bar-2/master/S1UI_CharacterWindow.gpk",
       "sha256": "56b7eba61ee5bcd6ead1a39d8beacd5bf7133c457bb358f374c10518df5be68e",
       "size_bytes": 39797,
       "source_url": "https://github.com/CatAnnaDev/Colored-hp-bar-2",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "last_verified_patch": "patch 103",
+      "tags": [
+        "tera",
+        "tera-mods",
+        "tera-proxy",
+        "tera-ui"
+      ]
     },
     {
       "id": "catannadev.yellow-orange-hp-bar",
@@ -1393,16 +1588,22 @@
       "long_description": "Yellow/orange self HP/MP bar.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by CatAnnaDev at https://github.com/CatAnnaDev/Yellow-Orange-hp-bar. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by CatAnnaDev at https://github.com/CatAnnaDev/Yellow-Orange-hp-bar. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/CatAnnaDev/Yellow-Orange-hp-bar/master/S1UI_CharacterWindow.gpk",
       "sha256": "31bd69520cd72fc3e0338471b1c683eda2b34578a137f12ffc947ee545e0775a",
       "size_bytes": 21114,
       "source_url": "https://github.com/CatAnnaDev/Yellow-Orange-hp-bar",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "last_verified_patch": "patch 103",
+      "tags": [
+        "tera",
+        "tera-mods",
+        "tera-proxy",
+        "tera-ui"
+      ]
     },
     {
       "id": "catannadev.pink-loading-progress",
@@ -1413,16 +1614,22 @@
       "long_description": "Pink recolor of map/zone loading bar.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by CatAnnaDev at https://github.com/CatAnnaDev/Pink-LoadingProgress. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by CatAnnaDev at https://github.com/CatAnnaDev/Pink-LoadingProgress. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/CatAnnaDev/Pink-LoadingProgress/master/S1UI_LoadingProgress.gpk",
       "sha256": "6d2ae92fd8913b4b889ec848864eced253cc3039480b2370132f287c1a6b76e9",
       "size_bytes": 264598,
       "source_url": "https://github.com/CatAnnaDev/Pink-LoadingProgress",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "last_verified_patch": "patch 103",
+      "tags": [
+        "tera",
+        "tera-mods",
+        "tera-proxy",
+        "tera-ui"
+      ]
     },
     {
       "id": "catannadev.red-loading-progress",
@@ -1433,16 +1640,22 @@
       "long_description": "Red recolor of map/zone loading bar.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by CatAnnaDev at https://github.com/CatAnnaDev/Red-LoadingProgress. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by CatAnnaDev at https://github.com/CatAnnaDev/Red-LoadingProgress. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/CatAnnaDev/Red-LoadingProgress/master/S1UI_LoadingProgress.gpk",
       "sha256": "9eb5490c21ead43b1671f5e89fd7e911aa25d75e880294619a0bbc068661249f",
       "size_bytes": 264598,
       "source_url": "https://github.com/CatAnnaDev/Red-LoadingProgress",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "last_verified_patch": "patch 103",
+      "tags": [
+        "tera",
+        "tera-mods",
+        "tera-proxy",
+        "tera-ui"
+      ]
     },
     {
       "id": "teralove.remove-artisan-icons",
@@ -1453,16 +1666,23 @@
       "long_description": "Strips artisan-mastery icons from nameplates.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by teralove at https://github.com/teralove/remove-artisan-icons. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by teralove at https://github.com/teralove/remove-artisan-icons. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/teralove/remove-artisan-icons/master/Icon_System.gpk",
       "sha256": "80e86a69e192e629fd669cf97c6e1cd2dea20bd3f3769d17bd804af4ef7774f1",
       "size_bytes": 2683803,
       "source_url": "https://github.com/teralove/remove-artisan-icons",
-      "screenshots": [],
+      "screenshots": [
+        "https://github.com/teralove/remove-artisan-icons/blob/master/artisan_mastery_icons.png"
+      ],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "Removes the artisan mastery icons from name plates. (GPK mod)",
+      "last_verified_patch": "patch 95",
+      "tags": [
+        "tera-proxy"
+      ]
     },
     {
       "id": "merusira.atlas-clean-onscreen-messages",
@@ -1473,16 +1693,17 @@
       "long_description": "Removes glyph/combat onscreen messages (patch 100 build).\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "ui",
       "license": "Unknown",
-      "credits": "Published by merusira at https://github.com/merusira/tera-toolbox-atlas. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by merusira at https://github.com/merusira/tera-toolbox-atlas. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/merusira/tera-toolbox-atlas/master/patch100/mods/Clear%20onscreen%20messages/S1UI_Message.gpk",
       "sha256": "ed4a48d70f710a1a30141f5fee5361e9169257614ae08a08352582a2e3d789a7",
       "size_bytes": 554802,
       "source_url": "https://github.com/merusira/tera-toolbox-atlas",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "TeraAtlas",
+      "last_verified_patch": "patch 115"
     },
     {
       "id": "pantypon.cheerleader-shorts",
@@ -1493,16 +1714,17 @@
       "long_description": "Costume edit: cheerleader shorts variant.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Cheerleader%20Shorts/PC_Event_29.gpk",
       "sha256": "68da0d70699a93e55bc80ba88786d10184b8b20db09521c1990f449058c364c2",
       "size_bytes": 16425681,
       "source_url": "https://github.com/pantypon/tera-client-mods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "pantys-mods",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "pantypon.elin-black-business-suit",
@@ -1513,16 +1735,17 @@
       "long_description": "Elin business suit recolor.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Elin%20Black%20Business%20Suit/PC_Event_14.gpk",
       "sha256": "5ffcaccb393b39ec2e04791d25f59964ed8e3b8da276bdc65a040cda04c87af9",
       "size_bytes": 59364155,
       "source_url": "https://github.com/pantypon/tera-client-mods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "pantys-mods",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "pantypon.elin-strawberry-maid",
@@ -1533,16 +1756,17 @@
       "long_description": "Elin strawberry maid recolor of PC_Event_53.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Elin%20Strawberry%20Maid/PC_Event_53.gpk",
       "sha256": "a49a0097487d6b642c3331629e31caf90a1ed414f3974e64c71dcdbdf49e2624",
       "size_bytes": 11539679,
       "source_url": "https://github.com/pantypon/tera-client-mods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "pantys-mods",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "pantypon.elin-pink-social-dress",
@@ -1553,16 +1777,17 @@
       "long_description": "Pink social dress recolor.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Elin%20Pink%20Social%20Dress/PC_Event_46.gpk",
       "sha256": "991d3589ef98235435580026fb256186e1f2dbe04247e794e30226962f29fca2",
       "size_bytes": 14863275,
       "source_url": "https://github.com/pantypon/tera-client-mods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "pantys-mods",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "pantypon.pastel-pora-elinu-uniform",
@@ -1573,16 +1798,17 @@
       "long_description": "Pastel variant of Pora Elinu uniform.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Pastel%20Pora%20Elinu%20Uniform/PC_Event_38.gpk",
       "sha256": "11e75d6fc6b9dea15d4a4d9a2a53746fa759a680ef43671d264c4ac269c4c04a",
       "size_bytes": 30019566,
       "source_url": "https://github.com/pantypon/tera-client-mods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "pantys-mods",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "pantypon.red-miko-costume",
@@ -1593,16 +1819,17 @@
       "long_description": "Red Miko costume skin.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Red%20Miko%20Costume/PC_Event_36.gpk",
       "sha256": "a9448fa2b6da512682162b97563abe4a76fbdd4bacf123c7250cc3cc30728460",
       "size_bytes": 18314237,
       "source_url": "https://github.com/pantypon/tera-client-mods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "pantys-mods",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "pantypon.white-castanica-demon",
@@ -1613,16 +1840,17 @@
       "long_description": "White recolor of Castanica Demon costume.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/White%20Castanica%20Demon/PC_Event_32.gpk",
       "sha256": "7081258b2d8d8a16ff897faf7f074bedbf07131b8cbecc5af4a4ac55e13e4aae",
       "size_bytes": 29369738,
       "source_url": "https://github.com/pantypon/tera-client-mods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "pantys-mods",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "pantypon.white-pixie",
@@ -1633,16 +1861,17 @@
       "long_description": "White pixie costume skin.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/White%20Pixie/PC_Event_68.gpk",
       "sha256": "cc66aad6f7f94fc185f2779f57e0dc51334e725b412d5e9cb8469625515c740d",
       "size_bytes": 20950551,
       "source_url": "https://github.com/pantypon/tera-client-mods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "pantys-mods",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "pantypon.better-dyeable-flight-suit",
@@ -1653,16 +1882,17 @@
       "long_description": "More dyeable regions on the flight suit.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Better%20Dyeable%20Flight%20Suit/PC_Event_62.gpk",
       "sha256": "22428d8200ec1ab09de976cc2e96d8b30d2b1710b798a89bbb921f21deddcd72",
       "size_bytes": 40197127,
       "source_url": "https://github.com/pantypon/tera-client-mods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "pantys-mods",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "pantypon.castanic-sleepy-running-togs",
@@ -1673,16 +1903,17 @@
       "long_description": "Castanic sleepy running togs recolor.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Castanic%20Sleepy%20Running%20Togs/PC_Event_03.gpk",
       "sha256": "eb98a89f8e177066143755fc48234f8bf6d1ec25938d1c860f0fdce1e2ec8063",
       "size_bytes": 17461658,
       "source_url": "https://github.com/pantypon/tera-client-mods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "pantys-mods",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "pantypon.charcoal-eldritch-no-skirt",
@@ -1693,16 +1924,17 @@
       "long_description": "Charcoal Eldritch costume without skirt.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Charcoal%20Eldritch%20No%20Skirt/PC_Event_09.gpk",
       "sha256": "cf1e2bb63cc1b72e894b2263f852508aa81fd44e383d84499f855b3941cbdc65",
       "size_bytes": 19180438,
       "source_url": "https://github.com/pantypon/tera-client-mods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "pantys-mods",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "pantypon.elin-sugar-alice",
@@ -1713,16 +1945,17 @@
       "long_description": "Sugar Alice Elin costume recolor.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Elin%20Sugar%20Alice/PC_Event_23A.gpk",
       "sha256": "18802df3cded68b338440cf9bb1da11e4b4f3faa9d624a1891173e5b3cfac368",
       "size_bytes": 13650139,
       "source_url": "https://github.com/pantypon/tera-client-mods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "pantys-mods",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "pantypon.elin-rose-gold-raincoat",
@@ -1733,16 +1966,17 @@
       "long_description": "Rose gold raincoat recolor.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Elin%20Rose%20Gold%20Raincoat/PC_Event_42A.gpk",
       "sha256": "467cc59e1b105380389f30ac1b2da9e029890af85804b9e99051cbf65b2c1732",
       "size_bytes": 3531229,
       "source_url": "https://github.com/pantypon/tera-client-mods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "pantys-mods",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "pantypon.elin-english-lavender-raincoat",
@@ -1753,16 +1987,17 @@
       "long_description": "Lavender raincoat recolor.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Elin%20English%20Lavender%20Raincoat/PC_Event_42A.gpk",
       "sha256": "2efad9021662f5aafbb14cb48037b7394259f0ea1d7cb39436f4b24e459d43d3",
       "size_bytes": 3442714,
       "source_url": "https://github.com/pantypon/tera-client-mods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "pantys-mods",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "pantypon.pink-picnic-dress",
@@ -1773,16 +2008,17 @@
       "long_description": "Pink picnic dress variant.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by pantypon at https://github.com/pantypon/tera-client-mods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/pantypon/tera-client-mods/master/Pink%20Picnic%20Dress/PC_Event_46.gpk",
       "sha256": "98d89332b45e0552ad700b657daaa91a528b2d118b7eafca3ded7979273562c7",
       "size_bytes": 14880539,
       "source_url": "https://github.com/pantypon/tera-client-mods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "pantys-mods",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "taylorswiftmodding.bear-animal-mask",
@@ -1793,16 +2029,17 @@
       "long_description": "Bear-themed recolor of Animal Mask accessory.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by TheTaylorSwiftOfModding at https://github.com/TheTaylorSwiftOfModding/TeraMods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by TheTaylorSwiftOfModding at https://github.com/TheTaylorSwiftOfModding/TeraMods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/TheTaylorSwiftOfModding/TeraMods/master/Bear%20Animal%20Mask/Acc_388.gpk",
       "sha256": "f97a01198cba130237458426c2ea3fcf804289168a1d3bd955184a1d433b03b9",
       "size_bytes": 268604,
       "source_url": "https://github.com/TheTaylorSwiftOfModding/TeraMods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "TeraMods made by TSwift",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "taylorswiftmodding.happy-kitty-mask",
@@ -1813,16 +2050,17 @@
       "long_description": "Happy kitty recolor of Animal Mask.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by TheTaylorSwiftOfModding at https://github.com/TheTaylorSwiftOfModding/TeraMods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by TheTaylorSwiftOfModding at https://github.com/TheTaylorSwiftOfModding/TeraMods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/TheTaylorSwiftOfModding/TeraMods/master/Happy%20Kitty%20Animal%20Mask/Acc_388.gpk",
       "sha256": "28eaed689548543c22b5d198200e4dca2c5a18168459fb86f1f133c506bf19b0",
       "size_bytes": 334068,
       "source_url": "https://github.com/TheTaylorSwiftOfModding/TeraMods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "TeraMods made by TSwift",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "taylorswiftmodding.bunny-chu-mount",
@@ -1833,16 +2071,17 @@
       "long_description": "Bunny in the Moon mount recolor.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by TheTaylorSwiftOfModding at https://github.com/TheTaylorSwiftOfModding/TeraMods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by TheTaylorSwiftOfModding at https://github.com/TheTaylorSwiftOfModding/TeraMods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/TheTaylorSwiftOfModding/TeraMods/master/Bunny%20Chu/Vehicle_BunnyInTheMoon.gpk",
       "sha256": "d8ce6b76fc170d82b274a3479e5d0406f4080b8d057cf03affd8d52ff322ce5f",
       "size_bytes": 5478560,
       "source_url": "https://github.com/TheTaylorSwiftOfModding/TeraMods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "TeraMods made by TSwift",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "taylorswiftmodding.candied-dragon",
@@ -1853,16 +2092,17 @@
       "long_description": "Pastel/candy dragon mount recolor.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by TheTaylorSwiftOfModding at https://github.com/TheTaylorSwiftOfModding/TeraMods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by TheTaylorSwiftOfModding at https://github.com/TheTaylorSwiftOfModding/TeraMods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/TheTaylorSwiftOfModding/TeraMods/master/Candied%20Dragon/Vehicle_Dragon.gpk",
       "sha256": "cd74ebd93f0d7a85ec0be632c5da0ac7d7dddedcb5034f59639f2dcd65ebc3e2",
       "size_bytes": 20594074,
       "source_url": "https://github.com/TheTaylorSwiftOfModding/TeraMods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "TeraMods made by TSwift",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "taylorswiftmodding.bunny-coco",
@@ -1873,16 +2113,17 @@
       "long_description": "CoCo pet → albino bunny recolor.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by TheTaylorSwiftOfModding at https://github.com/TheTaylorSwiftOfModding/TeraMods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by TheTaylorSwiftOfModding at https://github.com/TheTaylorSwiftOfModding/TeraMods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/TheTaylorSwiftOfModding/TeraMods/master/Bunny%20Coco/Partner_C_CoCo_Event00.gpk",
       "sha256": "745541ec6dddf74f1c18c6c5c22952eccefddbc6121c73e47e9b8b97ce223dfd",
       "size_bytes": 8100233,
       "source_url": "https://github.com/TheTaylorSwiftOfModding/TeraMods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "TeraMods made by TSwift",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "taylorswiftmodding.hanbok-bubblegum-princess",
@@ -1893,16 +2134,17 @@
       "long_description": "Pink hanbok costume recolor.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by TheTaylorSwiftOfModding at https://github.com/TheTaylorSwiftOfModding/TeraMods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by TheTaylorSwiftOfModding at https://github.com/TheTaylorSwiftOfModding/TeraMods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/TheTaylorSwiftOfModding/TeraMods/master/Hanbok%20Bubblegum%20Princess/PC_Event_27A.gpk",
       "sha256": "83feb1dd51c5880690dbc3446032a7a28036913e4ccb7afe1d3453406e6c0c9d",
       "size_bytes": 21235392,
       "source_url": "https://github.com/TheTaylorSwiftOfModding/TeraMods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "TeraMods made by TSwift",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "taylorswiftmodding.peaches-and-jeans",
@@ -1913,16 +2155,17 @@
       "long_description": "Peach/denim maid costume recolor.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by TheTaylorSwiftOfModding at https://github.com/TheTaylorSwiftOfModding/TeraMods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by TheTaylorSwiftOfModding at https://github.com/TheTaylorSwiftOfModding/TeraMods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/TheTaylorSwiftOfModding/TeraMods/master/Peaches%20and%20Jeans/PC_Event_53.gpk",
       "sha256": "108b0420c5daf9a6f261245c9b6c10a528402ec1e22d796d6eb6d433c3a0d7fa",
       "size_bytes": 10788907,
       "source_url": "https://github.com/TheTaylorSwiftOfModding/TeraMods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "TeraMods made by TSwift",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "taylorswiftmodding.pikachu-raincoat",
@@ -1933,16 +2176,17 @@
       "long_description": "Pikachu yellow raincoat recolor.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by TheTaylorSwiftOfModding at https://github.com/TheTaylorSwiftOfModding/TeraMods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by TheTaylorSwiftOfModding at https://github.com/TheTaylorSwiftOfModding/TeraMods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/TheTaylorSwiftOfModding/TeraMods/master/Pikachu%20Raincoat/PC_Event_42A.gpk",
       "sha256": "e6cd218309cec6d545e79bd58aa3adbcdf0d838a1c6c1bf70852cd5fb6c385dd",
       "size_bytes": 2912511,
       "source_url": "https://github.com/TheTaylorSwiftOfModding/TeraMods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "TeraMods made by TSwift",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "taylorswiftmodding.i-can-haz-backpack",
@@ -1953,16 +2197,17 @@
       "long_description": "Pink/cream cat backpack accessory recolor.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by TheTaylorSwiftOfModding at https://github.com/TheTaylorSwiftOfModding/TeraMods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by TheTaylorSwiftOfModding at https://github.com/TheTaylorSwiftOfModding/TeraMods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/TheTaylorSwiftOfModding/TeraMods/master/I%20can%20haz%20backpack/Acc_133.gpk",
       "sha256": "b2cc28bee16cf6b59dab8edccd0b5c2c71367a4bda6061ebe3ecd2656a4a6949",
       "size_bytes": 717236,
       "source_url": "https://github.com/TheTaylorSwiftOfModding/TeraMods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "TeraMods made by TSwift",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "taylorswiftmodding.maria-maria",
@@ -1973,16 +2218,17 @@
       "long_description": "Maria pet recolor.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by TheTaylorSwiftOfModding at https://github.com/TheTaylorSwiftOfModding/TeraMods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by TheTaylorSwiftOfModding at https://github.com/TheTaylorSwiftOfModding/TeraMods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/TheTaylorSwiftOfModding/TeraMods/master/Maria%20Maria/Partner_A_Rumi_F_Event00.gpk",
       "sha256": "2b9dfd74a8dfb56c7ac09b00b299eea7c68f3edec8495a06e2b00802c7210336",
       "size_bytes": 4363826,
       "source_url": "https://github.com/TheTaylorSwiftOfModding/TeraMods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "TeraMods made by TSwift",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "taylorswiftmodding.pinky-kun",
@@ -1993,16 +2239,17 @@
       "long_description": "KunKun pet pink recolor.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by TheTaylorSwiftOfModding at https://github.com/TheTaylorSwiftOfModding/TeraMods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by TheTaylorSwiftOfModding at https://github.com/TheTaylorSwiftOfModding/TeraMods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/TheTaylorSwiftOfModding/TeraMods/master/Pinky%20Kun/Partner_B_KunKun_Event00.gpk",
       "sha256": "559ff7bd0b3d0d2db690afa0a3a7b2c6fbd353ab6bcd07cf9d1305e7b7f167e1",
       "size_bytes": 3936588,
       "source_url": "https://github.com/TheTaylorSwiftOfModding/TeraMods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "TeraMods made by TSwift",
+      "last_verified_patch": "patch 100"
     },
     {
       "id": "taylorswiftmodding.blacker-bow",
@@ -2013,16 +2260,17 @@
       "long_description": "Darker-black recolor of bow accessory.\n\nThe launcher automatically downloads and installs this mod for you. You can manage it from the mod manager.",
       "category": "cosmetic",
       "license": "Unknown",
-      "credits": "Published by TheTaylorSwiftOfModding at https://github.com/TheTaylorSwiftOfModding/TeraMods. If you are the author and would like to update this entry, please contact us on GitHub.",
+      "credits": "Published by TheTaylorSwiftOfModding at https://github.com/TheTaylorSwiftOfModding/TeraMods. If you are the author and would prefer this entry removed or reattributed, open an issue on TERA-Europe-Classic/external-mod-catalog.",
       "version": "2026-04",
       "download_url": "https://raw.githubusercontent.com/TheTaylorSwiftOfModding/TeraMods/master/Blacker%20Bow/Acc_298.gpk",
       "sha256": "392649f6b3306848b065cd2e0d98dfc183cf36da06d7f08bb38c94e4702ee168",
       "size_bytes": 256704,
       "source_url": "https://github.com/TheTaylorSwiftOfModding/TeraMods",
-      "screenshots": [],
       "target_patch": "v100.02",
       "composite_flag": true,
-      "updated_at": "2026-04-18T20:21:17Z"
+      "updated_at": "2026-04-18T20:21:17Z",
+      "tagline": "TeraMods made by TSwift",
+      "last_verified_patch": "patch 100"
     }
   ]
 }
