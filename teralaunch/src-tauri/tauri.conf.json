@@ -27,7 +27,7 @@
   },
   "productName": "TERA Europe Classic+ Launcher",
   "mainBinaryName": "TERA Europe Classic+ Launcher",
-  "version": "0.1.26",
+  "version": "0.2.0",
   "identifier": "crazy-esports-classicplus",
   "plugins": {
     "updater": {
