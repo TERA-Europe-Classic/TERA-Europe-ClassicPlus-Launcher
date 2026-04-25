@@ -1,17 +1,22 @@
-//! Patch-based GPK install / enable / disable.
+//! Patch-based GPK install / enable / disable. Two deploy shapes are
+//! supported:
 //!
-//! Replaces the legacy "copy modded GPK whole-cloth into CookedPC" path
-//! with a flow that:
-//!   1. At install: derives a `PatchManifest` from the modded GPK against
-//!      vanilla bytes extracted from the user's composite container,
-//!      persists the manifest under `<app_root>/patch-manifests/<id>/`.
-//!   2. At enable: re-extracts the vanilla bytes, applies the manifest via
-//!      `gpk_patch_applier::apply_manifest`, writes the patched bytes as a
-//!      standalone `<game>/CookedPC/<target>.gpk`, redirects the composite
-//!      mapper at it.
-//!   3. At disable: hard-restores the mapper from `.clean` and deletes the
-//!      standalone. The vanilla bytes still live in the composite container
-//!      so no per-package baseline needs to be persisted.
+//! - **Composite-routed (Type A)**: vanilla bytes live inside a composite
+//!   container at a `(filename, offset, size)` recorded in
+//!   `CompositePackageMapper.clean`. Enable writes the patched bytes as a
+//!   standalone in CookedPC root and redirects the composite mapper at
+//!   it. Disable restores the mapper from `.clean` and deletes the
+//!   standalone.
+//! - **Standalone-file (Type B)**: vanilla `<package>.gpk` lives at a
+//!   deep filesystem path (e.g. `Art_Data/Packages/S1UI/<name>.gpk`).
+//!   Enable backs the vanilla file up to `<path>.vanilla-bak` (once),
+//!   then writes the patched bytes in place to `<path>`. Disable copies
+//!   `.vanilla-bak` over `<path>`.
+//!
+//! Resolution kind is chosen at install time by `vanilla_resolver::
+//! resolve_vanilla_for_package_name` and persisted in a per-mod
+//! `install_target.json` sidecar so enable / disable always dispatch via
+//! the same path that derived the manifest.
 //!
 //! Diff shapes the Phase 1 applier doesn't support (added exports, name /
 //! import drift, compressed packages, class changes) are refused at
@@ -19,11 +24,13 @@
 //! better than the legacy "install + break the client" failure mode.
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use super::{
-    composite_extract, gpk, gpk_patch_applier, manifest_store, patch_derivation,
+    gpk, gpk_patch_applier, manifest_store, patch_derivation, vanilla_resolver,
 };
+use super::manifest_store::InstallTarget;
+use super::vanilla_resolver::VanillaSource;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PatchInstallOutcome {
@@ -47,10 +54,23 @@ pub fn install_via_patch(
     }
     let modded = fs::read(source_gpk)
         .map_err(|e| format!("Failed to read modded GPK at {}: {e}", source_gpk.display()))?;
-    let vanilla =
-        composite_extract::extract_vanilla_for_package_name(game_root, target_package_name)?;
-    let manifest = patch_derivation::derive_manifest(mod_id, &vanilla, &modded)?;
+
+    let resolution =
+        vanilla_resolver::resolve_vanilla_for_package_name(game_root, target_package_name)?;
+
+    let manifest = patch_derivation::derive_manifest(mod_id, &resolution.bytes, &modded)?;
     manifest_store::save_manifest_at_root(app_root, mod_id, &manifest)?;
+
+    let install_target = match &resolution.source {
+        VanillaSource::Composite => InstallTarget::Composite {
+            package_name: target_package_name.to_string(),
+        },
+        VanillaSource::Standalone { path } => InstallTarget::Standalone {
+            relative_path: relative_to_game_root(game_root, path)?,
+        },
+    };
+    manifest_store::save_install_target_at_root(app_root, mod_id, &install_target)?;
+
     Ok(PatchInstallOutcome {
         target_filename: format!("{target_package_name}.gpk"),
         target_package_name: target_package_name.to_string(),
@@ -60,21 +80,70 @@ pub fn install_via_patch(
 pub fn enable_via_patch(game_root: &Path, app_root: &Path, mod_id: &str) -> Result<(), String> {
     let manifest = manifest_store::load_manifest_at_root(app_root, mod_id)?
         .ok_or_else(|| format!("No persisted manifest for mod '{mod_id}' — reinstall required"))?;
+    let target = manifest_store::load_install_target_at_root(app_root, mod_id)?
+        .ok_or_else(|| {
+            format!(
+                "No install_target sidecar for '{mod_id}' — reinstall required so the launcher knows where to apply the patch"
+            )
+        })?;
 
-    let target_package_name = manifest
-        .target_package
-        .strip_suffix(".gpk")
-        .unwrap_or(&manifest.target_package)
-        .to_string();
-    if target_package_name.trim().is_empty() {
-        return Err(format!(
-            "Manifest for '{mod_id}' has empty target_package — refusing to enable"
-        ));
+    match target {
+        InstallTarget::Composite { package_name } => {
+            enable_composite(game_root, &manifest, &package_name)
+        }
+        InstallTarget::Standalone { relative_path } => {
+            enable_standalone(game_root, &manifest, &relative_path)
+        }
     }
+}
 
-    let vanilla =
-        composite_extract::extract_vanilla_for_package_name(game_root, &target_package_name)?;
-    let patched = gpk_patch_applier::apply_manifest(&vanilla, &manifest)?;
+pub fn disable_via_patch(game_root: &Path, app_root: &Path, mod_id: &str) -> Result<(), String> {
+    // We always restore the mapper from `.clean` regardless of resolution
+    // kind — a Type A enable redirected the mapper, and we want it back to
+    // vanilla even if the install_target sidecar is missing. For Type B
+    // this is a cheap no-op since the mapper was never modified.
+    gpk::restore_clean_mapper_state(game_root)?;
+
+    let target = match manifest_store::load_install_target_at_root(app_root, mod_id)? {
+        Some(t) => t,
+        None => {
+            // No sidecar — nothing else we can safely clean up. Mapper
+            // restore above is the conservative fallback.
+            return Ok(());
+        }
+    };
+
+    match target {
+        InstallTarget::Composite { package_name } => {
+            let dest = game_root
+                .join(gpk::COOKED_PC_DIR)
+                .join(format!("{package_name}.gpk"));
+            if dest.exists() {
+                fs::remove_file(&dest).map_err(|e| {
+                    format!(
+                        "Failed to delete patched standalone {}: {e}",
+                        dest.display()
+                    )
+                })?;
+            }
+        }
+        InstallTarget::Standalone { relative_path } => {
+            disable_standalone(game_root, &relative_path)?;
+        }
+    }
+    Ok(())
+}
+
+fn enable_composite(
+    game_root: &Path,
+    manifest: &super::patch_manifest::PatchManifest,
+    target_package_name: &str,
+) -> Result<(), String> {
+    let vanilla = super::composite_extract::extract_vanilla_for_package_name(
+        game_root,
+        target_package_name,
+    )?;
+    let patched = gpk_patch_applier::apply_manifest(&vanilla, manifest)?;
 
     let target_filename = format!("{target_package_name}.gpk");
     let cooked_pc = game_root.join(gpk::COOKED_PC_DIR);
@@ -86,39 +155,114 @@ pub fn enable_via_patch(game_root: &Path, app_root: &Path, mod_id: &str) -> Resu
 
     let file_size = patched.len() as i64;
     let rewritten =
-        gpk::redirect_mapper_to_standalone(game_root, &target_package_name, file_size)?;
+        gpk::redirect_mapper_to_standalone(game_root, target_package_name, file_size)?;
     if rewritten == 0 {
-        // Vanilla mapper had no composite entry for this package. Roll the
-        // CookedPC write back so we don't leave an orphan file the engine
-        // never references.
         let _ = fs::remove_file(&dest);
         return Err(format!(
-            "Composite mapper has no entry pointing at vanilla '{target_package_name}' — \
-             this mod targets a package shape the launcher's patch deploy can't route yet"
+            "Composite mapper has no entry pointing at vanilla '{target_package_name}' — mapper drift between install and enable"
         ));
     }
     Ok(())
 }
 
-pub fn disable_via_patch(game_root: &Path, app_root: &Path, mod_id: &str) -> Result<(), String> {
-    // Mapper restore is independent of whether the manifest exists — even
-    // if the manifest bundle was deleted out from under us, we still want
-    // to give the user a clean mapper.
-    gpk::restore_clean_mapper_state(game_root)?;
+fn enable_standalone(
+    game_root: &Path,
+    manifest: &super::patch_manifest::PatchManifest,
+    relative_path: &str,
+) -> Result<(), String> {
+    let vanilla_path = resolve_relative_to_game_root(game_root, relative_path)?;
+    if !vanilla_path.exists() {
+        return Err(format!(
+            "Recorded vanilla file {} no longer exists — verify game files and reinstall the mod",
+            vanilla_path.display()
+        ));
+    }
 
-    if let Some(manifest) = manifest_store::load_manifest_at_root(app_root, mod_id)? {
-        let cooked_pc = game_root.join(gpk::COOKED_PC_DIR);
-        let dest = cooked_pc.join(&manifest.target_package);
-        if dest.exists() {
-            fs::remove_file(&dest).map_err(|e| {
-                format!(
-                    "Failed to delete patched standalone {}: {e}",
-                    dest.display()
-                )
-            })?;
-        }
+    let backup_path = vanilla_backup_path(&vanilla_path);
+
+    // First-run: snapshot the current bytes as the trusted vanilla baseline.
+    // We assume a freshly-installed mod has not yet been applied, so the
+    // bytes at `vanilla_path` are still vanilla. If `.vanilla-bak` already
+    // exists, trust it as the canonical baseline (a previous enable already
+    // ran or someone restored manually).
+    if !backup_path.exists() {
+        fs::copy(&vanilla_path, &backup_path).map_err(|e| {
+            format!(
+                "Failed to back up vanilla {} to {}: {e}",
+                vanilla_path.display(),
+                backup_path.display()
+            )
+        })?;
+    }
+
+    let baseline = fs::read(&backup_path).map_err(|e| {
+        format!(
+            "Failed to read vanilla baseline {}: {e}",
+            backup_path.display()
+        )
+    })?;
+    let patched = gpk_patch_applier::apply_manifest(&baseline, manifest)?;
+    fs::write(&vanilla_path, &patched).map_err(|e| {
+        format!(
+            "Failed to write patched bytes to {}: {e}",
+            vanilla_path.display()
+        )
+    })?;
+    Ok(())
+}
+
+fn disable_standalone(game_root: &Path, relative_path: &str) -> Result<(), String> {
+    let vanilla_path = resolve_relative_to_game_root(game_root, relative_path)?;
+    let backup_path = vanilla_backup_path(&vanilla_path);
+    if backup_path.exists() {
+        fs::copy(&backup_path, &vanilla_path).map_err(|e| {
+            format!(
+                "Failed to restore vanilla {} from {}: {e}",
+                vanilla_path.display(),
+                backup_path.display()
+            )
+        })?;
     }
     Ok(())
+}
+
+fn vanilla_backup_path(vanilla_path: &Path) -> PathBuf {
+    let mut s = vanilla_path.as_os_str().to_owned();
+    s.push(".vanilla-bak");
+    PathBuf::from(s)
+}
+
+fn relative_to_game_root(game_root: &Path, path: &Path) -> Result<String, String> {
+    let stripped = path.strip_prefix(game_root).map_err(|_| {
+        format!(
+            "Resolved vanilla path {} is not inside game_root {}",
+            path.display(),
+            game_root.display()
+        )
+    })?;
+    Ok(stripped
+        .to_string_lossy()
+        .replace('\\', "/")
+        .to_string())
+}
+
+fn resolve_relative_to_game_root(
+    game_root: &Path,
+    relative_path: &str,
+) -> Result<PathBuf, String> {
+    if relative_path.contains("..") || relative_path.starts_with('/') || relative_path.starts_with('\\') {
+        return Err(format!(
+            "install_target relative_path '{relative_path}' rejects parent traversal / absolute paths"
+        ));
+    }
+    if relative_path.contains(':') {
+        return Err(format!(
+            "install_target relative_path '{relative_path}' must not contain a drive letter"
+        ));
+    }
+    // Path::join accepts forward slashes on Windows fine, so no manual
+    // separator translation is needed here.
+    Ok(game_root.join(relative_path))
 }
 
 pub fn uninstall_via_patch(game_root: &Path, app_root: &Path, mod_id: &str) -> Result<(), String> {
@@ -588,6 +732,239 @@ mod tests {
         assert!(
             !cooked_pc.join("S1UI_GageBoss.gpk").exists(),
             "standalone must be rolled back when mapper redirect produces no rewrite"
+        );
+    }
+
+    // --- Type B (standalone in-place) tests ----------------------------
+
+    struct StandaloneSetup {
+        _tmp: TempDir,
+        game_root: std::path::PathBuf,
+        app_root: std::path::PathBuf,
+        vanilla_path: std::path::PathBuf,
+        backup_path: std::path::PathBuf,
+        mod_src: std::path::PathBuf,
+    }
+
+    fn setup_standalone_install() -> StandaloneSetup {
+        let tmp = TempDir::new().unwrap();
+        let game_root = tmp.path().join("game");
+        let app_root = tmp.path().join("app");
+        let cooked_pc = game_root.join(COOKED_PC_DIR);
+        let s1ui_dir = cooked_pc.join("Art_Data").join("Packages").join("S1UI");
+        fs::create_dir_all(&s1ui_dir).unwrap();
+        fs::create_dir_all(&app_root).unwrap();
+
+        // Empty composite mapper backup so resolver falls through to
+        // filesystem walk.
+        fs::write(cooked_pc.join(BACKUP_FILE), encrypt_mapper(b"")).unwrap();
+        fs::write(cooked_pc.join(MAPPER_FILE), encrypt_mapper(b"")).unwrap();
+
+        let vanilla_pkg = build_boss_window_test_package([0x10, 0x11, 0x12, 0x13], false);
+        let vanilla_path = s1ui_dir.join("S1UI_GageBoss.gpk");
+        fs::write(&vanilla_path, &vanilla_pkg).unwrap();
+        let backup_path = {
+            let mut s = vanilla_path.as_os_str().to_owned();
+            s.push(".vanilla-bak");
+            std::path::PathBuf::from(s)
+        };
+
+        let modded_pkg = build_boss_window_test_package([0xAA, 0xBB, 0xCC, 0xDD], false);
+        let mod_src = tmp.path().join("mod-src.gpk");
+        fs::write(&mod_src, &modded_pkg).unwrap();
+
+        StandaloneSetup {
+            _tmp: tmp,
+            game_root,
+            app_root,
+            vanilla_path,
+            backup_path,
+            mod_src,
+        }
+    }
+
+    #[test]
+    fn standalone_install_persists_manifest_and_install_target_sidecar() {
+        let s = setup_standalone_install();
+        let outcome = install_via_patch(
+            &s.game_root,
+            &s.app_root,
+            "test.mod",
+            &s.mod_src,
+            "S1UI_GageBoss",
+        )
+        .unwrap();
+
+        assert_eq!(outcome.target_filename, "S1UI_GageBoss.gpk");
+
+        // Manifest persisted.
+        assert!(
+            manifest_store::load_manifest_at_root(&s.app_root, "test.mod")
+                .unwrap()
+                .is_some()
+        );
+        // Install_target sidecar persisted with Standalone kind.
+        let target = manifest_store::load_install_target_at_root(&s.app_root, "test.mod")
+            .unwrap()
+            .expect("sidecar persisted");
+        match target {
+            InstallTarget::Standalone { relative_path } => {
+                assert!(
+                    relative_path.contains("S1UI_GageBoss.gpk"),
+                    "got: {relative_path}"
+                );
+                // Forward-slash on disk so cross-platform path is portable.
+                assert!(!relative_path.contains('\\'), "got: {relative_path}");
+            }
+            other => panic!("expected Standalone, got {other:?}"),
+        }
+
+        // Install must NOT touch the vanilla file or write a backup yet —
+        // those happen at enable time.
+        assert!(!s.backup_path.exists(), "backup must not exist after install alone");
+    }
+
+    #[test]
+    fn standalone_enable_writes_patched_bytes_in_place_and_creates_backup() {
+        let s = setup_standalone_install();
+        let vanilla_before = fs::read(&s.vanilla_path).unwrap();
+
+        install_via_patch(
+            &s.game_root,
+            &s.app_root,
+            "test.mod",
+            &s.mod_src,
+            "S1UI_GageBoss",
+        )
+        .unwrap();
+        enable_via_patch(&s.game_root, &s.app_root, "test.mod").unwrap();
+
+        // Backup created with the original vanilla bytes.
+        assert!(s.backup_path.exists(), "backup must exist after enable");
+        assert_eq!(fs::read(&s.backup_path).unwrap(), vanilla_before);
+
+        // Vanilla path now contains patched bytes.
+        let patched = fs::read(&s.vanilla_path).unwrap();
+        assert_ne!(patched, vanilla_before, "patched bytes must differ from vanilla");
+        let parsed = parse_package(&patched).unwrap();
+        let main = parsed
+            .exports
+            .iter()
+            .find(|e| e.object_path == "GageBoss")
+            .unwrap();
+        assert_eq!(main.payload, vec![0xAA, 0xBB, 0xCC, 0xDD]);
+    }
+
+    #[test]
+    fn standalone_disable_restores_vanilla_from_backup() {
+        let s = setup_standalone_install();
+        let vanilla_before = fs::read(&s.vanilla_path).unwrap();
+
+        install_via_patch(
+            &s.game_root,
+            &s.app_root,
+            "test.mod",
+            &s.mod_src,
+            "S1UI_GageBoss",
+        )
+        .unwrap();
+        enable_via_patch(&s.game_root, &s.app_root, "test.mod").unwrap();
+        disable_via_patch(&s.game_root, &s.app_root, "test.mod").unwrap();
+
+        assert_eq!(
+            fs::read(&s.vanilla_path).unwrap(),
+            vanilla_before,
+            "vanilla file must be restored after disable"
+        );
+    }
+
+    #[test]
+    fn standalone_enable_after_disable_reapplies_cleanly() {
+        let s = setup_standalone_install();
+        install_via_patch(
+            &s.game_root,
+            &s.app_root,
+            "test.mod",
+            &s.mod_src,
+            "S1UI_GageBoss",
+        )
+        .unwrap();
+        enable_via_patch(&s.game_root, &s.app_root, "test.mod").unwrap();
+        disable_via_patch(&s.game_root, &s.app_root, "test.mod").unwrap();
+
+        enable_via_patch(&s.game_root, &s.app_root, "test.mod").unwrap();
+
+        let patched = fs::read(&s.vanilla_path).unwrap();
+        let parsed = parse_package(&patched).unwrap();
+        let main = parsed
+            .exports
+            .iter()
+            .find(|e| e.object_path == "GageBoss")
+            .unwrap();
+        assert_eq!(main.payload, vec![0xAA, 0xBB, 0xCC, 0xDD]);
+    }
+
+    #[test]
+    fn standalone_uninstall_restores_vanilla_and_deletes_manifest() {
+        let s = setup_standalone_install();
+        let vanilla_before = fs::read(&s.vanilla_path).unwrap();
+
+        install_via_patch(
+            &s.game_root,
+            &s.app_root,
+            "test.mod",
+            &s.mod_src,
+            "S1UI_GageBoss",
+        )
+        .unwrap();
+        enable_via_patch(&s.game_root, &s.app_root, "test.mod").unwrap();
+
+        uninstall_via_patch(&s.game_root, &s.app_root, "test.mod").unwrap();
+
+        assert_eq!(
+            fs::read(&s.vanilla_path).unwrap(),
+            vanilla_before,
+            "vanilla restored after uninstall"
+        );
+        assert!(
+            manifest_store::load_manifest_at_root(&s.app_root, "test.mod")
+                .unwrap()
+                .is_none(),
+            "manifest deleted after uninstall"
+        );
+        assert!(
+            manifest_store::load_install_target_at_root(&s.app_root, "test.mod")
+                .unwrap()
+                .is_none(),
+            "install_target sidecar deleted after uninstall (bundle dir removed)"
+        );
+    }
+
+    #[test]
+    fn standalone_install_target_relative_path_rejects_traversal_at_apply_time() {
+        let s = setup_standalone_install();
+        // Hand-craft a malicious sidecar to verify enable defends against it.
+        manifest_store::save_install_target_at_root(
+            &s.app_root,
+            "evil.mod",
+            &InstallTarget::Standalone {
+                relative_path: "../../Windows/System32/foo.gpk".into(),
+            },
+        )
+        .unwrap();
+        // Also write a manifest so enable doesn't bail out earlier.
+        let manifest = patch_derivation::derive_manifest(
+            "evil.mod",
+            &fs::read(&s.vanilla_path).unwrap(),
+            &fs::read(&s.mod_src).unwrap(),
+        )
+        .unwrap();
+        manifest_store::save_manifest_at_root(&s.app_root, "evil.mod", &manifest).unwrap();
+
+        let err = enable_via_patch(&s.game_root, &s.app_root, "evil.mod").unwrap_err();
+        assert!(
+            err.contains("rejects parent traversal"),
+            "got: {err}"
         );
     }
 }

@@ -12,9 +12,94 @@
 use std::fs;
 use std::path::Path;
 
+use serde::{Deserialize, Serialize};
+
 use super::patch_manifest::{
     self, artifact_layout_for_mod_at_root, PatchManifest,
 };
+
+/// Per-mod sidecar persisted next to the manifest. Records *how* the
+/// vanilla baseline was resolved at install time so enable/disable can
+/// dispatch to the same code path that derived the manifest. Without this
+/// the runtime classifier could disagree between install and apply (e.g.
+/// the user's mapper changed between the two calls), causing a Type A
+/// install to be re-applied as Type B.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum InstallTarget {
+    /// Composite-routed: vanilla bytes lived in a composite container.
+    /// On enable: write patched standalone in CookedPC root, redirect
+    /// composite mapper. On disable: restore mapper from `.clean`,
+    /// delete standalone.
+    Composite {
+        /// The package name (e.g. `"S1UI_GageBoss"`). Used to resolve
+        /// the composite entry again at apply time.
+        package_name: String,
+    },
+    /// Standalone-file: vanilla `.gpk` lived at a deep path under
+    /// CookedPC. On enable: backup vanilla to `<path>.vanilla-bak` if
+    /// not present, apply manifest, write patched bytes to `<path>`.
+    /// On disable: copy `.vanilla-bak` over `<path>`.
+    Standalone {
+        /// Relative path under `game_root` (e.g.
+        /// `"S1Game/CookedPC/Art_Data/Packages/S1UI/S1UI_ProgressBar.gpk"`).
+        /// Stored relative so the launcher works across users with
+        /// different game install drives.
+        relative_path: String,
+    },
+}
+
+const INSTALL_TARGET_FILENAME: &str = "install_target.json";
+
+pub fn save_install_target_at_root(
+    root: &Path,
+    mod_id: &str,
+    target: &InstallTarget,
+) -> Result<(), String> {
+    let layout = artifact_layout_for_mod_at_root(root, mod_id);
+    fs::create_dir_all(&layout.bundle_dir).map_err(|e| {
+        format!(
+            "Failed to create bundle dir {} for install_target: {e}",
+            layout.bundle_dir.display()
+        )
+    })?;
+    let target_path = layout.bundle_dir.join(INSTALL_TARGET_FILENAME);
+    let json = serde_json::to_string_pretty(target)
+        .map_err(|e| format!("Failed to serialize install_target for '{mod_id}': {e}"))?;
+    let tmp = target_path.with_extension("json.tmp");
+    fs::write(&tmp, json)
+        .map_err(|e| format!("Failed to write install_target tmp {}: {e}", tmp.display()))?;
+    fs::rename(&tmp, &target_path).map_err(|e| {
+        format!(
+            "Failed to commit install_target {}: {e}",
+            target_path.display()
+        )
+    })
+}
+
+pub fn load_install_target_at_root(
+    root: &Path,
+    mod_id: &str,
+) -> Result<Option<InstallTarget>, String> {
+    let layout = artifact_layout_for_mod_at_root(root, mod_id);
+    let target_path = layout.bundle_dir.join(INSTALL_TARGET_FILENAME);
+    if !target_path.exists() {
+        return Ok(None);
+    }
+    let body = fs::read_to_string(&target_path).map_err(|e| {
+        format!(
+            "Failed to read install_target {}: {e}",
+            target_path.display()
+        )
+    })?;
+    let target: InstallTarget = serde_json::from_str(&body).map_err(|e| {
+        format!(
+            "Failed to parse install_target {}: {e}",
+            target_path.display()
+        )
+    })?;
+    Ok(Some(target))
+}
 
 pub fn save_manifest_at_root(
     root: &Path,

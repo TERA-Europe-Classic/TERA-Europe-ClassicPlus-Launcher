@@ -22,6 +22,7 @@ pub mod patch_derivation;
 pub mod patch_manifest;
 pub mod registry;
 pub mod types;
+pub mod vanilla_resolver;
 
 #[cfg(test)]
 pub mod test_fixtures;
