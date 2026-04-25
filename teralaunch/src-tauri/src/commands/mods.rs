@@ -24,16 +24,19 @@ use crate::services::mods::{
 };
 use crate::state::mods_state;
 
-/// Rebuilds the on-disk GPK deploy state to match the registry. For each
-/// GPK mod runs disable_via_patch first to revert mapper + delete any
-/// standalone, then enable_via_patch for those marked enabled. The
-/// composite mapper is hard-restored from `.clean` once up front so a
-/// removed-from-registry-but-still-on-disk standalone redirect doesn't
-/// survive into the rebuild.
+/// Rebuilds the on-disk GPK deploy state to match the registry. Migrates
+/// any registry slots installed by older launcher versions (legacy whole-
+/// file copies into CookedPC) before running the per-mod disable + enable
+/// cycle. The composite mapper is hard-restored from `.clean` once up
+/// front so a removed-from-registry-but-still-on-disk standalone redirect
+/// doesn't survive into the rebuild.
 fn rebuild_gpk_runtime_state() -> Result<(), String> {
     let game_root = resolve_game_root()?;
     let app_root = patch_manifest::get_manifest_root()
         .ok_or_else(|| "Could not resolve patch-manifest root directory".to_string())?;
+
+    migrate_legacy_gpk_installs(&game_root, &app_root)?;
+
     let installed = mods_state::list_mods()?;
     let gpk_mods: Vec<&ModEntry> = installed
         .iter()
@@ -55,6 +58,65 @@ fn rebuild_gpk_runtime_state() -> Result<(), String> {
         gpk_patch_deploy::enable_via_patch(&game_root, &app_root, &entry.id).map_err(|err| {
             format!("Failed to re-enable GPK mod '{}': {err}", entry.id)
         })?;
+    }
+    Ok(())
+}
+
+/// Detects legacy-installed GPK slots (deployed_filename set + no
+/// manifest persisted) and runs the legacy uninstall path to clean
+/// CookedPC, then flips the registry row to needs-reinstall. Idempotent
+/// — once a row has been migrated its `deployed_filename` is None, so
+/// subsequent calls skip it.
+fn migrate_legacy_gpk_installs(
+    game_root: &std::path::Path,
+    app_root: &std::path::Path,
+) -> Result<(), String> {
+    let installed = mods_state::list_mods()?;
+    let candidates: Vec<(String, String)> = installed
+        .into_iter()
+        .filter(|m| matches!(m.kind, ModKind::Gpk))
+        .filter_map(|m| m.deployed_filename.clone().map(|f| (m.id, f)))
+        .collect();
+    if candidates.is_empty() {
+        return Ok(());
+    }
+
+    for (mod_id, deployed_filename) in candidates {
+        let outcome = gpk_patch_deploy::migrate_legacy_install(
+            game_root,
+            app_root,
+            &mod_id,
+            &deployed_filename,
+        );
+        if let Some(err) = outcome.error.as_deref() {
+            log::warn!("legacy migration cleanup for {mod_id} reported: {err}");
+        }
+
+        // If a manifest already exists the slot was already on the new flow
+        // — leave the row alone. Otherwise mark it needs-reinstall and
+        // clear deployed_filename so the migration is idempotent.
+        let manifest_exists = matches!(
+            crate::services::mods::manifest_store::load_manifest_at_root(app_root, &mod_id),
+            Ok(Some(_))
+        );
+        if manifest_exists {
+            continue;
+        }
+
+        let _ = mods_state::mutate(|reg| {
+            if let Some(slot) = reg.find_mut(&mod_id) {
+                slot.deployed_filename = None;
+                slot.enabled = false;
+                slot.auto_launch = false;
+                slot.status = ModStatus::Error;
+                slot.last_error = Some(
+                    "This mod was installed by an older launcher version that overwrote vanilla files. \
+                     The legacy install has been cleaned up. Click Reinstall to redeploy via the new patch-based flow."
+                        .into(),
+                );
+            }
+            Ok(())
+        });
     }
     Ok(())
 }

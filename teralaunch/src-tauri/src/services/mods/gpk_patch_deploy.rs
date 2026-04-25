@@ -127,6 +127,63 @@ pub fn uninstall_via_patch(game_root: &Path, app_root: &Path, mod_id: &str) -> R
     Ok(())
 }
 
+/// Migration target: a registry slot whose patched bytes were applied by
+/// the legacy whole-file install path (`deployed_filename` is set) and
+/// has no patch manifest persisted. The new flow can't enable/disable it
+/// safely, so we clean up CookedPC and ask the user to reinstall.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LegacyMigrationOutcome {
+    pub mod_id: String,
+    pub target_filename: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Runs the one-time migration for slots installed by older launcher
+/// versions. For each (id, deployed_filename, manifest-missing) tuple:
+///   - deletes the standalone .gpk + restores any `.vanilla-bak` via the
+///     legacy uninstall path,
+///   - hard-restores the mapper from `.clean` so any mapper redirects the
+///     legacy install drove are gone.
+///
+/// Returns one outcome per migrated slot. The caller is expected to
+/// flip the registry rows to a needs-reinstall state and surface the
+/// result to the user.
+pub fn migrate_legacy_install(
+    game_root: &Path,
+    app_root: &Path,
+    mod_id: &str,
+    deployed_filename: &str,
+) -> LegacyMigrationOutcome {
+    if let Ok(Some(_)) = manifest_store::load_manifest_at_root(app_root, mod_id) {
+        // A manifest already exists — this slot is on the new flow.
+        return LegacyMigrationOutcome {
+            mod_id: mod_id.to_string(),
+            target_filename: Some(deployed_filename.to_string()),
+            error: None,
+        };
+    }
+
+    let legacy_err = match super::gpk::uninstall_legacy_gpk(game_root, deployed_filename) {
+        Ok(()) => None,
+        Err(err) => Some(err),
+    };
+    let mapper_err = match gpk::restore_clean_mapper_state(game_root) {
+        Ok(()) => None,
+        Err(err) => Some(err),
+    };
+
+    LegacyMigrationOutcome {
+        mod_id: mod_id.to_string(),
+        target_filename: Some(deployed_filename.to_string()),
+        error: match (legacy_err, mapper_err) {
+            (None, None) => None,
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            (Some(a), Some(b)) => Some(format!("{a}; {b}")),
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -392,6 +449,89 @@ mod tests {
         let s = setup_boss_window_install();
         let err = enable_via_patch(&s.game_root, &s.app_root, "test.mod").unwrap_err();
         assert!(err.contains("No persisted manifest"), "got: {err}");
+    }
+
+    #[test]
+    fn migrate_legacy_install_cleans_cooked_pc_when_no_manifest_exists() {
+        let tmp = TempDir::new().unwrap();
+        let game_root = tmp.path().join("game");
+        let app_root = tmp.path().join("app");
+        let cooked_pc = game_root.join(COOKED_PC_DIR);
+        fs::create_dir_all(&cooked_pc).unwrap();
+        fs::create_dir_all(&app_root).unwrap();
+
+        // Pretend a legacy install dropped a "modded" S1UI_FlightBar.gpk
+        // into CookedPC. There is no manifest persisted for the mod.
+        let modded_blob = b"FAKE-MODDED-PAYLOAD".to_vec();
+        let standalone = cooked_pc.join("S1UI_FlightBar.gpk");
+        fs::write(&standalone, &modded_blob).unwrap();
+        let clean_text = b"S1Common.gpk?Foo.S1UI_FlightBar,Comp,0,42,|!";
+        fs::write(cooked_pc.join(BACKUP_FILE), encrypt_mapper(clean_text)).unwrap();
+        fs::write(cooked_pc.join(MAPPER_FILE), encrypt_mapper(clean_text)).unwrap();
+
+        let outcome = migrate_legacy_install(
+            &game_root,
+            &app_root,
+            "test.mod",
+            "S1UI_FlightBar.gpk",
+        );
+
+        assert_eq!(outcome.mod_id, "test.mod");
+        assert_eq!(outcome.target_filename.as_deref(), Some("S1UI_FlightBar.gpk"));
+        assert!(outcome.error.is_none(), "error: {:?}", outcome.error);
+        assert!(!standalone.exists(), "legacy standalone must be removed");
+    }
+
+    #[test]
+    fn migrate_legacy_install_is_noop_when_manifest_exists() {
+        let tmp = TempDir::new().unwrap();
+        let game_root = tmp.path().join("game");
+        let app_root = tmp.path().join("app");
+        let cooked_pc = game_root.join(COOKED_PC_DIR);
+        fs::create_dir_all(&cooked_pc).unwrap();
+        fs::create_dir_all(&app_root).unwrap();
+
+        let standalone = cooked_pc.join("S1UI_FlightBar.gpk");
+        fs::write(&standalone, b"PATCHED-PAYLOAD").unwrap();
+        let clean_text = b"S1Common.gpk?Foo.S1UI_FlightBar,Comp,0,42,|!";
+        fs::write(cooked_pc.join(BACKUP_FILE), encrypt_mapper(clean_text)).unwrap();
+        fs::write(cooked_pc.join(MAPPER_FILE), encrypt_mapper(clean_text)).unwrap();
+
+        // Pre-existing manifest → already on the new flow.
+        let mod_src = tmp.path().join("mod-src.gpk");
+        let modded_pkg = build_boss_window_test_package([0xAA; 4], false);
+        fs::write(&mod_src, &modded_pkg).unwrap();
+        let vanilla_pkg = build_boss_window_test_package([0x10; 4], false);
+        fs::write(cooked_pc.join("S1Common.gpk"), &vanilla_pkg).unwrap();
+        let mapper = format!(
+            "S1Common.gpk?Owner.S1UI_GageBoss,Comp,0,{},|!",
+            vanilla_pkg.len()
+        );
+        fs::write(cooked_pc.join(BACKUP_FILE), encrypt_mapper(mapper.as_bytes())).unwrap();
+        fs::write(cooked_pc.join(MAPPER_FILE), encrypt_mapper(mapper.as_bytes())).unwrap();
+        install_via_patch(
+            &game_root,
+            &app_root,
+            "test.mod",
+            &mod_src,
+            "S1UI_GageBoss",
+        )
+        .unwrap();
+
+        let standalone_before = fs::read(&standalone).unwrap();
+        let outcome = migrate_legacy_install(
+            &game_root,
+            &app_root,
+            "test.mod",
+            "S1UI_FlightBar.gpk",
+        );
+        // Manifest exists → migration is a no-op; the standalone is left alone.
+        assert!(outcome.error.is_none(), "error: {:?}", outcome.error);
+        assert_eq!(
+            fs::read(&standalone).unwrap(),
+            standalone_before,
+            "standalone file must be untouched when a manifest already exists"
+        );
     }
 
     #[test]
