@@ -531,7 +531,10 @@ fn graceful_stop_process(pid: u32, timeout_ms: u32) -> bool {
     use winapi::um::synchapi::WaitForSingleObject;
     use winapi::um::winbase::WAIT_OBJECT_0;
     use winapi::um::winnt::{PROCESS_QUERY_INFORMATION, PROCESS_TERMINATE, SYNCHRONIZE};
-    use winapi::um::winuser::{EnumWindows, GetWindowThreadProcessId, PostMessageW, WM_CLOSE};
+    use winapi::um::winuser::{
+        EnumWindows, GetWindow, GetWindowTextLengthW, GetWindowThreadProcessId, IsWindowVisible,
+        PostMessageW, GW_OWNER, WM_CLOSE,
+    };
 
     // SYNCHRONIZE for WaitForSingleObject; PROCESS_TERMINATE for the
     // fallback; PROCESS_QUERY_INFORMATION reserved for future exit-code
@@ -544,25 +547,42 @@ fn graceful_stop_process(pid: u32, timeout_ms: u32) -> bool {
         return false;
     }
 
+    // Post WM_CLOSE only to the MAIN window, not every top-level window
+    // owned by the PID. Sending WM_CLOSE to all of Shinra's auxiliary
+    // windows (boss gauge, debuff uptime, upload history, …) at once
+    // races with its packet-processor thread: the auxiliary closes tear
+    // down their dispatchers while PacketAnalysisLoop is mid-flight,
+    // throwing TaskCanceledException out of EntityStatsMain.Update and
+    // tripping Shinra's BasicTeraData crash dialog before window.xml
+    // gets persisted. Closing only the main window lets WPF's normal
+    // shutdown chain run (Application.Exit handler stops the sniffer
+    // and packet thread, then closes child windows, then saves
+    // settings) — exactly what happens when the user clicks the X
+    // button manually.
     struct EnumCtx {
         pid: u32,
-        posted: u32,
+        main_hwnd: HWND,
     }
-    let mut ctx = EnumCtx { pid, posted: 0 };
+    let mut ctx = EnumCtx { pid, main_hwnd: std::ptr::null_mut() };
 
     extern "system" fn cb(hwnd: HWND, lparam: LPARAM) -> BOOL {
-        // SAFETY: lparam is the &mut EnumCtx we passed to EnumWindows;
-        // EnumWindows is synchronous so the borrow doesn't outlive us.
         let ctx = unsafe { &mut *(lparam as *mut EnumCtx) };
-        let mut win_pid: u32 = 0;
-        unsafe {
-            GetWindowThreadProcessId(hwnd, &mut win_pid);
+        if !ctx.main_hwnd.is_null() {
+            return TRUE; // already found a main window
         }
-        if win_pid == ctx.pid {
-            unsafe {
-                PostMessageW(hwnd, WM_CLOSE, 0, 0);
-            }
-            ctx.posted = ctx.posted.saturating_add(1);
+        let mut win_pid: u32 = 0;
+        unsafe { GetWindowThreadProcessId(hwnd, &mut win_pid) };
+        if win_pid != ctx.pid {
+            return TRUE;
+        }
+        // Heuristic for "main" window: visible, has a title bar, and
+        // has no owner. WPF's primary application window matches all
+        // three; tooltip/popup/auxiliary windows fail at least one.
+        let visible = unsafe { IsWindowVisible(hwnd) } == TRUE;
+        let titled = unsafe { GetWindowTextLengthW(hwnd) } > 0;
+        let unowned = unsafe { GetWindow(hwnd, GW_OWNER) }.is_null();
+        if visible && titled && unowned {
+            ctx.main_hwnd = hwnd;
         }
         TRUE
     }
@@ -570,6 +590,17 @@ fn graceful_stop_process(pid: u32, timeout_ms: u32) -> bool {
     unsafe {
         EnumWindows(Some(cb), &mut ctx as *mut _ as LPARAM);
     }
+
+    let posted: u32 = if !ctx.main_hwnd.is_null() {
+        unsafe { PostMessageW(ctx.main_hwnd, WM_CLOSE, 0, 0) };
+        1
+    } else {
+        0
+    };
+    drop(ctx);
+    // Shadow the original counter the rest of the function reads.
+    struct PostResult { posted: u32 }
+    let ctx = PostResult { posted };
 
     let graceful_exit = if ctx.posted > 0 {
         unsafe { WaitForSingleObject(handle, timeout_ms) == WAIT_OBJECT_0 }
