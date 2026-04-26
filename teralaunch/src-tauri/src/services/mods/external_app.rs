@@ -499,9 +499,17 @@ fn process_name_matches(exe_name: &str, process_name: &str) -> bool {
 /// Window-message timeout for graceful close before falling back to
 /// `TerminateProcess`. WPF apps like ShinraMeter persist window position
 /// and user settings in their `Closing`/`Application.Exit` handlers; a
-/// hard kill bypasses those, dropping unsaved state. 3s is enough for
-/// Settings.Save() round-trips without making auto-stop feel laggy.
-const GRACEFUL_CLOSE_TIMEOUT_MS: u32 = 3000;
+/// hard kill bypasses those, dropping unsaved state.
+///
+/// 3s was the original budget but turned out too tight: Shinra's Closing
+/// handler does several things in sequence (save window.xml, flush the
+/// EntityFramework DPS log DB, tear down the network sniffer, stop the
+/// DiscordRPC client) and on cold-cache disks would routinely overrun
+/// the timeout — TerminateProcess fired before window.xml was rewritten,
+/// so the user kept finding their meter back at (0, 0) every relaunch.
+/// 10s leaves plenty of headroom and only delays the closing flow when
+/// the game is already exiting (i.e. when the user is leaving anyway).
+const GRACEFUL_CLOSE_TIMEOUT_MS: u32 = 10000;
 
 /// Pure decision helper: should we fall back to `TerminateProcess` after
 /// posting WM_CLOSE? Yes if no windows took the message (background
