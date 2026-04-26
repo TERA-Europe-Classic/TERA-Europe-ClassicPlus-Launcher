@@ -256,9 +256,13 @@ const ModsView = {
                 if (selected) {
                     this.state.downloads.set('manual-import', { progress: 0, state: 'installing' });
                     this.render();
-                    await modsInvoke('install_mod', { entry: { id: 'manual-import', local_path: selected } });
-                    await this.loadInstalled();
-                    this.render();
+                    try {
+                        await modsInvoke('add_mod_from_file', { path: selected });
+                        await this.loadInstalled();
+                    } finally {
+                        this.state.downloads.delete('manual-import');
+                        this.render();
+                    }
                 }
             } catch (e) { showModsError(this.t('MODS_IMPORT_FAILED', 'Import failed'), e); }
         });

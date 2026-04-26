@@ -16,6 +16,7 @@ use std::path::{Path, PathBuf};
 
 use super::composite_extract;
 use super::gpk::COOKED_PC_DIR;
+use super::gpk_package;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VanillaSource {
@@ -44,7 +45,15 @@ pub fn resolve_vanilla_for_package_name(
 ) -> Result<VanillaResolution, String> {
     // 1. Composite first — matches engine's lookup priority.
     match composite_extract::extract_vanilla_for_package_name(game_root, package_name) {
-        Ok(bytes) => {
+        Ok(raw_bytes) => {
+            // The slice carved out of the composite container preserves
+            // whatever compression the package was cooked with. Phase 1
+            // patch derivation + applier require uncompressed input, so
+            // normalize here before returning.
+            let bytes = gpk_package::extract_uncompressed_package_bytes(&raw_bytes)
+                .map_err(|e| format!(
+                    "Failed to decompress composite-resolved vanilla for '{package_name}': {e}"
+                ))?;
             return Ok(VanillaResolution {
                 source: VanillaSource::Composite,
                 bytes,
@@ -82,12 +91,17 @@ pub fn resolve_vanilla_for_package_name(
             )
         })?;
 
-    let bytes = fs::read(&standalone_path).map_err(|e| {
+    let raw_bytes = fs::read(&standalone_path).map_err(|e| {
         format!(
             "Failed to read vanilla standalone file {}: {e}",
             standalone_path.display()
         )
     })?;
+    let bytes = gpk_package::extract_uncompressed_package_bytes(&raw_bytes)
+        .map_err(|e| format!(
+            "Failed to decompress standalone vanilla {}: {e}",
+            standalone_path.display()
+        ))?;
 
     Ok(VanillaResolution {
         source: VanillaSource::Standalone {

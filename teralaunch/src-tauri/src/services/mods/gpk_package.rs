@@ -194,6 +194,86 @@ struct RawExport {
     export_flags: u32,
 }
 
+/// Returns the uncompressed full-file representation of a GPK. For
+/// uncompressed inputs this is `bytes.to_vec()`; for ZLIB/LZO chunked
+/// packages it walks the chunk table and reassembles the body. Used by
+/// offline tooling that needs to feed `apply_manifest` (which only
+/// accepts uncompressed inputs).
+pub fn extract_uncompressed_package_bytes(bytes: &[u8]) -> Result<Vec<u8>, String> {
+    if bytes.len() < 32 {
+        return Err("GPK package is too small to contain a valid header".into());
+    }
+    let mut cursor = 0usize;
+    let tag = read_u32_le(bytes, &mut cursor)?;
+    if tag != PACKAGE_MAGIC {
+        return Err(format!(
+            "GPK package has invalid magic {:08X}; expected {:08X}",
+            tag, PACKAGE_MAGIC
+        ));
+    }
+    let file_version = read_u16_le(bytes, &mut cursor)?;
+    let _license_version = read_u16_le(bytes, &mut cursor)?;
+    let is_x64 = is_x64_file_version(file_version);
+    let _header_size = read_u32_le(bytes, &mut cursor)?;
+    let _package_name = read_fstring(bytes, &mut cursor)?;
+    let package_flags_pos = cursor;
+    let _package_flags = read_u32_le(bytes, &mut cursor)?;
+    let _raw_name_count = read_u32_le(bytes, &mut cursor)?;
+    let name_offset = read_u32_le(bytes, &mut cursor)?;
+    let _export_count = read_u32_le(bytes, &mut cursor)?;
+    let _export_offset = read_u32_le(bytes, &mut cursor)?;
+    let _import_count = read_u32_le(bytes, &mut cursor)?;
+    let _import_offset = read_u32_le(bytes, &mut cursor)?;
+    let _depends_offset = read_u32_le(bytes, &mut cursor)?;
+    if is_x64 {
+        skip_exact(bytes, &mut cursor, 16)?;
+    }
+    skip_exact(bytes, &mut cursor, 16)?;
+    let generation_count = read_u32_le(bytes, &mut cursor)? as usize;
+    skip_exact(bytes, &mut cursor, generation_count.saturating_mul(12))?;
+    let _engine_version = read_u32_le(bytes, &mut cursor)?;
+    let _cooker_version = read_u32_le(bytes, &mut cursor)?;
+    let compression_flags_pos = cursor;
+    let compression_flags = read_u32_le(bytes, &mut cursor)?;
+    let chunk_count_pos = cursor;
+    let chunk_count = read_u32_le(bytes, &mut cursor)? as usize;
+    let chunk_headers = read_chunk_headers(bytes, &mut cursor, chunk_count)?;
+    match compression_flags {
+        0 => Ok(bytes.to_vec()),
+        1 | 2 => {
+            let mut out = decompress_package_body(bytes, name_offset, compression_flags, &chunk_headers)?;
+            // Patch the header so subsequent parsers treat the result as
+            // uncompressed: compression_flags=0, chunk_count=0. The
+            // chunk_headers bytes after chunk_count remain as in-file
+            // padding before name_offset; they're harmless since
+            // chunk_count=0 means parsers don't read them.
+            if compression_flags_pos + 4 <= out.len() {
+                out[compression_flags_pos..compression_flags_pos + 4]
+                    .copy_from_slice(&0u32.to_le_bytes());
+            }
+            if chunk_count_pos + 4 <= out.len() {
+                out[chunk_count_pos..chunk_count_pos + 4]
+                    .copy_from_slice(&0u32.to_le_bytes());
+            }
+            // Strip the PKG_Compressed bit (0x02000000) from package_flags so
+            // the engine doesn't expect a compressed body it won't find.
+            if package_flags_pos + 4 <= out.len() {
+                let mut flags = u32::from_le_bytes([
+                    out[package_flags_pos], out[package_flags_pos + 1],
+                    out[package_flags_pos + 2], out[package_flags_pos + 3],
+                ]);
+                flags &= !0x02000000;
+                out[package_flags_pos..package_flags_pos + 4]
+                    .copy_from_slice(&flags.to_le_bytes());
+            }
+            Ok(out)
+        }
+        other => Err(format!(
+            "Unsupported GPK package compression flag {other}; expected 0 (none), 1 (zlib), or 2 (lzo)"
+        )),
+    }
+}
+
 pub fn parse_package(bytes: &[u8]) -> Result<GpkPackage, String> {
     if bytes.len() < 32 {
         return Err("GPK package is too small to contain a valid header".into());

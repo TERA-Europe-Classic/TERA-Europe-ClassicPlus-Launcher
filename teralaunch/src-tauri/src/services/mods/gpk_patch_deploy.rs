@@ -173,10 +173,17 @@ fn enable_composite(
     manifest: &super::patch_manifest::PatchManifest,
     target_package_name: &str,
 ) -> Result<(), String> {
-    let vanilla = super::composite_extract::extract_vanilla_for_package_name(
+    let raw_vanilla = super::composite_extract::extract_vanilla_for_package_name(
         game_root,
         target_package_name,
     )?;
+    // The carved slice from a composite container preserves the package's
+    // original compression. apply_manifest only handles uncompressed input,
+    // so normalize first.
+    let vanilla = gpk_package::extract_uncompressed_package_bytes(&raw_vanilla)
+        .map_err(|e| format!(
+            "Failed to decompress composite-resolved vanilla for '{target_package_name}': {e}"
+        ))?;
     let patched = gpk_patch_applier::apply_manifest(&vanilla, manifest)?;
 
     let target_filename = format!("{target_package_name}.gpk");
@@ -229,12 +236,17 @@ fn enable_standalone(
         })?;
     }
 
-    let baseline = fs::read(&backup_path).map_err(|e| {
+    let raw_baseline = fs::read(&backup_path).map_err(|e| {
         format!(
             "Failed to read vanilla baseline {}: {e}",
             backup_path.display()
         )
     })?;
+    let baseline = gpk_package::extract_uncompressed_package_bytes(&raw_baseline)
+        .map_err(|e| format!(
+            "Failed to decompress standalone vanilla baseline {}: {e}",
+            backup_path.display()
+        ))?;
     let patched = gpk_patch_applier::apply_manifest(&baseline, manifest)?;
     fs::write(&vanilla_path, &patched).map_err(|e| {
         format!(

@@ -685,7 +685,17 @@ pub async fn add_mod_from_file(path: String) -> Result<ModEntry, String> {
     // Best-effort mapper deploy. If the game root isn't configured we still
     // persist the import so the user can see it; the deploy happens next
     // time they hit enable.
-    let deploy = try_deploy_gpk(&entry.id, &entry.name, &dest, None);
+    //
+    // Pass the original source filename as a synthetic URL hint so
+    // resolve_target_package_name can derive the target package
+    // (e.g. "S1UI_ProgressBar") when the GPK header has folderName="None"
+    // (the v100.02 vanilla convention) and we've already copied the file
+    // away from its original name.
+    let url_hint = src
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(|n| format!("file:///{n}"));
+    let deploy = try_deploy_gpk(&entry.id, &entry.name, &dest, url_hint.as_deref());
     entry.deployed_filename = deploy.deployed_filename.clone();
     entry.last_error = deploy.last_error.clone();
     if deploy.blocks_enable {
