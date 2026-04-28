@@ -582,7 +582,8 @@ const ModsView = {
     async handleRowClick(event) {
         const btn = event.target.closest('[data-action]');
         const row = event.target.closest('.mods-row');
-        if (!btn && event.target.closest('.mods-row-toggle')) return;
+        const statusCell = event.target.closest('.mods-row-status');
+        if (!btn && (event.target.closest('.mods-row-toggle') || statusCell?.querySelector('.mods-row-toggle'))) return;
         // Any click on the row that didn't hit an action button (toggle,
         // install, overflow menu, etc.) opens the detail panel — clicking
         // on the thumbnail, status pill, or padding now works the same as
