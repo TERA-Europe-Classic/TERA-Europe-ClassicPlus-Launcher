@@ -32,6 +32,31 @@ fn consent_commands_use_public_https_client() {
     let source = fs::read_to_string(repo_root().join("src/commands/auth.rs"))
         .expect("auth commands source should be readable");
 
+    let builder_section = source
+        .split("fn build_website_auth_client")
+        .nth(1)
+        .and_then(|section| {
+            section
+                .split("async fn get_or_create_website_auth_client")
+                .next()
+        })
+        .expect("website auth client builder section should exist");
+
+    assert!(builder_section.contains("ReqwestClient::with_defaults"));
+    assert!(!builder_section.contains("ReqwestClient::with_http_allowed"));
+}
+
+#[test]
+fn consent_commands_reuse_tester_website_session_client() {
+    let source = fs::read_to_string(repo_root().join("src/commands/auth.rs"))
+        .expect("auth commands source should be readable");
+
+    assert!(source.contains("fn get_website_auth_client"));
+    assert!(source.contains("fn store_website_auth_client"));
+    assert!(source.contains("fn clear_website_auth_client"));
+    assert!(source.contains("if session.authenticated"));
+    assert!(source.contains("get_or_create_website_auth_client"));
+
     let get_section = source
         .split("pub async fn get_leaderboard_consent")
         .nth(1)
@@ -43,8 +68,10 @@ fn consent_commands_use_public_https_client() {
         .and_then(|section| section.split("#[cfg(test)]").next())
         .expect("set consent command section should exist");
 
-    assert!(get_section.contains("ReqwestClient::with_defaults"));
-    assert!(set_section.contains("ReqwestClient::with_defaults"));
+    assert!(get_section.contains("get_or_create_website_auth_client"));
+    assert!(set_section.contains("get_or_create_website_auth_client"));
+    assert!(!get_section.contains("ReqwestClient::with_defaults"));
+    assert!(!set_section.contains("ReqwestClient::with_defaults"));
 }
 
 #[test]

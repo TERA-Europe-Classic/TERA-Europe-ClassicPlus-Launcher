@@ -26,6 +26,7 @@ const CLASSICPLUS_WEBSITE_BASE_URL: &str = "https://tera-europe-classic.com";
 
 #[derive(Debug, Deserialize)]
 struct WebsiteSessionResponse {
+    authenticated: bool,
     #[serde(rename = "csrfToken")]
     csrf_token: String,
 }
@@ -42,6 +43,18 @@ fn classicplus_website_base_url() -> String {
         .map(|value| value.trim().trim_end_matches('/').to_string())
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| CLASSICPLUS_WEBSITE_BASE_URL.to_string())
+}
+
+fn get_website_auth_client() -> Option<reqwest::Client> {
+    crate::state::get_website_auth_client()
+}
+
+fn store_website_auth_client(client: reqwest::Client) {
+    crate::state::set_website_auth_client(client);
+}
+
+fn clear_website_auth_client() {
+    crate::state::clear_website_auth_client();
 }
 
 async fn fetch_tester_csrf(client: &reqwest::Client, base_url: &str) -> Result<String, String> {
@@ -70,6 +83,29 @@ async fn fetch_tester_csrf(client: &reqwest::Client, base_url: &str) -> Result<S
     Ok(session.csrf_token)
 }
 
+async fn fetch_tester_session(
+    client: &reqwest::Client,
+    base_url: &str,
+) -> Result<WebsiteSessionResponse, String> {
+    let response = client
+        .get(format!("{base_url}/api/tester/auth/session"))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch tester session: {e}"))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "Tester session request failed with status {}",
+            response.status()
+        ));
+    }
+
+    response
+        .json::<WebsiteSessionResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse tester session response: {e}"))
+}
+
 fn csrf_headers(base_url: &str, csrf_token: &str) -> Result<HeaderMap, String> {
     let mut headers = HeaderMap::new();
     headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
@@ -90,7 +126,12 @@ async fn ensure_tester_website_session(
     password: &str,
     base_url: &str,
 ) -> Result<String, String> {
-    let csrf_token = fetch_tester_csrf(client, base_url).await?;
+    let session = fetch_tester_session(client, base_url).await?;
+    if session.authenticated {
+        return Ok(session.csrf_token);
+    }
+
+    let csrf_token = session.csrf_token;
     let password = Zeroizing::new(password.to_string());
     let payload = json!({
         "login": username,
@@ -113,6 +154,32 @@ async fn ensure_tester_website_session(
     }
 
     fetch_tester_csrf(client, base_url).await
+}
+
+fn build_website_auth_client() -> Result<reqwest::Client, String> {
+    Ok(ReqwestClient::with_defaults(DOWNLOAD_TIMEOUT_SECS, CONNECT_TIMEOUT_SECS)?.inner())
+}
+
+async fn get_or_create_website_auth_client(
+    username: &str,
+    password: &str,
+    base_url: &str,
+) -> Result<reqwest::Client, String> {
+    if let Some(client) = get_website_auth_client() {
+        if ensure_tester_website_session(&client, username, password, base_url)
+            .await
+            .is_ok()
+        {
+            return Ok(client);
+        }
+
+        clear_website_auth_client();
+    }
+
+    let client = build_website_auth_client()?;
+    ensure_tester_website_session(&client, username, password, base_url).await?;
+    store_website_auth_client(client.clone());
+    Ok(client)
 }
 
 async fn fetch_leaderboard_consent_with_client(
@@ -350,6 +417,7 @@ pub fn set_auth_info(auth_key: String, user_name: String, user_no: i32, characte
 pub async fn handle_logout(_state: tauri::State<'_, GameState>) -> Result<(), String> {
     clear_auth_info();
     clear_auth_client();
+    clear_website_auth_client();
 
     Ok(())
 }
@@ -371,10 +439,8 @@ pub async fn get_leaderboard_consent(username: String, password: String) -> Resu
         return Err("Stored launcher credentials are required for consent checks".to_string());
     }
 
-    let client = ReqwestClient::with_defaults(DOWNLOAD_TIMEOUT_SECS, CONNECT_TIMEOUT_SECS)?;
-    let client = client.inner();
     let base_url = classicplus_website_base_url();
-    ensure_tester_website_session(&client, &username, &password, &base_url).await?;
+    let client = get_or_create_website_auth_client(&username, &password, &base_url).await?;
     let response = fetch_leaderboard_consent_with_client(&client, &base_url).await?;
 
     Ok(json!({ "ok": response.ok, "consent": response.consent }).to_string())
@@ -391,9 +457,8 @@ pub async fn set_leaderboard_consent(
         return Err("Stored launcher credentials are required for consent updates".to_string());
     }
 
-    let client = ReqwestClient::with_defaults(DOWNLOAD_TIMEOUT_SECS, CONNECT_TIMEOUT_SECS)?;
-    let client = client.inner();
     let base_url = classicplus_website_base_url();
+    let client = get_or_create_website_auth_client(&username, &password, &base_url).await?;
     let csrf_token =
         ensure_tester_website_session(&client, &username, &password, &base_url).await?;
     let response =
