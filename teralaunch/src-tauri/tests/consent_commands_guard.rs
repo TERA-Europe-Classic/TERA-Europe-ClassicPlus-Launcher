@@ -17,17 +17,18 @@ fn auth_commands_define_leaderboard_consent_commands() {
 }
 
 #[test]
-fn auth_commands_default_to_private_tester_website() {
+fn auth_commands_default_to_public_classic_website() {
     let source = fs::read_to_string(repo_root().join("src/commands/auth.rs"))
         .expect("auth commands source should be readable");
 
     assert!(source.contains(
-        "const CLASSICPLUS_WEBSITE_BASE_URL: &str = \"http://10.10.40.179:3000\""
+        "const CLASSICPLUS_WEBSITE_BASE_URL: &str = \"https://tera-europe-classic.com\""
     ));
+    assert!(!source.contains("10.10.40.179"));
 }
 
 #[test]
-fn consent_commands_allow_private_http_endpoint() {
+fn consent_commands_use_public_https_client() {
     let source = fs::read_to_string(repo_root().join("src/commands/auth.rs"))
         .expect("auth commands source should be readable");
 
@@ -42,8 +43,8 @@ fn consent_commands_allow_private_http_endpoint() {
         .and_then(|section| section.split("#[cfg(test)]").next())
         .expect("set consent command section should exist");
 
-    assert!(get_section.contains("ReqwestClient::with_http_allowed"));
-    assert!(set_section.contains("ReqwestClient::with_http_allowed"));
+    assert!(get_section.contains("ReqwestClient::with_defaults"));
+    assert!(set_section.contains("ReqwestClient::with_defaults"));
 }
 
 #[test]
