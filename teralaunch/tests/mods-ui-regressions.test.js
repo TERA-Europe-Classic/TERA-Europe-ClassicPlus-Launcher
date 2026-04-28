@@ -73,6 +73,30 @@ describe('mods UI regression fixes', () => {
         expect(js).toContain('mods-download-tray-item-meta');
     });
 
+    it('does not open details when clicking the enable toggle track', async () => {
+        window.__TAURI__ = {
+            core: { invoke: vi.fn() },
+            tauri: { invoke: vi.fn() },
+            event: { listen: vi.fn(async () => () => {}) },
+            dialog: { open: vi.fn() },
+        };
+        const { ModsView } = await import('../src/mods.js');
+        const row = ModsView.buildRow({
+            id: 'classicplus.shinra',
+            kind: 'external',
+            name: 'Shinra Meter',
+            author: 'Classic+',
+            status: 'disabled',
+            enabled: false,
+        }, 'installed');
+        const openDetail = vi.spyOn(ModsView, 'openDetail').mockImplementation(() => {});
+        row.addEventListener('click', (event) => { void ModsView.handleRowClick(event); });
+
+        row.querySelector('.mods-row-toggle-track').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+        expect(openDetail).not.toHaveBeenCalled();
+    });
+
     it('ships tray and progress-label CSS that stabilizes percentage width', () => {
         const css = fs.readFileSync(MODS_CSS, 'utf8');
         expect(css).toContain('.mods-download-tray');
