@@ -1919,6 +1919,25 @@ const App = {
     }
   },
 
+  async updateEnabledModsBeforeLaunch() {
+    const catalog = await invoke("get_mods_catalog", { forceRefresh: true });
+    const installed = await invoke("list_installed_mods");
+    const catalogMods = Array.isArray(catalog?.mods) ? catalog.mods : [];
+    if (!catalogMods.length || !Array.isArray(installed) || !installed.length) return;
+
+    const catalogById = new Map(catalogMods.map((mod) => [mod.id, mod]));
+    const enabledStatuses = new Set(["enabled", "running", "starting"]);
+    const outdatedEnabledMods = installed.filter((mod) => {
+      const catalogMod = catalogById.get(mod.id);
+      if (!catalogMod?.version || !mod.version || catalogMod.version === mod.version) return false;
+      return mod.enabled === true || enabledStatuses.has(mod.status);
+    });
+
+    for (const mod of outdatedEnabledMods) {
+      await invoke("install_mod", { entry: catalogById.get(mod.id) });
+    }
+  },
+
   /**
    * Sets up event listeners for game status events from the game server.
    *
@@ -3981,6 +4000,20 @@ const App = {
     if (activeAccount && AccountManager.isAccountInGame(activeAccount.userNo)) {
       window.showUpdateNotification('warning', this.t('ALREADY_RUNNING') || 'Already Running', this.t('ACCOUNT_ALREADY_RUNNING') || 'This account already has a game running');
       this.setState({ isGameLaunching: false });
+      return;
+    }
+    try {
+      if (this.statusEl) this.statusEl.textContent = this.t("UPDATING_MODS") || "Updating mods...";
+      await this.updateEnabledModsBeforeLaunch();
+    } catch (error) {
+      console.error("Enabled mod update failed before game launch:", error);
+      window.showUpdateNotification?.(
+        'error',
+        this.t('MOD_UPDATE_FAILED') || 'Mod update failed',
+        error?.message || String(error)
+      );
+      this.setState({ isGameLaunching: false });
+      this.updateUIForGameStatus(false);
       return;
     }
 
