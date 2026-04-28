@@ -32,6 +32,8 @@ pub fn list_commands() -> Vec<&'static str> {
         "set_auth_info",
         "handle_logout",
         "has_auth_session",
+        "get_leaderboard_consent",
+        "set_leaderboard_consent",
         // Config
         "select_game_folder",
         "get_game_path_from_config",
@@ -77,14 +79,15 @@ mod tests {
     #[test]
     fn list_commands_returns_expected_count() {
         let commands = list_commands();
-        // 5 auth + 6 config + 3 download + 3 game + 4 hash + 4 util + 9 mods = 34 commands
-        assert_eq!(commands.len(), 34);
+        // 7 auth + 6 config + 3 download + 3 game + 4 hash + 4 util + 9 mods = 36 commands
+        assert_eq!(commands.len(), 36);
     }
 
     #[test]
     fn list_commands_contains_expected_commands() {
         let commands = list_commands();
         assert!(commands.contains(&"login"));
+        assert!(commands.contains(&"get_leaderboard_consent"));
         assert!(commands.contains(&"handle_launch_game"));
         assert!(commands.contains(&"download_all_files"));
         assert!(commands.contains(&"is_debug"));

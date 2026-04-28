@@ -392,6 +392,8 @@ fn main() {
             commands::auth::set_auth_info,
             commands::auth::handle_logout,
             commands::auth::has_auth_session,
+            commands::auth::get_leaderboard_consent,
+            commands::auth::set_leaderboard_consent,
             // Config commands
             commands::config::select_game_folder,
             commands::config::get_game_path_from_config,
