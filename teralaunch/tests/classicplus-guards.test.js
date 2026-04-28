@@ -251,33 +251,28 @@ describe('ensureAuthSession stub', () => {
   });
 });
 
-describe('getLeaderboardConsent stub', () => {
-  it('returns unsuccessful result with null consent', async () => {
-    async function getLeaderboardConsent() {
-      return { success: false, consent: null };
-    }
-    const result = await getLeaderboardConsent();
-    expect(result.success).toBe(false);
-    expect(result.consent).toBeNull();
-  });
-});
+describe('Classic+ leaderboard consent wiring', () => {
+  it('uses real Tauri consent commands instead of no-op stubs', async () => {
+    const source = await import('node:fs').then(({ readFileSync }) =>
+      readFileSync(new URL('../src/app.js', import.meta.url), 'utf8'),
+    );
 
-describe('setLeaderboardConsent stub', () => {
-  it('returns false as a no-op', async () => {
-    async function setLeaderboardConsent(agreed) {
-      return false;
-    }
-    expect(await setLeaderboardConsent(true)).toBe(false);
-    expect(await setLeaderboardConsent(false)).toBe(false);
+    expect(source).toContain("invoke('get_leaderboard_consent'");
+    expect(source).toContain("invoke('set_leaderboard_consent'");
+    expect(source).not.toContain('Classic+ TODO: Re-enable when leaderboard consent endpoint is available');
+    expect(source).not.toContain('return { success: false, consent: null };');
+    expect(source).not.toContain('return false;\n  },\n\n  /**\n   * Check if we need to show the leaderboard consent modal.');
   });
-});
 
-describe('checkLeaderboardConsent stub', () => {
-  it('returns false to never show modal', async () => {
-    async function checkLeaderboardConsent() {
-      return false;
-    }
-    expect(await checkLeaderboardConsent()).toBe(false);
+  it('version-gates the next ClassicPlus consent prompt', async () => {
+    const source = await import('node:fs').then(({ readFileSync }) =>
+      readFileSync(new URL('../src/app.js', import.meta.url), 'utf8'),
+    );
+
+    expect(source).toContain('CLASSICPLUS_CONSENT_PROMPT_VERSION');
+    expect(source).toContain('classicplus_consent_prompt_version');
+    expect(source).toContain('shouldShowConsentPromptForVersion');
+    expect(source).toContain('markConsentPromptSeen');
   });
 });
 

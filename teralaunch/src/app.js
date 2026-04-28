@@ -57,6 +57,8 @@ const REQUIRED_PRIVILEGE_LEVEL = 3;
 const UPDATE_CHECK_ENABLED = true;
 // Local launcher release date used for update comparisons
 const CURRENT_RELEASE_DATE = "2024-06-07";
+const CLASSICPLUS_CONSENT_PROMPT_VERSION = "2026-04-28-classicplus-leaderboard-consent";
+const CLASSICPLUS_CONSENT_PROMPT_KEY = "classicplus_consent_prompt_version";
 
 // ========== HOME PAGE STATUS UI FUNCTIONS ==========
 // These functions update the status area and launch button in home.html.
@@ -4002,6 +4004,7 @@ const App = {
       this.setState({ isGameLaunching: false });
       return;
     }
+
     try {
       if (this.statusEl) this.statusEl.textContent = this.t("UPDATING_MODS") || "Updating mods...";
       await this.updateEnabledModsBeforeLaunch();
@@ -6740,7 +6743,13 @@ const App = {
       // Disable buttons immediately to prevent double-clicks
       agreeBtn.disabled = true;
       disagreeBtn.disabled = true;
-      await this.setLeaderboardConsent(true);
+      const success = await this.setLeaderboardConsent(true);
+      if (!success) {
+        agreeBtn.disabled = false;
+        disagreeBtn.disabled = false;
+        return;
+      }
+      this.markConsentPromptSeen();
       this.closeLeaderboardConsentModal();
       // Continue launching the game
       this._proceedWithLaunch = true;
@@ -6752,7 +6761,13 @@ const App = {
       // Disable buttons immediately to prevent double-clicks
       agreeBtn.disabled = true;
       disagreeBtn.disabled = true;
-      await this.setLeaderboardConsent(false);
+      const success = await this.setLeaderboardConsent(false);
+      if (!success) {
+        agreeBtn.disabled = false;
+        disagreeBtn.disabled = false;
+        return;
+      }
+      this.markConsentPromptSeen();
       this.closeLeaderboardConsentModal();
       // Continue launching the game
       this._proceedWithLaunch = true;
@@ -6875,60 +6890,97 @@ const App = {
     if (modal) modal.classList.remove('show');
   },
 
-  /**
-   * Ensures an authenticated session exists for API calls.
-   * If no session, silently re-authenticates using stored credentials.
-   * If re-auth fails, prompts user to re-login.
-   * @param {boolean} promptOnFailure - If true, open login modal on failure
-   * @returns {Promise<boolean>} true if session is ready, false if failed
-   */
-  /**
-   * Classic+ TODO: Re-enable when auth session API (has_auth_session) is available.
-   * Returns true as a no-op so callers proceed without blocking.
-   */
+  getActivePasswordCredentials() {
+    const activeAccount = AccountManager.getActiveAccount();
+    if (!activeAccount?.credentials || activeAccount.authMethod === 'oauth') return null;
+
+    try {
+      const credentials = JSON.parse(atob(activeAccount.credentials));
+      if (!credentials.u || !credentials.p) return null;
+      return {
+        username: credentials.u,
+        password: credentials.p,
+      };
+    } catch (error) {
+      console.warn('[Consent] Failed to read stored account credentials:', error);
+      return null;
+    }
+  },
+
+  shouldShowConsentPromptForVersion() {
+    return localStorage.getItem(CLASSICPLUS_CONSENT_PROMPT_KEY) !== CLASSICPLUS_CONSENT_PROMPT_VERSION;
+  },
+
+  markConsentPromptSeen() {
+    localStorage.setItem(CLASSICPLUS_CONSENT_PROMPT_KEY, CLASSICPLUS_CONSENT_PROMPT_VERSION);
+  },
+
   async ensureAuthSession(promptOnFailure = false) {
-    return true;
+    const credentials = this.getActivePasswordCredentials();
+    if (!credentials) {
+      if (promptOnFailure) this.openAddAccountModal(AccountManager.getActiveAccount()?.userName);
+      return false;
+    }
+    return this.silentAuthRefresh(credentials.username, credentials.password);
   },
 
   /**
    * Get leaderboard consent status from backend.
-   * Classic+ TODO: Re-enable when leaderboard API is available
-   * @returns {Promise<{success: boolean, consent: null}>}
+   * @returns {Promise<{success: boolean, consent: boolean|null}>}
    */
   async getLeaderboardConsent() {
-    // Classic+ TODO: Re-enable when leaderboard consent endpoint is available
-    return { success: false, consent: null };
+    const credentials = this.getActivePasswordCredentials();
+    const unavailable = { success: false, consent: null };
+    if (!credentials) return unavailable;
+
+    try {
+      const response = await invoke('get_leaderboard_consent', credentials);
+      const result = JSON.parse(response);
+      return {
+        success: result.ok === true,
+        consent: result.consent ?? null,
+      };
+    } catch (error) {
+      console.warn('[Consent] Could not fetch leaderboard consent:', error);
+      return unavailable;
+    }
   },
 
   /**
    * Set leaderboard consent on backend.
-   * Classic+ TODO: Re-enable when leaderboard API is available
    * @param {boolean} agreed
    * @returns {Promise<boolean>}
    */
   async setLeaderboardConsent(agreed) {
-    // Classic+ TODO: Re-enable when leaderboard consent endpoint is available
-    return false;
+    const credentials = this.getActivePasswordCredentials();
+    if (!credentials) return false;
+
+    try {
+      const response = await invoke('set_leaderboard_consent', {
+        ...credentials,
+        consent: agreed,
+      });
+      const result = JSON.parse(response);
+      return result.ok === true;
+    } catch (error) {
+      console.warn('[Consent] Could not update leaderboard consent:', error);
+      window.showUpdateNotification?.('error', this.t('ERROR') || 'Error', 'Failed to update leaderboard preference');
+      return false;
+    }
   },
 
   /**
    * Check if we need to show the leaderboard consent modal.
-   * Classic+ TODO: Re-enable when leaderboard API is available
-   * @returns {Promise<boolean>} Always false on Classic+ (no consent modal)
+   * @returns {Promise<boolean>}
    */
   async checkLeaderboardConsent() {
-    // Classic+ TODO: Re-enable when leaderboard consent endpoint is available
-    return false;
-
-    // Original logic preserved below for reference:
     const result = await this.getLeaderboardConsent();
     // If fetch failed, don't block game launch
     if (!result.success) {
       console.warn('[Consent] Could not check consent, allowing game launch');
       return false;
     }
-    // Show modal only if consent hasn't been set yet (null)
-    return result.consent === null;
+    return this.shouldShowConsentPromptForVersion();
   },
 };
 function LoadStartPage() {
