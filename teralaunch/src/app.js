@@ -491,6 +491,8 @@ let originalGamePath = '';
 // Track toast auto-hide timeout so we can cancel it
 let toastAutoHideTimeout = null;
 let lastUpdateToastState = null;
+const LAUNCHER_UPDATE_PROGRESS_NOTIFY_MS = 250;
+const LAUNCHER_UPDATE_PROGRESS_NOTIFY_BYTES = 512 * 1024;
 
 /**
  * Shows the update notification toast with the given state, title, and subtitle.
@@ -656,6 +658,8 @@ async function installLauncherUpdate(update) {
   let totalBytes = 0;
   let downloadedBytes = 0;
   let sawDownloadEvent = false;
+  let lastLauncherUpdateProgressPaintAt = 0;
+  let lastLauncherUpdateProgressBytes = 0;
 
   showUpdateNotification(
     'checking',
@@ -669,6 +673,8 @@ async function installLauncherUpdate(update) {
     if (progress.event === 'Started') {
       totalBytes = progress.data?.contentLength || 0;
       downloadedBytes = 0;
+      lastLauncherUpdateProgressPaintAt = Date.now();
+      lastLauncherUpdateProgressBytes = 0;
       const subtitle = totalBytes > 0
         ? getTranslationFormat('LAUNCHER_UPDATE_DOWNLOADING_PROGRESS', 'Downloading {0} / {1}', '0 B', formatUpdateBytes(totalBytes))
         : (getTranslation('LAUNCHER_UPDATE_DOWNLOADING_PACKAGE') || 'Downloading update package…');
@@ -678,6 +684,15 @@ async function installLauncherUpdate(update) {
 
     if (progress.event === 'Progress') {
       downloadedBytes += progress.data?.chunkLength || 0;
+      const now = Date.now();
+      const bytesSincePaint = downloadedBytes - lastLauncherUpdateProgressBytes;
+      const downloadComplete = totalBytes > 0 && downloadedBytes >= totalBytes;
+      const shouldPaint = downloadComplete
+        || now - lastLauncherUpdateProgressPaintAt >= LAUNCHER_UPDATE_PROGRESS_NOTIFY_MS
+        || bytesSincePaint >= LAUNCHER_UPDATE_PROGRESS_NOTIFY_BYTES;
+      if (!shouldPaint) return;
+      lastLauncherUpdateProgressPaintAt = now;
+      lastLauncherUpdateProgressBytes = downloadedBytes;
       const subtitle = totalBytes > 0
         ? getTranslationFormat('LAUNCHER_UPDATE_DOWNLOADING_PROGRESS', 'Downloading {0} / {1}', formatUpdateBytes(downloadedBytes), formatUpdateBytes(totalBytes))
         : getTranslationFormat('LAUNCHER_UPDATE_DOWNLOADING_CURRENT', 'Downloading {0}', formatUpdateBytes(downloadedBytes));

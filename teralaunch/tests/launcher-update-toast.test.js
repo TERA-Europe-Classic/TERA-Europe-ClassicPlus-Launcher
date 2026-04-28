@@ -30,4 +30,11 @@ describe('launcher update toast', () => {
         expect(js).toContain('lastUpdateToastState');
         expect(js).toContain('if (lastUpdateToastState !== state)');
     });
+
+    it('throttles launcher update progress toast refreshes', () => {
+        const js = fs.readFileSync(APP_JS, 'utf8');
+        expect(js).toContain('LAUNCHER_UPDATE_PROGRESS_NOTIFY_MS');
+        expect(js).toContain('lastLauncherUpdateProgressPaintAt');
+        expect(js).toContain('lastLauncherUpdateProgressBytes');
+    });
 });
