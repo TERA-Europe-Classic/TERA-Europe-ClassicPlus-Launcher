@@ -15,6 +15,17 @@ polished in the main branch.
 
 ---
 
+## 0.2.7 — Clearer mod updates and safer external app refreshes
+
+- Launching the game now opens the Mods download dialog when enabled mods
+  need an update first, so you can see why startup is waiting and which mod
+  is being refreshed.
+- Shinra Meter and TCC updates are more careful on Windows: the launcher
+  asks running copies to close before replacing files, retries cleanup of
+  stale read-only payloads, and keeps user config and custom sounds intact.
+
+---
+
 ## 0.1.20 — TCC interop handoff and safer GPK migration groundwork
 
 - TCC launch now hands off the shared Noctenium/Agnitor map-export path,
