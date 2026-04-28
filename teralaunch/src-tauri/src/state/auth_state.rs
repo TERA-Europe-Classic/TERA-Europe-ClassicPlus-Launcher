@@ -13,6 +13,8 @@ lazy_static! {
     /// Authenticated HTTP client with session cookies from login.
     /// Used for API calls that require the same session (e.g., consent).
     static ref AUTH_CLIENT: RwLock<Option<reqwest::Client>> = RwLock::new(None);
+    /// Authenticated website HTTP client with tester session cookies.
+    static ref WEBSITE_AUTH_CLIENT: RwLock<Option<reqwest::Client>> = RwLock::new(None);
 }
 
 /// Stores the authenticated HTTP client after login.
@@ -30,6 +32,27 @@ pub fn get_auth_client() -> Option<reqwest::Client> {
 /// Clears the authenticated HTTP client (e.g., on logout).
 pub fn clear_auth_client() {
     let mut guard = AUTH_CLIENT.write().unwrap_or_else(|e| e.into_inner());
+    *guard = None;
+}
+
+pub fn set_website_auth_client(client: reqwest::Client) {
+    let mut guard = WEBSITE_AUTH_CLIENT
+        .write()
+        .unwrap_or_else(|e| e.into_inner());
+    *guard = Some(client);
+}
+
+pub fn get_website_auth_client() -> Option<reqwest::Client> {
+    WEBSITE_AUTH_CLIENT
+        .read()
+        .ok()
+        .and_then(|guard| guard.clone())
+}
+
+pub fn clear_website_auth_client() {
+    let mut guard = WEBSITE_AUTH_CLIENT
+        .write()
+        .unwrap_or_else(|e| e.into_inner());
     *guard = None;
 }
 
