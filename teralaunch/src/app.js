@@ -1929,14 +1929,28 @@ const App = {
 
     const catalogById = new Map(catalogMods.map((mod) => [mod.id, mod]));
     const enabledStatuses = new Set(["enabled", "running", "starting"]);
-    const outdatedEnabledMods = installed.filter((mod) => {
+    const outdatedEnabledMods = installed.flatMap((mod) => {
       const catalogMod = catalogById.get(mod.id);
-      if (!catalogMod?.version || !mod.version || catalogMod.version === mod.version) return false;
-      return mod.enabled === true || enabledStatuses.has(mod.status);
+      if (!catalogMod?.version || !mod.version || catalogMod.version === mod.version) return [];
+      if (mod.enabled !== true && !enabledStatuses.has(mod.status)) return [];
+      return [{ ...mod, catalogEntry: catalogMod }];
     });
 
-    for (const mod of outdatedEnabledMods) {
-      await invoke("install_mod", { entry: catalogById.get(mod.id) });
+    if (outdatedEnabledMods.length > 0 && typeof window.ModsView?.open === "function") {
+      await window.ModsView.open();
+    }
+
+    for (let index = 0; index < outdatedEnabledMods.length; index += 1) {
+      const mod = outdatedEnabledMods[index];
+      const title = "Updating mods before launch";
+      const subtitle = `${mod.name || mod.id} (${index + 1}/${outdatedEnabledMods.length})`;
+      if (typeof window.showUpdateNotification === "function") {
+        window.showUpdateNotification("checking", title, subtitle, true);
+      }
+      if (this.statusEl) {
+        this.statusEl.textContent = `${title}: ${subtitle}`;
+      }
+      await invoke("install_mod", { entry: mod.catalogEntry });
     }
   },
 

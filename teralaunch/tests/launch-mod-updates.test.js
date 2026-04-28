@@ -37,6 +37,7 @@ async function loadAppForLaunchTest() {
     app.maybeShowModsOnboarding = vi.fn(() => false);
     app.t = (_key, fallback) => fallback || _key;
     window.showUpdateNotification = vi.fn();
+    window.ModsView = { open: vi.fn(async () => {}) };
     app.statusEl = document.createElement('div');
     app.state.isAuthenticated = true;
     app.state.isUpdateAvailable = false;
@@ -101,6 +102,65 @@ describe('launch-time mod update gate', () => {
             .toBeLessThan(mockInvoke.mock.calls.findIndex(([cmd]) => cmd === 'handle_launch_game'));
     });
 
+    it('shows visible feedback while enabled mods update before launch', async () => {
+        const catalogMod = {
+            id: 'classicplus.shinra',
+            name: 'Shinra Meter',
+            version: '3.0.6-classicplus',
+        };
+        mockInvoke.mockImplementation(async (cmd) => {
+            if (cmd === 'get_mods_catalog') return { mods: [catalogMod] };
+            if (cmd === 'list_installed_mods') return [{
+                id: 'classicplus.shinra',
+                name: 'Shinra Meter',
+                version: '3.0.5-classicplus',
+                enabled: true,
+                status: 'enabled',
+            }];
+            if (cmd === 'login') return JSON.stringify({ Return: { AuthKey: 'auth', UserNo: 1001, CharacterCount: 1 }, Msg: 'success' });
+            return null;
+        });
+
+        const app = await loadAppForLaunchTest();
+
+        await app.handleLaunchGame();
+
+        expect(window.showUpdateNotification).toHaveBeenCalledWith(
+            'checking',
+            'Updating mods before launch',
+            'Shinra Meter (1/1)',
+            true,
+        );
+    });
+
+    it('opens the downloads dialog while enabled mods update before launch', async () => {
+        const catalogMod = {
+            id: 'classicplus.shinra',
+            name: 'Shinra Meter',
+            version: '3.0.6-classicplus',
+        };
+        mockInvoke.mockImplementation(async (cmd) => {
+            if (cmd === 'get_mods_catalog') return { mods: [catalogMod] };
+            if (cmd === 'list_installed_mods') return [{
+                id: 'classicplus.shinra',
+                name: 'Shinra Meter',
+                version: '3.0.5-classicplus',
+                enabled: true,
+                status: 'enabled',
+            }];
+            if (cmd === 'login') return JSON.stringify({ Return: { AuthKey: 'auth', UserNo: 1001, CharacterCount: 1 }, Msg: 'success' });
+            return null;
+        });
+
+        const app = await loadAppForLaunchTest();
+
+        await app.handleLaunchGame();
+
+        expect(window.ModsView.open).toHaveBeenCalledTimes(1);
+        expect(window.ModsView.open.mock.invocationCallOrder[0])
+            .toBeLessThan(mockInvoke.mock.invocationCallOrder[mockInvoke.mock.calls.findIndex(([cmd]) => cmd === 'install_mod')]);
+    });
+
     it('does not update disabled outdated mods before launching the game', async () => {
         const catalogMod = {
             id: 'classicplus.shinra',
@@ -124,6 +184,29 @@ describe('launch-time mod update gate', () => {
 
         await app.handleLaunchGame();
 
+        expect(mockInvoke.mock.calls.some(([cmd]) => cmd === 'install_mod')).toBe(false);
+        expect(mockInvoke.mock.calls.some(([cmd]) => cmd === 'handle_launch_game')).toBe(true);
+    });
+
+    it('skips installed mods that are no longer present in the catalog before launch', async () => {
+        mockInvoke.mockImplementation(async (cmd) => {
+            if (cmd === 'get_mods_catalog') return { mods: [] };
+            if (cmd === 'list_installed_mods') return [{
+                id: 'classicplus.retired',
+                name: 'Retired Mod',
+                version: '1.0.0',
+                enabled: true,
+                status: 'enabled',
+            }];
+            if (cmd === 'login') return JSON.stringify({ Return: { AuthKey: 'auth', UserNo: 1001, CharacterCount: 1 }, Msg: 'success' });
+            return null;
+        });
+
+        const app = await loadAppForLaunchTest();
+
+        await app.handleLaunchGame();
+
+        expect(window.ModsView.open).not.toHaveBeenCalled();
         expect(mockInvoke.mock.calls.some(([cmd]) => cmd === 'install_mod')).toBe(false);
         expect(mockInvoke.mock.calls.some(([cmd]) => cmd === 'handle_launch_game')).toBe(true);
     });
