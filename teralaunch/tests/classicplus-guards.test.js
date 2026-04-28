@@ -4,6 +4,12 @@
  * and that disabled features (OAuth, leaderboard, profile) return early.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+function readAppSource() {
+  return readFileSync(join(process.cwd(), 'src', 'app.js'), 'utf8');
+}
 
 // ============================================================================
 // EXTRACTED LOGIC: URL guard patterns used throughout app.js
@@ -253,9 +259,7 @@ describe('ensureAuthSession stub', () => {
 
 describe('Classic+ leaderboard consent wiring', () => {
   it('uses real Tauri consent commands instead of no-op stubs', async () => {
-    const source = await import('node:fs').then(({ readFileSync }) =>
-      readFileSync(new URL('../src/app.js', import.meta.url), 'utf8'),
-    );
+    const source = readAppSource();
 
     expect(source).toContain("invoke('get_leaderboard_consent'");
     expect(source).toContain("invoke('set_leaderboard_consent'");
@@ -265,9 +269,7 @@ describe('Classic+ leaderboard consent wiring', () => {
   });
 
   it('version-gates the next ClassicPlus consent prompt', async () => {
-    const source = await import('node:fs').then(({ readFileSync }) =>
-      readFileSync(new URL('../src/app.js', import.meta.url), 'utf8'),
-    );
+    const source = readAppSource();
 
     expect(source).toContain('CLASSICPLUS_CONSENT_PROMPT_VERSION');
     expect(source).toContain('classicplus_consent_prompt_version');
