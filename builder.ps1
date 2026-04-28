@@ -60,9 +60,13 @@ $makensisCheck = Get-Command makensis -ErrorAction SilentlyContinue
 # Potential NSIS paths
 $potentialPaths = @(
     "${env:ProgramFiles(x86)}\NSIS\makensis.exe",
+    "${env:ProgramFiles(x86)}\NSIS\Bin\makensis.exe",
     "${env:ProgramFiles}\NSIS\makensis.exe",
-    "C:\ProgramData\chocolatey\bin\makensis.exe"
+    "${env:ProgramFiles}\NSIS\Bin\makensis.exe",
+    "C:\ProgramData\chocolatey\bin\makensis.exe",
+    "C:\ProgramData\chocolatey\lib\nsis\tools\makensis.exe"
 )
+$chocolateyNsisRoot = "C:\ProgramData\chocolatey\lib\nsis"
 
 $foundNsis = $false
 
@@ -76,6 +80,14 @@ if ($makensisCheck) {
             $nsisDir = Split-Path -Parent $path
             $env:Path += ";$nsisDir"
             break
+        }
+    }
+
+    if (-not $foundNsis -and (Test-Path $chocolateyNsisRoot)) {
+        $chocolateyNsis = Get-ChildItem -LiteralPath $chocolateyNsisRoot -Filter "makensis.exe" -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($chocolateyNsis) {
+            $foundNsis = $true
+            $env:Path += ";$($chocolateyNsis.DirectoryName)"
         }
     }
 }
