@@ -182,9 +182,9 @@ fn revert_dir_uses_recursive_remove_dir_all() {
 }
 
 /// In `download_and_extract`, the revert call must precede the
-/// `return Err(e)` on the extract-failure path. A refactor that
-/// returns before reverting makes the cleanup dead code — the
-/// function exits and the partial extract stays on disk.
+/// restore-and-return path on extract failure. A refactor that returns
+/// before reverting makes the cleanup dead code — the function exits
+/// and the partial extract stays on disk.
 #[test]
 fn revert_dir_runs_before_err_return_in_download_and_extract() {
     let src = external_app_src();
@@ -208,14 +208,14 @@ fn revert_dir_runs_before_err_return_in_download_and_extract() {
              inside the extract-Err branch",
         );
     let return_pos = body[err_block_pos..]
-        .find("return Err(e);")
+        .find("return restore_preserved_then_return_error(dest_dir, &preserved_settings, e);")
         .map(|p| err_block_pos + p)
-        .expect("download_and_extract must return Err(e) after revert");
+        .expect("download_and_extract must restore preserved settings and return the extract error after revert");
     assert!(
         revert_pos < return_pos,
         "PRD 3.2.8: revert_partial_install_dir(dest_dir) must be \
-         called BEFORE `return Err(e);`. A `return` before the \
-         revert makes cleanup dead code — partial extract stays on \
+         called BEFORE restoring preserved settings and returning the \
+         extract error. A `return` before the revert makes cleanup dead code — partial extract stays on \
          disk.\nBody window:\n{body}"
     );
 }

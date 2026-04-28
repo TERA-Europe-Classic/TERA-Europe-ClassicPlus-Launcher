@@ -55,9 +55,8 @@ fn rebuild_gpk_runtime_state() -> Result<(), String> {
     }
 
     for entry in gpk_mods.iter().filter(|e| e.enabled) {
-        gpk_patch_deploy::enable_via_patch(&game_root, &app_root, &entry.id).map_err(|err| {
-            format!("Failed to re-enable GPK mod '{}': {err}", entry.id)
-        })?;
+        gpk_patch_deploy::enable_via_patch(&game_root, &app_root, &entry.id)
+            .map_err(|err| format!("Failed to re-enable GPK mod '{}': {err}", entry.id))?;
     }
     Ok(())
 }
@@ -250,6 +249,8 @@ async fn install_external_mod(
         get_external_apps_dir().ok_or_else(|| "Could not resolve external apps dir".to_string())?;
     let dest = install_root.join(&entry.id);
 
+    stop_external_app_before_update(&entry.id, external_app::stop_process_by_name);
+
     // Mark Installing in the registry so the UI can render progress. The
     // claim is atomic with the check — if a parallel install of the same
     // id is already in progress, mods_state::mutate sees Installing and
@@ -341,6 +342,19 @@ async fn install_external_mod(
             Ok(final_row)
         }
         Err(err) => finalize_error(&entry.id, err, &window),
+    }
+}
+
+fn stop_external_app_before_update(
+    id: &str,
+    mut stop_process: impl FnMut(&str) -> Result<u32, String>,
+) {
+    let Some(exe_name) = external_executable_name(id) else {
+        return;
+    };
+
+    if let Err(err) = stop_process(&exe_name) {
+        log::warn!("install_external_mod: could not stop {id} before update: {err}");
     }
 }
 
@@ -491,19 +505,18 @@ fn try_deploy_gpk(
         }
     };
 
-    let target_package_name =
-        match resolve_target_package_name(source_gpk, download_url) {
-            Some(name) => name,
-            None => {
-                return GpkDeployOutcome {
+    let target_package_name = match resolve_target_package_name(source_gpk, download_url) {
+        Some(name) => name,
+        None => {
+            return GpkDeployOutcome {
                     last_error: Some(
                         "Mod's target package name is not derivable from URL or GPK header — install aborted".into(),
                     ),
                     deployed_filename: None,
                     blocks_enable: false,
                 };
-            }
-        };
+        }
+    };
 
     let outcome = match gpk_patch_deploy::install_via_patch(
         &game_root,
@@ -1238,6 +1251,31 @@ mod tests {
         assert_eq!(slot.version, "2.0.0");
     }
 
+    #[test]
+    fn external_update_preflight_stops_known_running_apps() {
+        let mut stopped = Vec::new();
+
+        stop_external_app_before_update("classicplus.shinra", |exe| {
+            stopped.push(exe.to_string());
+            Ok(1)
+        });
+        stop_external_app_before_update("tera-europe-classic.tcc", |exe| {
+            stopped.push(exe.to_string());
+            Ok(1)
+        });
+        stop_external_app_before_update("classicplus.unknown", |exe| {
+            stopped.push(exe.to_string());
+            Ok(1)
+        });
+
+        assert_eq!(stopped, vec!["ShinraMeter.exe", "TCC.exe"]);
+    }
+
+    #[test]
+    fn external_update_preflight_does_not_block_update_when_stop_fails() {
+        stop_external_app_before_update("classicplus.shinra", |_| Err("access denied".into()));
+    }
+
     /// Re-installing over an existing slot must re-enable it: a user who
     /// previously untoggled the mod and then clicks Install again expects
     /// the same fresh-install behaviour, not their old disabled state.
@@ -1395,9 +1433,9 @@ mod tests {
         let install_idx = body
             .find("gpk_patch_deploy::install_via_patch")
             .expect("try_deploy_gpk must call install_via_patch");
-        let enable_idx = body
-            .find("gpk_patch_deploy::enable_via_patch")
-            .expect("try_deploy_gpk must enable after install so the patched bytes land in CookedPC");
+        let enable_idx = body.find("gpk_patch_deploy::enable_via_patch").expect(
+            "try_deploy_gpk must enable after install so the patched bytes land in CookedPC",
+        );
         let rollback_idx = body
             .find("gpk_patch_deploy::uninstall_via_patch")
             .expect("try_deploy_gpk must roll back the manifest when enable fails so disk and registry stay consistent");
@@ -1411,8 +1449,7 @@ mod tests {
             "uninstall fallback must come after the enable attempt"
         );
         assert!(
-            !body.contains("install_legacy_gpk")
-                && !body.contains("gpk::install_gpk("),
+            !body.contains("install_legacy_gpk") && !body.contains("gpk::install_gpk("),
             "try_deploy_gpk must not call the legacy whole-file install paths"
         );
     }

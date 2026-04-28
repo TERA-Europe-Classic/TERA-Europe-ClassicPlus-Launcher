@@ -49,12 +49,18 @@ pub async fn download_and_extract(
         ));
     }
 
-    if dest_dir.exists() {
-        fs::remove_dir_all(dest_dir)
-            .map_err(|e| format!("Failed to clear {}: {}", dest_dir.display(), e))?;
+    let preserved_settings = collect_preserved_user_settings(dest_dir)?;
+
+    if let Err(e) = clear_existing_install_dir(dest_dir) {
+        return restore_preserved_then_return_error(dest_dir, &preserved_settings, e);
     }
-    fs::create_dir_all(dest_dir)
-        .map_err(|e| format!("Failed to create {}: {}", dest_dir.display(), e))?;
+    if let Err(e) = fs::create_dir_all(dest_dir) {
+        return restore_preserved_then_return_error(
+            dest_dir,
+            &preserved_settings,
+            format!("Failed to create {}: {}", dest_dir.display(), e),
+        );
+    }
 
     // PRD 3.2.8.disk-full-revert: if zip extraction fails partway — classic
     // trigger is ENOSPC on Windows, where half the files are on disk and
@@ -63,10 +69,134 @@ pub async fn download_and_extract(
     // to spawn an executable that's missing its dependent DLLs.
     if let Err(e) = extract_zip(&bytes, dest_dir) {
         revert_partial_install_dir(dest_dir);
-        return Err(e);
+        return restore_preserved_then_return_error(dest_dir, &preserved_settings, e);
     }
+    restore_preserved_user_settings(dest_dir, &preserved_settings)?;
 
     Ok(dest_dir.to_path_buf())
+}
+
+fn restore_preserved_then_return_error<T>(
+    dest_dir: &Path,
+    preserved: &[(PathBuf, Vec<u8>)],
+    original_error: String,
+) -> Result<T, String> {
+    if let Err(restore_error) = restore_preserved_user_settings(dest_dir, preserved) {
+        return Err(format!(
+            "{}; additionally failed to restore preserved settings: {}",
+            original_error, restore_error
+        ));
+    }
+    Err(original_error)
+}
+
+fn clear_existing_install_dir(dest_dir: &Path) -> Result<(), String> {
+    if !dest_dir.exists() {
+        return Ok(());
+    }
+
+    let mut last_error = None;
+    for attempt in 1..=3 {
+        make_tree_writable(dest_dir);
+        match fs::remove_dir_all(dest_dir) {
+            Ok(_) => return Ok(()),
+            Err(err) => {
+                last_error = Some(err);
+                if attempt < 3 {
+                    std::thread::sleep(std::time::Duration::from_millis(250));
+                }
+            }
+        }
+    }
+
+    let err = last_error
+        .map(|e| e.to_string())
+        .unwrap_or_else(|| "unknown error".to_string());
+    Err(format!("Failed to clear {}: {}", dest_dir.display(), err))
+}
+
+fn make_tree_writable(root: &Path) {
+    for entry in walkdir::WalkDir::new(root)
+        .into_iter()
+        .filter_map(Result::ok)
+    {
+        let path = entry.path();
+        if let Ok(metadata) = fs::metadata(path) {
+            let mut permissions = metadata.permissions();
+            if permissions.readonly() {
+                permissions.set_readonly(false);
+                let _ = fs::set_permissions(path, permissions);
+            }
+        }
+    }
+}
+
+fn collect_preserved_user_settings(dest_dir: &Path) -> Result<Vec<(PathBuf, Vec<u8>)>, String> {
+    if !dest_dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut preserved = Vec::new();
+    for entry in walkdir::WalkDir::new(dest_dir)
+        .into_iter()
+        .filter_map(Result::ok)
+    {
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        let path = entry.path();
+        let relative = path
+            .strip_prefix(dest_dir)
+            .map_err(|e| format!("Failed to inspect {}: {}", path.display(), e))?;
+        if is_preserved_user_state_path(relative) {
+            let bytes = fs::read(path)
+                .map_err(|e| format!("Failed to preserve {}: {}", path.display(), e))?;
+            preserved.push((relative.to_path_buf(), bytes));
+        }
+    }
+    Ok(preserved)
+}
+
+fn is_preserved_user_state_path(relative: &Path) -> bool {
+    let components: Vec<String> = relative
+        .components()
+        .filter_map(|component| component.as_os_str().to_str().map(str::to_ascii_lowercase))
+        .collect();
+
+    matches_user_state_dir(&components, &["config"])
+        || matches_user_state_dir(&components, &["sound"])
+        || matches_user_state_dir(&components, &["resources", "config"])
+        || matches_user_state_dir(&components, &["resources", "sound"])
+}
+
+fn matches_user_state_dir(components: &[String], prefix: &[&str]) -> bool {
+    components.len() > prefix.len()
+        && components
+            .iter()
+            .zip(prefix.iter())
+            .all(|(component, expected)| component == expected)
+}
+
+fn restore_preserved_user_settings(
+    dest_dir: &Path,
+    preserved: &[(PathBuf, Vec<u8>)],
+) -> Result<(), String> {
+    for (relative, bytes) in preserved {
+        let path = dest_dir.join(relative);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).map_err(|e| {
+                format!("Failed to restore settings dir {}: {}", parent.display(), e)
+            })?;
+        }
+        fs::write(&path, bytes).map_err(|e| {
+            format!(
+                "Failed to restore preserved setting {}: {}",
+                path.display(),
+                e
+            )
+        })?;
+    }
+    Ok(())
 }
 
 /// Best-effort cleanup of a partially-populated install dir after a
@@ -563,7 +693,10 @@ fn graceful_stop_process(pid: u32, timeout_ms: u32) -> bool {
         pid: u32,
         main_hwnd: HWND,
     }
-    let mut ctx = EnumCtx { pid, main_hwnd: std::ptr::null_mut() };
+    let mut ctx = EnumCtx {
+        pid,
+        main_hwnd: std::ptr::null_mut(),
+    };
 
     extern "system" fn cb(hwnd: HWND, lparam: LPARAM) -> BOOL {
         let ctx = unsafe { &mut *(lparam as *mut EnumCtx) };
@@ -599,7 +732,9 @@ fn graceful_stop_process(pid: u32, timeout_ms: u32) -> bool {
     };
     drop(ctx);
     // Shadow the original counter the rest of the function reads.
-    struct PostResult { posted: u32 }
+    struct PostResult {
+        posted: u32,
+    }
     let ctx = PostResult { posted };
 
     let graceful_exit = if ctx.posted > 0 {
@@ -949,6 +1084,34 @@ mod tests {
         port
     }
 
+    async fn serve_once_owned(body: Vec<u8>) -> u16 {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+
+        tokio::spawn(async move {
+            if let Ok((mut sock, _)) = listener.accept().await {
+                let mut buf = [0u8; 1024];
+                let _ = sock.read(&mut buf).await;
+
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\n\
+                     Content-Length: {}\r\n\
+                     Content-Type: application/zip\r\n\
+                     Connection: close\r\n\r\n",
+                    body.len()
+                );
+                let _ = sock.write_all(response.as_bytes()).await;
+                let _ = sock.write_all(&body).await;
+                let _ = sock.shutdown().await;
+            }
+        });
+
+        port
+    }
+
     #[tokio::test]
     async fn sha_mismatch_aborts_before_write() {
         let tmp = TempDir::new().unwrap();
@@ -1280,6 +1443,139 @@ mod tests {
 
         w.finish().unwrap();
         buf
+    }
+
+    fn build_update_fixture_zip() -> Vec<u8> {
+        let mut buf = Vec::new();
+        let cursor = Cursor::new(&mut buf);
+        let mut w = zip::ZipWriter::new(cursor);
+        let opts: zip::write::SimpleFileOptions = Default::default();
+
+        use std::io::Write;
+        w.start_file("ShinraMeter.exe", opts).unwrap();
+        w.write_all(b"new executable").unwrap();
+
+        w.start_file("resources/config/window.xml", opts).unwrap();
+        w.write_all(b"<window x=\"default\" />").unwrap();
+
+        w.start_file("resources/config/server-overrides.txt", opts)
+            .unwrap();
+        w.write_all(b"default overrides").unwrap();
+
+        w.start_file("resources/sound/custom-alert.wav", opts)
+            .unwrap();
+        w.write_all(b"default sound").unwrap();
+
+        w.start_file("assets/config/app.xml", opts).unwrap();
+        w.write_all(b"<app version=\"new\" />").unwrap();
+
+        w.finish().unwrap();
+        buf
+    }
+
+    #[tokio::test]
+    async fn download_and_extract_preserves_user_config_xml_on_update() {
+        let tmp = TempDir::new().unwrap();
+        let dest = tmp.path().join("shinra");
+        let user_window = dest.join("resources").join("config").join("window.xml");
+        let user_overrides = dest
+            .join("resources")
+            .join("config")
+            .join("server-overrides.txt");
+        let user_sound = dest
+            .join("resources")
+            .join("sound")
+            .join("custom-alert.wav");
+        let app_xml = dest.join("assets").join("config").join("app.xml");
+        fs::create_dir_all(user_window.parent().unwrap()).unwrap();
+        fs::write(&user_window, b"<window x=\"user\" />").unwrap();
+        fs::write(&user_overrides, b"user overrides").unwrap();
+        fs::create_dir_all(user_sound.parent().unwrap()).unwrap();
+        fs::write(&user_sound, b"user sound").unwrap();
+        fs::create_dir_all(app_xml.parent().unwrap()).unwrap();
+        fs::write(&app_xml, b"<app version=\"old\" />").unwrap();
+        fs::write(dest.join("stale.dll"), b"old payload").unwrap();
+
+        let zip_bytes = build_update_fixture_zip();
+        let correct_sha = hex_lower(&Sha256::digest(&zip_bytes));
+        let port = serve_once_owned(zip_bytes).await;
+        let url = format!("http://127.0.0.1:{port}/shinra.zip");
+
+        download_and_extract(&url, &correct_sha, &dest, |_, _| {})
+            .await
+            .expect("update extract should succeed");
+
+        assert_eq!(
+            fs::read_to_string(&user_window).unwrap(),
+            "<window x=\"user\" />",
+            "Shinra window.xml is user settings and must survive updates"
+        );
+        assert_eq!(
+            fs::read_to_string(&user_overrides).unwrap(),
+            "user overrides",
+            "Shinra config contains non-XML user state and must survive updates"
+        );
+        assert_eq!(
+            fs::read_to_string(&user_sound).unwrap(),
+            "user sound",
+            "custom Shinra alert sounds must survive updates"
+        );
+        assert_eq!(
+            fs::read_to_string(&app_xml).unwrap(),
+            "<app version=\"new\" />",
+            "only known user-state directories should be preserved; unrelated config XML must update normally"
+        );
+        assert!(dest.join("ShinraMeter.exe").is_file());
+        assert!(
+            !dest.join("stale.dll").exists(),
+            "update must still clear stale binaries while preserving user config"
+        );
+    }
+
+    #[tokio::test]
+    async fn download_and_extract_clears_readonly_stale_payload_on_update() {
+        let tmp = TempDir::new().unwrap();
+        let dest = tmp.path().join("shinra");
+        fs::create_dir_all(&dest).unwrap();
+        let stale = dest.join("stale.dll");
+        fs::write(&stale, b"old payload").unwrap();
+        let mut permissions = fs::metadata(&stale).unwrap().permissions();
+        permissions.set_readonly(true);
+        fs::set_permissions(&stale, permissions).unwrap();
+
+        let zip_bytes = build_update_fixture_zip();
+        let correct_sha = hex_lower(&Sha256::digest(&zip_bytes));
+        let port = serve_once_owned(zip_bytes).await;
+        let url = format!("http://127.0.0.1:{port}/shinra.zip");
+
+        download_and_extract(&url, &correct_sha, &dest, |_, _| {})
+            .await
+            .expect("update extract should clear readonly stale payloads");
+
+        assert!(dest.join("ShinraMeter.exe").is_file());
+        assert!(
+            !stale.exists(),
+            "readonly stale files must not block update cleanup or remain after extract"
+        );
+    }
+
+    #[test]
+    fn download_and_extract_uses_resilient_install_dir_clear() {
+        let source = include_str!("external_app.rs");
+        let fn_start = source
+            .find("pub async fn download_and_extract")
+            .expect("download_and_extract present");
+        let fn_tail = &source[fn_start..];
+        let fn_end = fn_tail[1..]
+            .find("\npub async fn ")
+            .map(|i| i + 1)
+            .unwrap_or(fn_tail.len());
+        let body = &fn_tail[..fn_end];
+
+        assert!(
+            body.contains("clear_existing_install_dir"),
+            "external app updates must use resilient cleanup so one Windows remove_dir_all failure does not abort Shinra/TCC updates"
+        );
     }
 
     /// Pin the output tree shape: exactly the 3 expected files, exactly
