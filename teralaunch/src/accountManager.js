@@ -5,6 +5,17 @@ const ACTIVE_ACCOUNT_KEY = 'active_account_id';
 const INSTANCE_ID_KEY = 'launcher_instance_id';
 const RUNNING_GAMES_KEY = 'running_games';
 
+function normalizeUserNo(userNo) {
+  return String(userNo);
+}
+
+function normalizeAccount(account) {
+  return {
+    ...account,
+    userNo: normalizeUserNo(account.userNo),
+  };
+}
+
 /**
  * Get or create a unique instance ID for this launcher window.
  * Uses sessionStorage so each window has its own ID.
@@ -25,7 +36,7 @@ export function getInstanceId() {
 export function getAccounts() {
   try {
     const data = localStorage.getItem(ACCOUNTS_KEY);
-    return data ? JSON.parse(data) : [];
+    return data ? JSON.parse(data).map(normalizeAccount) : [];
   } catch (e) {
     console.error('Failed to parse accounts:', e);
     return [];
@@ -37,7 +48,7 @@ export function getAccounts() {
  * @param {Array} accounts - Array of account objects
  */
 export function saveAccounts(accounts) {
-  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts.map(normalizeAccount)));
 }
 
 /**
@@ -46,19 +57,20 @@ export function saveAccounts(accounts) {
  * @returns {boolean} true if added, false if duplicate
  */
 export function addAccount(account) {
+  const normalizedAccount = normalizeAccount(account);
   const accounts = getAccounts();
-  const exists = accounts.some(a => a.userNo === account.userNo);
+  const exists = accounts.some(a => a.userNo === normalizedAccount.userNo);
   if (exists) {
     return false;
   }
   const entry = {
-    userNo: account.userNo,
-    userName: account.userName,
-    credentials: account.credentials,
+    userNo: normalizedAccount.userNo,
+    userName: normalizedAccount.userName,
+    credentials: normalizedAccount.credentials,
     lastUsed: Date.now(),
   };
-  if (account.authMethod) entry.authMethod = account.authMethod;
-  if (account.provider) entry.provider = account.provider;
+  if (normalizedAccount.authMethod) entry.authMethod = normalizedAccount.authMethod;
+  if (normalizedAccount.provider) entry.provider = normalizedAccount.provider;
   accounts.push(entry);
   saveAccounts(accounts);
   return true;
@@ -69,11 +81,12 @@ export function addAccount(account) {
  * @param {string} userNo - Account ID to remove
  */
 export function removeAccount(userNo) {
-  const accounts = getAccounts().filter(a => a.userNo !== userNo);
+  const accountId = normalizeUserNo(userNo);
+  const accounts = getAccounts().filter(a => a.userNo !== accountId);
   saveAccounts(accounts);
 
   // If removed account was active, clear active
-  if (getActiveAccountId() === userNo) {
+  if (getActiveAccountId() === accountId) {
     clearActiveAccount();
   }
 }
@@ -84,8 +97,9 @@ export function removeAccount(userNo) {
  * @param {string} credentials - New base64 encoded credentials
  */
 export function updateAccountCredentials(userNo, credentials) {
+  const accountId = normalizeUserNo(userNo);
   const accounts = getAccounts();
-  const account = accounts.find(a => a.userNo === userNo);
+  const account = accounts.find(a => a.userNo === accountId);
   if (account) {
     account.credentials = credentials;
     account.lastUsed = Date.now();
@@ -100,8 +114,9 @@ export function updateAccountCredentials(userNo, credentials) {
  * @param {string|null} provider - OAuth provider name (null for password accounts)
  */
 export function updateAccountAuthMethod(userNo, authMethod, provider = null) {
+  const accountId = normalizeUserNo(userNo);
   const accounts = getAccounts();
-  const account = accounts.find(a => a.userNo === userNo);
+  const account = accounts.find(a => a.userNo === accountId);
   if (account) {
     account.authMethod = authMethod;
     account.provider = provider;
@@ -126,7 +141,8 @@ export function isOAuthAccount(userNo) {
  * @returns {Object|null} Account object or null
  */
 export function getAccount(userNo) {
-  return getAccounts().find(a => a.userNo === userNo) || null;
+  const accountId = normalizeUserNo(userNo);
+  return getAccounts().find(a => a.userNo === accountId) || null;
 }
 
 /**
@@ -142,11 +158,12 @@ export function getActiveAccountId() {
  * @param {string} userNo - Account ID
  */
 export function setActiveAccountId(userNo) {
-  sessionStorage.setItem(ACTIVE_ACCOUNT_KEY, userNo);
+  const accountId = normalizeUserNo(userNo);
+  sessionStorage.setItem(ACTIVE_ACCOUNT_KEY, accountId);
 
   // Update lastUsed timestamp
   const accounts = getAccounts();
-  const account = accounts.find(a => a.userNo === userNo);
+  const account = accounts.find(a => a.userNo === accountId);
   if (account) {
     account.lastUsed = Date.now();
     saveAccounts(accounts);
