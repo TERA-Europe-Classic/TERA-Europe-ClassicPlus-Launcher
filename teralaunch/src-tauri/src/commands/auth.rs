@@ -22,7 +22,7 @@ use crate::state::{
 use crate::GameState;
 use teralib::config::get_config_value;
 
-const CLASSICPLUS_WEBSITE_BASE_URL: &str = "https://tera-europe-classic.com";
+const CLASSICPLUS_WEBSITE_BASE_URL: &str = "http://10.10.40.179:3000";
 
 #[derive(Debug, Deserialize)]
 struct WebsiteSessionResponse {
@@ -371,7 +371,7 @@ pub async fn get_leaderboard_consent(username: String, password: String) -> Resu
         return Err("Stored launcher credentials are required for consent checks".to_string());
     }
 
-    let client = ReqwestClient::with_defaults(DOWNLOAD_TIMEOUT_SECS, CONNECT_TIMEOUT_SECS)?;
+    let client = ReqwestClient::with_http_allowed(DOWNLOAD_TIMEOUT_SECS, CONNECT_TIMEOUT_SECS)?;
     let client = client.inner();
     let base_url = classicplus_website_base_url();
     ensure_tester_website_session(&client, &username, &password, &base_url).await?;
@@ -391,7 +391,7 @@ pub async fn set_leaderboard_consent(
         return Err("Stored launcher credentials are required for consent updates".to_string());
     }
 
-    let client = ReqwestClient::with_defaults(DOWNLOAD_TIMEOUT_SECS, CONNECT_TIMEOUT_SECS)?;
+    let client = ReqwestClient::with_http_allowed(DOWNLOAD_TIMEOUT_SECS, CONNECT_TIMEOUT_SECS)?;
     let client = client.inner();
     let base_url = classicplus_website_base_url();
     let csrf_token =
