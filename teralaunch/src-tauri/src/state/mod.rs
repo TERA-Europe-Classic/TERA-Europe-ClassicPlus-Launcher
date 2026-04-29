@@ -10,9 +10,8 @@ pub mod mods_state;
 
 // Re-export commonly used functions for convenience
 pub use auth_state::{
-    clear_auth_client, clear_auth_info, clear_website_auth_client, get_auth_client,
-    get_website_auth_client, read_auth_info, set_auth_client, set_auth_info,
-    set_website_auth_client,
+    clear_auth_client, clear_auth_info, get_auth_client, read_auth_info, set_auth_client,
+    set_auth_info,
 };
 pub use deep_link_state::set_pending_deep_link;
 pub use download_state::{

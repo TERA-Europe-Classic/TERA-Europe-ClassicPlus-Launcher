@@ -7,9 +7,7 @@
 //! - Auth info management
 
 use log::info;
-use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE, ORIGIN};
-use serde::Deserialize;
-use serde_json::json;
+use serde_json::{json, Value};
 use zeroize::Zeroizing;
 
 use crate::domain::{CONNECT_TIMEOUT_SECS, DOWNLOAD_TIMEOUT_SECS};
@@ -21,216 +19,6 @@ use crate::state::{
 };
 use crate::GameState;
 use teralib::config::get_config_value;
-
-const CLASSICPLUS_WEBSITE_BASE_URL: &str = "https://tera-europe-classic.com";
-
-#[derive(Debug, Deserialize)]
-struct WebsiteSessionResponse {
-    authenticated: bool,
-    #[serde(rename = "csrfToken")]
-    csrf_token: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct ConsentResponse {
-    ok: bool,
-    consent: Option<bool>,
-}
-
-fn classicplus_website_base_url() -> String {
-    std::env::var("CLASSICPLUS_WEBSITE_BASE_URL")
-        .ok()
-        .map(|value| value.trim().trim_end_matches('/').to_string())
-        .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| CLASSICPLUS_WEBSITE_BASE_URL.to_string())
-}
-
-fn get_website_auth_client() -> Option<reqwest::Client> {
-    crate::state::get_website_auth_client()
-}
-
-fn store_website_auth_client(client: reqwest::Client) {
-    crate::state::set_website_auth_client(client);
-}
-
-fn clear_website_auth_client() {
-    crate::state::clear_website_auth_client();
-}
-
-async fn fetch_tester_csrf(client: &reqwest::Client, base_url: &str) -> Result<String, String> {
-    let response = client
-        .get(format!("{base_url}/api/tester/auth/session"))
-        .send()
-        .await
-        .map_err(|e| format!("Failed to fetch tester session: {e}"))?;
-
-    if !response.status().is_success() {
-        return Err(format!(
-            "Tester session request failed with status {}",
-            response.status()
-        ));
-    }
-
-    let session = response
-        .json::<WebsiteSessionResponse>()
-        .await
-        .map_err(|e| format!("Failed to parse tester session response: {e}"))?;
-
-    if session.csrf_token.trim().is_empty() {
-        return Err("Tester session response did not include a CSRF token".to_string());
-    }
-
-    Ok(session.csrf_token)
-}
-
-async fn fetch_tester_session(
-    client: &reqwest::Client,
-    base_url: &str,
-) -> Result<WebsiteSessionResponse, String> {
-    let response = client
-        .get(format!("{base_url}/api/tester/auth/session"))
-        .send()
-        .await
-        .map_err(|e| format!("Failed to fetch tester session: {e}"))?;
-
-    if !response.status().is_success() {
-        return Err(format!(
-            "Tester session request failed with status {}",
-            response.status()
-        ));
-    }
-
-    response
-        .json::<WebsiteSessionResponse>()
-        .await
-        .map_err(|e| format!("Failed to parse tester session response: {e}"))
-}
-
-fn csrf_headers(base_url: &str, csrf_token: &str) -> Result<HeaderMap, String> {
-    let mut headers = HeaderMap::new();
-    headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-    headers.insert(
-        ORIGIN,
-        HeaderValue::from_str(base_url).map_err(|e| format!("Invalid origin header: {e}"))?,
-    );
-    headers.insert(
-        "x-csrf-token",
-        HeaderValue::from_str(csrf_token).map_err(|e| format!("Invalid CSRF header: {e}"))?,
-    );
-    Ok(headers)
-}
-
-async fn ensure_tester_website_session(
-    client: &reqwest::Client,
-    username: &str,
-    password: &str,
-    base_url: &str,
-) -> Result<String, String> {
-    let session = fetch_tester_session(client, base_url).await?;
-    if session.authenticated {
-        return Ok(session.csrf_token);
-    }
-
-    let csrf_token = session.csrf_token;
-    let password = Zeroizing::new(password.to_string());
-    let payload = json!({
-        "login": username,
-        "password": password.as_str(),
-    });
-
-    let response = client
-        .post(format!("{base_url}/api/tester/auth/login/start"))
-        .headers(csrf_headers(base_url, &csrf_token)?)
-        .json(&payload)
-        .send()
-        .await
-        .map_err(|e| format!("Failed to establish tester website session: {e}"))?;
-
-    if !response.status().is_success() {
-        return Err(format!(
-            "Tester website login failed with status {}",
-            response.status()
-        ));
-    }
-
-    fetch_tester_csrf(client, base_url).await
-}
-
-fn build_website_auth_client() -> Result<reqwest::Client, String> {
-    Ok(ReqwestClient::with_defaults(DOWNLOAD_TIMEOUT_SECS, CONNECT_TIMEOUT_SECS)?.inner())
-}
-
-async fn get_or_create_website_auth_client(
-    username: &str,
-    password: &str,
-    base_url: &str,
-) -> Result<reqwest::Client, String> {
-    if let Some(client) = get_website_auth_client() {
-        if ensure_tester_website_session(&client, username, password, base_url)
-            .await
-            .is_ok()
-        {
-            return Ok(client);
-        }
-
-        clear_website_auth_client();
-    }
-
-    let client = build_website_auth_client()?;
-    ensure_tester_website_session(&client, username, password, base_url).await?;
-    store_website_auth_client(client.clone());
-    Ok(client)
-}
-
-async fn fetch_leaderboard_consent_with_client(
-    client: &reqwest::Client,
-    base_url: &str,
-) -> Result<ConsentResponse, String> {
-    let response = client
-        .get(format!("{base_url}/api/tester/auth/settings/consent"))
-        .send()
-        .await
-        .map_err(|e| format!("Failed to fetch leaderboard consent: {e}"))?;
-
-    if !response.status().is_success() {
-        return Err(format!(
-            "Leaderboard consent request failed with status {}",
-            response.status()
-        ));
-    }
-
-    response
-        .json::<ConsentResponse>()
-        .await
-        .map_err(|e| format!("Failed to parse leaderboard consent response: {e}"))
-}
-
-async fn update_leaderboard_consent_with_client(
-    client: &reqwest::Client,
-    base_url: &str,
-    csrf_token: &str,
-    consent: bool,
-) -> Result<ConsentResponse, String> {
-    let response = client
-        .post(format!("{base_url}/api/tester/auth/settings/consent"))
-        .headers(csrf_headers(base_url, csrf_token)?)
-        .json(&json!({ "consent": consent }))
-        .send()
-        .await
-        .map_err(|e| format!("Failed to update leaderboard consent: {e}"))?;
-
-    if !response.status().is_success() {
-        return Err(format!(
-            "Leaderboard consent update failed with status {}",
-            response.status()
-        ));
-    }
-
-    response
-        .json::<ConsentResponse>()
-        .await
-        .map_err(|e| format!("Failed to parse leaderboard consent update response: {e}"))
-}
 
 /// Inner testable login function using the v100 single-POST API.
 ///
@@ -283,6 +71,52 @@ async fn login_with_client<H: HttpClient>(
         auth_service::parse_v100_login_response(&response_text).map_err(|e| e.to_string())?;
 
     Ok(auth_service::serialize_login_result(&result))
+}
+
+fn set_account_info_url() -> Result<String, String> {
+    let get_url = get_config_value("GET_ACCOUNT_INFO_URL");
+    if !get_url.ends_with("GetAccountInfoByUserNo") {
+        return Err("GET_ACCOUNT_INFO_URL must end with GetAccountInfoByUserNo".to_string());
+    }
+    Ok(get_url.replace("GetAccountInfoByUserNo", "SetAccountInfoByUserNo"))
+}
+
+fn parse_consent_value(value: Option<&Value>) -> Option<bool> {
+    match value {
+        Some(Value::Bool(consent)) => Some(*consent),
+        Some(Value::Number(consent)) => consent.as_i64().map(|number| number != 0),
+        Some(Value::String(consent)) if consent == "0" || consent == "1" => Some(consent == "1"),
+        _ => None,
+    }
+}
+
+fn parse_launcher_login_return(response: &str) -> Result<(i64, String, Option<bool>), String> {
+    let parsed: Value = serde_json::from_str(response)
+        .map_err(|error| format!("Failed to parse login response: {error}"))?;
+    let payload = parsed
+        .get("Return")
+        .ok_or_else(|| "Login response missing Return payload".to_string())?;
+    let user_no = payload
+        .get("UserNo")
+        .and_then(Value::as_i64)
+        .ok_or_else(|| "Login response missing UserNo".to_string())?;
+    let auth_key = payload
+        .get("AuthKey")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .ok_or_else(|| "Login response missing AuthKey".to_string())?;
+    let consent = parse_consent_value(payload.get("LeaderboardConsent"));
+    Ok((user_no, auth_key, consent))
+}
+
+async fn login_for_account_info<H: HttpClient>(
+    client: &H,
+    username: String,
+    password: String,
+) -> Result<(i64, String, Option<bool>), String> {
+    let login_url = get_config_value("LOGIN_ACTION_URL");
+    let response = login_with_client(client, username, password, &login_url).await?;
+    parse_launcher_login_return(&response)
 }
 
 /// Authenticates a user with the game server using the v100 API.
@@ -417,7 +251,6 @@ pub fn set_auth_info(auth_key: String, user_name: String, user_no: i32, characte
 pub async fn handle_logout(_state: tauri::State<'_, GameState>) -> Result<(), String> {
     clear_auth_info();
     clear_auth_client();
-    clear_website_auth_client();
 
     Ok(())
 }
@@ -439,11 +272,10 @@ pub async fn get_leaderboard_consent(username: String, password: String) -> Resu
         return Err("Stored launcher credentials are required for consent checks".to_string());
     }
 
-    let base_url = classicplus_website_base_url();
-    let client = get_or_create_website_auth_client(&username, &password, &base_url).await?;
-    let response = fetch_leaderboard_consent_with_client(&client, &base_url).await?;
+    let client = ReqwestClient::with_http_allowed(DOWNLOAD_TIMEOUT_SECS, CONNECT_TIMEOUT_SECS)?;
+    let (_, _, consent) = login_for_account_info(&client, username, password).await?;
 
-    Ok(json!({ "ok": response.ok, "consent": response.consent }).to_string())
+    Ok(json!({ "ok": true, "consent": consent }).to_string())
 }
 
 #[cfg(not(tarpaulin_include))]
@@ -457,14 +289,36 @@ pub async fn set_leaderboard_consent(
         return Err("Stored launcher credentials are required for consent updates".to_string());
     }
 
-    let base_url = classicplus_website_base_url();
-    let client = get_or_create_website_auth_client(&username, &password, &base_url).await?;
-    let csrf_token =
-        ensure_tester_website_session(&client, &username, &password, &base_url).await?;
-    let response =
-        update_leaderboard_consent_with_client(&client, &base_url, &csrf_token, consent).await?;
+    let client = ReqwestClient::with_http_allowed(DOWNLOAD_TIMEOUT_SECS, CONNECT_TIMEOUT_SECS)?;
+    let (user_no, auth_key, _) = login_for_account_info(&client, username, password).await?;
+    let payload = json!({
+        "userNo": user_no,
+        "authKey": auth_key,
+        "leaderboardConsent": if consent { 1 } else { 0 },
+    });
+    let response = client
+        .post(&set_account_info_url()?, &payload.to_string())
+        .await?;
 
-    Ok(json!({ "ok": response.ok, "consent": response.consent }).to_string())
+    if !response.is_success() {
+        return Err(format!(
+            "Leaderboard consent update failed with status {}",
+            response.status
+        ));
+    }
+
+    let body = response.text().map_err(|error| error.to_string())?;
+    let parsed: Value = serde_json::from_str(&body)
+        .map_err(|error| format!("Failed to parse leaderboard consent update response: {error}"))?;
+    if parsed.get("Return").and_then(Value::as_bool) != Some(true) {
+        let message = parsed
+            .get("Msg")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown error");
+        return Err(format!("Leaderboard consent update failed: {message}"));
+    }
+
+    Ok(json!({ "ok": true, "consent": consent }).to_string())
 }
 
 #[cfg(test)]
