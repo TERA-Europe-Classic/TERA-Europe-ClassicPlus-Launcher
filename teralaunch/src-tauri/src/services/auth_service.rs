@@ -232,6 +232,12 @@ pub fn parse_v100_login_response(response: &str) -> Result<LoginResult, AuthErro
 
     let permission = json["Permission"].as_i64().unwrap_or(0);
     let privilege = json["Privilege"].as_i64().unwrap_or(0);
+    let leaderboard_consent = match json.get("LeaderboardConsent") {
+        Some(Value::Bool(consent)) => Some(*consent),
+        Some(Value::Number(consent)) => consent.as_i64().map(|number| number != 0),
+        Some(Value::String(consent)) if consent == "0" || consent == "1" => Some(consent == "1"),
+        _ => None,
+    };
 
     Ok(LoginResult {
         auth_key,
@@ -242,7 +248,7 @@ pub fn parse_v100_login_response(response: &str) -> Result<LoginResult, AuthErro
         privilege,
         region: "EU".to_string(),
         banned: false,
-        leaderboard_consent: None,
+        leaderboard_consent,
     })
 }
 
@@ -536,6 +542,7 @@ mod tests {
         assert_eq!(parsed["Return"]["Privilege"], 20);
         assert_eq!(parsed["Return"]["Region"], "EU");
         assert_eq!(parsed["Return"]["Banned"], false);
+        assert_eq!(parsed["Return"]["LeaderboardConsent"], true);
         assert_eq!(parsed["Msg"], "success");
     }
 
@@ -576,6 +583,14 @@ mod tests {
         assert_eq!(login.region, "EU");
         assert!(!login.banned);
         assert_eq!(login.leaderboard_consent, None);
+    }
+
+    #[test]
+    fn parse_v100_login_response_with_leaderboard_consent() {
+        let response = r#"{"Return":true,"ReturnCode":0,"Msg":"success","CharacterCount":"0||","Permission":0,"Privilege":0,"UserNo":19,"UserName":"testclaude01","AuthKey":"550e8400-e29b-41d4-a716-446655440000","LeaderboardConsent":1}"#;
+        let result = parse_v100_login_response(response).unwrap();
+
+        assert_eq!(result.leaderboard_consent, Some(true));
     }
 
     #[test]
