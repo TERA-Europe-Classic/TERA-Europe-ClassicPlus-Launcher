@@ -3,14 +3,71 @@ use std::time::SystemTime;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// Information about a file that needs to be downloaded/updated
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum FileHashAlgorithm {
+    Sha256,
+    Md5,
+}
+
+impl Default for FileHashAlgorithm {
+    fn default() -> Self {
+        Self::Sha256
+    }
+}
+
+/// How a downloaded file should be installed after transfer.
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum FileInstallMode {
+    Direct,
+    LzmaCab,
+}
+
+impl Default for FileInstallMode {
+    fn default() -> Self {
+        Self::Direct
+    }
+}
+
+/// Information about a file that needs to be downloaded/updated.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FileInfo {
+    /// Final game-relative path after installation.
     pub path: String,
     pub hash: String,
     pub size: u64,
     pub url: String,
     #[serde(default, skip_serializing_if = "is_zero")]
     pub existing_size: u64,
+    /// Optional game-relative staging path used when the download is not the final file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub download_path: Option<String>,
+    /// Expected size of the final installed file when it differs from downloaded bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_size: Option<u64>,
+    /// Hash algorithm for verifying the final installed file.
+    #[serde(default)]
+    pub hash_algorithm: FileHashAlgorithm,
+    /// Installation behavior for the downloaded payload.
+    #[serde(default)]
+    pub install_mode: FileInstallMode,
+}
+
+impl Default for FileInfo {
+    fn default() -> Self {
+        Self {
+            path: String::new(),
+            hash: String::new(),
+            size: 0,
+            url: String::new(),
+            existing_size: 0,
+            download_path: None,
+            output_size: None,
+            hash_algorithm: FileHashAlgorithm::default(),
+            install_mode: FileInstallMode::default(),
+        }
+    }
 }
 
 /// Helper function for serde skip_serializing_if
@@ -68,6 +125,7 @@ mod tests {
             size: 1000,
             url: "http://example.com/test.pak".to_string(),
             existing_size: 0,
+            ..FileInfo::default()
         };
         let json = serde_json::to_string(&info).unwrap();
         assert!(!json.contains("existing_size"));
@@ -81,6 +139,7 @@ mod tests {
             size: 1000,
             url: "http://example.com/test.pak".to_string(),
             existing_size: 500,
+            ..FileInfo::default()
         };
         let json = serde_json::to_string(&info).unwrap();
         assert!(json.contains("existing_size"));
@@ -95,6 +154,7 @@ mod tests {
             size: 2048,
             url: "https://cdn.example.com/files/test.pak".to_string(),
             existing_size: 1024,
+            ..FileInfo::default()
         };
 
         let json = serde_json::to_string(&original).unwrap();
@@ -118,6 +178,34 @@ mod tests {
 
         let info: FileInfo = serde_json::from_str(json).unwrap();
         assert_eq!(info.existing_size, 0);
+        assert_eq!(info.hash_algorithm, FileHashAlgorithm::Sha256);
+        assert_eq!(info.install_mode, FileInstallMode::Direct);
+        assert_eq!(info.download_path, None);
+        assert_eq!(info.output_size, None);
+    }
+
+    #[test]
+    fn file_info_roundtrips_v100_install_metadata() {
+        let original = FileInfo {
+            path: "S1Game/S1Data/DataCenter_Final_EUR.dat".to_string(),
+            hash: "dc193ac520efac09b9faefb7f46f2405".to_string(),
+            size: 61_905_708,
+            url: "http://157.90.107.2:8090/public/patch/patch/1-1.cab".to_string(),
+            download_path: Some("$Patch/v100/patch/1-1.cab".to_string()),
+            output_size: Some(61_076_240),
+            hash_algorithm: FileHashAlgorithm::Md5,
+            install_mode: FileInstallMode::LzmaCab,
+            ..FileInfo::default()
+        };
+
+        let json = serde_json::to_string(&original).unwrap();
+        let deserialized: FileInfo = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.path, original.path);
+        assert_eq!(deserialized.hash_algorithm, FileHashAlgorithm::Md5);
+        assert_eq!(deserialized.install_mode, FileInstallMode::LzmaCab);
+        assert_eq!(deserialized.download_path, original.download_path);
+        assert_eq!(deserialized.output_size, original.output_size);
     }
 
     #[test]
@@ -128,6 +216,7 @@ mod tests {
             size: 512,
             url: "http://example.com".to_string(),
             existing_size: 256,
+            ..FileInfo::default()
         };
 
         let cloned = original.clone();

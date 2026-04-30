@@ -26,6 +26,8 @@ sha2 = "0.10.8"
 base64 = "0.22"
 getrandom = { version = "0.2", features = ["std"] }
 hex = "0.4"
+lzma-rs = "0.3.0"
+md5 = "0.7"
 cryptify = "3.1.1"
 chamox = "0.1.4"
 zeroize = { version = "1.7", features = ["zeroize_derive"] }
@@ -44,6 +46,7 @@ tracing = "0.1"
 dotenvy = "0.15"
 cookie = "0.16"
 regex = "1.11.1"
+rusqlite = { version = "0.32", features = ["bundled"] }
 url = "2"
 dirs-next = "2"
 chrono = { version = "0.4", features = ["clock"] }

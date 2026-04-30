@@ -619,6 +619,7 @@ mod tests {
             size,
             url: "https://example.com/test.pak".to_string(),
             existing_size,
+            ..FileInfo::default()
         }
     }
 
