@@ -5,6 +5,8 @@
         "REGISTER_ACTION_URL": "http://157.90.107.2:8090/tera/LauncherSignupAction",
         "MAINTENANCE_STATUS_URL": "http://157.90.107.2:8090/tera/LauncherMaintenanceStatus",
         "SERVER_LIST_URL": "http://157.90.107.2:8090/tera/ServerList",
+        "PATCH_SOURCE": "v100_static",
+        "V100_PATCH_BASE_URL": "http://157.90.107.2:8090/public/patch",
         "HASH_FILE_URL": "",
         "FILE_SERVER_URL": ""
 }

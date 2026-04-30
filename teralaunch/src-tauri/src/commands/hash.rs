@@ -32,7 +32,7 @@ use walkdir::WalkDir;
 use crate::commands::config::{get_cache_file_path, get_game_path};
 use crate::domain::{FileCheckProgress, FileInfo, BUFFER_SIZE, HASH_BUFFER_SIZE};
 use crate::infrastructure::{EventEmitter, FileSystem};
-use crate::services::hash_service;
+use crate::services::{hash_service, patch_source};
 use crate::state::clear_hash_cache;
 use crate::utils::is_ignored;
 use teralib::config::get_config_value;
@@ -134,6 +134,12 @@ pub async fn get_files_to_update(_window: tauri::Window) -> Result<Vec<FileInfo>
 #[cfg(not(tarpaulin_include))]
 pub async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, String> {
     info!("Starting get_files_to_update");
+
+    let patch_source_kind =
+        patch_source::PatchSourceKind::from_config_value(&get_config_value("PATCH_SOURCE"));
+    if patch_source_kind == patch_source::PatchSourceKind::V100Static {
+        return get_v100_files_to_update(window).await;
+    }
 
     let start_time = Instant::now();
     let server_hash_file = match get_server_hash_file().await {
@@ -260,6 +266,7 @@ pub async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>,
                     size,
                     url,
                     existing_size: 0,
+                    ..FileInfo::default()
                 });
             }
 
@@ -274,6 +281,7 @@ pub async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>,
                         size,
                         url,
                         existing_size: 0,
+                        ..FileInfo::default()
                     });
                 }
             };
@@ -288,6 +296,7 @@ pub async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>,
                     size,
                     url,
                     existing_size: resume_offset(metadata.len(), size),
+                    ..FileInfo::default()
                 });
             }
 
@@ -316,6 +325,7 @@ pub async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>,
                         size,
                         url,
                         existing_size: resume_offset(metadata.len(), size),
+                        ..FileInfo::default()
                     });
                 }
             };
@@ -339,6 +349,7 @@ pub async fn get_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>,
                     size,
                     url,
                     existing_size: resume_offset(metadata.len(), size),
+                    ..FileInfo::default()
                 })
             } else {
                 None
@@ -495,6 +506,7 @@ pub async fn generate_hash_file(window: tauri::Window) -> Result<String, String>
                     size,
                     url,
                     existing_size: 0,
+                    ..FileInfo::default()
                 });
 
                 total_size.fetch_add(size, Ordering::Relaxed);
@@ -551,6 +563,116 @@ pub async fn generate_hash_file(window: tauri::Window) -> Result<String, String>
 // ============================================================================
 // Internal helper functions
 // ============================================================================
+
+#[cfg(not(feature = "skip-updates"))]
+#[cfg(not(tarpaulin_include))]
+async fn get_v100_files_to_update(window: tauri::Window) -> Result<Vec<FileInfo>, String> {
+    let patch_base_url = patch_source::v100_patch_base_url(
+        &get_config_value("V100_PATCH_BASE_URL"),
+        &get_config_value("API_BASE_URL"),
+    );
+    let version_url = patch_source::join_patch_url(&patch_base_url, "version.ini");
+    info!("Fetching v100 version manifest from {}", version_url);
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(DOWNLOAD_TIMEOUT_SECS))
+        .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
+        .pool_max_idle_per_host(HTTP_POOL_MAX_IDLE_PER_HOST)
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+
+    let _ = window.emit(
+        "file_check_progress",
+        FileCheckProgress {
+            current_file: "version.ini".to_string(),
+            progress: 5.0,
+            current_count: 0,
+            total_files: 0,
+            elapsed_time: 0.0,
+            files_to_update: 0,
+        },
+    );
+
+    let version_ini = client
+        .get(&version_url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch v100 version.ini: {}", e))?
+        .error_for_status()
+        .map_err(|e| format!("Failed to fetch v100 version.ini: {}", e))?
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read v100 version.ini: {}", e))?;
+    let manifest = patch_source::parse_v100_version_ini(&version_ini)?;
+    let db_url = patch_source::join_patch_url(&patch_base_url, &manifest.db_file);
+    patch_source::validate_v100_patch_url(&db_url, &patch_base_url)?;
+
+    let _ = window.emit(
+        "file_check_progress",
+        FileCheckProgress {
+            current_file: manifest.db_file.clone(),
+            progress: 35.0,
+            current_count: 0,
+            total_files: 0,
+            elapsed_time: 0.0,
+            files_to_update: 0,
+        },
+    );
+
+    let db_cab_bytes = client
+        .get(&db_url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch v100 server DB: {}", e))?
+        .error_for_status()
+        .map_err(|e| format!("Failed to fetch v100 server DB: {}", e))?
+        .bytes()
+        .await
+        .map_err(|e| format!("Failed to read v100 server DB: {}", e))?;
+    patch_source::validate_v100_db_cab_size(db_cab_bytes.len())?;
+
+    let game_path = get_game_path()?;
+    let staging_dir = game_path.join("$Patch").join("v100").join("db");
+    tokio::fs::create_dir_all(&staging_dir)
+        .await
+        .map_err(|e| format!("Failed to create v100 staging directory: {}", e))?;
+    let db_cab_name = Path::new(&manifest.db_file)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| format!("Invalid v100 DB file path: {}", manifest.db_file))?;
+    let db_cab_path = staging_dir.join(db_cab_name);
+    tokio::fs::write(&db_cab_path, &db_cab_bytes)
+        .await
+        .map_err(|e| format!("Failed to write v100 server DB CAB: {}", e))?;
+    let db_path = staging_dir.join(db_cab_name.trim_end_matches(".cab"));
+    let db_cab_path_for_decode = db_cab_path.clone();
+    let db_path_for_decode = db_path.clone();
+    tokio::task::spawn_blocking(move || {
+        patch_source::decompress_lzma_file_to_path_with_limit(
+            &db_cab_path_for_decode,
+            &db_path_for_decode,
+            Some(patch_source::MAX_V100_DB_BYTES),
+        )
+    })
+    .await
+    .map_err(|e| format!("v100 DB decompression task failed: {}", e))??;
+
+    let files =
+        patch_source::plan_v100_updates_from_db(&manifest, &patch_base_url, &db_path, &game_path)?;
+    let total_size: u64 = files.iter().map(|file| file.size).sum();
+    let _ = window.emit(
+        "file_check_completed",
+        json!({
+            "total_files": files.len(),
+            "files_to_update": files.len(),
+            "total_size": total_size,
+            "total_time_seconds": 0,
+            "average_time_per_file_ms": 0.0
+        }),
+    );
+
+    Ok(files)
+}
 
 /// Fetches the hash file from the server with retry logic.
 ///
