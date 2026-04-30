@@ -28,8 +28,7 @@ pub fn derive_manifest(
 
     if reference.summary.compression_flags != 0 || modded.summary.compression_flags != 0 {
         return Err(
-            "Compressed packages are not supported by the Phase 1 patch applier yet"
-                .to_string(),
+            "Compressed packages are not supported by the Phase 1 patch applier yet".to_string(),
         );
     }
 
@@ -100,9 +99,7 @@ pub fn derive_manifest(
     }
 
     if exports.is_empty() {
-        return Err(
-            "Modded package is byte-equivalent to vanilla — nothing to patch".to_string(),
-        );
+        return Err("Modded package is byte-equivalent to vanilla — nothing to patch".to_string());
     }
 
     let manifest = patch_manifest::PatchManifest {
@@ -250,8 +247,8 @@ mod tests {
         assert_eq!(manifest.exports.len(), 1);
         assert_eq!(manifest.exports[0].replacement_payload_hex, "aabbccdd");
 
-        let patched = gpk_patch_applier::apply_manifest(&reference, &manifest)
-            .expect("apply x64 manifest");
+        let patched =
+            gpk_patch_applier::apply_manifest(&reference, &manifest).expect("apply x64 manifest");
         let parsed = gpk_package::parse_package(&patched).expect("parse patched x64");
         assert_eq!(parsed.summary.file_version, 897);
         let main = parsed

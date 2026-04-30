@@ -142,9 +142,17 @@ fn build_boss_window_inner(
         tail.extend_from_slice(&[0x20, 0x21, 0x22, 0x23]);
     }
 
-    patch_u32(&mut tail, export0_serial_size_pos + 4, export0_payload_offset);
+    patch_u32(
+        &mut tail,
+        export0_serial_size_pos + 4,
+        export0_payload_offset,
+    );
     if let Some(export1_serial_size_pos) = export1_serial_size_pos {
-        patch_u32(&mut tail, export1_serial_size_pos + 4, export1_payload_offset);
+        patch_u32(
+            &mut tail,
+            export1_serial_size_pos + 4,
+            export1_payload_offset,
+        );
     }
 
     bytes.extend_from_slice(&names_blob);

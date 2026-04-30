@@ -987,8 +987,8 @@ pub fn redirect_mapper_to_standalone(
 
     ensure_backup(game_root)?;
 
-    let mapper_bytes = fs::read(mapper_path(game_root))
-        .map_err(|e| format!("Failed to read mapper: {e}"))?;
+    let mapper_bytes =
+        fs::read(mapper_path(game_root)).map_err(|e| format!("Failed to read mapper: {e}"))?;
     let decrypted = decrypt_mapper(&mapper_bytes);
     let decrypted_str = String::from_utf8_lossy(&decrypted).to_string();
     let mut map = parse_mapper(&decrypted_str);

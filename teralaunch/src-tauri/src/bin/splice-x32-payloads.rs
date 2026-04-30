@@ -96,7 +96,9 @@ fn parse_args() -> Result<CliArgs, String> {
             }
             "--rename" => {
                 let v = iter.next().ok_or("--rename needs A=B value")?;
-                let (a, b) = v.split_once('=').ok_or_else(|| format!("--rename '{v}' must be A=B"))?;
+                let (a, b) = v
+                    .split_once('=')
+                    .ok_or_else(|| format!("--rename '{v}' must be A=B"))?;
                 renames.push((a.to_string(), b.to_string()));
             }
             "--only-class" => {
@@ -127,7 +129,9 @@ fn parse_args() -> Result<CliArgs, String> {
 
 fn find_gfx_offset(bytes: &[u8]) -> Option<usize> {
     // Scaleform GFx files start with "GFX" (47 46 58) + 1 version byte.
-    bytes.windows(4).position(|w| w[0] == b'G' && w[1] == b'F' && w[2] == b'X' && (w[3] >= 0x07 && w[3] <= 0x0C))
+    bytes.windows(4).position(|w| {
+        w[0] == b'G' && w[1] == b'F' && w[2] == b'X' && (w[3] >= 0x07 && w[3] <= 0x0C)
+    })
 }
 
 fn hex_lower(bytes: &[u8]) -> String {
@@ -147,16 +151,14 @@ fn main() {
         }
     };
 
-    let vanilla_bytes = fs::read(&args.vanilla_x64)
-        .unwrap_or_else(|e| {
-            eprintln!("read vanilla failed: {e}");
-            std::process::exit(1);
-        });
-    let modded_bytes = fs::read(&args.modded_x32)
-        .unwrap_or_else(|e| {
-            eprintln!("read modded failed: {e}");
-            std::process::exit(1);
-        });
+    let vanilla_bytes = fs::read(&args.vanilla_x64).unwrap_or_else(|e| {
+        eprintln!("read vanilla failed: {e}");
+        std::process::exit(1);
+    });
+    let modded_bytes = fs::read(&args.modded_x32).unwrap_or_else(|e| {
+        eprintln!("read modded failed: {e}");
+        std::process::exit(1);
+    });
 
     let vanilla = gpk_package::parse_package(&vanilla_bytes).unwrap_or_else(|e| {
         eprintln!("vanilla parse failed: {e}");
@@ -167,16 +169,36 @@ fn main() {
         std::process::exit(1);
     });
 
-    println!("vanilla: names={} imports={} exports={}", vanilla.names.len(), vanilla.imports.len(), vanilla.exports.len());
-    println!("modded:  names={} imports={} exports={}", modded.names.len(), modded.imports.len(), modded.exports.len());
+    println!(
+        "vanilla: names={} imports={} exports={}",
+        vanilla.names.len(),
+        vanilla.imports.len(),
+        vanilla.exports.len()
+    );
+    println!(
+        "modded:  names={} imports={} exports={}",
+        modded.names.len(),
+        modded.imports.len(),
+        modded.exports.len()
+    );
 
     println!("\n--- vanilla exports ---");
     for (i, e) in vanilla.exports.iter().enumerate() {
-        println!("  [{i:2}] {} class={:?} payload={} bytes", e.object_path, e.class_name, e.payload.len());
+        println!(
+            "  [{i:2}] {} class={:?} payload={} bytes",
+            e.object_path,
+            e.class_name,
+            e.payload.len()
+        );
     }
     println!("\n--- modded exports ---");
     for (i, e) in modded.exports.iter().enumerate() {
-        println!("  [{i:2}] {} class={:?} payload={} bytes", e.object_path, e.class_name, e.payload.len());
+        println!(
+            "  [{i:2}] {} class={:?} payload={} bytes",
+            e.object_path,
+            e.class_name,
+            e.payload.len()
+        );
     }
 
     // Match by object_path, applying user-supplied renames first so a mod
@@ -196,7 +218,11 @@ fn main() {
             .get(me.object_path.as_str())
             .map(|s| (*s).to_string())
             .unwrap_or_else(|| me.object_path.clone());
-        let Some(ve) = vanilla.exports.iter().find(|v| v.object_path == resolved_path) else {
+        let Some(ve) = vanilla
+            .exports
+            .iter()
+            .find(|v| v.object_path == resolved_path)
+        else {
             unmatched_modded.push(resolved_path.clone());
             continue;
         };
@@ -205,7 +231,11 @@ fn main() {
         // properties differ between archs and would crash the engine).
         if !args.only_classes.is_empty() {
             let class_str = ve.class_name.as_deref().unwrap_or("");
-            if !args.only_classes.iter().any(|c| class_str == c || class_str.ends_with(c)) {
+            if !args
+                .only_classes
+                .iter()
+                .any(|c| class_str == c || class_str.ends_with(c))
+            {
                 println!("  skip '{resolved_path}' class={class_str:?} (not in --only-class list)");
                 continue;
             }
@@ -232,10 +262,16 @@ fn main() {
         {
             let v_off = find_gfx_offset(&ve.payload)
                 .ok_or_else(|| format!("vanilla '{resolved_path}' has no GFX magic"))
-                .unwrap_or_else(|e| { eprintln!("FAIL: {e}"); std::process::exit(8); });
+                .unwrap_or_else(|e| {
+                    eprintln!("FAIL: {e}");
+                    std::process::exit(8);
+                });
             let f_off = find_gfx_offset(&me.payload)
                 .ok_or_else(|| format!("modded '{}' has no GFX magic", me.object_path))
-                .unwrap_or_else(|e| { eprintln!("FAIL: {e}"); std::process::exit(8); });
+                .unwrap_or_else(|e| {
+                    eprintln!("FAIL: {e}");
+                    std::process::exit(8);
+                });
             // UE3 ArrayProperty<u8> wrapper (right before GFX bytes):
             //   ... property header ending with Size (4) + ArrayIndex (4)
             //   Count (4)
@@ -256,14 +292,19 @@ fn main() {
             if v_off >= 12 {
                 new_payload[v_off - 4..v_off].copy_from_slice(&new_count.to_le_bytes());
                 new_payload[v_off - 12..v_off - 8].copy_from_slice(&new_size.to_le_bytes());
-                let old_count = u32::from_le_bytes(ve.payload[v_off-4..v_off].try_into().unwrap());
-                let old_size = u32::from_le_bytes(ve.payload[v_off-12..v_off-8].try_into().unwrap());
+                let old_count =
+                    u32::from_le_bytes(ve.payload[v_off - 4..v_off].try_into().unwrap());
+                let old_size =
+                    u32::from_le_bytes(ve.payload[v_off - 12..v_off - 8].try_into().unwrap());
                 println!(
                     "  gfx-swap '{}': v_off={} f_off={} v_old_count={} new_count={} v_old_size={} new_size={}",
                     resolved_path, v_off, f_off, old_count, new_count, old_size, new_size
                 );
             } else {
-                eprintln!("  WARN: v_off={} too small to patch wrapper size fields", v_off);
+                eprintln!(
+                    "  WARN: v_off={} too small to patch wrapper size fields",
+                    v_off
+                );
             }
             new_payload
         } else {
@@ -284,9 +325,15 @@ fn main() {
 
     println!("\nmatched-and-changed exports: {matched}");
     println!("matched-but-identical:        {unchanged}");
-    println!("unmatched modded exports:     {} {:?}", unmatched_modded.len(), unmatched_modded);
+    println!(
+        "unmatched modded exports:     {} {:?}",
+        unmatched_modded.len(),
+        unmatched_modded
+    );
     if matched == 0 {
-        eprintln!("\nFATAL: no matching exports with payload differences — splice would be a no-op.");
+        eprintln!(
+            "\nFATAL: no matching exports with payload differences — splice would be a no-op."
+        );
         std::process::exit(2);
     }
 
@@ -300,7 +347,9 @@ fn main() {
             source_patch_label: "splice-x32-payloads".into(),
             package_fingerprint: format!(
                 "exports:{}|imports:{}|names:{}",
-                vanilla.exports.len(), vanilla.imports.len(), vanilla.names.len()
+                vanilla.exports.len(),
+                vanilla.imports.len(),
+                vanilla.names.len()
             ),
             provenance: None,
         },
@@ -332,7 +381,11 @@ fn main() {
         eprintln!("write output failed: {e}");
         std::process::exit(5);
     });
-    println!("\nWrote {} bytes to {}", patched.len(), args.output.display());
+    println!(
+        "\nWrote {} bytes to {}",
+        patched.len(),
+        args.output.display()
+    );
 
     println!("\nself-verify: re-parse output + diff against vanilla...");
     let verify = gpk_package::parse_package(&patched).unwrap_or_else(|e| {
@@ -341,16 +394,27 @@ fn main() {
     });
     println!(
         "  spliced: names={} imports={} exports={} compression_flags={}",
-        verify.names.len(), verify.imports.len(), verify.exports.len(),
+        verify.names.len(),
+        verify.imports.len(),
+        verify.exports.len(),
         verify.summary.compression_flags
     );
     let diff = gpk_package::compare_packages(&vanilla, &verify);
-    println!("  diff vs vanilla: changed={} added={:?} removed={:?}",
-        diff.changed_exports.len(), diff.added_exports, diff.removed_exports);
-    println!("  diff: name {}→{}, imports {}→{}, exports {}→{}",
-        diff.name_count_before, diff.name_count_after,
-        diff.import_count_before, diff.import_count_after,
-        diff.export_count_before, diff.export_count_after);
+    println!(
+        "  diff vs vanilla: changed={} added={:?} removed={:?}",
+        diff.changed_exports.len(),
+        diff.added_exports,
+        diff.removed_exports
+    );
+    println!(
+        "  diff: name {}→{}, imports {}→{}, exports {}→{}",
+        diff.name_count_before,
+        diff.name_count_after,
+        diff.import_count_before,
+        diff.import_count_after,
+        diff.export_count_before,
+        diff.export_count_after
+    );
     if diff.added_exports.is_empty()
         && diff.import_count_before == diff.import_count_after
         && diff.name_count_before == diff.name_count_after

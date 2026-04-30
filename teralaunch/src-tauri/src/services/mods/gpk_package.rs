@@ -958,10 +958,8 @@ mod tests {
 
     #[test]
     fn read_file_version_returns_modern_for_x64_fixture() {
-        let bytes = super::super::test_fixtures::build_x64_boss_window_test_package(
-            [0x10; 4],
-            false,
-        );
+        let bytes =
+            super::super::test_fixtures::build_x64_boss_window_test_package([0x10; 4], false);
         assert_eq!(read_file_version(&bytes), Some(897));
         assert!(is_x64_file_version(897));
     }

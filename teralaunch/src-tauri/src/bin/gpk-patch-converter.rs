@@ -390,14 +390,26 @@ fn write_manifest_candidate(
     layout: &patch_manifest::PatchArtifactLayout,
     manifest: &patch_manifest::PatchManifest,
 ) -> Result<(), String> {
-    std::fs::create_dir_all(&layout.bundle_dir)
-        .map_err(|e| format!("Failed to create bundle dir {}: {e}", layout.bundle_dir.display()))?;
-    std::fs::create_dir_all(&layout.payload_dir)
-        .map_err(|e| format!("Failed to create payload dir {}: {e}", layout.payload_dir.display()))?;
+    std::fs::create_dir_all(&layout.bundle_dir).map_err(|e| {
+        format!(
+            "Failed to create bundle dir {}: {e}",
+            layout.bundle_dir.display()
+        )
+    })?;
+    std::fs::create_dir_all(&layout.payload_dir).map_err(|e| {
+        format!(
+            "Failed to create payload dir {}: {e}",
+            layout.payload_dir.display()
+        )
+    })?;
     let json = serde_json::to_string_pretty(manifest)
         .map_err(|e| format!("Failed to serialize manifest candidate: {e}"))?;
-    std::fs::write(&layout.manifest_path, json)
-        .map_err(|e| format!("Failed to write manifest candidate {}: {e}", layout.manifest_path.display()))
+    std::fs::write(&layout.manifest_path, json).map_err(|e| {
+        format!(
+            "Failed to write manifest candidate {}: {e}",
+            layout.manifest_path.display()
+        )
+    })
 }
 
 fn hex_lower(bytes: &[u8]) -> String {
@@ -595,8 +607,14 @@ mod tests {
 
         write_manifest_candidate(&layout, &manifest).expect("write candidate manifest");
 
-        assert!(layout.manifest_path.exists(), "manifest.json should be created");
-        assert!(layout.payload_dir.exists(), "payloads dir should be created");
+        assert!(
+            layout.manifest_path.exists(),
+            "manifest.json should be created"
+        );
+        assert!(
+            layout.payload_dir.exists(),
+            "payloads dir should be created"
+        );
         let loaded = patch_manifest::load_manifest(&layout.manifest_path).expect("reload manifest");
         assert_eq!(loaded.mod_id, manifest.mod_id);
         assert_eq!(loaded.exports.len(), 1);

@@ -50,10 +50,12 @@ pub fn resolve_vanilla_for_package_name(
             // whatever compression the package was cooked with. Phase 1
             // patch derivation + applier require uncompressed input, so
             // normalize here before returning.
-            let bytes = gpk_package::extract_uncompressed_package_bytes(&raw_bytes)
-                .map_err(|e| format!(
-                    "Failed to decompress composite-resolved vanilla for '{package_name}': {e}"
-                ))?;
+            let bytes =
+                gpk_package::extract_uncompressed_package_bytes(&raw_bytes).map_err(|e| {
+                    format!(
+                        "Failed to decompress composite-resolved vanilla for '{package_name}': {e}"
+                    )
+                })?;
             return Ok(VanillaResolution {
                 source: VanillaSource::Composite,
                 bytes,
@@ -97,11 +99,12 @@ pub fn resolve_vanilla_for_package_name(
             standalone_path.display()
         )
     })?;
-    let bytes = gpk_package::extract_uncompressed_package_bytes(&raw_bytes)
-        .map_err(|e| format!(
+    let bytes = gpk_package::extract_uncompressed_package_bytes(&raw_bytes).map_err(|e| {
+        format!(
             "Failed to decompress standalone vanilla {}: {e}",
             standalone_path.display()
-        ))?;
+        )
+    })?;
 
     Ok(VanillaResolution {
         source: VanillaSource::Standalone {
@@ -136,10 +139,7 @@ fn find_standalone_vanilla(
                 return true;
             }
             if entry.file_type().is_dir() {
-                let leaf = entry
-                    .file_name()
-                    .to_str()
-                    .unwrap_or_default();
+                let leaf = entry.file_name().to_str().unwrap_or_default();
                 return !leaf.starts_with('_');
             }
             true
@@ -252,7 +252,10 @@ mod tests {
         fs::write(&vanilla_path, &vanilla).unwrap();
 
         let resolution = resolve_vanilla_for_package_name(game_root, "S1UI_GageBoss").unwrap();
-        assert_eq!(resolution.bytes, vanilla, "must pick vanilla, not the mod in _mods");
+        assert_eq!(
+            resolution.bytes, vanilla,
+            "must pick vanilla, not the mod in _mods"
+        );
     }
 
     #[test]
@@ -263,8 +266,7 @@ mod tests {
         fs::create_dir_all(&cooked_pc).unwrap();
         fs::write(cooked_pc.join(BACKUP_FILE), encrypt_mapper(b"")).unwrap();
 
-        let err =
-            resolve_vanilla_for_package_name(game_root, "Nonexistent_Pkg").unwrap_err();
+        let err = resolve_vanilla_for_package_name(game_root, "Nonexistent_Pkg").unwrap_err();
         assert!(
             err.contains("not found under") || err.contains("Type D"),
             "got: {err}"

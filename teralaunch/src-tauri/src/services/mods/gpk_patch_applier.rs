@@ -12,7 +12,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::{gpk_package, patch_manifest::{ExportPatchOperation, PatchManifest}};
+use super::{
+    gpk_package,
+    patch_manifest::{ExportPatchOperation, PatchManifest},
+};
 
 #[derive(Debug, Clone)]
 struct HeaderLayout {
@@ -33,10 +36,15 @@ struct RawExportLayout {
 
 pub fn apply_manifest(package_bytes: &[u8], manifest: &PatchManifest) -> Result<Vec<u8>, String> {
     if !manifest.import_patches.is_empty() {
-        return Err("Launcher-side curated GPK patch application does not support import patches yet".into());
+        return Err(
+            "Launcher-side curated GPK patch application does not support import patches yet"
+                .into(),
+        );
     }
     if !manifest.name_patches.is_empty() {
-        return Err("Launcher-side curated GPK patch application does not support name patches yet".into());
+        return Err(
+            "Launcher-side curated GPK patch application does not support name patches yet".into(),
+        );
     }
 
     let package = gpk_package::parse_package(package_bytes)?;
@@ -45,8 +53,13 @@ pub fn apply_manifest(package_bytes: &[u8], manifest: &PatchManifest) -> Result<
     }
 
     let header = parse_header_layout(package_bytes)?;
-    if header.export_offset != package.summary.export_offset || header.export_count != package.summary.export_count {
-        return Err("Package header export summary drifted during parse; refusing curated patch apply".into());
+    if header.export_offset != package.summary.export_offset
+        || header.export_count != package.summary.export_count
+    {
+        return Err(
+            "Package header export summary drifted during parse; refusing curated patch apply"
+                .into(),
+        );
     }
 
     let raw_exports = parse_raw_export_layouts(
@@ -64,7 +77,10 @@ pub fn apply_manifest(package_bytes: &[u8], manifest: &PatchManifest) -> Result<
 
     let mut requested = BTreeMap::new();
     for export in &manifest.exports {
-        if requested.insert(export.object_path.clone(), export).is_some() {
+        if requested
+            .insert(export.object_path.clone(), export)
+            .is_some()
+        {
             return Err(format!(
                 "Manifest contains duplicate export patch entries for '{}'",
                 export.object_path
@@ -72,7 +88,8 @@ pub fn apply_manifest(package_bytes: &[u8], manifest: &PatchManifest) -> Result<
         }
         if matches!(
             export.operation,
-            ExportPatchOperation::ReplaceExportClassAndPayload | ExportPatchOperation::PatchProperties
+            ExportPatchOperation::ReplaceExportClassAndPayload
+                | ExportPatchOperation::PatchProperties
         ) {
             return Err(format!(
                 "Launcher-side curated GPK patch application does not support {:?} yet",
@@ -114,10 +131,19 @@ pub fn apply_manifest(package_bytes: &[u8], manifest: &PatchManifest) -> Result<
     }
 
     for object_path in requested.keys() {
-        if !matched.contains(object_path) && package.exports.iter().any(|e| &e.object_path == object_path) {
+        if !matched.contains(object_path)
+            && package
+                .exports
+                .iter()
+                .any(|e| &e.object_path == object_path)
+        {
             continue;
         }
-        if !package.exports.iter().any(|e| &e.object_path == object_path) {
+        if !package
+            .exports
+            .iter()
+            .any(|e| &e.object_path == object_path)
+        {
             return Err(format!(
                 "Manifest export patch references missing object_path '{}'",
                 object_path
@@ -125,7 +151,9 @@ pub fn apply_manifest(package_bytes: &[u8], manifest: &PatchManifest) -> Result<
         }
     }
 
-    let export_table_end = raw_exports.last().map_or(header.export_offset as usize, |entry| entry.end);
+    let export_table_end = raw_exports
+        .last()
+        .map_or(header.export_offset as usize, |entry| entry.end);
     let first_payload_offset = package
         .exports
         .iter()
@@ -136,7 +164,11 @@ pub fn apply_manifest(package_bytes: &[u8], manifest: &PatchManifest) -> Result<
     let payload_region_end = package
         .exports
         .iter()
-        .filter_map(|export| export.serial_offset.map(|offset| (offset as usize) + export.serial_size as usize))
+        .filter_map(|export| {
+            export
+                .serial_offset
+                .map(|offset| (offset as usize) + export.serial_size as usize)
+        })
         .max()
         .unwrap_or(first_payload_offset);
 
@@ -174,34 +206,48 @@ pub fn apply_manifest(package_bytes: &[u8], manifest: &PatchManifest) -> Result<
         payload_bytes.extend_from_slice(&payload);
     }
 
-    let mut rebuilt = Vec::with_capacity(prefix.len() + export_table.len() + middle.len() + payload_bytes.len() + suffix.len());
+    let mut rebuilt = Vec::with_capacity(
+        prefix.len() + export_table.len() + middle.len() + payload_bytes.len() + suffix.len(),
+    );
     rebuilt.extend_from_slice(prefix);
     rebuilt.extend_from_slice(&export_table);
     rebuilt.extend_from_slice(middle);
     rebuilt.extend_from_slice(&payload_bytes);
     rebuilt.extend_from_slice(suffix);
 
-    patch_u32(&mut rebuilt, header.export_count_pos, (export_table.len() / (raw_exports[0].end - raw_exports[0].start)) as u32);
-    patch_u32(&mut rebuilt, header.depends_offset_pos, new_depends_offset as u32);
+    patch_u32(
+        &mut rebuilt,
+        header.export_count_pos,
+        (export_table.len() / (raw_exports[0].end - raw_exports[0].start)) as u32,
+    );
+    patch_u32(
+        &mut rebuilt,
+        header.depends_offset_pos,
+        new_depends_offset as u32,
+    );
 
     let reparsed = gpk_package::parse_package(&rebuilt)?;
-    if reparsed.exports.len() != manifest
-        .exports
-        .iter()
-        .filter(|patch| !matches!(patch.operation, ExportPatchOperation::RemoveExport))
-        .count()
-        + package
+    if reparsed.exports.len()
+        != manifest
             .exports
             .iter()
-            .filter(|export| !requested.contains_key(&export.object_path))
+            .filter(|patch| !matches!(patch.operation, ExportPatchOperation::RemoveExport))
             .count()
+            + package
+                .exports
+                .iter()
+                .filter(|export| !requested.contains_key(&export.object_path))
+                .count()
     {
         return Err("Reparsed export count did not match rebuilt export table count".into());
     }
     Ok(rebuilt)
 }
 
-fn validate_patch_target(parsed: &gpk_package::GpkExportEntry, patch: &super::patch_manifest::ExportPatch) -> Result<(), String> {
+fn validate_patch_target(
+    parsed: &gpk_package::GpkExportEntry,
+    patch: &super::patch_manifest::ExportPatch,
+) -> Result<(), String> {
     if let Some(class_name) = &patch.class_name {
         if parsed.class_name.as_deref() != Some(class_name.as_str()) {
             return Err(format!(
@@ -228,8 +274,10 @@ fn decode_hex(value: &str) -> Result<Vec<u8>, String> {
     let mut out = Vec::with_capacity(value.len() / 2);
     let bytes = value.as_bytes();
     for idx in (0..bytes.len()).step_by(2) {
-        let chunk = std::str::from_utf8(&bytes[idx..idx + 2]).map_err(|e| format!("Invalid UTF-8 in hex payload: {e}"))?;
-        let byte = u8::from_str_radix(chunk, 16).map_err(|e| format!("Invalid hex payload byte '{chunk}': {e}"))?;
+        let chunk = std::str::from_utf8(&bytes[idx..idx + 2])
+            .map_err(|e| format!("Invalid UTF-8 in hex payload: {e}"))?;
+        let byte = u8::from_str_radix(chunk, 16)
+            .map_err(|e| format!("Invalid hex payload byte '{chunk}': {e}"))?;
         out.push(byte);
     }
     Ok(out)
@@ -277,7 +325,11 @@ fn parse_header_layout(bytes: &[u8]) -> Result<HeaderLayout, String> {
     })
 }
 
-fn parse_raw_export_layouts(bytes: &[u8], mut offset: usize, count: usize) -> Result<Vec<RawExportLayout>, String> {
+fn parse_raw_export_layouts(
+    bytes: &[u8],
+    mut offset: usize,
+    count: usize,
+) -> Result<Vec<RawExportLayout>, String> {
     let mut raw = Vec::with_capacity(count);
     for _ in 0..count {
         let start = offset;
@@ -331,7 +383,9 @@ fn read_fstring(bytes: &[u8], cursor: &mut usize) -> Result<String, String> {
 }
 
 fn read_slice<'a>(bytes: &'a [u8], cursor: &mut usize, len: usize) -> Result<&'a [u8], String> {
-    let end = cursor.checked_add(len).ok_or_else(|| "Cursor overflow while reading GPK bytes".to_string())?;
+    let end = cursor
+        .checked_add(len)
+        .ok_or_else(|| "Cursor overflow while reading GPK bytes".to_string())?;
     if end > bytes.len() {
         return Err("Unexpected EOF while reading GPK bytes".into());
     }
@@ -373,8 +427,8 @@ fn patch_u32(bytes: &mut [u8], offset: usize, value: u32) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::patch_manifest;
+    use super::*;
 
     const PACKAGE_MAGIC: u32 = 0x9E2A83C1;
     const IMPORT_ENTRY_LEN: u32 = 28;
@@ -408,7 +462,8 @@ mod tests {
             class_name: None,
         });
 
-        let err = apply_manifest(&package_bytes, &manifest).expect_err("import patches must fail closed");
+        let err =
+            apply_manifest(&package_bytes, &manifest).expect_err("import patches must fail closed");
         assert!(err.contains("does not support import patches yet"));
     }
 
@@ -417,10 +472,12 @@ mod tests {
         let package_bytes = build_boss_window_test_package([0x10, 0x11, 0x12, 0x13], true);
         let parsed = gpk_package::parse_package(&package_bytes).expect("parse source package");
         let mut manifest = boss_window_manifest(&parsed);
-        manifest.exports[0].operation = patch_manifest::ExportPatchOperation::ReplaceExportClassAndPayload;
+        manifest.exports[0].operation =
+            patch_manifest::ExportPatchOperation::ReplaceExportClassAndPayload;
         manifest.exports[0].new_class_name = Some("Core.Texture2D".into());
 
-        let err = apply_manifest(&package_bytes, &manifest).expect_err("class changes must fail closed");
+        let err =
+            apply_manifest(&package_bytes, &manifest).expect_err("class changes must fail closed");
         assert!(err.contains("does not support ReplaceExportClassAndPayload yet"));
     }
 
@@ -498,8 +555,18 @@ mod tests {
         }
     }
 
-    fn build_boss_window_test_package(export0_payload: [u8; 4], include_redirector_export: bool) -> Vec<u8> {
-        let names = ["Core", "GFxMovieInfo", "ObjectRedirector", "GageBoss", "GageBoss_I1C", "S1UI_GageBoss"];
+    fn build_boss_window_test_package(
+        export0_payload: [u8; 4],
+        include_redirector_export: bool,
+    ) -> Vec<u8> {
+        let names = [
+            "Core",
+            "GFxMovieInfo",
+            "ObjectRedirector",
+            "GageBoss",
+            "GageBoss_I1C",
+            "S1UI_GageBoss",
+        ];
         let mut bytes = Vec::new();
         bytes.extend_from_slice(&PACKAGE_MAGIC.to_le_bytes());
         bytes.extend_from_slice(&610u16.to_le_bytes());
@@ -533,7 +600,11 @@ mod tests {
         let header_size = bytes.len() as u32;
         patch_u32(&mut bytes, header_size_pos, header_size);
         patch_u32(&mut bytes, name_offset_pos, header_size);
-        patch_u32(&mut bytes, raw_name_count_pos, header_size + names.len() as u32);
+        patch_u32(
+            &mut bytes,
+            raw_name_count_pos,
+            header_size + names.len() as u32,
+        );
 
         let mut names_blob = Vec::new();
         for name in names {
@@ -575,9 +646,17 @@ mod tests {
             tail.extend_from_slice(&[0x20, 0x21, 0x22, 0x23]);
         }
 
-        patch_u32(&mut tail, export0_serial_size_pos + 4, export0_payload_offset);
+        patch_u32(
+            &mut tail,
+            export0_serial_size_pos + 4,
+            export0_payload_offset,
+        );
         if let Some(export1_serial_size_pos) = export1_serial_size_pos {
-            patch_u32(&mut tail, export1_serial_size_pos + 4, export1_payload_offset);
+            patch_u32(
+                &mut tail,
+                export1_serial_size_pos + 4,
+                export1_payload_offset,
+            );
         }
 
         bytes.extend_from_slice(&names_blob);
@@ -589,14 +668,27 @@ mod tests {
         names.iter().map(|name| 4 + name.len() + 1 + 8).sum()
     }
 
-    fn write_import(bytes: &mut Vec<u8>, class_package_index: u32, class_name_index: u32, owner_index: i32, object_name_index: u32) {
+    fn write_import(
+        bytes: &mut Vec<u8>,
+        class_package_index: u32,
+        class_name_index: u32,
+        owner_index: i32,
+        object_name_index: u32,
+    ) {
         bytes.extend_from_slice(&(class_package_index as u64).to_le_bytes());
         bytes.extend_from_slice(&(class_name_index as u64).to_le_bytes());
         bytes.extend_from_slice(&owner_index.to_le_bytes());
         bytes.extend_from_slice(&(object_name_index as u64).to_le_bytes());
     }
 
-    fn write_export_header(bytes: &mut Vec<u8>, class_index: i32, super_index: i32, package_index: i32, object_name_index: i32, serial_size: u32) -> usize {
+    fn write_export_header(
+        bytes: &mut Vec<u8>,
+        class_index: i32,
+        super_index: i32,
+        package_index: i32,
+        object_name_index: i32,
+        serial_size: u32,
+    ) -> usize {
         bytes.extend_from_slice(&class_index.to_le_bytes());
         bytes.extend_from_slice(&super_index.to_le_bytes());
         bytes.extend_from_slice(&package_index.to_le_bytes());

@@ -220,10 +220,20 @@ pub fn validate_bundle_layout(layout: &PatchArtifactLayout, mod_id: &str) -> Res
             layout.payload_dir.display()
         ));
     }
-    for entry in fs::read_dir(&layout.bundle_dir)
-        .map_err(|e| format!("Failed to read patch artifact bundle {}: {}", layout.bundle_dir.display(), e))?
-    {
-        let entry = entry.map_err(|e| format!("Failed to enumerate patch artifact bundle {}: {}", layout.bundle_dir.display(), e))?;
+    for entry in fs::read_dir(&layout.bundle_dir).map_err(|e| {
+        format!(
+            "Failed to read patch artifact bundle {}: {}",
+            layout.bundle_dir.display(),
+            e
+        )
+    })? {
+        let entry = entry.map_err(|e| {
+            format!(
+                "Failed to enumerate patch artifact bundle {}: {}",
+                layout.bundle_dir.display(),
+                e
+            )
+        })?;
         let path = entry.path();
         if path == layout.manifest_path || path == layout.payload_dir {
             continue;
@@ -494,9 +504,14 @@ mod tests {
     #[test]
     fn validate_bundle_layout_accepts_manifest_and_payload_dir_only() {
         let temp = tempfile::tempdir().expect("tempdir");
-        let layout = artifact_layout_for_mod_at_root(temp.path(), "foglio1024.ui-remover-bosswindow");
+        let layout =
+            artifact_layout_for_mod_at_root(temp.path(), "foglio1024.ui-remover-bosswindow");
         fs::create_dir_all(&layout.payload_dir).expect("create payload dir");
-        fs::write(&layout.manifest_path, serde_json::to_string(&sample_manifest()).unwrap()).expect("write manifest");
+        fs::write(
+            &layout.manifest_path,
+            serde_json::to_string(&sample_manifest()).unwrap(),
+        )
+        .expect("write manifest");
 
         validate_bundle_layout(&layout, "foglio1024.ui-remover-bosswindow")
             .expect("bundle layout should validate");
@@ -505,10 +520,16 @@ mod tests {
     #[test]
     fn validate_bundle_layout_rejects_unexpected_top_level_paths() {
         let temp = tempfile::tempdir().expect("tempdir");
-        let layout = artifact_layout_for_mod_at_root(temp.path(), "foglio1024.ui-remover-bosswindow");
+        let layout =
+            artifact_layout_for_mod_at_root(temp.path(), "foglio1024.ui-remover-bosswindow");
         fs::create_dir_all(&layout.payload_dir).expect("create payload dir");
-        fs::write(&layout.manifest_path, serde_json::to_string(&sample_manifest()).unwrap()).expect("write manifest");
-        fs::write(layout.bundle_dir.join("notes.txt"), "oops").expect("write unexpected top-level file");
+        fs::write(
+            &layout.manifest_path,
+            serde_json::to_string(&sample_manifest()).unwrap(),
+        )
+        .expect("write manifest");
+        fs::write(layout.bundle_dir.join("notes.txt"), "oops")
+            .expect("write unexpected top-level file");
 
         let err = validate_bundle_layout(&layout, "foglio1024.ui-remover-bosswindow")
             .expect_err("extra top-level paths must fail closed");

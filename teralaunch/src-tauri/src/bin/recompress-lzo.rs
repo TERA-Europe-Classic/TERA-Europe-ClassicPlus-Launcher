@@ -20,39 +20,64 @@ const PACKAGE_MAGIC: u32 = 0x9E2A83C1;
 const X64_THRESHOLD: u16 = 0x381;
 const BLOCK_SIZE: usize = 131072;
 
-fn read_u16(b: &[u8], o: usize) -> u16 { u16::from_le_bytes(b[o..o+2].try_into().unwrap()) }
-fn read_u32(b: &[u8], o: usize) -> u32 { u32::from_le_bytes(b[o..o+4].try_into().unwrap()) }
-fn write_u32(b: &mut [u8], o: usize, v: u32) { b[o..o+4].copy_from_slice(&v.to_le_bytes()); }
+fn read_u16(b: &[u8], o: usize) -> u16 {
+    u16::from_le_bytes(b[o..o + 2].try_into().unwrap())
+}
+fn read_u32(b: &[u8], o: usize) -> u32 {
+    u32::from_le_bytes(b[o..o + 4].try_into().unwrap())
+}
+fn write_u32(b: &mut [u8], o: usize, v: u32) {
+    b[o..o + 4].copy_from_slice(&v.to_le_bytes());
+}
 
 fn read_fstring_end(bytes: &[u8], off: usize) -> usize {
-    let len = i32::from_le_bytes(bytes[off..off+4].try_into().unwrap());
-    if len == 0 { off + 4 }
-    else if len > 0 { off + 4 + len as usize }
-    else { off + 4 + (-len as usize) * 2 }
+    let len = i32::from_le_bytes(bytes[off..off + 4].try_into().unwrap());
+    if len == 0 {
+        off + 4
+    } else if len > 0 {
+        off + 4 + len as usize
+    } else {
+        off + 4 + (-len as usize) * 2
+    }
 }
 
 fn locate_header_fields(bytes: &[u8]) -> (usize, usize, usize, usize, u32) {
     // returns (package_flags_pos, compression_flags_pos, chunk_count_pos, name_offset, _name_offset_value_unused)
     let mut c = 0;
-    assert_eq!(read_u32(bytes, c), PACKAGE_MAGIC); c += 4;
-    let file_ver = read_u16(bytes, c); c += 2;
-    let _lic = read_u16(bytes, c); c += 2;
+    assert_eq!(read_u32(bytes, c), PACKAGE_MAGIC);
+    c += 4;
+    let file_ver = read_u16(bytes, c);
+    c += 2;
+    let _lic = read_u16(bytes, c);
+    c += 2;
     let is_x64 = file_ver >= X64_THRESHOLD;
     c += 4; // header_size
     c = read_fstring_end(bytes, c); // folder_name
-    let pkg_flags_pos = c; c += 4;
+    let pkg_flags_pos = c;
+    c += 4;
     c += 4; // raw_name_count
-    let name_offset = read_u32(bytes, c) as usize; c += 4;
+    let name_offset = read_u32(bytes, c) as usize;
+    c += 4;
     c += 4 * 5; // export_count, export_offset, import_count, import_offset, depends_offset
-    if is_x64 { c += 16; } // ImportExportGuids block
+    if is_x64 {
+        c += 16;
+    } // ImportExportGuids block
     c += 16; // FGuid
-    let gen_count = read_u32(bytes, c) as usize; c += 4;
+    let gen_count = read_u32(bytes, c) as usize;
+    c += 4;
     c += gen_count * 12;
     c += 4; // engine_version
     c += 4; // cooker_version
-    let comp_flags_pos = c; c += 4;
+    let comp_flags_pos = c;
+    c += 4;
     let chunk_count_pos = c;
-    (pkg_flags_pos, comp_flags_pos, chunk_count_pos, name_offset, 0)
+    (
+        pkg_flags_pos,
+        comp_flags_pos,
+        chunk_count_pos,
+        name_offset,
+        0,
+    )
 }
 
 fn main() {
@@ -63,13 +88,17 @@ fn main() {
     }
     let bytes = fs::read(&args[1]).expect("read input");
 
-    let (pkg_flags_pos, comp_flags_pos, chunk_count_pos, name_offset, _) = locate_header_fields(&bytes);
+    let (pkg_flags_pos, comp_flags_pos, chunk_count_pos, name_offset, _) =
+        locate_header_fields(&bytes);
     println!("name_offset = {name_offset}");
     println!("pkg_flags_pos = {pkg_flags_pos}, comp_flags_pos = {comp_flags_pos}, chunk_count_pos = {chunk_count_pos}");
 
     let body = &bytes[name_offset..];
     let body_len = body.len();
-    println!("body_len = {body_len} bytes; will produce {} blocks of <= {BLOCK_SIZE}", body_len.div_ceil(BLOCK_SIZE));
+    println!(
+        "body_len = {body_len} bytes; will produce {} blocks of <= {BLOCK_SIZE}",
+        body_len.div_ceil(BLOCK_SIZE)
+    );
 
     // LZO-compress each block
     let mut compressed_blocks: Vec<Vec<u8>> = Vec::new();

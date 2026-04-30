@@ -55,7 +55,9 @@ pub fn extract_vanilla_for_package_name(
     let suffix = format!(".{package_name}");
     let entry = map.values().find(|e| {
         e.object_path.eq_ignore_ascii_case(package_name)
-            || e.object_path.to_ascii_lowercase().ends_with(&suffix.to_ascii_lowercase())
+            || e.object_path
+                .to_ascii_lowercase()
+                .ends_with(&suffix.to_ascii_lowercase())
     });
     let entry = entry.ok_or_else(|| {
         format!(
@@ -168,9 +170,8 @@ mod tests {
         container.extend_from_slice(&pkg_b);
         fs::write(cooked_pc.join("S1UI_GageBoss.gpk"), &container).unwrap();
 
-        let mapper_text = format!(
-            "S1UI_GageBoss.gpk?GageBossModded.GageBoss,Comp,{off_b},{size_b},|!"
-        );
+        let mapper_text =
+            format!("S1UI_GageBoss.gpk?GageBossModded.GageBoss,Comp,{off_b},{size_b},|!");
         write_mapper(&cooked_pc.join(BACKUP_FILE), &mapper_text);
 
         let extracted =
@@ -189,8 +190,7 @@ mod tests {
             "S1UI_Other.gpk?Foo.Bar,X,0,10,|!",
         );
 
-        let err =
-            extract_vanilla_for_object_path(game_root, "Missing.Path").unwrap_err();
+        let err = extract_vanilla_for_object_path(game_root, "Missing.Path").unwrap_err();
         assert!(err.contains("not found"), "got: {err}");
     }
 
@@ -245,13 +245,11 @@ mod tests {
         // Two entries — one whose object_path *equals* the package name,
         // one whose object_path *ends with* `.<package_name>`. Both should
         // resolve to the same vanilla bytes.
-        let mapper_text = format!(
-            "S1UI_GageBoss.gpk?S1UI_OtherOwner.S1UI_FlightBar,Comp,{off_b},{size_b},|!"
-        );
+        let mapper_text =
+            format!("S1UI_GageBoss.gpk?S1UI_OtherOwner.S1UI_FlightBar,Comp,{off_b},{size_b},|!");
         write_mapper(&cooked_pc.join(BACKUP_FILE), &mapper_text);
 
-        let extracted =
-            extract_vanilla_for_package_name(game_root, "S1UI_FlightBar").unwrap();
+        let extracted = extract_vanilla_for_package_name(game_root, "S1UI_FlightBar").unwrap();
         assert_eq!(extracted, pkg_b);
     }
 

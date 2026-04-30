@@ -14,9 +14,7 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use super::patch_manifest::{
-    self, artifact_layout_for_mod_at_root, PatchManifest,
-};
+use super::patch_manifest::{self, artifact_layout_for_mod_at_root, PatchManifest};
 
 /// Per-mod sidecar persisted next to the manifest. Records *how* the
 /// vanilla baseline was resolved at install time so enable/disable can
@@ -123,12 +121,8 @@ pub fn save_manifest_at_root(
     let json = serde_json::to_string_pretty(manifest)
         .map_err(|e| format!("Failed to serialize manifest for '{mod_id}': {e}"))?;
     let tmp = layout.manifest_path.with_extension("json.tmp");
-    fs::write(&tmp, json).map_err(|e| {
-        format!(
-            "Failed to write manifest tmp {}: {e}",
-            tmp.display()
-        )
-    })?;
+    fs::write(&tmp, json)
+        .map_err(|e| format!("Failed to write manifest tmp {}: {e}", tmp.display()))?;
     fs::rename(&tmp, &layout.manifest_path).map_err(|e| {
         format!(
             "Failed to commit manifest {}: {e}",
@@ -137,10 +131,7 @@ pub fn save_manifest_at_root(
     })
 }
 
-pub fn load_manifest_at_root(
-    root: &Path,
-    mod_id: &str,
-) -> Result<Option<PatchManifest>, String> {
+pub fn load_manifest_at_root(root: &Path, mod_id: &str) -> Result<Option<PatchManifest>, String> {
     let layout = artifact_layout_for_mod_at_root(root, mod_id);
     if !layout.manifest_path.exists() {
         return Ok(None);
@@ -256,10 +247,14 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let manifest = sample_manifest("test.mod");
         save_manifest_at_root(tmp.path(), "test.mod", &manifest).unwrap();
-        assert!(load_manifest_at_root(tmp.path(), "test.mod").unwrap().is_some());
+        assert!(load_manifest_at_root(tmp.path(), "test.mod")
+            .unwrap()
+            .is_some());
 
         delete_manifest_at_root(tmp.path(), "test.mod").unwrap();
-        assert!(load_manifest_at_root(tmp.path(), "test.mod").unwrap().is_none());
+        assert!(load_manifest_at_root(tmp.path(), "test.mod")
+            .unwrap()
+            .is_none());
     }
 
     #[test]
@@ -274,12 +269,11 @@ mod tests {
         let mut bad = sample_manifest("test.mod");
         bad.exports.clear(); // validate() rejects empty exports list
         let err = save_manifest_at_root(tmp.path(), "test.mod", &bad).unwrap_err();
-        assert!(
-            err.contains("at least one export patch"),
-            "got: {err}"
-        );
+        assert!(err.contains("at least one export patch"), "got: {err}");
         // Nothing should have been written
-        assert!(load_manifest_at_root(tmp.path(), "test.mod").unwrap().is_none());
+        assert!(load_manifest_at_root(tmp.path(), "test.mod")
+            .unwrap()
+            .is_none());
     }
 
     #[test]
@@ -302,7 +296,9 @@ mod tests {
         m2.exports[0].replacement_payload_hex = "01020304".into();
         save_manifest_at_root(tmp.path(), "test.mod", &m2).unwrap();
 
-        let loaded = load_manifest_at_root(tmp.path(), "test.mod").unwrap().unwrap();
+        let loaded = load_manifest_at_root(tmp.path(), "test.mod")
+            .unwrap()
+            .unwrap();
         assert_eq!(loaded.exports[0].replacement_payload_hex, "01020304");
     }
 }

@@ -26,11 +26,11 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use super::manifest_store::InstallTarget;
+use super::vanilla_resolver::VanillaSource;
 use super::{
     gpk, gpk_package, gpk_patch_applier, manifest_store, patch_derivation, vanilla_resolver,
 };
-use super::manifest_store::InstallTarget;
-use super::vanilla_resolver::VanillaSource;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PatchInstallOutcome {
@@ -173,30 +173,25 @@ fn enable_composite(
     manifest: &super::patch_manifest::PatchManifest,
     target_package_name: &str,
 ) -> Result<(), String> {
-    let raw_vanilla = super::composite_extract::extract_vanilla_for_package_name(
-        game_root,
-        target_package_name,
-    )?;
+    let raw_vanilla =
+        super::composite_extract::extract_vanilla_for_package_name(game_root, target_package_name)?;
     // The carved slice from a composite container preserves the package's
     // original compression. apply_manifest only handles uncompressed input,
     // so normalize first.
-    let vanilla = gpk_package::extract_uncompressed_package_bytes(&raw_vanilla)
-        .map_err(|e| format!(
-            "Failed to decompress composite-resolved vanilla for '{target_package_name}': {e}"
-        ))?;
+    let vanilla = gpk_package::extract_uncompressed_package_bytes(&raw_vanilla).map_err(|e| {
+        format!("Failed to decompress composite-resolved vanilla for '{target_package_name}': {e}")
+    })?;
     let patched = gpk_patch_applier::apply_manifest(&vanilla, manifest)?;
 
     let target_filename = format!("{target_package_name}.gpk");
     let cooked_pc = game_root.join(gpk::COOKED_PC_DIR);
-    fs::create_dir_all(&cooked_pc)
-        .map_err(|e| format!("Failed to create CookedPC dir: {e}"))?;
+    fs::create_dir_all(&cooked_pc).map_err(|e| format!("Failed to create CookedPC dir: {e}"))?;
     let dest = cooked_pc.join(&target_filename);
     fs::write(&dest, &patched)
         .map_err(|e| format!("Failed to write patched GPK to {}: {e}", dest.display()))?;
 
     let file_size = patched.len() as i64;
-    let rewritten =
-        gpk::redirect_mapper_to_standalone(game_root, target_package_name, file_size)?;
+    let rewritten = gpk::redirect_mapper_to_standalone(game_root, target_package_name, file_size)?;
     if rewritten == 0 {
         let _ = fs::remove_file(&dest);
         return Err(format!(
@@ -242,11 +237,12 @@ fn enable_standalone(
             backup_path.display()
         )
     })?;
-    let baseline = gpk_package::extract_uncompressed_package_bytes(&raw_baseline)
-        .map_err(|e| format!(
+    let baseline = gpk_package::extract_uncompressed_package_bytes(&raw_baseline).map_err(|e| {
+        format!(
             "Failed to decompress standalone vanilla baseline {}: {e}",
             backup_path.display()
-        ))?;
+        )
+    })?;
     let patched = gpk_patch_applier::apply_manifest(&baseline, manifest)?;
     fs::write(&vanilla_path, &patched).map_err(|e| {
         format!(
@@ -286,17 +282,14 @@ fn relative_to_game_root(game_root: &Path, path: &Path) -> Result<String, String
             game_root.display()
         )
     })?;
-    Ok(stripped
-        .to_string_lossy()
-        .replace('\\', "/")
-        .to_string())
+    Ok(stripped.to_string_lossy().replace('\\', "/").to_string())
 }
 
-fn resolve_relative_to_game_root(
-    game_root: &Path,
-    relative_path: &str,
-) -> Result<PathBuf, String> {
-    if relative_path.contains("..") || relative_path.starts_with('/') || relative_path.starts_with('\\') {
+fn resolve_relative_to_game_root(game_root: &Path, relative_path: &str) -> Result<PathBuf, String> {
+    if relative_path.contains("..")
+        || relative_path.starts_with('/')
+        || relative_path.starts_with('\\')
+    {
         return Err(format!(
             "install_target relative_path '{relative_path}' rejects parent traversal / absolute paths"
         ));
@@ -533,7 +526,10 @@ mod tests {
         assert!(!s.cooked_pc.join(STANDALONE_FILE).exists());
         let mapper_now = fs::read(s.cooked_pc.join(MAPPER_FILE)).unwrap();
         let clean_now = fs::read(s.cooked_pc.join(BACKUP_FILE)).unwrap();
-        assert_eq!(mapper_now, clean_now, "mapper must equal clean after disable");
+        assert_eq!(
+            mapper_now, clean_now,
+            "mapper must equal clean after disable"
+        );
     }
 
     #[test]
@@ -616,24 +612,16 @@ mod tests {
         let mod_src = tmp.path().join("mod-src.gpk");
         fs::write(&mod_src, &modded_pkg).unwrap();
 
-        let err = install_via_patch(
-            &game_root,
-            &app_root,
-            "test.mod",
-            &mod_src,
-            "S1UI_GageBoss",
-        )
-        .unwrap_err();
+        let err = install_via_patch(&game_root, &app_root, "test.mod", &mod_src, "S1UI_GageBoss")
+            .unwrap_err();
         assert!(
             err.contains("added exports"),
             "expected unsupported-diff error, got: {err}"
         );
         // No manifest persisted on refusal
-        assert!(
-            manifest_store::load_manifest_at_root(&app_root, "test.mod")
-                .unwrap()
-                .is_none()
-        );
+        assert!(manifest_store::load_manifest_at_root(&app_root, "test.mod")
+            .unwrap()
+            .is_none());
     }
 
     #[test]
@@ -661,15 +649,14 @@ mod tests {
         fs::write(cooked_pc.join(BACKUP_FILE), encrypt_mapper(clean_text)).unwrap();
         fs::write(cooked_pc.join(MAPPER_FILE), encrypt_mapper(clean_text)).unwrap();
 
-        let outcome = migrate_legacy_install(
-            &game_root,
-            &app_root,
-            "test.mod",
-            "S1UI_FlightBar.gpk",
-        );
+        let outcome =
+            migrate_legacy_install(&game_root, &app_root, "test.mod", "S1UI_FlightBar.gpk");
 
         assert_eq!(outcome.mod_id, "test.mod");
-        assert_eq!(outcome.target_filename.as_deref(), Some("S1UI_FlightBar.gpk"));
+        assert_eq!(
+            outcome.target_filename.as_deref(),
+            Some("S1UI_FlightBar.gpk")
+        );
         assert!(outcome.error.is_none(), "error: {:?}", outcome.error);
         assert!(!standalone.exists(), "legacy standalone must be removed");
     }
@@ -699,24 +686,21 @@ mod tests {
             "S1Common.gpk?Owner.S1UI_GageBoss,Comp,0,{},|!",
             vanilla_pkg.len()
         );
-        fs::write(cooked_pc.join(BACKUP_FILE), encrypt_mapper(mapper.as_bytes())).unwrap();
-        fs::write(cooked_pc.join(MAPPER_FILE), encrypt_mapper(mapper.as_bytes())).unwrap();
-        install_via_patch(
-            &game_root,
-            &app_root,
-            "test.mod",
-            &mod_src,
-            "S1UI_GageBoss",
+        fs::write(
+            cooked_pc.join(BACKUP_FILE),
+            encrypt_mapper(mapper.as_bytes()),
         )
         .unwrap();
+        fs::write(
+            cooked_pc.join(MAPPER_FILE),
+            encrypt_mapper(mapper.as_bytes()),
+        )
+        .unwrap();
+        install_via_patch(&game_root, &app_root, "test.mod", &mod_src, "S1UI_GageBoss").unwrap();
 
         let standalone_before = fs::read(&standalone).unwrap();
-        let outcome = migrate_legacy_install(
-            &game_root,
-            &app_root,
-            "test.mod",
-            "S1UI_FlightBar.gpk",
-        );
+        let outcome =
+            migrate_legacy_install(&game_root, &app_root, "test.mod", "S1UI_FlightBar.gpk");
         // Manifest exists → migration is a no-op; the standalone is left alone.
         assert!(outcome.error.is_none(), "error: {:?}", outcome.error);
         assert_eq!(
@@ -758,14 +742,7 @@ mod tests {
         let mod_src = tmp.path().join("mod-src.gpk");
         fs::write(&mod_src, &modded_pkg).unwrap();
 
-        install_via_patch(
-            &game_root,
-            &app_root,
-            "test.mod",
-            &mod_src,
-            "S1UI_GageBoss",
-        )
-        .unwrap();
+        install_via_patch(&game_root, &app_root, "test.mod", &mod_src, "S1UI_GageBoss").unwrap();
 
         // …but then we corrupt the LIVE mapper to remove the entry, simulating
         // a state where the mapper has drifted between install and enable.
@@ -869,7 +846,10 @@ mod tests {
 
         // Install must NOT touch the vanilla file or write a backup yet —
         // those happen at enable time.
-        assert!(!s.backup_path.exists(), "backup must not exist after install alone");
+        assert!(
+            !s.backup_path.exists(),
+            "backup must not exist after install alone"
+        );
     }
 
     #[test]
@@ -893,7 +873,10 @@ mod tests {
 
         // Vanilla path now contains patched bytes.
         let patched = fs::read(&s.vanilla_path).unwrap();
-        assert_ne!(patched, vanilla_before, "patched bytes must differ from vanilla");
+        assert_ne!(
+            patched, vanilla_before,
+            "patched bytes must differ from vanilla"
+        );
         let parsed = parse_package(&patched).unwrap();
         let main = parsed
             .exports
@@ -1016,14 +999,8 @@ mod tests {
         let mod_src = tmp.path().join("mod-src.gpk");
         fs::write(&mod_src, &modded_pkg).unwrap();
 
-        let err = install_via_patch(
-            &game_root,
-            &app_root,
-            "test.mod",
-            &mod_src,
-            "S1UI_GageBoss",
-        )
-        .unwrap_err();
+        let err = install_via_patch(&game_root, &app_root, "test.mod", &mod_src, "S1UI_GageBoss")
+            .unwrap_err();
 
         assert!(err.contains("incompatible"), "got: {err}");
         assert!(err.contains("x32"), "got: {err}");
@@ -1067,14 +1044,8 @@ mod tests {
         let mod_src = tmp.path().join("mod-src.gpk");
         fs::write(&mod_src, &modded_pkg).unwrap();
 
-        install_via_patch(
-            &game_root,
-            &app_root,
-            "test.mod",
-            &mod_src,
-            "S1UI_GageBoss",
-        )
-        .expect("x64-vs-x64 install must succeed");
+        install_via_patch(&game_root, &app_root, "test.mod", &mod_src, "S1UI_GageBoss")
+            .expect("x64-vs-x64 install must succeed");
 
         assert!(
             manifest_store::load_manifest_at_root(&app_root, "test.mod")
@@ -1106,9 +1077,6 @@ mod tests {
         manifest_store::save_manifest_at_root(&s.app_root, "evil.mod", &manifest).unwrap();
 
         let err = enable_via_patch(&s.game_root, &s.app_root, "evil.mod").unwrap_err();
-        assert!(
-            err.contains("rejects parent traversal"),
-            "got: {err}"
-        );
+        assert!(err.contains("rejects parent traversal"), "got: {err}");
     }
 }

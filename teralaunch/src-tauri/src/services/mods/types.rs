@@ -421,11 +421,20 @@ mod tests {
         }"#;
         let entry: CatalogEntry = serde_json::from_str(json).unwrap();
         assert_eq!(entry.tagline.as_deref(), Some("Punchy hook"));
-        assert_eq!(entry.featured_image.as_deref(), Some("https://example.com/hero.png"));
-        assert_eq!(entry.before_image.as_deref(), Some("https://example.com/before.png"));
+        assert_eq!(
+            entry.featured_image.as_deref(),
+            Some("https://example.com/hero.png")
+        );
+        assert_eq!(
+            entry.before_image.as_deref(),
+            Some("https://example.com/before.png")
+        );
         assert_eq!(entry.tags, vec!["minimap", "quality-of-life"]);
         assert_eq!(entry.gpk_files, vec!["S1UI_Map.gpk"]);
-        assert_eq!(entry.compatibility_notes.as_deref(), Some("Conflicts with X"));
+        assert_eq!(
+            entry.compatibility_notes.as_deref(),
+            Some("Conflicts with X")
+        );
         assert_eq!(entry.last_verified_patch.as_deref(), Some("patch 113"));
         assert_eq!(entry.download_count, Some(42));
     }
