@@ -16,6 +16,8 @@
 | `REGISTER_ACTION_URL` | `http://157.90.107.2:8090/tera/LauncherSignupAction` |
 | `MAINTENANCE_STATUS_URL` | `http://157.90.107.2:8090/tera/LauncherMaintenanceStatus` |
 | `SERVER_LIST_URL` | `http://157.90.107.2:8090/tera/ServerList` |
+| `PATCH_SOURCE` | `v100_static` |
+| `V100_PATCH_BASE_URL` | `http://157.90.107.2:8090/public/patch` |
 
 This is the developer's LAN. It is not externally routable. Every request carries the launcher's `AuthKey` and password plaintext over the wire.
 
@@ -26,6 +28,7 @@ Over HTTP on an unsecured network:
 - **Credential capture** — password at `/tera/LauncherLoginAction`, `AuthKey` on subsequent `/tera/GetAccountInfoByUserNo` POSTs.
 - **Session hijack** — MitM replays `AuthKey` against the same endpoint for the lifetime of the session.
 - **Response tampering** — attacker can rewrite `MAINTENANCE_STATUS`, `SERVER_LIST`, or maintenance banner text, steering the client anywhere.
+- **Patch tampering / resource exhaustion** — attacker can rewrite `version.ini`, the v100 SQLite DB CAB, or patch CAB payloads under `V100_PATCH_BASE_URL`; launcher-side URL scoping, path traversal rejection, size ceilings, and final hash checks are defense-in-depth, not a substitute for HTTPS/authenticated patch metadata.
 - **Stale-TLS-pinning absence** — even if the client later moves to HTTPS, without cert-pinning the launcher will trust any CA-signed cert for the target host.
 
 ## Required before public launch
@@ -40,7 +43,7 @@ Deploy the portal behind TLS. Minimum viable:
 
 ## Launcher-side migration steps (once the endpoint is up)
 
-1. Update `teralib/src/config/config.json` — replace every `http://157.90.107.2:8090` with `https://<fqdn>`.
+1. Update `teralib/src/config/config.json` — replace every `http://157.90.107.2:8090` with `https://<fqdn>`, including `V100_PATCH_BASE_URL`.
 2. Run full auth flow (login → account info → server list → maintenance status → registration) against the new endpoint. Each must return the documented `Return: true, ReturnCode: 0` shape.
 3. Verify `reqwest` in `teralaunch/src-tauri` actually terminates TLS (no custom `danger_accept_invalid_certs(true)` in the codepath — grep confirmed none today).
 4. Optional but recommended: add a CI gate that fails `cargo build --release` if any URL in `config.json` starts with `http://` (rg-based check in `.github/workflows/deploy.yml`). Tracked separately as a candidate polish.
