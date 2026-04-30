@@ -441,6 +441,14 @@ async fn install_external_mod(
     let dest = install_root.join(&entry.id);
 
     stop_external_app_before_update(&entry.id, external_app::stop_process_by_name);
+    // fix.kill-before-extract: graceful_stop returns when the PID exits,
+    // but Windows can hold file locks briefly afterwards. Poll for the
+    // exe-name to disappear from the process table for up to ~3s before
+    // proceeding so the unzip doesn't race the file-handle release on a
+    // mod that was running at update time.
+    if let Some(exe_name) = external_executable_name(&entry.id) {
+        wait_for_process_gone(&exe_name, std::time::Duration::from_secs(3)).await;
+    }
 
     // Mark Installing in the registry so the UI can render progress. The
     // claim is atomic with the check — if a parallel install of the same
@@ -533,6 +541,21 @@ async fn install_external_mod(
             Ok(final_row)
         }
         Err(err) => finalize_error(&entry.id, err, &window),
+    }
+}
+
+/// fix.kill-before-extract: poll `is_process_running` for up to `timeout`
+/// so the extraction step waits until Windows has released the exe's file
+/// handle. graceful_stop already TerminateProcess'd the PID; this is a
+/// belt-and-braces wait for the file lock to actually drop.
+async fn wait_for_process_gone(exe_name: &str, timeout: std::time::Duration) {
+    let deadline = std::time::Instant::now() + timeout;
+    let poll_interval = std::time::Duration::from_millis(150);
+    while std::time::Instant::now() < deadline {
+        if !external_app::is_process_running(exe_name) {
+            return;
+        }
+        tokio::time::sleep(poll_interval).await;
     }
 }
 

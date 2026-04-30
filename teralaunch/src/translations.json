@@ -220,7 +220,12 @@
     "MODS_DETAIL_COMPAT": "Compatibilité",
     "MODS_DETAIL_OPEN_SETTINGS": "Ouvrir le dossier des paramètres",
     "MODS_ARIA_PREV": "Précédent",
-    "MODS_ARIA_NEXT": "Suivant"
+    "MODS_ARIA_NEXT": "Suivant",
+    "UPDATING_MODS": "Mise à jour des mods...",
+    "MOD_UPDATE_FAILED": "Échec de la mise à jour des mods",
+    "MOD_UPDATE_PARTIAL": "Certains mods n'ont pas pu être mis à jour",
+    "MOD_UPDATE_CHECK_FAILED": "Vérification des mises à jour des mods impossible",
+    "MODS_UP_TO_DATE": "Mods à jour"
   },
   "EUR": {
     "OFFLINE_BANNER_TITLE": "Can't reach the portal server",
@@ -443,7 +448,12 @@
     "MODS_DETAIL_COMPAT": "Compatibility",
     "MODS_DETAIL_OPEN_SETTINGS": "Open settings folder",
     "MODS_ARIA_PREV": "Previous",
-    "MODS_ARIA_NEXT": "Next"
+    "MODS_ARIA_NEXT": "Next",
+    "UPDATING_MODS": "Updating mods...",
+    "MOD_UPDATE_FAILED": "Mod update failed",
+    "MOD_UPDATE_PARTIAL": "Some mods failed to update",
+    "MOD_UPDATE_CHECK_FAILED": "Mod update check failed",
+    "MODS_UP_TO_DATE": "Mods up to date"
   },
   "RUS": {
     "OFFLINE_BANNER_TITLE": "Не удаётся связаться с сервером портала",
@@ -666,7 +676,12 @@
     "MODS_DETAIL_COMPAT": "Совместимость",
     "MODS_DETAIL_OPEN_SETTINGS": "Открыть папку настроек",
     "MODS_ARIA_PREV": "Назад",
-    "MODS_ARIA_NEXT": "Вперёд"
+    "MODS_ARIA_NEXT": "Вперёд",
+    "UPDATING_MODS": "Обновление модов...",
+    "MOD_UPDATE_FAILED": "Не удалось обновить моды",
+    "MOD_UPDATE_PARTIAL": "Некоторые моды не удалось обновить",
+    "MOD_UPDATE_CHECK_FAILED": "Не удалось проверить обновления модов",
+    "MODS_UP_TO_DATE": "Моды обновлены"
   },
   "GER": {
     "OFFLINE_BANNER_TITLE": "Portal-Server nicht erreichbar",
@@ -889,6 +904,11 @@
     "MODS_DETAIL_COMPAT": "Kompatibilität",
     "MODS_DETAIL_OPEN_SETTINGS": "Einstellungsordner öffnen",
     "MODS_ARIA_PREV": "Zurück",
-    "MODS_ARIA_NEXT": "Weiter"
+    "MODS_ARIA_NEXT": "Weiter",
+    "UPDATING_MODS": "Mods werden aktualisiert...",
+    "MOD_UPDATE_FAILED": "Mod-Aktualisierung fehlgeschlagen",
+    "MOD_UPDATE_PARTIAL": "Einige Mods konnten nicht aktualisiert werden",
+    "MOD_UPDATE_CHECK_FAILED": "Mod-Aktualisierungsprüfung fehlgeschlagen",
+    "MODS_UP_TO_DATE": "Mods sind aktuell"
   }
 }

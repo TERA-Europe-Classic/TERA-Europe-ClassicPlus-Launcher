@@ -1380,6 +1380,109 @@ function compareVersions(v1, v2) {
   return 0;
 }
 
+/**
+ * Standalone download tray rendered in the launcher main view (bottom-right)
+ * for the auto-update-on-launch flow. Reuses the `.mods-download-tray-*`
+ * CSS classes from the mod manager so the visuals are identical, but is
+ * anchored to the viewport via `.mods-download-tray-standalone` and
+ * doesn't require opening the modal.
+ *
+ * Lifecycle is fully driven by `mod_download_progress` events:
+ *  - update(id, info) — upserts a row + ensures the tray is mounted
+ *  - remove(id)       — drops a row; auto-unmounts when empty
+ *  - clearAll()       — explicit unmount used at the end of the Rust call
+ */
+const LaunchUpdateTray = {
+  _tray: null,
+  _items: new Map(), // id -> { progress, received_bytes, total_bytes, name }
+
+  _ensureMounted() {
+    if (this._tray) return;
+    const tray = document.createElement('div');
+    tray.className = 'mods-download-tray mods-download-tray-standalone';
+    tray.id = 'launch-update-tray';
+    tray.innerHTML = `
+      <div class="mods-download-tray-header">
+        <span data-launch-tray-title>${App.t ? App.t('UPDATING_MODS') || 'Updating mods...' : 'Updating mods...'}</span>
+        <span class="mods-download-tray-count" data-launch-tray-count>0</span>
+      </div>
+      <div class="mods-download-tray-items" data-launch-tray-items></div>`;
+    document.body.appendChild(tray);
+    this._tray = tray;
+  },
+
+  _unmount() {
+    if (this._tray) {
+      this._tray.remove();
+      this._tray = null;
+    }
+  },
+
+  update(id, info) {
+    if (!id) return;
+    const merged = { ...(this._items.get(id) || {}), ...info };
+    this._items.set(id, merged);
+    this._ensureMounted();
+    this._render();
+  },
+
+  remove(id) {
+    if (!this._items.delete(id)) return;
+    if (this._items.size === 0) {
+      this._unmount();
+    } else {
+      this._render();
+    }
+  },
+
+  clearAll() {
+    this._items.clear();
+    this._unmount();
+  },
+
+  _render() {
+    if (!this._tray) return;
+    const titleEl = this._tray.querySelector('[data-launch-tray-title]');
+    const countEl = this._tray.querySelector('[data-launch-tray-count]');
+    const itemsEl = this._tray.querySelector('[data-launch-tray-items]');
+    if (!itemsEl) return;
+    if (titleEl) {
+      titleEl.textContent = (App.t && App.t('UPDATING_MODS')) || 'Updating mods...';
+    }
+    if (countEl) countEl.textContent = String(this._items.size);
+
+    const fmtMB = (b) => (b ? `${(b / (1024 * 1024)).toFixed(1)} MB` : '');
+    const escape = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+    itemsEl.innerHTML = '';
+    for (const [id, info] of this._items) {
+      const pct = Math.max(0, Math.min(100, Math.round(info.progress || 0)));
+      const received = info.received_bytes || 0;
+      const total = info.total_bytes || 0;
+      const name = info.name || id;
+      const row = document.createElement('div');
+      row.className = 'mods-download-tray-item';
+      row.dataset.dlId = id;
+      row.innerHTML = `
+        <div class="mods-download-tray-item-header">
+          <span class="mods-download-tray-name">${escape(name)}</span>
+          <span class="mods-download-tray-progress">${pct}%</span>
+        </div>
+        <div class="mods-download-tray-item-meta">
+          <span class="mods-download-tray-bytes">${total > 0 ? `${fmtMB(received)} / ${fmtMB(total)}` : ''}</span>
+        </div>
+        <div class="mods-download-tray-bar">
+          <div class="mods-download-tray-bar-fill" style="width:${pct}%"></div>
+        </div>`;
+      itemsEl.appendChild(row);
+    }
+  },
+};
+
+if (typeof window !== 'undefined') {
+  window.LaunchUpdateTray = LaunchUpdateTray;
+}
+
 const App = {
   translations: {},
   currentLanguage: "GER",
@@ -1940,17 +2043,18 @@ const App = {
    * Pre-launch hook: asks the Rust side to check the live catalog for
    * updates to every enabled mod and reinstall them in place. The Rust
    * command (`auto_update_enabled_mods`) emits `mod_download_progress`
-   * events while each mod downloads — we subscribe locally for the
-   * duration of the call so the existing toast can mirror the same
-   * "Updating mods" progress the mod-manager tray would show.
+   * events while each mod downloads — we render a standalone bottom-right
+   * download tray (same visuals as the mod-manager tray, anchored to the
+   * viewport) so the user sees per-mod progress without forcing the
+   * mod-manager modal open.
    *
    * Failures are surfaced as a warning toast — they do NOT block the
-   * launch. The user keeps their last-known-good install and can
-   * retry from the manager later.
+   * launch. The user keeps their last-known-good install and can retry
+   * from the manager later.
    */
   async updateEnabledModsBeforeLaunch() {
+    const tray = LaunchUpdateTray;
     let unlistenProgress = null;
-    const progressById = new Map(); // id -> last known pct
 
     try {
       const { listen } = window.__TAURI__.event;
@@ -1958,19 +2062,19 @@ const App = {
         const payload = event?.payload;
         if (!payload || !payload.id) return;
         if (payload.state === "done" || payload.state === "error") {
-          progressById.delete(payload.id);
+          tray.remove(payload.id);
           return;
         }
-        progressById.set(payload.id, Math.max(0, Math.min(100, payload.progress || 0)));
-        const ids = Array.from(progressById.keys());
-        if (ids.length === 0) return;
-        const id = ids[0];
-        const pct = progressById.get(id) || 0;
-        const title = this.t("UPDATING_MODS") || "Updating mods...";
-        const subtitle = `${id} — ${pct}%`;
-        if (this.statusEl) this.statusEl.textContent = `${title} ${id} ${pct}%`;
-        if (typeof window.showUpdateNotification === "function") {
-          window.showUpdateNotification("checking", title, subtitle, true);
+        tray.update(payload.id, {
+          progress: Math.max(0, Math.min(100, payload.progress || 0)),
+          received_bytes: payload.received_bytes || 0,
+          total_bytes: payload.total_bytes || 0,
+          // Display name resolved later via render(); pass id as fallback.
+          name: payload.id,
+        });
+        if (this.statusEl) {
+          const title = this.t("UPDATING_MODS") || "Updating mods...";
+          this.statusEl.textContent = title;
         }
       });
     } catch (e) {
@@ -1996,6 +2100,10 @@ const App = {
       if (typeof unlistenProgress === "function") {
         try { unlistenProgress(); } catch (_) { /* ignore */ }
       }
+      // Hide the tray once the Rust command returns. mod_download_progress
+      // 'done'/'error' events should already have cleared each row, but
+      // a final clearAll() guarantees the DOM is gone before launch.
+      tray.clearAll();
     }
 
     const attempted = Array.isArray(result?.attempted) ? result.attempted : [];
@@ -2013,7 +2121,7 @@ const App = {
       window.showUpdateNotification(
         "success",
         this.t("MODS_UP_TO_DATE") || "Mods up to date",
-        `Updated ${attempted.length} mod${attempted.length === 1 ? "" : "s"}`
+        `${this.t("UPDATING_MODS") || "Mods updated"} (${attempted.length})`
       );
     }
   },

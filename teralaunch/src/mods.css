@@ -515,6 +515,16 @@
     transition: width 0.3s ease;
 }
 
+/* Standalone variant rendered outside the mods modal so the launch flow
+   can show a download tray without forcing the user into the manager.
+   Same visuals as the in-modal tray; only the anchoring changes. */
+.mods-download-tray.mods-download-tray-standalone {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 9000;
+}
+
 .mods-row-overflow {
     width: 32px;
     height: 32px;

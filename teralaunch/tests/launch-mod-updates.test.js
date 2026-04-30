@@ -121,22 +121,44 @@ describe('launch-time mod update gate', () => {
         expect(mockInvoke.mock.calls.some(([cmd]) => cmd === 'get_mods_catalog')).toBe(false);
     });
 
-    it('mirrors mod_download_progress events into the update toast', async () => {
+    it('renders the standalone download tray (NOT the mod manager modal) while updating', async () => {
         const app = await loadAppForLaunchTest({
             progressEvents: [
                 { id: 'classicplus.shinra', progress: 42, state: 'downloading' },
             ],
         });
 
+        let trayDuringUpdate = null;
+        const orig = window.LaunchUpdateTray.update.bind(window.LaunchUpdateTray);
+        window.LaunchUpdateTray.update = (id, info) => {
+            orig(id, info);
+            // Snapshot the tray DOM the first time a row is added so we can
+            // assert it actually rendered while the Rust call was in flight.
+            if (!trayDuringUpdate) {
+                trayDuringUpdate = document.getElementById('launch-update-tray');
+            }
+        };
+
         await app.handleLaunchGame();
 
-        const checkingCalls = window.showUpdateNotification.mock.calls.filter(
-            ([state]) => state === 'checking'
-        );
-        expect(checkingCalls.length).toBeGreaterThan(0);
-        const lastChecking = checkingCalls[checkingCalls.length - 1];
-        expect(lastChecking[2]).toContain('classicplus.shinra');
-        expect(lastChecking[2]).toContain('42%');
+        // The mod manager modal must NOT have been opened — the user
+        // explicitly does not want the entire manager to pop up on launch.
+        expect(window.ModsView.open).not.toHaveBeenCalled();
+        // The standalone tray must have rendered while the update was in
+        // flight (it is unmounted in the `finally` block once Rust returns).
+        expect(trayDuringUpdate).not.toBeNull();
+        expect(trayDuringUpdate.classList.contains('mods-download-tray-standalone')).toBe(true);
+        expect(trayDuringUpdate.querySelector('.mods-download-tray-bar-fill')).not.toBeNull();
+    });
+
+    it('cleans the standalone tray off the DOM after auto_update_enabled_mods returns', async () => {
+        const app = await loadAppForLaunchTest({
+            progressEvents: [
+                { id: 'classicplus.shinra', progress: 80, state: 'downloading' },
+            ],
+        });
+        await app.handleLaunchGame();
+        expect(document.getElementById('launch-update-tray')).toBeNull();
     });
 
     it('does NOT block launch when auto_update_enabled_mods reports partial failures', async () => {

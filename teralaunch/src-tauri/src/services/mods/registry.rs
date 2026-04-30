@@ -116,7 +116,13 @@ impl Registry {
     /// boundary which already serialises on a single `Mutex<Registry>`. Two
     /// `install_*` commands fired back-to-back will enter `mutate` one at a
     /// time; the first claims, the second sees `Installing` and returns Err.
-    pub fn try_claim_installing(&mut self, row: ModEntry) -> Result<(), String> {
+    ///
+    /// User-intent preservation (fix.preserve-enabled-on-update): when the
+    /// slot already exists, the user's `enabled` and `auto_launch` flags are
+    /// merged into the incoming Installing row. Without this, an update of
+    /// an enabled mod that fails mid-flight would leave the row at the
+    /// catalog default (`enabled=false`) — destroying the user's intent.
+    pub fn try_claim_installing(&mut self, mut row: ModEntry) -> Result<(), String> {
         use super::types::ModStatus;
         if let Some(slot) = self.find(&row.id) {
             if matches!(slot.status, ModStatus::Installing) {
@@ -125,6 +131,8 @@ impl Registry {
                     row.id
                 ));
             }
+            row.enabled = slot.enabled;
+            row.auto_launch = slot.auto_launch;
         }
         self.upsert(row);
         Ok(())
@@ -443,5 +451,83 @@ mod tests {
         let slot = reg.find("classicplus.shinra").unwrap();
         assert!(matches!(slot.status, ModStatus::Installing));
         assert_eq!(slot.progress, Some(0));
+    }
+
+    /// fix.preserve-enabled-on-update: a re-claim on an existing row
+    /// must keep the user's `enabled` and `auto_launch` flags. Without
+    /// this, an update of an enabled mod that fails mid-flight would
+    /// leave the row at the catalog default (`enabled=false`),
+    /// destroying the user's intent — they explicitly toggled it ON.
+    #[test]
+    fn reclaim_preserves_user_enabled_flags() {
+        let mut reg = Registry::default();
+        // User has Shinra installed and ENABLED with auto-launch ON.
+        let mut existing = installing_entry("classicplus.shinra");
+        existing.status = ModStatus::Enabled;
+        existing.enabled = true;
+        existing.auto_launch = true;
+        reg.upsert(existing);
+
+        // Auto-update kicks in: install_external_mod re-claims with a
+        // fresh ModEntry::from_catalog (enabled=false, auto_launch=false).
+        let mut fresh = installing_entry("classicplus.shinra");
+        fresh.enabled = false;
+        fresh.auto_launch = false;
+
+        reg.try_claim_installing(fresh).expect("re-claim must succeed");
+
+        let slot = reg.find("classicplus.shinra").unwrap();
+        assert!(
+            slot.enabled,
+            "user's enabled=true must survive a re-claim — fix.preserve-enabled-on-update"
+        );
+        assert!(
+            slot.auto_launch,
+            "user's auto_launch=true must survive a re-claim"
+        );
+        // Status still flips to Installing — the merge only protects
+        // intent flags, not the install lifecycle status.
+        assert!(matches!(slot.status, ModStatus::Installing));
+    }
+
+    /// A re-claim on a slot that was previously DISABLED should keep
+    /// it disabled. The contract is "merge user intent forward", not
+    /// "always set enabled=true".
+    #[test]
+    fn reclaim_preserves_user_disabled_state() {
+        let mut reg = Registry::default();
+        let mut existing = installing_entry("classicplus.shinra");
+        existing.status = ModStatus::Disabled;
+        existing.enabled = false;
+        existing.auto_launch = false;
+        reg.upsert(existing);
+
+        // Even if the catalog default is enabled=true, a disabled
+        // user intent must persist across the install.
+        let mut fresh = installing_entry("classicplus.shinra");
+        fresh.enabled = true;
+        fresh.auto_launch = true;
+
+        reg.try_claim_installing(fresh).unwrap();
+
+        let slot = reg.find("classicplus.shinra").unwrap();
+        assert!(!slot.enabled, "disabled state must persist on re-claim");
+        assert!(!slot.auto_launch, "auto_launch=false must persist");
+    }
+
+    /// A first install (no existing slot) must use the incoming row's
+    /// flags as-is — there's no prior intent to merge.
+    #[test]
+    fn first_claim_does_not_modify_incoming_flags() {
+        let mut reg = Registry::default();
+        let mut fresh = installing_entry("classicplus.shinra");
+        fresh.enabled = true;
+        fresh.auto_launch = true;
+
+        reg.try_claim_installing(fresh).unwrap();
+
+        let slot = reg.find("classicplus.shinra").unwrap();
+        assert!(slot.enabled);
+        assert!(slot.auto_launch);
     }
 }
