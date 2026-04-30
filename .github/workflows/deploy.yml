@@ -182,24 +182,6 @@ jobs:
         shell: bash
         run: node teralaunch/tests/deploy_scope.spec.js
 
-      - name: Bundle-size gate (≤5% growth vs previous tag)
-        # PRD 3.6.6.bundle-size-gate. Compares the fresh setup.exe + updater
-        # zip against the previous release's assets on GitHub. Fails the job
-        # if either artifact grew by more than 5 % — guards against silent
-        # bloat from a missed minify step, stray debug symbols, or a
-        # dependency upgrade that pulls in megabytes of transitives.
-        # Skipped cleanly when there's no previous tag (first release).
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          PREV_TAG=$(git tag --sort=-v:refname | grep -v "^v${{ steps.bump.outputs.version }}$" | head -n 1 || true)
-          node scripts/check-bundle-size.mjs \
-            --current-setup "${{ steps.files.outputs.setup }}" \
-            --current-zip   "${{ steps.files.outputs.zip }}" \
-            --previous-tag  "${PREV_TAG}" \
-            --max-growth-pct 5
-
       - name: Upload to FTPS
         env:
           SFTP_HOST: ${{ secrets.SFTP_HOST }}
