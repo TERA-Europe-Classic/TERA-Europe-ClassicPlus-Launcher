@@ -1936,36 +1936,85 @@ const App = {
     }
   },
 
+  /**
+   * Pre-launch hook: asks the Rust side to check the live catalog for
+   * updates to every enabled mod and reinstall them in place. The Rust
+   * command (`auto_update_enabled_mods`) emits `mod_download_progress`
+   * events while each mod downloads — we subscribe locally for the
+   * duration of the call so the existing toast can mirror the same
+   * "Updating mods" progress the mod-manager tray would show.
+   *
+   * Failures are surfaced as a warning toast — they do NOT block the
+   * launch. The user keeps their last-known-good install and can
+   * retry from the manager later.
+   */
   async updateEnabledModsBeforeLaunch() {
-    const catalog = await invoke("get_mods_catalog", { forceRefresh: true });
-    const installed = await invoke("list_installed_mods");
-    const catalogMods = Array.isArray(catalog?.mods) ? catalog.mods : [];
-    if (!catalogMods.length || !Array.isArray(installed) || !installed.length) return;
+    let unlistenProgress = null;
+    const progressById = new Map(); // id -> last known pct
 
-    const catalogById = new Map(catalogMods.map((mod) => [mod.id, mod]));
-    const enabledStatuses = new Set(["enabled", "running", "starting"]);
-    const outdatedEnabledMods = installed.flatMap((mod) => {
-      const catalogMod = catalogById.get(mod.id);
-      if (!catalogMod?.version || !mod.version || catalogMod.version === mod.version) return [];
-      if (mod.enabled !== true && !enabledStatuses.has(mod.status)) return [];
-      return [{ ...mod, catalogEntry: catalogMod }];
-    });
-
-    if (outdatedEnabledMods.length > 0 && typeof window.ModsView?.open === "function") {
-      await window.ModsView.open();
+    try {
+      const { listen } = window.__TAURI__.event;
+      unlistenProgress = await listen("mod_download_progress", (event) => {
+        const payload = event?.payload;
+        if (!payload || !payload.id) return;
+        if (payload.state === "done" || payload.state === "error") {
+          progressById.delete(payload.id);
+          return;
+        }
+        progressById.set(payload.id, Math.max(0, Math.min(100, payload.progress || 0)));
+        const ids = Array.from(progressById.keys());
+        if (ids.length === 0) return;
+        const id = ids[0];
+        const pct = progressById.get(id) || 0;
+        const title = this.t("UPDATING_MODS") || "Updating mods...";
+        const subtitle = `${id} — ${pct}%`;
+        if (this.statusEl) this.statusEl.textContent = `${title} ${id} ${pct}%`;
+        if (typeof window.showUpdateNotification === "function") {
+          window.showUpdateNotification("checking", title, subtitle, true);
+        }
+      });
+    } catch (e) {
+      console.warn("mod_download_progress subscribe failed (non-fatal):", e);
     }
 
-    for (let index = 0; index < outdatedEnabledMods.length; index += 1) {
-      const mod = outdatedEnabledMods[index];
-      const title = "Updating mods before launch";
-      const subtitle = `${mod.name || mod.id} (${index + 1}/${outdatedEnabledMods.length})`;
+    let result;
+    try {
+      result = await invoke("auto_update_enabled_mods");
+    } catch (error) {
+      // Hard error from the command itself (catalog fetch failed and
+      // there's no cache). Log + warn but don't block launch.
+      console.warn("auto_update_enabled_mods failed:", error);
       if (typeof window.showUpdateNotification === "function") {
-        window.showUpdateNotification("checking", title, subtitle, true);
+        window.showUpdateNotification(
+          "warning",
+          this.t("MOD_UPDATE_CHECK_FAILED") || "Mod update check failed",
+          error?.message || String(error)
+        );
       }
-      if (this.statusEl) {
-        this.statusEl.textContent = `${title}: ${subtitle}`;
+      return;
+    } finally {
+      if (typeof unlistenProgress === "function") {
+        try { unlistenProgress(); } catch (_) { /* ignore */ }
       }
-      await invoke("install_mod", { entry: mod.catalogEntry });
+    }
+
+    const attempted = Array.isArray(result?.attempted) ? result.attempted : [];
+    const failed = Array.isArray(result?.failed_ids) ? result.failed_ids : [];
+
+    if (attempted.length === 0) return;
+
+    if (failed.length > 0 && typeof window.showUpdateNotification === "function") {
+      window.showUpdateNotification(
+        "warning",
+        this.t("MOD_UPDATE_PARTIAL") || "Some mods failed to update",
+        failed.join(", ")
+      );
+    } else if (typeof window.showUpdateNotification === "function") {
+      window.showUpdateNotification(
+        "success",
+        this.t("MODS_UP_TO_DATE") || "Mods up to date",
+        `Updated ${attempted.length} mod${attempted.length === 1 ? "" : "s"}`
+      );
     }
   },
 

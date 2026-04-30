@@ -6,16 +6,31 @@ function encodeCredentials(username, password) {
     return btoa(JSON.stringify({ u: username, p: password }));
 }
 
-async function loadAppForLaunchTest() {
+/**
+ * Loads app.js with a stubbed Tauri shell and returns the App + the
+ * `mod_download_progress` event injector. The default invoke handler
+ * accepts `auto_update_enabled_mods` and `login`; tests override
+ * specific commands by reassigning `commandMap` BEFORE calling
+ * handleLaunchGame.
+ */
+async function loadAppForLaunchTest({ progressEvents = [], commandMap = {} } = {}) {
     vi.resetModules();
 
     globalThis.createRouter = vi.fn(() => ({ navigate: vi.fn() }));
     globalThis.startOAuth = vi.fn();
 
+    let progressHandler = null;
+    const fakeListen = vi.fn(async (event, handler) => {
+        if (event === 'mod_download_progress') {
+            progressHandler = handler;
+        }
+        return () => { progressHandler = null; };
+    });
+
     window.__TAURI__ = {
         core: { invoke: mockInvoke },
         tauri: { invoke: mockInvoke },
-        event: { listen: vi.fn(async () => () => {}) },
+        event: { listen: fakeListen },
         window: { appWindow: { minimize: vi.fn(), close: vi.fn() } },
         dialog: { message: vi.fn(async () => {}), ask: vi.fn(async () => false) },
         shell: { open: vi.fn() },
@@ -43,6 +58,21 @@ async function loadAppForLaunchTest() {
     app.state.isUpdateAvailable = false;
     app.state.isGameLaunching = false;
 
+    const defaultMap = {
+        auto_update_enabled_mods: () => {
+            for (const ev of progressEvents) {
+                if (progressHandler) progressHandler({ payload: ev });
+            }
+            return { attempted: ['classicplus.shinra'], failed_ids: [] };
+        },
+        login: () => JSON.stringify({ Return: { AuthKey: 'auth', UserNo: 1001, CharacterCount: 1 }, Msg: 'success' }),
+    };
+    const merged = { ...defaultMap, ...commandMap };
+    mockInvoke.mockImplementation(async (cmd, args) => {
+        if (cmd in merged) return merged[cmd](args);
+        return null;
+    });
+
     return app;
 }
 
@@ -60,6 +90,7 @@ describe('launch-time mod update gate', () => {
         mockInvoke.mockReset();
         vi.spyOn(console, 'log').mockImplementation(() => {});
         vi.spyOn(console, 'error').mockImplementation(() => {});
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
         localStorage.clear();
         sessionStorage.clear();
         document.body.innerHTML = '';
@@ -71,171 +102,84 @@ describe('launch-time mod update gate', () => {
         vi.restoreAllMocks();
     });
 
-    it('updates enabled outdated installed mods before launching the game', async () => {
-        const catalogMod = {
-            id: 'classicplus.shinra',
-            name: 'Shinra Meter',
-            version: '3.0.6-classicplus',
-        };
-        mockInvoke.mockImplementation(async (cmd) => {
-            if (cmd === 'get_mods_catalog') return { mods: [catalogMod] };
-            if (cmd === 'list_installed_mods') return [{
-                id: 'classicplus.shinra',
-                name: 'Shinra Meter',
-                version: '3.0.5-classicplus',
-                enabled: true,
-                status: 'enabled',
-            }];
-            if (cmd === 'login') return JSON.stringify({ Return: { AuthKey: 'auth', UserNo: 1001, CharacterCount: 1 }, Msg: 'success' });
-            return null;
-        });
-
+    it('delegates the update flow to auto_update_enabled_mods before launching', async () => {
         const app = await loadAppForLaunchTest();
-
         await app.handleLaunchGame();
 
-        const installCall = mockInvoke.mock.calls.find(([cmd]) => cmd === 'install_mod');
-        const launchCall = mockInvoke.mock.calls.find(([cmd]) => cmd === 'handle_launch_game');
-        expect(installCall).toEqual(['install_mod', { entry: catalogMod }]);
-        expect(launchCall).toBeDefined();
-        expect(mockInvoke.mock.calls.findIndex(([cmd]) => cmd === 'install_mod'))
-            .toBeLessThan(mockInvoke.mock.calls.findIndex(([cmd]) => cmd === 'handle_launch_game'));
+        const autoCallIdx = mockInvoke.mock.calls.findIndex(([cmd]) => cmd === 'auto_update_enabled_mods');
+        const launchCallIdx = mockInvoke.mock.calls.findIndex(([cmd]) => cmd === 'handle_launch_game');
+        expect(autoCallIdx).toBeGreaterThanOrEqual(0);
+        expect(launchCallIdx).toBeGreaterThanOrEqual(0);
+        expect(autoCallIdx).toBeLessThan(launchCallIdx);
     });
 
-    it('shows visible feedback while enabled mods update before launch', async () => {
-        const catalogMod = {
-            id: 'classicplus.shinra',
-            name: 'Shinra Meter',
-            version: '3.0.6-classicplus',
-        };
-        mockInvoke.mockImplementation(async (cmd) => {
-            if (cmd === 'get_mods_catalog') return { mods: [catalogMod] };
-            if (cmd === 'list_installed_mods') return [{
-                id: 'classicplus.shinra',
-                name: 'Shinra Meter',
-                version: '3.0.5-classicplus',
-                enabled: true,
-                status: 'enabled',
-            }];
-            if (cmd === 'login') return JSON.stringify({ Return: { AuthKey: 'auth', UserNo: 1001, CharacterCount: 1 }, Msg: 'success' });
-            return null;
-        });
-
+    it('does NOT re-run the JS-side install_mod loop (Rust owns the flow)', async () => {
         const app = await loadAppForLaunchTest();
+        await app.handleLaunchGame();
+        expect(mockInvoke.mock.calls.some(([cmd]) => cmd === 'install_mod')).toBe(false);
+        expect(mockInvoke.mock.calls.some(([cmd]) => cmd === 'list_installed_mods')).toBe(false);
+        expect(mockInvoke.mock.calls.some(([cmd]) => cmd === 'get_mods_catalog')).toBe(false);
+    });
+
+    it('mirrors mod_download_progress events into the update toast', async () => {
+        const app = await loadAppForLaunchTest({
+            progressEvents: [
+                { id: 'classicplus.shinra', progress: 42, state: 'downloading' },
+            ],
+        });
 
         await app.handleLaunchGame();
 
+        const checkingCalls = window.showUpdateNotification.mock.calls.filter(
+            ([state]) => state === 'checking'
+        );
+        expect(checkingCalls.length).toBeGreaterThan(0);
+        const lastChecking = checkingCalls[checkingCalls.length - 1];
+        expect(lastChecking[2]).toContain('classicplus.shinra');
+        expect(lastChecking[2]).toContain('42%');
+    });
+
+    it('does NOT block launch when auto_update_enabled_mods reports partial failures', async () => {
+        const app = await loadAppForLaunchTest({
+            commandMap: {
+                auto_update_enabled_mods: () => ({
+                    attempted: ['classicplus.shinra'],
+                    failed_ids: ['classicplus.shinra'],
+                }),
+            },
+        });
+        await app.handleLaunchGame();
+
+        expect(mockInvoke.mock.calls.some(([cmd]) => cmd === 'handle_launch_game')).toBe(true);
         expect(window.showUpdateNotification).toHaveBeenCalledWith(
-            'checking',
-            'Updating mods before launch',
-            'Shinra Meter (1/1)',
-            true,
+            'warning',
+            expect.any(String),
+            expect.stringContaining('classicplus.shinra'),
         );
     });
 
-    it('opens the downloads dialog while enabled mods update before launch', async () => {
-        const catalogMod = {
-            id: 'classicplus.shinra',
-            name: 'Shinra Meter',
-            version: '3.0.6-classicplus',
-        };
-        mockInvoke.mockImplementation(async (cmd) => {
-            if (cmd === 'get_mods_catalog') return { mods: [catalogMod] };
-            if (cmd === 'list_installed_mods') return [{
-                id: 'classicplus.shinra',
-                name: 'Shinra Meter',
-                version: '3.0.5-classicplus',
-                enabled: true,
-                status: 'enabled',
-            }];
-            if (cmd === 'login') return JSON.stringify({ Return: { AuthKey: 'auth', UserNo: 1001, CharacterCount: 1 }, Msg: 'success' });
-            return null;
+    it('does NOT block launch when the update command itself errors out', async () => {
+        const app = await loadAppForLaunchTest({
+            commandMap: {
+                auto_update_enabled_mods: () => { throw new Error('catalog network down'); },
+            },
         });
-
-        const app = await loadAppForLaunchTest();
-
         await app.handleLaunchGame();
 
-        expect(window.ModsView.open).toHaveBeenCalledTimes(1);
-        expect(window.ModsView.open.mock.invocationCallOrder[0])
-            .toBeLessThan(mockInvoke.mock.invocationCallOrder[mockInvoke.mock.calls.findIndex(([cmd]) => cmd === 'install_mod')]);
-    });
-
-    it('does not update disabled outdated mods before launching the game', async () => {
-        const catalogMod = {
-            id: 'classicplus.shinra',
-            name: 'Shinra Meter',
-            version: '3.0.6-classicplus',
-        };
-        mockInvoke.mockImplementation(async (cmd) => {
-            if (cmd === 'get_mods_catalog') return { mods: [catalogMod] };
-            if (cmd === 'list_installed_mods') return [{
-                id: 'classicplus.shinra',
-                name: 'Shinra Meter',
-                version: '3.0.5-classicplus',
-                enabled: false,
-                status: 'disabled',
-            }];
-            if (cmd === 'login') return JSON.stringify({ Return: { AuthKey: 'auth', UserNo: 1001, CharacterCount: 1 }, Msg: 'success' });
-            return null;
-        });
-
-        const app = await loadAppForLaunchTest();
-
-        await app.handleLaunchGame();
-
-        expect(mockInvoke.mock.calls.some(([cmd]) => cmd === 'install_mod')).toBe(false);
         expect(mockInvoke.mock.calls.some(([cmd]) => cmd === 'handle_launch_game')).toBe(true);
     });
 
-    it('skips installed mods that are no longer present in the catalog before launch', async () => {
-        mockInvoke.mockImplementation(async (cmd) => {
-            if (cmd === 'get_mods_catalog') return { mods: [] };
-            if (cmd === 'list_installed_mods') return [{
-                id: 'classicplus.retired',
-                name: 'Retired Mod',
-                version: '1.0.0',
-                enabled: true,
-                status: 'enabled',
-            }];
-            if (cmd === 'login') return JSON.stringify({ Return: { AuthKey: 'auth', UserNo: 1001, CharacterCount: 1 }, Msg: 'success' });
-            return null;
+    it('skips the success toast when nothing was attempted (no enabled mods needed updating)', async () => {
+        const app = await loadAppForLaunchTest({
+            commandMap: {
+                auto_update_enabled_mods: () => ({ attempted: [], failed_ids: [] }),
+            },
         });
-
-        const app = await loadAppForLaunchTest();
-
         await app.handleLaunchGame();
 
-        expect(window.ModsView.open).not.toHaveBeenCalled();
-        expect(mockInvoke.mock.calls.some(([cmd]) => cmd === 'install_mod')).toBe(false);
-        expect(mockInvoke.mock.calls.some(([cmd]) => cmd === 'handle_launch_game')).toBe(true);
-    });
-
-    it('stops launch when an enabled mod update fails', async () => {
-        const catalogMod = {
-            id: 'classicplus.shinra',
-            name: 'Shinra Meter',
-            version: '3.0.6-classicplus',
-        };
-        mockInvoke.mockImplementation(async (cmd) => {
-            if (cmd === 'get_mods_catalog') return { mods: [catalogMod] };
-            if (cmd === 'list_installed_mods') return [{
-                id: 'classicplus.shinra',
-                name: 'Shinra Meter',
-                version: '3.0.5-classicplus',
-                enabled: true,
-                status: 'enabled',
-            }];
-            if (cmd === 'install_mod') throw new Error('download failed');
-            if (cmd === 'login') return JSON.stringify({ Return: { AuthKey: 'auth', UserNo: 1001, CharacterCount: 1 }, Msg: 'success' });
-            return null;
-        });
-
-        const app = await loadAppForLaunchTest();
-
-        await app.handleLaunchGame();
-
-        expect(mockInvoke.mock.calls.some(([cmd]) => cmd === 'install_mod')).toBe(true);
-        expect(mockInvoke.mock.calls.some(([cmd]) => cmd === 'handle_launch_game')).toBe(false);
+        const successCalls = window.showUpdateNotification.mock.calls.filter(
+            ([state]) => state === 'success'
+        );
+        expect(successCalls.length).toBe(0);
     });
 });

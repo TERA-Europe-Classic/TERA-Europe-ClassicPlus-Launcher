@@ -14,6 +14,8 @@ use std::path::PathBuf;
 use log::info;
 use tauri::Emitter;
 
+use serde::{Deserialize, Serialize};
+
 use crate::services::mods::{
     catalog::{self, CachedCatalog},
     external_app,
@@ -23,6 +25,76 @@ use crate::services::mods::{
     types::{Catalog, CatalogEntry, ModEntry, ModKind, ModStatus},
 };
 use crate::state::mods_state;
+
+/// One row of catalog-vs-installed version mismatch. Returned by
+/// `check_mod_updates` and consumed by `auto_update_enabled_mods`.
+///
+/// `enabled` is the user's intent (registry.enabled flag) — auto-update
+/// only re-installs rows whose `enabled == true`. `current_version` is
+/// what's on disk, `available_version` is what the catalog advertises.
+/// `kind` is included so the frontend can render different copy for
+/// external-app vs GPK updates if it wants to.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ModUpdateInfo {
+    pub id: String,
+    pub kind: ModKind,
+    pub current_version: String,
+    pub available_version: String,
+    pub enabled: bool,
+}
+
+/// Pure version comparator. Strings differ → update available.
+/// Pinned in a helper so the unit tests can exercise it without touching
+/// the registry; v1 keeps it stupid (string equality) since catalog
+/// versions are author-managed labels (e.g. "3.0.9-classicplus") rather
+/// than semver — author bump intent is the trigger, not version math.
+fn versions_differ(installed: &str, catalog: &str) -> bool {
+    let i = installed.trim();
+    let c = catalog.trim();
+    !i.is_empty() && !c.is_empty() && i != c
+}
+
+/// Pure update-detector. Walks installed rows, looks up their catalog
+/// counterpart, returns the diff list and the set of ids whose status
+/// should flip to `UpdateAvailable`. Status flips skip rows that are
+/// mid-flight (`Installing`/`Running`/`Starting`/`Error`) so an in-
+/// progress install isn't visually overridden.
+///
+/// Split out so unit tests can run without the global registry.
+fn detect_updates(installed: &[ModEntry], catalog_mods: &[CatalogEntry]) -> Vec<ModUpdateInfo> {
+    use std::collections::HashMap;
+    let by_id: HashMap<&str, &CatalogEntry> = catalog_mods
+        .iter()
+        .map(|c| (c.id.as_str(), c))
+        .collect();
+
+    installed
+        .iter()
+        .filter_map(|m| {
+            let cat = by_id.get(m.id.as_str())?;
+            if !versions_differ(&m.version, &cat.version) {
+                return None;
+            }
+            Some(ModUpdateInfo {
+                id: m.id.clone(),
+                kind: m.kind,
+                current_version: m.version.clone(),
+                available_version: cat.version.clone(),
+                enabled: m.enabled,
+            })
+        })
+        .collect()
+}
+
+/// Status values whose UpdateAvailable pill must NOT replace the
+/// existing display: a mid-flight install or a live process should keep
+/// its real-time status visible.
+fn should_flip_to_update_available(status: ModStatus) -> bool {
+    !matches!(
+        status,
+        ModStatus::Installing | ModStatus::Running | ModStatus::Starting | ModStatus::Error
+    )
+}
 
 /// Rebuilds the on-disk GPK deploy state to match the registry. Migrates
 /// any registry slots installed by older launcher versions (legacy whole-
@@ -167,6 +239,125 @@ pub async fn get_mods_catalog(force_refresh: Option<bool>) -> Result<Catalog, St
             Err(fetch_err)
         }
     }
+}
+
+/// Force-refreshes the catalog, walks installed mods, returns rows whose
+/// installed version differs from the catalog version. Side effect: any
+/// row whose status is safely flippable (`Disabled`/`Enabled`/`NotInstalled`/
+/// `UpdateAvailable`) is set to `UpdateAvailable` so the next
+/// `list_installed_mods` already reflects the new state.
+///
+/// Called both from the mod-manager open path (decoration only — the
+/// frontend renders the pill) and from the Launch button path
+/// (`auto_update_enabled_mods` consumes the diff list to drive
+/// reinstalls). Emits one `mod_update_available` event per detected
+/// update so any view subscribed to live updates can refresh without
+/// re-querying the list.
+#[tauri::command]
+#[cfg(not(tarpaulin_include))]
+pub async fn check_mod_updates(window: tauri::Window) -> Result<Vec<ModUpdateInfo>, String> {
+    // Force-refresh so a freshly-pushed catalog (e.g. a Shinra release
+    // that just landed) is picked up without waiting on the 24h TTL.
+    let catalog_doc = get_mods_catalog(Some(true)).await?;
+    let installed = mods_state::list_mods()?;
+
+    let updates = detect_updates(&installed, &catalog_doc.mods);
+
+    if !updates.is_empty() {
+        let update_ids: std::collections::HashSet<&str> =
+            updates.iter().map(|u| u.id.as_str()).collect();
+        let _ = mods_state::mutate(|reg| {
+            for slot in reg.mods.iter_mut() {
+                if update_ids.contains(slot.id.as_str())
+                    && should_flip_to_update_available(slot.status)
+                {
+                    slot.status = ModStatus::UpdateAvailable;
+                }
+            }
+            Ok(())
+        });
+    }
+
+    for u in &updates {
+        let _ = window.emit(
+            "mod_update_available",
+            serde_json::json!({
+                "id": u.id,
+                "current_version": u.current_version,
+                "available_version": u.available_version,
+                "enabled": u.enabled,
+            }),
+        );
+    }
+
+    Ok(updates)
+}
+
+/// Result of `auto_update_enabled_mods`. `attempted` is every enabled
+/// mod that had an update queued; `failed_ids` is the subset whose
+/// reinstall returned an error. Empty `failed_ids` means the launch
+/// flow can proceed cleanly. Non-empty does NOT block the caller — the
+/// frontend decides whether to surface a warning or proceed.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AutoUpdateResult {
+    pub attempted: Vec<String>,
+    pub failed_ids: Vec<String>,
+}
+
+/// Launch-button companion: detects updates for enabled mods only,
+/// then reinstalls each via the existing `install_mod` flow so the user
+/// gets the same `mod_download_progress` feedback they'd see clicking
+/// Install in the manager. Disabled mods are skipped — the user has
+/// signalled they don't want them, so spending a download budget on
+/// them is wasteful and surprising.
+///
+/// Failures are collected, not propagated, so the launcher can still
+/// start the game with the last-known-good install. The caller can
+/// surface the failed ids inline if it cares.
+#[tauri::command]
+#[cfg(not(tarpaulin_include))]
+pub async fn auto_update_enabled_mods(
+    window: tauri::Window,
+) -> Result<AutoUpdateResult, String> {
+    let catalog_doc = get_mods_catalog(Some(true)).await?;
+    let installed = mods_state::list_mods()?;
+
+    let updates: Vec<ModUpdateInfo> = detect_updates(&installed, &catalog_doc.mods)
+        .into_iter()
+        .filter(|u| u.enabled)
+        .collect();
+
+    let mut attempted = Vec::with_capacity(updates.len());
+    let mut failed_ids = Vec::new();
+
+    let by_id: std::collections::HashMap<&str, &CatalogEntry> = catalog_doc
+        .mods
+        .iter()
+        .map(|c| (c.id.as_str(), c))
+        .collect();
+
+    for update in updates {
+        let Some(catalog_entry) = by_id.get(update.id.as_str()) else {
+            continue;
+        };
+        attempted.push(update.id.clone());
+        match install_mod((*catalog_entry).clone(), window.clone()).await {
+            Ok(_) => log::info!("auto_update_enabled_mods: updated {}", update.id),
+            Err(err) => {
+                log::warn!(
+                    "auto_update_enabled_mods: failed to update {}: {}",
+                    update.id,
+                    err
+                );
+                failed_ids.push(update.id.clone());
+            }
+        }
+    }
+
+    Ok(AutoUpdateResult {
+        attempted,
+        failed_ids,
+    })
 }
 
 /// Applies the fresh-install defaults to a registry slot: enabled + auto-launch
@@ -1604,5 +1795,222 @@ mod tests {
             "validate_game_root must not call .parent() — see iter-83 bug \
              history. game_path from config_service IS the install root."
         );
+    }
+
+    // --- auto-update on launch / mod-manager open --------------------------
+
+    fn enabled_slot(id: &str, version: &str, kind: ModKind) -> ModEntry {
+        let mut slot = disabled_slot();
+        slot.id = id.into();
+        slot.kind = kind;
+        slot.version = version.into();
+        slot.enabled = true;
+        slot.status = ModStatus::Enabled;
+        slot.last_error = None;
+        slot.progress = None;
+        slot
+    }
+
+    fn catalog_entry(id: &str, version: &str, kind: ModKind) -> CatalogEntry {
+        CatalogEntry {
+            id: id.into(),
+            kind,
+            name: id.into(),
+            author: "test".into(),
+            tagline: None,
+            featured_image: None,
+            before_image: None,
+            tags: vec![],
+            gpk_files: vec![],
+            compatibility_notes: None,
+            last_verified_patch: None,
+            download_count: None,
+            short_description: "".into(),
+            long_description: "".into(),
+            category: "".into(),
+            license: "".into(),
+            credits: "".into(),
+            version: version.into(),
+            download_url: format!("https://example.com/{id}.zip"),
+            sha256: "deadbeef".into(),
+            size_bytes: 0,
+            source_url: None,
+            icon_url: None,
+            screenshots: vec![],
+            executable_relpath: Some(format!("{id}.exe")),
+            auto_launch_default: None,
+            settings_folder: None,
+            target_patch: None,
+            composite_flag: None,
+            compatible_arch: None,
+            updated_at: "".into(),
+        }
+    }
+
+    /// Strict string equality is the contract. Author bumps the version
+    /// label, comparator triggers — no semver math, no parsing.
+    #[test]
+    fn versions_differ_basic_cases() {
+        assert!(versions_differ("3.0.8-classicplus", "3.0.9-classicplus"));
+        assert!(!versions_differ("1.0.0", "1.0.0"));
+    }
+
+    /// Empty/whitespace strings are not actionable — refuse to flag an
+    /// update so we don't reinstall a mod whose registry version got
+    /// truncated by a bad write.
+    #[test]
+    fn versions_differ_skips_empty_or_whitespace() {
+        assert!(!versions_differ("", "1.0.0"));
+        assert!(!versions_differ("1.0.0", ""));
+        assert!(!versions_differ("   ", "1.0.0"));
+        assert!(!versions_differ("1.0.0", "   "));
+    }
+
+    /// Mismatched whitespace shouldn't cause a phantom update — trim
+    /// before compare.
+    #[test]
+    fn versions_differ_ignores_surrounding_whitespace() {
+        assert!(!versions_differ(" 1.0.0 ", "1.0.0"));
+    }
+
+    /// Happy path: a single enabled mod with a newer catalog version
+    /// surfaces as one update entry that carries the kind through.
+    #[test]
+    fn detect_updates_flags_enabled_mod_with_newer_catalog() {
+        let installed = vec![enabled_slot(
+            "classicplus.shinra",
+            "3.0.8-classicplus",
+            ModKind::External,
+        )];
+        let catalog = vec![catalog_entry(
+            "classicplus.shinra",
+            "3.0.9-classicplus",
+            ModKind::External,
+        )];
+
+        let updates = detect_updates(&installed, &catalog);
+        assert_eq!(updates.len(), 1);
+        assert_eq!(updates[0].id, "classicplus.shinra");
+        assert_eq!(updates[0].current_version, "3.0.8-classicplus");
+        assert_eq!(updates[0].available_version, "3.0.9-classicplus");
+        assert_eq!(updates[0].kind, ModKind::External);
+        assert!(updates[0].enabled);
+    }
+
+    /// Same version → no update. Pins the catalog-only-flips-on-bump
+    /// contract that drives the "I just updated, don't redownload"
+    /// behaviour.
+    #[test]
+    fn detect_updates_skips_same_version() {
+        let installed = vec![enabled_slot("a", "1.0.0", ModKind::External)];
+        let catalog = vec![catalog_entry("a", "1.0.0", ModKind::External)];
+        assert!(detect_updates(&installed, &catalog).is_empty());
+    }
+
+    /// A disabled mod with an out-of-date version still appears in the
+    /// diff list — the LIST is "everything that has an update". The
+    /// `enabled` flag is carried through so the auto-update path can
+    /// filter it out without re-querying the registry.
+    #[test]
+    fn detect_updates_includes_disabled_mods_in_diff_list() {
+        let mut installed = enabled_slot("a", "1.0.0", ModKind::External);
+        installed.enabled = false;
+        installed.status = ModStatus::Disabled;
+        let installed = vec![installed];
+        let catalog = vec![catalog_entry("a", "2.0.0", ModKind::External)];
+
+        let updates = detect_updates(&installed, &catalog);
+        assert_eq!(updates.len(), 1);
+        assert!(!updates[0].enabled);
+    }
+
+    /// A mod present in the registry but not the catalog is left alone
+    /// — it might be a local import or a removed catalog entry. We
+    /// can't tell from here, and quietly ignoring is the safest action.
+    #[test]
+    fn detect_updates_ignores_mods_missing_from_catalog() {
+        let installed = vec![enabled_slot("local.aa", "1.0.0", ModKind::Gpk)];
+        let catalog: Vec<CatalogEntry> = vec![];
+        assert!(detect_updates(&installed, &catalog).is_empty());
+    }
+
+    /// New catalog entry that the user hasn't installed yet is not an
+    /// "update" — only installed mods generate update rows.
+    #[test]
+    fn detect_updates_ignores_uninstalled_catalog_entries() {
+        let installed: Vec<ModEntry> = vec![];
+        let catalog = vec![catalog_entry("a", "1.0.0", ModKind::External)];
+        assert!(detect_updates(&installed, &catalog).is_empty());
+    }
+
+    /// A version with no version string in the registry (legacy
+    /// records) doesn't trigger an update — versions_differ refuses
+    /// empty values, so the slot is left to be reconciled by an
+    /// explicit reinstall instead of an auto-clobber.
+    #[test]
+    fn detect_updates_skips_blank_installed_version() {
+        let mut row = enabled_slot("a", "", ModKind::External);
+        row.version = "".into();
+        let installed = vec![row];
+        let catalog = vec![catalog_entry("a", "1.0.0", ModKind::External)];
+        assert!(detect_updates(&installed, &catalog).is_empty());
+    }
+
+    /// Mid-flight statuses keep their real-time display — flipping
+    /// them to UpdateAvailable would visually halt a live download.
+    #[test]
+    fn flip_to_update_available_skips_midflight_statuses() {
+        assert!(!should_flip_to_update_available(ModStatus::Installing));
+        assert!(!should_flip_to_update_available(ModStatus::Running));
+        assert!(!should_flip_to_update_available(ModStatus::Starting));
+        // Error rows hold the user's last failure message; clobbering
+        // them with UpdateAvailable hides the troubleshooting context.
+        assert!(!should_flip_to_update_available(ModStatus::Error));
+    }
+
+    /// Stable rest-states are safe to flip — Disabled, Enabled,
+    /// NotInstalled (browse rows whose registry slot was upserted),
+    /// and the idempotent UpdateAvailable case.
+    #[test]
+    fn flip_to_update_available_allowed_for_stable_states() {
+        assert!(should_flip_to_update_available(ModStatus::Disabled));
+        assert!(should_flip_to_update_available(ModStatus::Enabled));
+        assert!(should_flip_to_update_available(ModStatus::NotInstalled));
+        assert!(should_flip_to_update_available(ModStatus::UpdateAvailable));
+    }
+
+    /// AutoUpdateResult round-trips through serde_json — the frontend
+    /// reads `attempted` and `failed_ids` by name so a rename or
+    /// alias-strip would be a contract break.
+    #[test]
+    fn auto_update_result_serializes_with_expected_field_names() {
+        let r = AutoUpdateResult {
+            attempted: vec!["a".into(), "b".into()],
+            failed_ids: vec!["b".into()],
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        assert!(json.contains("\"attempted\""));
+        assert!(json.contains("\"failed_ids\""));
+        let back: AutoUpdateResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, r);
+    }
+
+    /// ModUpdateInfo round-trips with the keys the frontend reads.
+    /// Keeps the cross-language contract pinned.
+    #[test]
+    fn mod_update_info_serializes_with_expected_field_names() {
+        let info = ModUpdateInfo {
+            id: "a".into(),
+            kind: ModKind::External,
+            current_version: "1.0".into(),
+            available_version: "2.0".into(),
+            enabled: true,
+        };
+        let json = serde_json::to_string(&info).unwrap();
+        assert!(json.contains("\"id\""));
+        assert!(json.contains("\"kind\""));
+        assert!(json.contains("\"current_version\""));
+        assert!(json.contains("\"available_version\""));
+        assert!(json.contains("\"enabled\""));
     }
 }

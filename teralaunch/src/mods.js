@@ -49,6 +49,7 @@ const ModsView = {
             this.bindEvents();
             this._mounted = true;
             await Promise.all([this.loadInstalled(), this.loadCatalog(true)]);
+            await this.runUpdateCheck();
             this.render();
             this.subscribeToProgress();
             if (window.App?.updateAllTranslations) {
@@ -56,6 +57,7 @@ const ModsView = {
             }
         } else {
             await Promise.all([this.loadInstalled(), this.loadCatalog(false)]);
+            await this.runUpdateCheck();
             this.render();
         }
 
@@ -315,6 +317,25 @@ const ModsView = {
             this.state.installed = await modsInvoke('list_installed_mods');
             this.reconcileInstalledFromCatalog();
         } catch (e) { console.error('list_installed_mods failed:', e); this.state.installed = []; }
+    },
+
+    /**
+     * Runs the Rust-side `check_mod_updates` so the registry rows flip to
+     * UpdateAvailable on disk (so they survive a relaunch even if the user
+     * never re-opens the manager). Refreshes the in-memory installed list
+     * after, so the next render picks up the flipped statuses.
+     *
+     * Best-effort — a network failure here doesn't block the manager
+     * from rendering whatever stale catalog state we already had.
+     */
+    async runUpdateCheck() {
+        try {
+            await modsInvoke('check_mod_updates');
+            this.state.installed = await modsInvoke('list_installed_mods');
+            this.reconcileInstalledFromCatalog();
+        } catch (e) {
+            console.warn('check_mod_updates failed:', e);
+        }
     },
 
     async loadCatalog(forceRefresh = false) {

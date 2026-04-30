@@ -426,6 +426,8 @@ fn main() {
             // Mods commands
             commands::mods::list_installed_mods,
             commands::mods::get_mods_catalog,
+            commands::mods::check_mod_updates,
+            commands::mods::auto_update_enabled_mods,
             commands::mods::install_mod,
             commands::mods::add_mod_from_file,
             commands::mods::uninstall_mod,
