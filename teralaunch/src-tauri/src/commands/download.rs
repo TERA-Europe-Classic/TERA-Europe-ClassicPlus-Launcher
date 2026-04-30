@@ -33,15 +33,16 @@ use tokio::task::JoinSet;
 use crate::commands::config::get_game_path;
 use crate::domain::DownloadError;
 use crate::domain::{
-    FileInfo, ProgressPayload, BUFFER_SIZE, BUFWRITER_CAPACITY, CHUNK_MIN_SIZE,
-    CONNECT_TIMEOUT_SECS, HTTP_POOL_MAX_IDLE_PER_HOST, MAX_CONCURRENT_DOWNLOADS, MAX_PARTS,
-    PART_ASSEMBLY_BUFFER_SIZE, PART_SIZE, PROGRESS_UPDATE_MS, STALL_TIMEOUT_SECS,
+    FileHashAlgorithm, FileInfo, FileInstallMode, ProgressPayload, BUFFER_SIZE, BUFWRITER_CAPACITY,
+    CHUNK_MIN_SIZE, CONNECT_TIMEOUT_SECS, HTTP_POOL_MAX_IDLE_PER_HOST, MAX_CONCURRENT_DOWNLOADS,
+    MAX_PARTS, PART_ASSEMBLY_BUFFER_SIZE, PART_SIZE, PROGRESS_UPDATE_MS, STALL_TIMEOUT_SECS,
 };
 use crate::infrastructure::{EventEmitter, HttpClient, HttpResponse};
 use crate::services::download_service;
 use crate::services::download_service::{
     classify_error, DownloadHealth, ErrorClassification, RetryPolicy,
 };
+use crate::services::patch_source;
 use crate::state::{
     add_downloaded_bytes, cancel_download, get_current_file_name, get_download_generation,
     get_downloaded_bytes as state_get_downloaded_bytes, increment_download_generation,
@@ -54,6 +55,7 @@ use crate::utils::{
     is_server_unreachable_error, stall_exceeded, validate_download_url, validate_path_within_base,
     RetryDelays,
 };
+use teralib::config::get_config_value;
 
 /// Guard that ensures DOWNLOAD_IN_PROGRESS is reset when dropped
 struct DownloadGuard;
@@ -422,11 +424,18 @@ pub async fn download_all_files(
                 None => continue,
             };
             let game_path = get_game_path()?;
-            let file_path = game_path.join(&file_info.path);
-            if !file_path.exists() {
+            let file_path =
+                validate_path_within_base(&game_path, &game_path.join(&file_info.path))?;
+            let downloaded_path = validate_path_within_base(
+                &game_path,
+                &game_path.join(download_relative_path(&file_info)),
+            )?;
+            if !downloaded_path.exists() {
                 continue;
             }
             verified_count += 1;
+
+            install_downloaded_file(&file_info, &downloaded_path, &file_path).await?;
 
             // Emit progress for verification
             let _ = window.emit(
@@ -440,6 +449,7 @@ pub async fn download_all_files(
             );
 
             let expected_hash = file_info.hash.clone();
+            let hash_algorithm = file_info.hash_algorithm.clone();
             let file_path_for_size = file_path.clone();
 
             // Retry verification with exponential backoff (handles file locks, antivirus, etc.)
@@ -472,8 +482,11 @@ pub async fn download_all_files(
                 }
 
                 let file_path_clone = file_path.clone();
-                match tokio::task::spawn_blocking(move || calculate_file_hash(&file_path_clone))
-                    .await
+                let hash_algorithm_clone = hash_algorithm.clone();
+                match tokio::task::spawn_blocking(move || {
+                    calculate_file_hash_with_algorithm(&file_path_clone, &hash_algorithm_clone)
+                })
+                .await
                 {
                     Ok(Ok(hash)) => {
                         calc = Some(hash);
@@ -585,10 +598,21 @@ pub async fn download_all_files(
 
                     match redownload_result {
                         Ok(_) => {
+                            if let Err(e) =
+                                install_downloaded_file(&file_info, &downloaded_path, &file_path)
+                                    .await
+                            {
+                                warn!("Failed to install redownloaded {}: {}", file_info.path, e);
+                                continue;
+                            }
                             // Verify hash again after redownload
                             let file_path_verify = file_path.clone();
+                            let hash_algorithm_verify = file_info.hash_algorithm.clone();
                             let verify_hash = tokio::task::spawn_blocking(move || {
-                                calculate_file_hash(&file_path_verify)
+                                calculate_file_hash_with_algorithm(
+                                    &file_path_verify,
+                                    &hash_algorithm_verify,
+                                )
                             })
                             .await
                             .map_err(|e| e.to_string())
@@ -710,7 +734,8 @@ async fn update_file(
     set_current_file_name(file_info.path.clone());
 
     let game_path = get_game_path()?;
-    let file_path = game_path.join(&file_info.path);
+    let download_relative_path = download_relative_path(&file_info);
+    let file_path = game_path.join(download_relative_path);
 
     // Validate that the file path is within the game directory (prevent path traversal)
     let file_path = validate_path_within_base(&game_path, &file_path)?;
@@ -729,9 +754,8 @@ async fn update_file(
         corrected_url = format!("{}{}", &corrected_url[..pos], &corrected_url[(pos + 7)..]);
     }
 
-    // Defense-in-depth: Validate URL domain even though hash.rs also validates
-    // This catches any code paths that bypass hash.rs validation
-    validate_download_url(&corrected_url)?;
+    // Defense-in-depth: validate the URL again because this command can be invoked directly.
+    validate_file_download_url(&file_info, &corrected_url)?;
 
     let file_size = file_info.size;
     let file_info_path = file_info.path.clone();
@@ -795,11 +819,16 @@ async fn update_file(
                 .map_err(|e| e.to_string())?;
 
             // Check for empty response when resume should have content
-            if res.content_length() == Some(0) && (file_size - resume_from) > 0 {
+            let expected_remaining = file_size - resume_from;
+            validate_response_content_length(
+                &file_info.path,
+                expected_remaining,
+                res.content_length(),
+            )?;
+            if res.content_length() == Some(0) && expected_remaining > 0 {
                 return Err(format!(
                     "Server returned empty response for resume on {} (expected {} bytes remaining)",
-                    file_info.path,
-                    file_size - resume_from
+                    file_info.path, expected_remaining
                 ));
             }
 
@@ -823,9 +852,15 @@ async fn update_file(
                         return Err("cancelled".into());
                     }
                     let chunk = chunk_result.map_err(|e| e.to_string())?;
-                    file.write_all(&chunk).await.map_err(|e| e.to_string())?;
                     let len = chunk.len() as u64;
-                    downloaded += len;
+                    let new_downloaded = checked_downloaded_size_after_chunk(
+                        &file_info.path,
+                        expected_remaining,
+                        downloaded,
+                        len,
+                    )?;
+                    file.write_all(&chunk).await.map_err(|e| e.to_string())?;
+                    downloaded = new_downloaded;
                     add_downloaded_bytes(len);
                 }
                 bytes_written = resume_from + downloaded;
@@ -871,6 +906,8 @@ async fn update_file(
                 .error_for_status()
                 .map_err(|e| e.to_string())?;
 
+            validate_response_content_length(&file_info.path, file_size, res.content_length())?;
+
             let mut downloaded: u64 = 0;
             let mut stream = res.bytes_stream();
 
@@ -879,9 +916,15 @@ async fn update_file(
                     return Err("cancelled".into());
                 }
                 let chunk = chunk_result.map_err(|e| e.to_string())?;
-                file.write_all(&chunk).await.map_err(|e| e.to_string())?;
                 let len = chunk.len() as u64;
-                downloaded += len;
+                let new_downloaded = checked_downloaded_size_after_chunk(
+                    &file_info.path,
+                    file_size,
+                    downloaded,
+                    len,
+                )?;
+                file.write_all(&chunk).await.map_err(|e| e.to_string())?;
+                downloaded = new_downloaded;
                 add_downloaded_bytes(len);
             }
             bytes_written = downloaded;
@@ -929,6 +972,11 @@ async fn update_file(
                         .map_err(|e| e.to_string())?;
 
                     // Check for empty response when range should have content - this is an error
+                    validate_response_content_length(
+                        &file_info_path_clone,
+                        expected_part_size,
+                        res.content_length(),
+                    )?;
                     if res.content_length() == Some(0) && expected_part_size > 0 {
                         return Err(format!(
                             "Server returned empty response for range request on {} (expected {} bytes)",
@@ -943,16 +991,23 @@ async fn update_file(
                             .await
                             .map_err(|e| e.to_string())?,
                     );
+                    let mut part_bytes_written: u64 = 0;
                     while let Some(chunk_result) = stream.next().await {
                         if is_download_cancelled() {
                             return Err("cancelled".into());
                         }
                         let chunk = chunk_result.map_err(|e| e.to_string())?;
+                        let len = chunk.len() as u64;
+                        part_bytes_written = checked_downloaded_size_after_chunk(
+                            &file_info_path_clone,
+                            expected_part_size,
+                            part_bytes_written,
+                            len,
+                        )?;
                         part_file
                             .write_all(&chunk)
                             .await
                             .map_err(|e| e.to_string())?;
-                        let len = chunk.len() as u64;
                         add_downloaded_bytes(len);
                     }
 
@@ -1008,6 +1063,8 @@ async fn update_file(
             .error_for_status()
             .map_err(|e| e.to_string())?;
 
+        validate_response_content_length(&file_info.path, file_info.size, res.content_length())?;
+
         // Check for empty response when file should have content - this is an error
         if res.content_length() == Some(0) && file_info.size > 0 {
             return Err(format!(
@@ -1024,9 +1081,15 @@ async fn update_file(
                 return Err("cancelled".into());
             }
             let chunk = chunk_result.map_err(|e| e.to_string())?;
-            file.write_all(&chunk).await.map_err(|e| e.to_string())?;
             let len = chunk.len() as u64;
-            downloaded += len;
+            let new_downloaded = checked_downloaded_size_after_chunk(
+                &file_info.path,
+                file_info.size,
+                downloaded,
+                len,
+            )?;
+            file.write_all(&chunk).await.map_err(|e| e.to_string())?;
+            downloaded = new_downloaded;
             add_downloaded_bytes(len);
         }
         bytes_written = downloaded;
@@ -1465,6 +1528,110 @@ fn compute_initial_downloaded(files: &[FileInfo], resume_override: Option<u64>) 
     download_service::compute_initial_downloaded(files, resume_override)
 }
 
+fn download_relative_path(file_info: &FileInfo) -> &str {
+    file_info
+        .download_path
+        .as_deref()
+        .unwrap_or(file_info.path.as_str())
+}
+
+fn validate_file_download_url(file_info: &FileInfo, url: &str) -> Result<(), String> {
+    if file_info.install_mode == FileInstallMode::LzmaCab {
+        let patch_base_url = patch_source::v100_patch_base_url(
+            &get_config_value("V100_PATCH_BASE_URL"),
+            &get_config_value("API_BASE_URL"),
+        );
+        patch_source::validate_v100_patch_url(url, &patch_base_url)
+    } else {
+        validate_download_url(url)
+    }
+}
+
+fn validate_response_content_length(
+    file_path: &str,
+    expected_size: u64,
+    content_length: Option<u64>,
+) -> Result<(), String> {
+    if let Some(actual_size) = content_length {
+        if actual_size > expected_size {
+            return Err(format!(
+                "Download size exceeds expected size for {}: expected at most {} bytes but server declared {} bytes",
+                file_path, expected_size, actual_size
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn checked_downloaded_size_after_chunk(
+    file_path: &str,
+    expected_size: u64,
+    bytes_downloaded: u64,
+    chunk_size: u64,
+) -> Result<u64, String> {
+    let new_size = bytes_downloaded.checked_add(chunk_size).ok_or_else(|| {
+        format!(
+            "Download size overflow for {} while enforcing expected size {} bytes",
+            file_path, expected_size
+        )
+    })?;
+
+    if new_size > expected_size {
+        return Err(format!(
+            "Download size exceeds expected size for {}: expected at most {} bytes but received at least {} bytes",
+            file_path, expected_size, new_size
+        ));
+    }
+
+    Ok(new_size)
+}
+
+async fn install_downloaded_file(
+    file_info: &FileInfo,
+    downloaded_path: &Path,
+    final_path: &Path,
+) -> Result<(), String> {
+    match file_info.install_mode {
+        FileInstallMode::Direct => Ok(()),
+        FileInstallMode::LzmaCab => {
+            let input = downloaded_path.to_path_buf();
+            let output = final_path.to_path_buf();
+            let output_limit = file_info.output_size;
+            tokio::task::spawn_blocking(move || {
+                patch_source::decompress_lzma_file_to_path_with_limit(&input, &output, output_limit)
+            })
+            .await
+            .map_err(|e| format!("v100 LZMA install task failed: {}", e))??;
+
+            if let Some(expected_size) = file_info.output_size {
+                let actual_size = tokio::fs::metadata(final_path)
+                    .await
+                    .map_err(|e| format!("Failed to read installed file metadata: {}", e))?
+                    .len();
+                if actual_size != expected_size {
+                    return Err(format!(
+                        "Installed size mismatch for {}: expected {} bytes but got {} bytes",
+                        file_info.path, expected_size, actual_size
+                    ));
+                }
+            }
+            Ok(())
+        }
+    }
+}
+
+#[cfg(not(tarpaulin_include))]
+fn calculate_file_hash_with_algorithm(
+    path: &Path,
+    algorithm: &FileHashAlgorithm,
+) -> Result<String, String> {
+    match algorithm {
+        FileHashAlgorithm::Sha256 => calculate_file_hash(path),
+        FileHashAlgorithm::Md5 => patch_source::md5_file_hex(path),
+    }
+}
+
 /// Calculates the SHA-256 hash of a file with retry on file access errors.
 ///
 /// On Windows, files may be briefly locked by other processes (antivirus, etc.)
@@ -1534,6 +1701,66 @@ mod tests {
     }
 
     #[test]
+    fn download_relative_path_prefers_v100_staging_path() {
+        let file = FileInfo {
+            path: "S1Game/S1Data/DataCenter_Final_EUR.dat".to_string(),
+            hash: "hash".to_string(),
+            size: 10,
+            url: "http://157.90.107.2:8090/public/patch/patch/1-1.cab".to_string(),
+            download_path: Some("$Patch/v100/patch/1-1.cab".to_string()),
+            install_mode: FileInstallMode::LzmaCab,
+            hash_algorithm: FileHashAlgorithm::Md5,
+            ..FileInfo::default()
+        };
+
+        assert_eq!(download_relative_path(&file), "$Patch/v100/patch/1-1.cab");
+    }
+
+    #[test]
+    fn validate_file_download_url_allows_configured_v100_http_patch_host() {
+        let file = FileInfo {
+            path: "S1Game/S1Data/DataCenter_Final_EUR.dat".to_string(),
+            hash: "hash".to_string(),
+            size: 10,
+            url: "http://157.90.107.2:8090/public/patch/patch/1-1.cab".to_string(),
+            download_path: Some("$Patch/v100/patch/1-1.cab".to_string()),
+            install_mode: FileInstallMode::LzmaCab,
+            hash_algorithm: FileHashAlgorithm::Md5,
+            ..FileInfo::default()
+        };
+
+        assert!(validate_file_download_url(&file, &file.url).is_ok());
+        assert!(validate_file_download_url(
+            &file,
+            "http://157.90.107.2:8090/not-public/patch/1-1.cab"
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn validate_response_content_length_rejects_declared_oversize() {
+        let result = validate_response_content_length("$Patch/v100/patch/1-1.cab", 10, Some(11));
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("server declared 11 bytes"));
+    }
+
+    #[test]
+    fn checked_downloaded_size_after_chunk_rejects_streamed_oversize_before_write() {
+        let result = checked_downloaded_size_after_chunk("$Patch/v100/patch/1-1.cab", 10, 8, 3);
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("received at least 11 bytes"));
+    }
+
+    #[test]
+    fn checked_downloaded_size_after_chunk_accepts_exact_expected_size() {
+        let result = checked_downloaded_size_after_chunk("$Patch/v100/patch/1-1.cab", 10, 8, 2);
+
+        assert_eq!(result.unwrap(), 10);
+    }
+
+    #[test]
     fn compute_initial_downloaded_empty_files_array() {
         let files: Vec<FileInfo> = vec![];
         assert_eq!(compute_initial_downloaded(&files, None), 0);
@@ -1549,6 +1776,7 @@ mod tests {
                 size: 100,
                 url: "u".to_string(),
                 existing_size: 50,
+                ..FileInfo::default()
             },
             FileInfo {
                 path: "b".to_string(),
@@ -1556,6 +1784,7 @@ mod tests {
                 size: 200,
                 url: "u".to_string(),
                 existing_size: 100,
+                ..FileInfo::default()
             },
         ];
         // Sum of resume_offsets: 50 + 100 = 150
@@ -1570,6 +1799,7 @@ mod tests {
             size: 100,
             url: "u".to_string(),
             existing_size: 80,
+            ..FileInfo::default()
         }];
         // Existing is 80, override is 50, so we use existing (80)
         assert_eq!(compute_initial_downloaded(&files, Some(50)), 80);
@@ -1583,6 +1813,7 @@ mod tests {
             size: 50,
             url: "u".to_string(),
             existing_size: 0,
+            ..FileInfo::default()
         }];
         // Override 100 exceeds total_size 50, should be clamped
         assert_eq!(compute_initial_downloaded(&files, Some(100)), 50);
@@ -2248,6 +2479,7 @@ mod tests {
             size: 100,
             url: "u".to_string(),
             existing_size: 30,
+            ..FileInfo::default()
         }];
         // Override 80 is greater than existing (30), so use override
         assert_eq!(compute_initial_downloaded(&files, Some(80)), 80);
