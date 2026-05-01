@@ -11,12 +11,16 @@
 //! ([`catalog`]) and the on-disk registry of installed mods ([`registry`]).
 
 pub mod catalog;
+#[cfg(test)]
+pub mod catalog_audit;
 pub mod composite_extract;
+pub mod dds;
 pub mod external_app;
 pub mod gpk;
 pub mod gpk_package;
 pub mod gpk_patch_applier;
 pub mod gpk_patch_deploy;
+pub mod gpk_resource_inspector;
 pub mod manifest_store;
 pub mod patch_derivation;
 pub mod patch_manifest;
