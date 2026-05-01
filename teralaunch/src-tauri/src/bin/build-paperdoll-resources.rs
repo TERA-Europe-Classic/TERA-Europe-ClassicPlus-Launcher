@@ -109,10 +109,16 @@ fn process_dir(
         *idx += 1;
         let composite_uid = format!("{uid_prefix}_{:04x}", *idx);
         let composite_filename = format!("{filename_prefix}_{:04x}", *idx);
-        let composite_object_path = format!("{composite_uid}.{texture_name}_dup");
+        // The texture export's object_name MUST equal the part-after-dot of the
+        // composite_object_path, otherwise engine-side hierarchical lookup
+        // fails silently. Vanilla v100 composite slices follow this convention
+        // (e.g. composite_object_path "<uid>.PaperDoll_I147_dup" pairs with
+        // texture object_name "PaperDoll_I147_dup"). We append "_dup" here.
+        let texture_object_name = format!("{texture_name}_dup");
+        let composite_object_path = format!("{composite_uid}.{texture_object_name}");
 
         let gpk_bytes = composite_author::author_composite_slice(
-            &dds, &texture_name, parent_package, &composite_object_path,
+            &dds, &texture_object_name, parent_package, &composite_object_path,
         ).map_err(|e| format!("author {}: {e}", path.display()))?;
 
         let out_path = staging.join(format!("{composite_filename}.gpk"));
