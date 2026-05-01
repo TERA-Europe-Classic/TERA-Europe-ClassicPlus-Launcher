@@ -70,6 +70,8 @@ pub fn parse_dds(bytes: &[u8]) -> Result<DdsImage, String> {
     }
     let fourcc = &bytes[PIXEL_FORMAT_OFFSET + 8..PIXEL_FORMAT_OFFSET + 12];
 
+    // 4x4 block sizes per S3TC: DXT1 = 8B (color only),
+    // DXT3/5 = 16B (8B alpha + 8B color).
     let (format, block_bytes) = match fourcc {
         b"DXT1" => (DdsPixelFormat::Dxt1, 8usize),
         b"DXT3" => (DdsPixelFormat::Dxt3, 16usize),
@@ -159,6 +161,15 @@ mod tests {
         let bytes = build_synthetic_dds(8, 8, b"DXT5", &pixels);
         let dds = parse_dds(&bytes).unwrap();
         assert_eq!(dds.format, DdsPixelFormat::Dxt5);
+        assert_eq!(dds.mips[0], pixels);
+    }
+
+    #[test]
+    fn parses_dxt3_dds() {
+        let pixels = vec![0xCCu8; 64]; // 8x8 DXT3 = 16 bytes per 4x4 block * 4 blocks = 64 bytes
+        let bytes = build_synthetic_dds(8, 8, b"DXT3", &pixels);
+        let dds = parse_dds(&bytes).unwrap();
+        assert_eq!(dds.format, DdsPixelFormat::Dxt3);
         assert_eq!(dds.mips[0], pixels);
     }
 
