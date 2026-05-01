@@ -23,6 +23,7 @@ pub mod gpk_patch_applier;
 pub mod gpk_patch_deploy;
 pub mod gpk_resource_inspector;
 pub mod manifest_store;
+pub mod mapper_extend;
 pub mod patch_derivation;
 pub mod patch_manifest;
 pub mod registry;
