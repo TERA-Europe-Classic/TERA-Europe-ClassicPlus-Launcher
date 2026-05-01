@@ -23,7 +23,7 @@ use std::path::{Path, PathBuf};
 /// Magic footer at the end of a `.gpk` mod file that carries metadata
 /// TMM writes. Without it the file is treated as raw game content and
 /// can't be installed.
-const PACKAGE_MAGIC: u32 = 0x9E2A83C1;
+pub(crate) const PACKAGE_MAGIC: u32 = 0x9E2A83C1;
 
 /// Folder-name prefix TMM writes into a mod's CompositePackage folder
 /// name. The real object path begins immediately after `MOD:`.
@@ -137,6 +137,17 @@ pub struct MapperEntry {
 /// Each `?...!` block is one composite filename. Each `|`-separated cell
 /// inside is one (objectPath, compositeName, offset, size) entry.
 pub fn parse_mapper(decrypted: &str) -> HashMap<String, MapperEntry> {
+    parse_mapper_impl(decrypted, false).unwrap_or_default()
+}
+
+pub fn parse_mapper_strict(decrypted: &str) -> Result<HashMap<String, MapperEntry>, String> {
+    parse_mapper_impl(decrypted, true)
+}
+
+fn parse_mapper_impl(
+    decrypted: &str,
+    strict_numbers: bool,
+) -> Result<HashMap<String, MapperEntry>, String> {
     let mut out = HashMap::new();
     let bytes = decrypted.as_bytes();
     let mut pos_end = 0usize;
@@ -176,12 +187,15 @@ pub fn parse_mapper(decrypted: &str) -> HashMap<String, MapperEntry> {
             let size_s = &decrypted[pos..c4];
             pos = c4 + 1;
 
+            let offset = parse_mapper_i64(offset_s, "offset", composite_name, strict_numbers)?;
+            let size = parse_mapper_i64(size_s, "size", composite_name, strict_numbers)?;
+
             let entry = MapperEntry {
                 filename: filename.clone(),
                 object_path: object_path.to_string(),
                 composite_name: composite_name.to_string(),
-                offset: offset_s.parse::<i64>().unwrap_or(0),
-                size: size_s.parse::<i64>().unwrap_or(0),
+                offset,
+                size,
             };
             out.insert(entry.composite_name.clone(), entry);
 
@@ -205,7 +219,25 @@ pub fn parse_mapper(decrypted: &str) -> HashMap<String, MapperEntry> {
         }
         pos_end = bang + 1;
     }
-    out
+    Ok(out)
+}
+
+fn parse_mapper_i64(
+    value: &str,
+    field: &str,
+    composite_name: &str,
+    strict: bool,
+) -> Result<i64, String> {
+    match value.parse::<i64>() {
+        Ok(parsed) if !strict || parsed >= 0 => Ok(parsed),
+        Ok(parsed) => Err(format!(
+            "invalid {field} '{parsed}' for composite '{composite_name}'"
+        )),
+        Err(_) if strict => Err(format!(
+            "invalid {field} '{value}' for composite '{composite_name}'"
+        )),
+        Err(_) => Ok(0),
+    }
 }
 
 fn find_from(hay: &[u8], needle: u8, from: usize) -> Option<usize> {
@@ -587,6 +619,7 @@ fn parse_composite_package(bytes: &[u8], off: usize) -> Result<ModPackage, Strin
         ..Default::default()
     };
     let folder = read_prefixed_string(bytes, off + 12)?;
+    let folder = folder.trim_end_matches('\0');
     if let Some(stripped) = folder.strip_prefix(MOD_PREFIX) {
         p.object_path = stripped.to_string();
     }
@@ -726,7 +759,14 @@ pub fn restore_clean_mapper_state(game_root: &Path) -> Result<(), String> {
     let clean = backup_path(game_root);
     let current = mapper_path(game_root);
     if clean.exists() {
-        fs::copy(&clean, &current).map_err(|e| {
+        let bytes = fs::read(&clean).map_err(|e| {
+            format!(
+                "Failed to read clean CompositePackageMapper.dat backup {}: {}",
+                clean.display(),
+                e
+            )
+        })?;
+        write_atomic_file(&current, &bytes).map_err(|e| {
             format!(
                 "Failed to restore CompositePackageMapper.dat from clean backup: {}",
                 e
@@ -742,7 +782,7 @@ fn restore_clean_pkg_mapper_state(game_root: &Path) -> Result<(), String> {
     let clean = pkg_mapper_backup_path(game_root);
     let current = pkg_mapper_path(game_root);
     if clean.exists() {
-        fs::copy(&clean, &current)
+        copy_atomic(&clean, &current)
             .map_err(|e| format!("Failed to restore PkgMapper.dat from clean backup: {}", e))?;
     } else if current.exists() {
         ensure_pkg_mapper_backup(game_root)?;
@@ -750,9 +790,107 @@ fn restore_clean_pkg_mapper_state(game_root: &Path) -> Result<(), String> {
     Ok(())
 }
 
-pub fn rebuild_gpk_state(game_root: &Path, items: &[RebuildItem]) -> Result<(), String> {
+pub fn restore_clean_gpk_state(game_root: &Path) -> Result<(), String> {
+    restore_vanilla_gpk_backups(game_root)?;
     restore_clean_mapper_state(game_root)?;
     restore_clean_pkg_mapper_state(game_root)?;
+    Ok(())
+}
+
+fn restore_vanilla_gpk_backups(game_root: &Path) -> Result<usize, String> {
+    let cooked_pc = game_root.join(COOKED_PC_DIR);
+    if !cooked_pc.exists() {
+        return Ok(0);
+    }
+
+    restore_vanilla_gpk_backups_in_dir(&cooked_pc)
+}
+
+fn restore_vanilla_gpk_backups_in_dir(dir: &Path) -> Result<usize, String> {
+    let mut restored = 0usize;
+    let entries =
+        fs::read_dir(dir).map_err(|e| format!("Failed to list GPK dir {}: {e}", dir.display()))?;
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("Failed to read GPK dir entry: {e}"))?;
+        let path = entry.path();
+        if path.is_dir() {
+            restored += restore_vanilla_gpk_backups_in_dir(&path)?;
+            continue;
+        }
+        if !path.is_file() {
+            continue;
+        }
+        let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        let Some(target_name) = file_name.strip_suffix(".vanilla-bak") else {
+            continue;
+        };
+        if !target_name.ends_with(".gpk") || !is_safe_gpk_container_filename(target_name) {
+            continue;
+        }
+        let target_path = path
+            .parent()
+            .ok_or_else(|| format!("Backup path has no parent: {}", path.display()))?
+            .join(target_name);
+        copy_atomic(&path, &target_path).map_err(|e| {
+            format!(
+                "Failed to restore vanilla GPK {} from {}: {e}",
+                target_path.display(),
+                path.display()
+            )
+        })?;
+        restored += 1;
+    }
+    Ok(restored)
+}
+
+pub(crate) fn copy_atomic(src: &Path, dst: &Path) -> Result<(), String> {
+    let bytes = fs::read(src).map_err(|e| format!("Failed to read {}: {e}", src.display()))?;
+    write_atomic_file(dst, &bytes)
+}
+
+pub(crate) fn write_atomic_file(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    let tmp = path.with_extension("tmp");
+    fs::write(&tmp, bytes).map_err(|e| format!("Failed to write tmp {}: {e}", tmp.display()))?;
+    replace_file(&tmp, path).map_err(|e| {
+        let _ = fs::remove_file(&tmp);
+        format!(
+            "Failed to commit tmp {} to {}: {e}",
+            tmp.display(),
+            path.display()
+        )
+    })
+}
+
+#[cfg(windows)]
+fn replace_file(src: &Path, dst: &Path) -> std::io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+    use winapi::um::winbase::{MoveFileExW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH};
+
+    let src_wide: Vec<u16> = src.as_os_str().encode_wide().chain(Some(0)).collect();
+    let dst_wide: Vec<u16> = dst.as_os_str().encode_wide().chain(Some(0)).collect();
+    let ok = unsafe {
+        MoveFileExW(
+            src_wide.as_ptr(),
+            dst_wide.as_ptr(),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+        )
+    };
+    if ok == 0 {
+        Err(std::io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
+}
+
+#[cfg(not(windows))]
+fn replace_file(src: &Path, dst: &Path) -> std::io::Result<()> {
+    fs::rename(src, dst)
+}
+
+pub fn rebuild_gpk_state(game_root: &Path, items: &[RebuildItem]) -> Result<(), String> {
+    restore_clean_gpk_state(game_root)?;
 
     // First clean up every launcher-managed legacy drop-in so reapplication
     // starts from a vanilla baseline. Composite mods are safe to leave on disk
@@ -957,80 +1095,6 @@ pub fn ensure_backup(game_root: &Path) -> Result<(), String> {
     }
     fs::copy(&src, &dst).map_err(|e| format!("Failed to back up mapper: {}", e))?;
     Ok(())
-}
-
-/// Repoints every composite-mapper entry whose `object_path` ends in
-/// `.<folder_name>` (or matches `<folder_name>` exactly) at a standalone
-/// `<folder_name>.gpk` of size `file_size` at offset 0 in CookedPC. Adds
-/// the `TMM_MARKER` so downstream tooling can tell the mapper has been
-/// touched.
-///
-/// Used by the patch-based deploy flow (`gpk_patch_deploy`) after writing
-/// the patched-from-vanilla bytes to CookedPC. Independent from
-/// `install_legacy_gpk` which does the same redirect from inside the
-/// legacy whole-file-copy install path.
-///
-/// Returns the number of mapper entries that were rewritten. A zero return
-/// means no composite entry pointed at this package — the caller can
-/// decide whether that's an error (no-op deploy) or fine (mod is purely
-/// PkgMapper.dat-driven, see `install_legacy_gpk`'s standalone fallback).
-pub fn redirect_mapper_to_standalone(
-    game_root: &Path,
-    folder_name: &str,
-    file_size: i64,
-) -> Result<usize, String> {
-    if !is_safe_gpk_container_filename(&format!("{folder_name}.gpk")) {
-        return Err(format!(
-            "Refusing to redirect mapper: package name '{folder_name}' would produce an unsafe CookedPC filename"
-        ));
-    }
-
-    ensure_backup(game_root)?;
-
-    let mapper_bytes =
-        fs::read(mapper_path(game_root)).map_err(|e| format!("Failed to read mapper: {e}"))?;
-    let decrypted = decrypt_mapper(&mapper_bytes);
-    let decrypted_str = String::from_utf8_lossy(&decrypted).to_string();
-    let mut map = parse_mapper(&decrypted_str);
-
-    let suffix = format!(".{folder_name}");
-    let target_filename = format!("{folder_name}.gpk");
-    let mut rewritten = 0usize;
-    for entry in map.values_mut() {
-        if entry.object_path.eq_ignore_ascii_case(folder_name)
-            || entry
-                .object_path
-                .to_ascii_lowercase()
-                .ends_with(&suffix.to_ascii_lowercase())
-        {
-            entry.filename = target_filename.clone();
-            entry.offset = 0;
-            entry.size = file_size;
-            rewritten += 1;
-        }
-    }
-
-    if rewritten == 0 {
-        return Ok(0);
-    }
-
-    map.insert(
-        TMM_MARKER.into(),
-        MapperEntry {
-            filename: TMM_MARKER.into(),
-            object_path: TMM_MARKER.into(),
-            composite_name: TMM_MARKER.into(),
-            offset: 0,
-            size: 0,
-        },
-    );
-
-    let serialized = serialize_mapper(&map);
-    let encrypted = encrypt_mapper(serialized.as_bytes());
-    fs::write(mapper_path(game_root), &encrypted)
-        .map_err(|e| format!("Failed to write patched mapper: {e}"))?;
-
-    Ok(rewritten)
 }
 
 /// Validates that a TMM container filename from an untrusted `.gpk` is a
@@ -1538,6 +1602,25 @@ mod tests {
         let s = serialize_mapper(&map);
         let map2 = parse_mapper(&s);
         assert_eq!(map, map2);
+    }
+
+    #[test]
+    fn strict_mapper_parse_rejects_invalid_numeric_fields() {
+        let bad_offset = "A.gpk?Obj1,Comp1,not-a-number,200,|!";
+        let bad_size = "A.gpk?Obj1,Comp1,100,not-a-number,|!";
+
+        assert!(
+            parse_mapper_strict(bad_offset)
+                .unwrap_err()
+                .contains("invalid offset"),
+            "strict parser must not silently coerce an invalid offset to zero"
+        );
+        assert!(
+            parse_mapper_strict(bad_size)
+                .unwrap_err()
+                .contains("invalid size"),
+            "strict parser must not silently coerce an invalid size to zero"
+        );
     }
 
     #[test]
@@ -2310,6 +2393,21 @@ mod tests {
         );
     }
 
+    #[test]
+    fn composite_package_folder_trims_gpk_null_terminator() {
+        let mut bytes = v1_fixture();
+        let replacement = "MOD:SomeObject\0";
+        let folder_offset = 28usize;
+        bytes[folder_offset..folder_offset + 4]
+            .copy_from_slice(&(replacement.len() as i32).to_le_bytes());
+        bytes[folder_offset + 4..folder_offset + 4 + replacement.len()]
+            .copy_from_slice(replacement.as_bytes());
+
+        let parsed = parse_composite_package(&bytes, 16).expect("parse package");
+
+        assert_eq!(parsed.object_path, "SomeObject");
+    }
+
     /// Regression guard: if `v1_fixture()` itself drifts, this test
     /// would silently change what we're pinning. Cross-check the
     /// fixture length + a few interior bytes.
@@ -2983,6 +3081,74 @@ mod tests {
         assert!(
             !cooked.join("S1UI_Chat.gpk").exists(),
             "modded file must be removed when no backup to restore"
+        );
+    }
+
+    #[test]
+    fn restore_clean_gpk_state_restores_mappers_and_backed_up_containers() {
+        let tmp = TempDir::new().unwrap();
+        let game_root = tmp.path();
+        let cooked = game_root.join(COOKED_PC_DIR);
+        fs::create_dir_all(&cooked).unwrap();
+
+        let clean_mapper = mapper_with(&[("Comp", "Obj.Package", "S1Common.gpk")]);
+        let dirty_mapper = mapper_with(&[("Comp", "Obj.Package", "Modded.gpk")]);
+        fs::write(
+            cooked.join(BACKUP_FILE),
+            encrypt_mapper(serialize_mapper(&clean_mapper).as_bytes()),
+        )
+        .unwrap();
+        fs::write(
+            cooked.join(MAPPER_FILE),
+            encrypt_mapper(serialize_mapper(&dirty_mapper).as_bytes()),
+        )
+        .unwrap();
+
+        let clean_pkg_mapper = pkg_mapper_text(&[("Obj.Package", "Comp.Package")]);
+        let dirty_pkg_mapper = pkg_mapper_text(&[("Obj.Package", "Dirty.Package")]);
+        fs::write(
+            cooked.join(PKG_MAPPER_BACKUP_FILE),
+            encrypt_mapper(clean_pkg_mapper.as_bytes()),
+        )
+        .unwrap();
+        fs::write(
+            cooked.join(PKG_MAPPER_FILE),
+            encrypt_mapper(dirty_pkg_mapper.as_bytes()),
+        )
+        .unwrap();
+
+        fs::write(cooked.join("S1Common.gpk"), b"TRUNCATED-MODDED").unwrap();
+        fs::write(cooked.join("S1Common.gpk.vanilla-bak"), b"FULL-VANILLA").unwrap();
+        let nested = cooked.join("Art_Data").join("Packages").join("S1UI");
+        fs::create_dir_all(&nested).unwrap();
+        fs::write(nested.join("S1UI_PaperDoll.gpk"), b"NESTED-MODDED").unwrap();
+        fs::write(
+            nested.join("S1UI_PaperDoll.gpk.vanilla-bak"),
+            b"NESTED-VANILLA",
+        )
+        .unwrap();
+
+        restore_clean_gpk_state(game_root).expect("clean GPK restore must succeed");
+
+        assert_eq!(
+            fs::read(cooked.join("S1Common.gpk")).unwrap(),
+            b"FULL-VANILLA",
+            "container bytes must be restored before clean mapper offsets are trusted"
+        );
+        assert_eq!(
+            fs::read(nested.join("S1UI_PaperDoll.gpk")).unwrap(),
+            b"NESTED-VANILLA",
+            "nested standalone GPK backups under CookedPC must also be restored"
+        );
+        assert_eq!(
+            fs::read(cooked.join(MAPPER_FILE)).unwrap(),
+            fs::read(cooked.join(BACKUP_FILE)).unwrap(),
+            "composite mapper must match clean backup"
+        );
+        assert_eq!(
+            fs::read(cooked.join(PKG_MAPPER_FILE)).unwrap(),
+            fs::read(cooked.join(PKG_MAPPER_BACKUP_FILE)).unwrap(),
+            "package mapper must match clean backup"
         );
     }
 

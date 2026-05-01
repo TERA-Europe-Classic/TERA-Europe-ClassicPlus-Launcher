@@ -28,6 +28,7 @@ pub mod patch_derivation;
 pub mod patch_manifest;
 pub mod registry;
 pub mod texture_encoder;
+pub mod tmm_wrap;
 pub mod types;
 pub mod vanilla_resolver;
 
