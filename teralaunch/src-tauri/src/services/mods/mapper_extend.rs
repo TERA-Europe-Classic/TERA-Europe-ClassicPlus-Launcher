@@ -37,20 +37,48 @@ pub fn extend_mappers(game_root: &Path, additions: &[MapperAddition]) -> Result<
         ));
     }
 
-    // PkgMapper: append "<logical>,<composite_object_path>|" if not already present.
+    // PkgMapper: REPLACE any existing row with the same logical_path, then append ours.
+    // TERA's engine uses first-match resolution; an appended override is silently
+    // shadowed by an existing vanilla row. Removing the conflicting row first
+    // lets our override take effect.
     let pm_path = cooked.join(gpk::PKG_MAPPER_FILE);
     let pm_enc = std::fs::read(&pm_path).map_err(|e| format!("read PkgMapper: {e}"))?;
-    let mut pm_text = String::from_utf8_lossy(&gpk::decrypt_mapper(&pm_enc)).to_string();
+    let pm_text = String::from_utf8_lossy(&gpk::decrypt_mapper(&pm_enc)).to_string();
     let mut pm_dirty = false;
+    let mut rows: Vec<String> = pm_text
+        .split('|')
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect();
     for add in additions {
-        let row = format!("{},{}|", add.logical_path, add.composite_object_path);
-        if !pm_text.contains(&row) {
-            pm_text.push_str(&row);
+        let key_prefix = format!("{},", add.logical_path);
+        let new_row = format!("{},{}", add.logical_path, add.composite_object_path);
+        let existed_with_same_target = rows.iter().any(|r| *r == new_row);
+        let any_with_same_key = rows.iter().any(|r| r.starts_with(&key_prefix));
+        if existed_with_same_target {
+            // Already present and pointing where we want; ensure no other row with
+            // the same key shadows it (defensive).
+            let before = rows.len();
+            rows.retain(|r| *r == new_row || !r.starts_with(&key_prefix));
+            if rows.len() != before {
+                pm_dirty = true;
+            }
+            continue;
+        }
+        if any_with_same_key {
+            rows.retain(|r| !r.starts_with(&key_prefix));
             pm_dirty = true;
         }
+        rows.push(new_row);
+        pm_dirty = true;
     }
     if pm_dirty {
-        let pm_new = gpk::encrypt_mapper(pm_text.as_bytes());
+        let mut new_text = String::with_capacity(pm_text.len() + 256);
+        for r in &rows {
+            new_text.push_str(r);
+            new_text.push('|');
+        }
+        let pm_new = gpk::encrypt_mapper(new_text.as_bytes());
         gpk::write_atomic_file(&pm_path, &pm_new)?;
     }
 
@@ -231,5 +259,74 @@ mod tests {
         let tmp = tempfile::TempDir::new().unwrap();
         let err = extend_mappers(tmp.path(), &[]).unwrap_err();
         assert!(err.contains("CookedPC"), "got: {err}");
+    }
+
+    /// Critical regression: TERA's engine uses first-match in PkgMapper. If a
+    /// vanilla row with the same logical_path already exists, our APPENDED
+    /// override is silently shadowed. extend_mappers must REPLACE such rows.
+    #[test]
+    fn replaces_existing_pkgmapper_row_with_same_logical_path() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let cooked = tmp.path().join("S1Game/CookedPC");
+        std::fs::create_dir_all(&cooked).unwrap();
+        // Seed a vanilla-shaped row that would shadow our override.
+        let pkg_text =
+            "S1UI_Other.Other,uid_other.Other_dup|S1UIRES_Component.Component_I35A,vanilla_uid.Component_I35A_dup|";
+        let comp_text = "uid_other?uid_other.Other_dup,uid_other,0,100,|!";
+        std::fs::write(
+            cooked.join("PkgMapper.dat"),
+            gpk::encrypt_mapper(pkg_text.as_bytes()),
+        )
+        .unwrap();
+        std::fs::write(
+            cooked.join("PkgMapper.clean"),
+            gpk::encrypt_mapper(pkg_text.as_bytes()),
+        )
+        .unwrap();
+        std::fs::write(
+            cooked.join("CompositePackageMapper.dat"),
+            gpk::encrypt_mapper(comp_text.as_bytes()),
+        )
+        .unwrap();
+        std::fs::write(
+            cooked.join("CompositePackageMapper.clean"),
+            gpk::encrypt_mapper(comp_text.as_bytes()),
+        )
+        .unwrap();
+
+        extend_mappers(
+            tmp.path(),
+            &[MapperAddition {
+                logical_path: "S1UIRES_Component.Component_I35A".into(),
+                composite_uid: "modres_comp_004f".into(),
+                composite_object_path: "modres_comp_004f.Component_I35A_dup".into(),
+                composite_filename: "modres_paperdoll_comp_004f".into(),
+                composite_offset: 0,
+                composite_size: 6962,
+            }],
+        )
+        .unwrap();
+
+        let pm = std::fs::read(cooked.join("PkgMapper.dat")).unwrap();
+        let pm_text = String::from_utf8_lossy(&gpk::decrypt_mapper(&pm)).to_string();
+
+        // EXACTLY ONE row for the logical path, and it must be ours.
+        let occurrences: Vec<&str> = pm_text
+            .split('|')
+            .filter(|r| r.starts_with("S1UIRES_Component.Component_I35A,"))
+            .collect();
+        assert_eq!(
+            occurrences.len(),
+            1,
+            "must have exactly 1 row for the logical path; got {occurrences:?}"
+        );
+        assert_eq!(
+            occurrences[0],
+            "S1UIRES_Component.Component_I35A,modres_comp_004f.Component_I35A_dup",
+            "row must point at our composite, not vanilla"
+        );
+
+        // Other rows preserved.
+        assert!(pm_text.contains("S1UI_Other.Other,uid_other.Other_dup"));
     }
 }
