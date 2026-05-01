@@ -364,6 +364,14 @@ pub struct CatalogEntry {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub composite_flag: Option<bool>,
 
+    /// Full logical path (`Package.Object`) of the specific composite slice
+    /// this mod replaces. Required for mods targeting multi-object widget
+    /// packages — without this qualifier `vanilla_resolver` errors with
+    /// "maps to multiple vanilla composite byte ranges". Catalog entries
+    /// for single-object packages may leave this `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_object_path: Option<String>,
+
     #[serde(default)]
     pub updated_at: String,
 }
@@ -494,6 +502,7 @@ mod tests {
             settings_folder: None,
             target_patch: None,
             composite_flag: None,
+            target_object_path: None,
             compatible_arch: None,
             updated_at: "".into(),
         };
@@ -559,6 +568,7 @@ mod tests {
             settings_folder: None,
             target_patch: Some("v100.02".into()),
             composite_flag: Some(true),
+            target_object_path: None,
             compatible_arch: Some("x64".into()),
             updated_at: "2026-04-18".into(),
         };
@@ -601,6 +611,7 @@ mod tests {
             settings_folder: None,
             target_patch: None,
             composite_flag: None,
+            target_object_path: None,
             compatible_arch: None,
             updated_at: "".into(),
         };

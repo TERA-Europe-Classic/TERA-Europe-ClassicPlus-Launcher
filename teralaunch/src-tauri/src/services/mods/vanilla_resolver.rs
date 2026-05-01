@@ -39,6 +39,28 @@ pub struct VanillaResolution {
     pub bytes: Vec<u8>,
 }
 
+/// Resolve a *single* composite slice by full logical path
+/// (e.g. `"S1UI_PaperDoll.PaperDoll"`). Used when the catalog entry
+/// provides a `target_object_path` qualifier — required for multi-object
+/// widget packages where `resolve_vanilla_for_package_name` errors with
+/// "maps to multiple vanilla composite byte ranges".
+pub fn resolve_vanilla_for_logical_path(
+    game_root: &Path,
+    logical_path: &str,
+) -> Result<VanillaResolution, String> {
+    let raw_bytes =
+        composite_extract::extract_vanilla_for_logical_path(game_root, logical_path)?;
+    let bytes = gpk_package::extract_uncompressed_package_bytes(&raw_bytes).map_err(|e| {
+        format!(
+            "Failed to decompress composite-resolved vanilla for logical path '{logical_path}': {e}"
+        )
+    })?;
+    Ok(VanillaResolution {
+        source: VanillaSource::Composite,
+        bytes,
+    })
+}
+
 pub fn resolve_vanilla_for_package_name(
     game_root: &Path,
     package_name: &str,

@@ -26,13 +26,22 @@ use super::patch_manifest::{self, artifact_layout_for_mod_at_root, PatchManifest
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum InstallTarget {
     /// Composite-routed: vanilla bytes lived in a composite container.
-    /// On enable: write patched standalone in CookedPC root, redirect
-    /// composite mapper. On disable: restore mapper from `.clean`,
-    /// delete standalone.
+    /// On enable: patch the live container slice in place, then update
+    /// composite mapper offsets/sizes. On disable: restore the container
+    /// from `<container>.vanilla-bak`, then restore mapper state from
+    /// `.clean`.
     Composite {
         /// The package name (e.g. `"S1UI_GageBoss"`). Used to resolve
         /// the composite entry again at apply time.
         package_name: String,
+        /// Optional full logical path (`Package.Object`) qualifier. Set
+        /// when the catalog entry's `target_object_path` was provided —
+        /// disambiguates multi-object packages where package-only
+        /// resolution errors with "matches multiple clean composite
+        /// byte ranges". Backwards-compatible with prior installs that
+        /// omitted this field (deserialised as `None`).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        object_path: Option<String>,
     },
     /// Standalone-file: vanilla `.gpk` lived at a deep path under
     /// CookedPC. On enable: backup vanilla to `<path>.vanilla-bak` if
@@ -48,6 +57,7 @@ pub enum InstallTarget {
 }
 
 const INSTALL_TARGET_FILENAME: &str = "install_target.json";
+const RAW_MOD_PACKAGE_FILENAME: &str = "raw_mod_package.gpk";
 
 pub fn save_install_target_at_root(
     root: &Path,
@@ -97,6 +107,37 @@ pub fn load_install_target_at_root(
         )
     })?;
     Ok(Some(target))
+}
+
+pub fn save_raw_mod_package_at_root(root: &Path, mod_id: &str, bytes: &[u8]) -> Result<(), String> {
+    let layout = artifact_layout_for_mod_at_root(root, mod_id);
+    fs::create_dir_all(&layout.payload_dir).map_err(|e| {
+        format!(
+            "Failed to create payload dir {} for raw mod package: {e}",
+            layout.payload_dir.display()
+        )
+    })?;
+    let raw_path = layout.payload_dir.join(RAW_MOD_PACKAGE_FILENAME);
+    let tmp = raw_path.with_extension("gpk.tmp");
+    fs::write(&tmp, bytes)
+        .map_err(|e| format!("Failed to write raw mod package tmp {}: {e}", tmp.display()))?;
+    fs::rename(&tmp, &raw_path).map_err(|e| {
+        format!(
+            "Failed to commit raw mod package {}: {e}",
+            raw_path.display()
+        )
+    })
+}
+
+pub fn load_raw_mod_package_at_root(root: &Path, mod_id: &str) -> Result<Option<Vec<u8>>, String> {
+    let layout = artifact_layout_for_mod_at_root(root, mod_id);
+    let raw_path = layout.payload_dir.join(RAW_MOD_PACKAGE_FILENAME);
+    if !raw_path.exists() {
+        return Ok(None);
+    }
+    let bytes = fs::read(&raw_path)
+        .map_err(|e| format!("Failed to read raw mod package {}: {e}", raw_path.display()))?;
+    Ok(Some(bytes))
 }
 
 pub fn save_manifest_at_root(

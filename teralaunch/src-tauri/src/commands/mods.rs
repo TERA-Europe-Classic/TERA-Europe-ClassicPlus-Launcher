@@ -20,7 +20,7 @@ use crate::services::mods::{
     catalog::{self, CachedCatalog},
     external_app,
     gpk::{self, ModConflict},
-    gpk_patch_deploy, patch_manifest,
+    gpk_package, gpk_patch_deploy, patch_manifest,
     registry::{get_external_apps_dir, get_gpk_dir, get_registry_path},
     types::{Catalog, CatalogEntry, ModEntry, ModKind, ModStatus},
 };
@@ -63,10 +63,8 @@ fn versions_differ(installed: &str, catalog: &str) -> bool {
 /// Split out so unit tests can run without the global registry.
 fn detect_updates(installed: &[ModEntry], catalog_mods: &[CatalogEntry]) -> Vec<ModUpdateInfo> {
     use std::collections::HashMap;
-    let by_id: HashMap<&str, &CatalogEntry> = catalog_mods
-        .iter()
-        .map(|c| (c.id.as_str(), c))
-        .collect();
+    let by_id: HashMap<&str, &CatalogEntry> =
+        catalog_mods.iter().map(|c| (c.id.as_str(), c)).collect();
 
     installed
         .iter()
@@ -99,9 +97,9 @@ fn should_flip_to_update_available(status: ModStatus) -> bool {
 /// Rebuilds the on-disk GPK deploy state to match the registry. Migrates
 /// any registry slots installed by older launcher versions (legacy whole-
 /// file copies into CookedPC) before running the per-mod disable + enable
-/// cycle. The composite mapper is hard-restored from `.clean` once up
-/// front so a removed-from-registry-but-still-on-disk standalone redirect
-/// doesn't survive into the rebuild.
+/// cycle. Composite disable restores each patched container before restoring
+/// mapper state, and rebuild fails fast on any restore error so later enables
+/// never stack onto a dirty mapper/container pair.
 fn rebuild_gpk_runtime_state() -> Result<(), String> {
     let game_root = resolve_game_root()?;
     let app_root = patch_manifest::get_manifest_root()
@@ -115,14 +113,9 @@ fn rebuild_gpk_runtime_state() -> Result<(), String> {
         .filter(|entry| matches!(entry.kind, ModKind::Gpk))
         .collect();
 
-    gpk::restore_clean_mapper_state(&game_root)?;
-
     for entry in &gpk_mods {
-        if let Err(err) = gpk_patch_deploy::disable_via_patch(&game_root, &app_root, &entry.id) {
-            log::warn!(
-                "rebuild_gpk_runtime_state: disable_via_patch({}) failed: {err}",
-                entry.id
-            );
+        if should_restore_gpk_patch_state(entry, &app_root)? {
+            gpk_patch_deploy::disable_via_patch(&game_root, &app_root, &entry.id)?;
         }
     }
 
@@ -131,6 +124,26 @@ fn rebuild_gpk_runtime_state() -> Result<(), String> {
             .map_err(|err| format!("Failed to re-enable GPK mod '{}': {err}", entry.id))?;
     }
     Ok(())
+}
+
+fn should_restore_gpk_patch_state(
+    entry: &ModEntry,
+    app_root: &std::path::Path,
+) -> Result<bool, String> {
+    if crate::services::mods::manifest_store::load_install_target_at_root(app_root, &entry.id)?
+        .is_some()
+    {
+        return Ok(true);
+    }
+
+    if entry.enabled {
+        return Err(format!(
+            "Enabled GPK mod '{}' has no install_target sidecar — refusing to guess restore target; reinstall or repair GPK state",
+            entry.id
+        ));
+    }
+
+    Ok(false)
 }
 
 /// Detects legacy-installed GPK slots (deployed_filename set + no
@@ -316,9 +329,7 @@ pub struct AutoUpdateResult {
 /// surface the failed ids inline if it cares.
 #[tauri::command]
 #[cfg(not(tarpaulin_include))]
-pub async fn auto_update_enabled_mods(
-    window: tauri::Window,
-) -> Result<AutoUpdateResult, String> {
+pub async fn auto_update_enabled_mods(window: tauri::Window) -> Result<AutoUpdateResult, String> {
     let catalog_doc = get_mods_catalog(Some(true)).await?;
     let installed = mods_state::list_mods()?;
 
@@ -408,7 +419,8 @@ fn gpk_unsupported_diff_fallback(mod_name: &str) -> String {
 
 /// Installs a mod from a catalog entry: download, verify, extract, register.
 /// External apps extract to `<app_data>/mods/external/<id>/`. GPK mods are
-/// Phase C — this command returns a not-implemented error for them.
+/// downloaded to the launcher cache, converted to patch manifests, and
+/// applied to the user's game files through the patch deploy service.
 ///
 /// Emits `mod_download_progress` events (shape: `{ id, progress, state }`)
 /// during the download phase. The final state of the mod is persisted via
@@ -418,11 +430,9 @@ fn gpk_unsupported_diff_fallback(mod_name: &str) -> String {
 pub async fn install_mod(entry: CatalogEntry, window: tauri::Window) -> Result<ModEntry, String> {
     match entry.kind {
         ModKind::External => install_external_mod(entry, window).await,
-        // GPK install v1 is "download to mods folder". Patching the
-        // CompositePackageMapper.dat and flipping the composite flag is
-        // Phase C; for now the file lands in <app_data>/mods/gpk/<id>.gpk
-        // and the user sees it in the list with a status note so they can
-        // copy it into the game manually while we build the patcher.
+        // GPK installs are patch-based: derive/persist a manifest, then apply
+        // the patch to either a standalone package or a composite container
+        // slice before marking the registry row enabled.
         ModKind::Gpk => install_gpk_mod(entry, window).await,
     }
 }
@@ -572,11 +582,8 @@ fn stop_external_app_before_update(
     }
 }
 
-/// GPK install v1: download the .gpk to `<app_data>/mods/gpk/<id>.gpk`.
-/// The mapper-patcher integration (flip the composite flag in
-/// CompositePackageMapper.dat, register in ModList.tmm, etc.) lands in
-/// Phase C; for now the registry entry stays at Disabled with a
-/// last_error-style note pointing users at the file.
+/// GPK install: download the .gpk to `<app_data>/mods/gpk/<id>.gpk`, derive a
+/// patch manifest, apply it to the user's game files, then persist the row.
 async fn install_gpk_mod(entry: CatalogEntry, window: tauri::Window) -> Result<ModEntry, String> {
     let gpk_dir = get_gpk_dir().ok_or_else(|| "Could not resolve GPK mods dir".to_string())?;
     // Derive the on-disk filename from the id so each entry owns a slot and
@@ -640,7 +647,14 @@ async fn install_gpk_mod(entry: CatalogEntry, window: tauri::Window) -> Result<M
             // Attempt deploy through embedded metadata first, then fall back
             // to filename-based legacy install when the file lacks that
             // metadata but still maps cleanly to a known game package.
-            let deploy = try_deploy_gpk(&entry.id, &entry.name, &dest, Some(&entry.download_url));
+            let deploy = try_deploy_gpk(
+                &entry.id,
+                &entry.name,
+                &dest,
+                &entry.gpk_files,
+                Some(&entry.download_url),
+                entry.target_object_path.as_deref(),
+            );
 
             let final_row = mods_state::mutate(|reg| {
                 let slot = reg.find_mut(&entry.id).ok_or_else(|| {
@@ -679,19 +693,67 @@ async fn install_gpk_mod(entry: CatalogEntry, window: tauri::Window) -> Result<M
 ///   1. Resolve the target package name from the URL hint or GPK header.
 ///   2. Extract vanilla bytes via `composite_extract` + `.clean` mapper.
 ///   3. Diff vanilla vs modded → derive + persist a manifest.
-///   4. Apply the manifest, write patched bytes to CookedPC, redirect
-///      the composite mapper.
+///   4. Apply the manifest, patch the target container bytes in CookedPC,
+///      then update the composite mapper offsets/sizes.
 ///
 /// Diff shapes the Phase 1 applier doesn't support (added exports, name
-/// or import drift, compressed packages, class changes) are refused at
-/// step 3 with a clear error so the user sees the failure mode up front
-/// instead of a silently broken client.
+/// or import drift, class changes, or unsupported compression formats) are
+/// refused at step 3 with a clear error so the user sees the failure mode up
+/// front instead of a silently broken client.
 fn try_deploy_gpk(
     mod_id: &str,
     _mod_name: &str,
     source_gpk: &std::path::Path,
+    catalog_gpk_files: &[String],
     download_url: Option<&str>,
+    target_object_path: Option<&str>,
 ) -> GpkDeployOutcome {
+    match read_gpk_file_version(source_gpk) {
+        Ok(file_version) if !gpk_package::is_x64_file_version(file_version) => {
+            return GpkDeployOutcome {
+                last_error: Some(format!(
+                    "This catalog artifact is a legacy x32 GPK (FileVersion {file_version}) and cannot be loaded by the v100.02 x64 client. It needs a rebuilt/published x64 artifact before install."
+                )),
+                deployed_filename: None,
+                blocks_enable: true,
+            };
+        }
+        Ok(_) => {}
+        Err(err) => {
+            return GpkDeployOutcome {
+                last_error: Some(err),
+                deployed_filename: None,
+                blocks_enable: true,
+            };
+        }
+    }
+
+    let target_package_name = match resolve_target_package_name(
+        source_gpk,
+        catalog_gpk_files,
+        download_url,
+    ) {
+        Some(name) => name,
+        None => {
+            return GpkDeployOutcome {
+                    last_error: Some(
+                        "Mod's target package name is missing or ambiguous — catalog must declare exactly one gpk_files target, or this mod must be split/repacked before install.".into(),
+                    ),
+                    deployed_filename: None,
+                    blocks_enable: true,
+                };
+        }
+    };
+    if !gpk::is_safe_gpk_container_filename(&format!("{target_package_name}.gpk")) {
+        return GpkDeployOutcome {
+            last_error: Some(format!(
+                "Mod's target package name resolves to unsafe target package '{target_package_name}' — install aborted."
+            )),
+            deployed_filename: None,
+            blocks_enable: true,
+        };
+    }
+
     let game_root = match resolve_game_root() {
         Ok(p) => p,
         Err(e) => {
@@ -719,25 +781,13 @@ fn try_deploy_gpk(
         }
     };
 
-    let target_package_name = match resolve_target_package_name(source_gpk, download_url) {
-        Some(name) => name,
-        None => {
-            return GpkDeployOutcome {
-                    last_error: Some(
-                        "Mod's target package name is not derivable from URL or GPK header — install aborted".into(),
-                    ),
-                    deployed_filename: None,
-                    blocks_enable: false,
-                };
-        }
-    };
-
-    let outcome = match gpk_patch_deploy::install_via_patch(
+    let outcome = match gpk_patch_deploy::install_via_patch_with_qualifier(
         &game_root,
         &app_root,
         mod_id,
         source_gpk,
         &target_package_name,
+        target_object_path,
     ) {
         Ok(o) => o,
         Err(err) => {
@@ -752,8 +802,10 @@ fn try_deploy_gpk(
     };
 
     if let Err(err) = gpk_patch_deploy::enable_via_patch(&game_root, &app_root, mod_id) {
-        // Roll the manifest back so disk and registry stay consistent.
-        let _ = gpk_patch_deploy::uninstall_via_patch(&game_root, &app_root, mod_id);
+        // enable_via_patch owns operation-local rollback for any bytes it
+        // touched. Do not run a full uninstall here: that can restore shared
+        // mapper/container state to clean and clobber already-enabled GPK mods.
+        let _ = crate::services::mods::manifest_store::delete_manifest_at_root(&app_root, mod_id);
         return GpkDeployOutcome {
             last_error: Some(format!("Patch applied OK but enable failed: {err}")),
             deployed_filename: None,
@@ -780,8 +832,17 @@ fn try_deploy_gpk(
 /// usable URL hint is available (e.g. `add_mod_from_file`).
 fn resolve_target_package_name(
     source_gpk: &std::path::Path,
+    catalog_gpk_files: &[String],
     download_url: Option<&str>,
 ) -> Option<String> {
+    if let Some(hint) = single_catalog_package_hint(catalog_gpk_files) {
+        return Some(hint);
+    }
+
+    if catalog_gpk_files.len() > 1 {
+        return None;
+    }
+
     let url_hint = download_url
         .and_then(|url| url::Url::parse(url).ok())
         .and_then(|u| u.path_segments().and_then(|s| s.last()).map(str::to_string));
@@ -803,6 +864,42 @@ fn resolve_target_package_name(
         }
     }
     None
+}
+
+fn single_catalog_package_hint(catalog_gpk_files: &[String]) -> Option<String> {
+    let mut hints = catalog_gpk_files.iter().filter_map(|hint| {
+        let trimmed = hint.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        let stripped = trimmed.strip_suffix(".gpk").unwrap_or(trimmed).trim();
+        if stripped.is_empty() {
+            None
+        } else {
+            Some(stripped.to_string())
+        }
+    });
+    let first = hints.next()?;
+    if hints.next().is_some() {
+        None
+    } else {
+        Some(first)
+    }
+}
+
+fn read_gpk_file_version(source_gpk: &std::path::Path) -> Result<u16, String> {
+    let bytes = std::fs::read(source_gpk).map_err(|err| {
+        format!(
+            "Failed to read downloaded GPK {}: {err}",
+            source_gpk.display()
+        )
+    })?;
+    gpk_package::read_file_version(&bytes).ok_or_else(|| {
+        format!(
+            "Downloaded file {} has an invalid GPK header — install aborted.",
+            source_gpk.display()
+        )
+    })
 }
 
 /// Reads the game root from the launcher's config.ini via the existing
@@ -922,7 +1019,7 @@ pub async fn add_mod_from_file(path: String) -> Result<ModEntry, String> {
         .file_name()
         .and_then(|n| n.to_str())
         .map(|n| format!("file:///{n}"));
-    let deploy = try_deploy_gpk(&entry.id, &entry.name, &dest, url_hint.as_deref());
+    let deploy = try_deploy_gpk(&entry.id, &entry.name, &dest, &[], url_hint.as_deref(), None);
     entry.deployed_filename = deploy.deployed_filename.clone();
     entry.last_error = deploy.last_error.clone();
     if deploy.blocks_enable {
@@ -990,6 +1087,15 @@ pub async fn uninstall_mod(id: String, delete_settings: Option<bool>) -> Result<
                 get_gpk_dir().ok_or_else(|| "Could not resolve GPK mods dir".to_string())?;
             let file = gpk_dir.join(format!("{}.gpk", entry.id.replace('/', "_")));
             let _ = delete_settings; // GPK has no per-mod settings folder
+
+            let game_root = resolve_game_root()?;
+            let app_root = patch_manifest::get_manifest_root()
+                .ok_or_else(|| "Could not resolve patch-manifest root directory".to_string())?;
+            if should_restore_gpk_patch_state(&entry, &app_root)? {
+                gpk_patch_deploy::uninstall_via_patch(&game_root, &app_root, &id)?;
+            } else {
+                crate::services::mods::manifest_store::delete_manifest_at_root(&app_root, &id)?;
+            }
 
             mods_state::mutate(|reg| {
                 reg.remove(&id);
@@ -1629,6 +1735,29 @@ mod tests {
     }
 
     #[test]
+    fn rebuild_gpk_runtime_state_fails_fast_on_disable_errors() {
+        let source = include_str!("mods.rs");
+        let fn_start = source
+            .find("fn rebuild_gpk_runtime_state")
+            .expect("rebuild_gpk_runtime_state present");
+        let fn_tail = &source[fn_start..];
+        let body_end = fn_tail[1..]
+            .find("\nfn ")
+            .map(|i| i + 1)
+            .unwrap_or(fn_tail.len());
+        let body = &fn_tail[..body_end];
+
+        assert!(
+            !body.contains("log::warn!") && !body.contains("if let Err(err)"),
+            "rebuild must fail fast on disable errors; warning and continuing can stack patches onto dirty mapper/container state"
+        );
+        assert!(
+            body.contains("gpk_patch_deploy::disable_via_patch(&game_root, &app_root, &entry.id)?"),
+            "disable errors must propagate before any enable pass begins"
+        );
+    }
+
+    #[test]
     fn try_deploy_gpk_routes_through_patch_based_install() {
         let source = include_str!("mods.rs");
         let fn_start = source
@@ -1651,8 +1780,8 @@ mod tests {
             "try_deploy_gpk must enable after install so the patched bytes land in CookedPC",
         );
         let rollback_idx = body
-            .find("gpk_patch_deploy::uninstall_via_patch")
-            .expect("try_deploy_gpk must roll back the manifest when enable fails so disk and registry stay consistent");
+            .find("manifest_store::delete_manifest_at_root")
+            .expect("try_deploy_gpk must delete the new manifest bundle when enable fails without full uninstall side effects");
 
         assert!(
             install_idx < enable_idx,
@@ -1660,7 +1789,7 @@ mod tests {
         );
         assert!(
             enable_idx < rollback_idx,
-            "uninstall fallback must come after the enable attempt"
+            "manifest cleanup must come after the enable attempt"
         );
         assert!(
             !body.contains("install_legacy_gpk") && !body.contains("gpk::install_gpk("),
@@ -1672,12 +1801,146 @@ mod tests {
     fn both_gpk_install_entry_points_flow_through_shared_deploy_gate() {
         let source = include_str!("mods.rs");
         assert!(
-            source.contains("let deploy = try_deploy_gpk(&entry.id, &entry.name, &dest, Some(&entry.download_url));"),
+            source.contains("&entry.gpk_files,")
+                && source.contains("Some(&entry.download_url),"),
             "install_gpk_mod must route through try_deploy_gpk with id + display name so manifest gating is centralized"
         );
         assert!(
-            source.contains("let deploy = try_deploy_gpk(&entry.id, &entry.name, &dest, None);"),
+            source.contains("let deploy = try_deploy_gpk(&entry.id, &entry.name, &dest, &[], url_hint.as_deref(), None);"),
             "add_mod_from_file must route through the same shared deploy gate so local imports cannot bypass manifest checks"
+        );
+    }
+
+    #[test]
+    fn resolve_target_package_name_prefers_single_catalog_gpk_file() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("opaque-id.gpk");
+        std::fs::write(&source, [0u8; 8]).expect("write source");
+        let hints = vec!["S1UI_ProgressBar.gpk".to_string()];
+
+        let resolved = resolve_target_package_name(
+            &source,
+            &hints,
+            Some("https://example.com/WrongFromUrl.gpk"),
+        );
+
+        assert_eq!(resolved.as_deref(), Some("S1UI_ProgressBar"));
+    }
+
+    #[test]
+    fn resolve_target_package_name_rejects_multi_gpk_catalog_entries() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("PostProcess.gpk");
+        std::fs::write(&source, [0u8; 8]).expect("write source");
+        let hints = vec![
+            "S1UI_ExtShortCut.gpk".to_string(),
+            "S1UI_ShortCut.gpk".to_string(),
+        ];
+
+        let resolved = resolve_target_package_name(
+            &source,
+            &hints,
+            Some("https://example.com/PostProcess.gpk"),
+        );
+
+        assert_eq!(resolved, None);
+    }
+
+    #[test]
+    fn try_deploy_gpk_blocks_legacy_x32_before_game_root_resolution() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("legacy.gpk");
+        std::fs::write(
+            &source,
+            [
+                0xC1, 0x83, 0x2A, 0x9E, // TERA package magic
+                0x62, 0x02, // FileVersion 610 / x32
+                0x0E, 0x00, // LicenseVersion 14
+            ],
+        )
+        .expect("write legacy gpk");
+
+        let outcome = try_deploy_gpk("tester.legacy", "Legacy", &source, &[], None, None);
+
+        assert!(outcome.blocks_enable);
+        assert_eq!(outcome.deployed_filename, None);
+        let err = outcome.last_error.unwrap_or_default();
+        assert!(err.contains("legacy x32 GPK"), "unexpected error: {err}");
+        assert!(
+            err.contains("rebuilt/published x64"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn try_deploy_gpk_blocks_invalid_gpk_before_game_root_resolution() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("not-a-gpk.gpk");
+        std::fs::write(&source, b"not-a-gpk").expect("write invalid gpk");
+
+        let outcome = try_deploy_gpk("tester.invalid", "Invalid", &source, &[], None, None);
+
+        assert!(outcome.blocks_enable);
+        assert_eq!(outcome.deployed_filename, None);
+        let err = outcome.last_error.unwrap_or_default();
+        assert!(
+            err.contains("invalid GPK header"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn try_deploy_gpk_blocks_multi_gpk_catalog_entries_before_game_root_resolution() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("multi.gpk");
+        std::fs::write(
+            &source,
+            [
+                0xC1, 0x83, 0x2A, 0x9E, // TERA package magic
+                0x81, 0x03, // FileVersion 897 / x64
+                0x11, 0x00, // LicenseVersion 17
+            ],
+        )
+        .expect("write modern gpk");
+        let hints = vec![
+            "S1UI_ExtShortCut.gpk".to_string(),
+            "S1UI_ShortCut.gpk".to_string(),
+        ];
+
+        let outcome = try_deploy_gpk("tester.multi", "Multi", &source, &hints, None, None);
+
+        assert!(outcome.blocks_enable);
+        assert_eq!(outcome.deployed_filename, None);
+        let err = outcome.last_error.unwrap_or_default();
+        assert!(
+            err.contains("missing or ambiguous"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn try_deploy_gpk_blocks_unsafe_catalog_target_before_game_root_resolution() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("unsafe.gpk");
+        std::fs::write(
+            &source,
+            [
+                0xC1, 0x83, 0x2A, 0x9E, // TERA package magic
+                0x81, 0x03, // FileVersion 897 / x64
+                0x11, 0x00, // LicenseVersion 17
+            ],
+        )
+        .expect("write modern gpk");
+        let hints = vec!["..\\evil.gpk".to_string()];
+
+        let outcome = try_deploy_gpk("tester.unsafe", "Unsafe", &source, &hints, None, None);
+
+        assert!(outcome.blocks_enable);
+        assert_eq!(outcome.deployed_filename, None);
+        let err = outcome.last_error.unwrap_or_default();
+        assert!(
+            err.contains("unsafe target package"),
+            "unexpected error: {err}"
         );
     }
 
@@ -1705,6 +1968,49 @@ mod tests {
     }
 
     #[test]
+    fn disabled_error_gpk_without_install_target_does_not_restore_patch_state() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let mut slot = disabled_slot();
+        slot.kind = ModKind::Gpk;
+        slot.status = ModStatus::Error;
+        slot.enabled = false;
+
+        assert!(!should_restore_gpk_patch_state(&slot, tmp.path()).unwrap());
+    }
+
+    #[test]
+    fn enabled_gpk_without_install_target_fails_closed() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let mut slot = disabled_slot();
+        slot.kind = ModKind::Gpk;
+        slot.status = ModStatus::Enabled;
+        slot.enabled = true;
+
+        let err = should_restore_gpk_patch_state(&slot, tmp.path()).unwrap_err();
+
+        assert!(err.contains("has no install_target sidecar"), "got: {err}");
+    }
+
+    #[test]
+    fn gpk_with_install_target_restores_patch_state_even_when_disabled() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let mut slot = disabled_slot();
+        slot.kind = ModKind::Gpk;
+        slot.status = ModStatus::Disabled;
+        slot.enabled = false;
+        crate::services::mods::manifest_store::save_install_target_at_root(
+            tmp.path(),
+            &slot.id,
+            &crate::services::mods::manifest_store::InstallTarget::Composite {
+                package_name: "S1UI_GageBoss".into(),
+            },
+        )
+        .unwrap();
+
+        assert!(should_restore_gpk_patch_state(&slot, tmp.path()).unwrap());
+    }
+
+    #[test]
     fn rebuild_gpk_runtime_state_uses_per_mod_disable_then_enable() {
         let source = include_str!("mods.rs");
         let fn_start = source
@@ -1721,8 +2027,8 @@ mod tests {
         let body = &fn_body[..body_end];
 
         assert!(
-            body.contains("restore_clean_mapper_state"),
-            "rebuild must hard-restore the mapper from .clean before per-mod operations"
+            !body.contains("restore_clean_mapper_state"),
+            "rebuild must not restore the mapper alone; composite disables restore container then mapper together"
         );
         let disable_idx = body
             .find("gpk_patch_deploy::disable_via_patch")
@@ -1737,6 +2043,40 @@ mod tests {
         assert!(
             !body.contains("rebuild_gpk_state(&game_root"),
             "rebuild_gpk_runtime_state must not call the legacy rebuild_gpk_state"
+        );
+    }
+
+    #[test]
+    fn uninstall_gpk_restores_patch_state_before_registry_removal() {
+        let source = include_str!("mods.rs");
+        let fn_start = source
+            .find("pub async fn uninstall_mod")
+            .expect("uninstall_mod present");
+        let fn_body = &source[fn_start..];
+        let body_end = fn_body[1..]
+            .find("\nfn ")
+            .or_else(|| fn_body[1..].find("\npub async fn "))
+            .map(|i| i + 1)
+            .unwrap_or(fn_body.len());
+        let body = &fn_body[..body_end];
+
+        let uninstall_idx = body
+            .find("gpk_patch_deploy::uninstall_via_patch")
+            .expect("GPK uninstall must restore patch-managed disk state");
+        let remove_idx = body
+            .find("reg.remove(&id)")
+            .expect("GPK uninstall removes registry row");
+        let rebuild_idx = body
+            .find("rebuild_gpk_runtime_state")
+            .expect("GPK uninstall rebuilds remaining enabled mods");
+
+        assert!(
+            uninstall_idx < remove_idx,
+            "patch-managed disk state must be restored before removing the registry row"
+        );
+        assert!(
+            remove_idx < rebuild_idx,
+            "remaining enabled mods must be rebuilt after the removed mod leaves the registry"
         );
     }
 
