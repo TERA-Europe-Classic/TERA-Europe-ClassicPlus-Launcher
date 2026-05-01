@@ -82,70 +82,44 @@ pub fn extend_mappers(game_root: &Path, additions: &[MapperAddition]) -> Result<
         gpk::write_atomic_file(&pm_path, &pm_new)?;
     }
 
-    // CompositePackageMapper: REPLACE any existing row whose composite_uid
-    // matches the new addition. The composite_uid is the unique key (per the
-    // mapper's parse semantics — each composite_name maps to one entry). If a
-    // vanilla row exists with the same composite_uid pointing at a vanilla
-    // container/offset, leaving it in place AND adding ours creates duplicate
-    // rows; the engine's first-match resolution would pick the wrong one.
+    // CompositePackageMapper: ADD a new row group only when our composite_uid
+    // is not already present. We DO NOT do REPLACE-by-uid here.
     //
-    // The format is `<filename>?<row1>,<row2>,...,|!<filename2>?...|!` where
-    // each row is `<object_path>,<composite_uid>,<offset>,<size>,`. We split
-    // by `|`, drop any cell whose third comma-field equals our composite_uid,
-    // then append our new group.
+    // Why: an earlier attempt to REPLACE existing vanilla rows by composite_uid
+    // (so that a vanilla uid would resolve to our modded file at offset 0)
+    // caused the v100 engine to fatal-error at startup. The cause is not yet
+    // fully understood but is likely tied to the engine's bulk-loading
+    // assumptions about which slices live in which containers — moving a uid
+    // out of its vanilla container appears to break a startup invariant.
+    //
+    // The known-working pattern (used by silhouettes) is to allocate a FRESH
+    // composite_uid that vanilla doesn't know about, route the logical name
+    // to that fresh uid via PkgMapper REPLACE, and add a new
+    // CompositePackageMapper row for it. That keeps every vanilla composite
+    // entry untouched in CompositePackageMapper.
+    //
+    // Append-if-row-text-not-already-present is the original behavior we
+    // restore here.
     let cm_path = cooked.join(gpk::MAPPER_FILE);
     let cm_enc = std::fs::read(&cm_path).map_err(|e| format!("read CompositeMapper: {e}"))?;
-    let cm_text = String::from_utf8_lossy(&gpk::decrypt_mapper(&cm_enc)).to_string();
-    let uids_to_remove: std::collections::HashSet<&str> =
-        additions.iter().map(|a| a.composite_uid.as_str()).collect();
-
-    // Filter: keep cells (split by `|`) whose third comma-field is NOT one we're replacing.
-    // A cell can be a row body like `objpath,uid,off,size,` OR a filename header
-    // like `<filename>?objpath,uid,off,size,` OR a closing `!<filename>?...`.
-    // We need to find rows containing a uid we're replacing and DROP them, while
-    // keeping other rows intact.
+    let mut cm_text = String::from_utf8_lossy(&gpk::decrypt_mapper(&cm_enc)).to_string();
     let mut cm_dirty = false;
-    let mut rebuilt = String::with_capacity(cm_text.len() + 4096);
-    let mut current_filename: Option<&str> = None;
-    let mut current_filename_emitted = false;
-    // Walk the mapper text token-by-token. Format reminder:
-    //   filename?obj,uid,off,size,|obj,uid,off,size,|!filename?obj,uid,off,size,|!
-    // After splitting on `|`, cells are either:
-    //   "filename?obj,uid,off,size," (first row of a group)
-    //   "obj,uid,off,size,"          (continuation row)
-    //   "!filename?obj,uid,off,size," (start of next group; previous group ended)
-    //   "!"                           (lone group terminator at end)
-    //   "" (trailing empty after final `|`)
-    // The official parser consumes `?` and `!` as group delimiters; we mirror.
-    //
-    // To keep this simple AND correct, we re-serialize via parse_mapper +
-    // serialize_mapper after applying replacements via the parsed map.
-    let mut map = gpk::parse_mapper(&cm_text);
     for add in additions {
-        let new_entry = gpk::MapperEntry {
-            filename: add.composite_filename.clone(),
-            composite_name: add.composite_uid.clone(),
-            object_path: add.composite_object_path.clone(),
-            offset: add.composite_offset,
-            size: add.composite_size,
-        };
-        let prior = map.insert(add.composite_uid.clone(), new_entry);
-        match prior {
-            Some(p) if p.filename == add.composite_filename
-                    && p.offset == add.composite_offset
-                    && p.size == add.composite_size
-                    && p.object_path == add.composite_object_path => {
-                // identical, no-op
-            }
-            _ => {
-                cm_dirty = true;
-            }
+        let row = format!(
+            "{}?{},{},{},{},|!",
+            add.composite_filename,
+            add.composite_object_path,
+            add.composite_uid,
+            add.composite_offset,
+            add.composite_size
+        );
+        if !cm_text.contains(&row) {
+            cm_text.push_str(&row);
+            cm_dirty = true;
         }
     }
-    let _ = (rebuilt, current_filename, current_filename_emitted, uids_to_remove); // silence warnings
     if cm_dirty {
-        let plain = gpk::serialize_mapper(&map);
-        let cm_new = gpk::encrypt_mapper(plain.as_bytes());
+        let cm_new = gpk::encrypt_mapper(cm_text.as_bytes());
         gpk::write_atomic_file(&cm_path, &cm_new)?;
     }
 

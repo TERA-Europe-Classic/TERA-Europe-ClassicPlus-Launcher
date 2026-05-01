@@ -31,11 +31,8 @@ use std::path::{Path, PathBuf};
 #[allow(dead_code)] #[path = "../services/mods/gpk_resource_inspector.rs"] mod gpk_resource_inspector;
 #[allow(dead_code)] #[path = "../services/mods/patch_manifest.rs"] mod patch_manifest;
 #[allow(dead_code)] #[path = "../services/mods/mapper_extend.rs"] mod mapper_extend;
-
-use patch_manifest::{
-    CompatibilityPolicy, ExportPatch, ExportPatchOperation, PatchFamily, PatchManifest,
-    ReferenceBaseline,
-};
+#[allow(dead_code)] #[path = "../services/mods/texture_encoder.rs"] mod texture_encoder;
+#[allow(dead_code)] #[path = "../services/mods/composite_author.rs"] mod composite_author;
 
 const USAGE: &str = "port-foglio-compiled-pack --foglio-gpk <path> --target-package <name> \
     --uid-prefix <prefix> --filename-prefix <prefix> --game-root <path> --staging <dir>";
@@ -176,81 +173,118 @@ fn run() -> Result<(), String> {
         let vanilla_pkg = gpk_package::parse_package(&vanilla_uncompressed)
             .map_err(|e| format!("parse vanilla slice for {logical}: {e}"))?;
 
-        // Find the Texture2D inside (should be exactly one).
+        // Use the SAME proven-working pattern as silhouettes:
+        // 1) decode foglio's pixels (handles LZO source)
+        // 2) derive format from element_count/dimensions (8B/block = DXT1, 16B = DXT5)
+        // 3) author a fresh composite slice from scratch via composite_author
+        // 4) allocate a FRESH composite_uid and route logical → fresh_uid via PkgMapper REPLACE
+        // 5) ADD new CompositePackageMapper row for fresh_uid
+        //
+        // This avoids the failed REPLACE-by-vanilla-uid pattern that crashed the engine.
+        let foglio_mip = match gpk_resource_inspector::first_mip_bulk_location(
+            foglio_export, &foglio_pkg.names, foglio_is_x64) {
+            Ok(m) => m,
+            Err(e) => { println!("  skip {logical} (foglio mip locate: {e})"); skipped += 1; continue; }
+        };
+        // Read foglio's mip metadata via texture_bulk_locations to get dimensions
+        // (first_mip_bulk_location returns offset/len but not size_x/size_y; we
+        // re-walk via the inspector's mip-array reader). Simpler: parse the
+        // vanilla x64 MipInspection — which has dimensions — then use the
+        // same dimensions for our new slice.
+        let mut foglio_w = 0i32;
+        let mut foglio_h = 0i32;
+        let mut foglio_element_count = 0i32;
+        if let Ok(insps) = gpk_resource_inspector::inspect_texture_exports(&foglio_pkg) {
+            if let Some(insp) = insps.iter().find(|i| i.object_path.ends_with(&tex_name)) {
+                if let Some(m) = &insp.first_mip {
+                    foglio_w = m.size_x;
+                    foglio_h = m.size_y;
+                    foglio_element_count = m.element_count;
+                }
+            }
+        }
+        if foglio_w <= 0 || foglio_h <= 0 || foglio_element_count <= 0 {
+            println!("  skip {logical} (could not determine foglio dims/element_count)");
+            skipped += 1;
+            continue;
+        }
+        // Derive format from UNCOMPRESSED element_count (the pixel byte count
+        // before LZO). For DXT1 (8B/block 4x4) total = (w/4)*(h/4)*8.
+        // For DXT5 (16B/block 4x4) total = (w/4)*(h/4)*16.
+        let blocks = ((foglio_w as usize + 3) / 4) * ((foglio_h as usize + 3) / 4);
+        let bytes_per_block = if blocks == 0 { 0 } else { foglio_element_count as usize / blocks };
+        let dds_format = match bytes_per_block {
+            8 => dds::DdsPixelFormat::Dxt1,
+            16 => dds::DdsPixelFormat::Dxt5,
+            other => {
+                println!("  skip {logical} (unrecognized bytes_per_block {other} for {foglio_w}x{foglio_h}, element_count={foglio_element_count})");
+                skipped += 1;
+                continue;
+            }
+        };
+        // Decode foglio's mip pixels (handles LZO).
+        // We rebuild the FirstMipPayload-shaped argument by re-walking via the
+        // same locate logic. Since `decode_mip_pixels` is private, use the
+        // public `replace_texture_first_mip_pixels` indirectly via target+source
+        // — that's what the silhouettes pipeline does. Simpler: we already have
+        // first_mip_bulk_location; the raw bytes are at payload_offset..payload_len.
+        // If foglio source has flag != 0 (LZO), we MUST decode. inspect's
+        // public surface doesn't expose a standalone "decode mip" — but
+        // replace_texture_first_mip_pixels DOES handle decoding internally.
+        // So we keep using replace_texture_first_mip_pixels against a target
+        // we throw away, JUST to extract the decoded source pixels — then we
+        // build a fresh slice from those pixels.
+        // Actually simpler: build the target from scratch already and let
+        // replace_* hand us the swap result; we can extract the new pixels
+        // from inside the returned payload by locating its first mip.
+
+        // Find the target Texture2D inside the vanilla slice and run the
+        // existing pixel-swap to get decoded foglio pixels in target format.
         let target_tex = vanilla_pkg.exports.iter().find(|e|
             matches!(e.class_name.as_deref(), Some("Core.Texture2D") | Some("Core.Engine.Texture2D")));
         let target_tex = match target_tex {
             Some(t) => t,
-            None => {
-                println!("  skip {logical} (vanilla slice has no Texture2D)");
-                skipped += 1;
-                continue;
-            }
+            None => { println!("  skip {logical} (no Texture2D in vanilla slice)"); skipped += 1; continue; }
         };
-
-        // Swap pixels. replace_texture_first_mip_pixels handles dim/element-count
-        // checks and returns the rewritten target payload.
-        let new_payload = match gpk_resource_inspector::replace_texture_first_mip_pixels(
+        let new_target_payload = match gpk_resource_inspector::replace_texture_first_mip_pixels(
             target_tex, &vanilla_pkg.names, true,
             foglio_export, &foglio_pkg.names, foglio_is_x64,
         ) {
             Ok(p) => p,
-            Err(e) => {
-                println!("  skip {logical} (replace failed: {e})");
-                skipped += 1;
-                continue;
-            }
+            Err(e) => { println!("  skip {logical} (replace failed: {e})"); skipped += 1; continue; }
         };
+        // Extract the now-decoded mip pixel bytes from the new target payload.
+        let mip_loc = gpk_resource_inspector::first_mip_bulk_location(
+            target_tex, &vanilla_pkg.names, true)
+            .map_err(|e| format!("locate target mip for {logical}: {e}"))?;
+        let decoded_pixels = new_target_payload[
+            mip_loc.payload_offset..mip_loc.payload_offset + mip_loc.payload_len
+        ].to_vec();
 
-        // Re-emit the vanilla slice with the new payload via apply_manifest.
-        let manifest = PatchManifest {
-            schema_version: 2,
-            mod_id: format!("foglio-pack-{logical}"),
-            title: logical.clone(),
-            target_package: format!("{}.gpk", vanilla_pkg.summary.package_name),
-            patch_family: PatchFamily::UiLayout,
-            reference: ReferenceBaseline {
-                source_patch_label: "foglio compiled pack".into(),
-                package_fingerprint: format!("exports:{}|imports:{}|names:{}",
-                    vanilla_pkg.exports.len(), vanilla_pkg.imports.len(), vanilla_pkg.names.len()),
-                provenance: None,
-            },
-            compatibility: CompatibilityPolicy {
-                require_exact_package_fingerprint: false,
-                require_all_exports_present: false,
-                forbid_name_or_import_expansion: false,
-            },
-            exports: vec![ExportPatch {
-                object_path: target_tex.object_path.clone(),
-                class_name: target_tex.class_name.clone(),
-                reference_export_fingerprint: target_tex.payload_fingerprint.clone(),
-                target_export_fingerprint: Some(target_tex.payload_fingerprint.clone()),
-                operation: ExportPatchOperation::ReplaceExportPayload,
-                new_class_name: None,
-                replacement_payload_hex: hex_lower(&new_payload),
-            }],
-            import_patches: vec![],
-            name_patches: vec![],
-            notes: vec![format!("Foglio pixel swap from {}", args.foglio_gpk.display())],
+        // Build a synthetic DdsImage and author from scratch.
+        let dds_img = dds::DdsImage {
+            width: foglio_w as u32,
+            height: foglio_h as u32,
+            format: dds_format,
+            mips: vec![decoded_pixels],
         };
-
-        let modded_slice = gpk_patch_applier::apply_manifest(&vanilla_uncompressed, &manifest)
-            .map_err(|e| format!("apply_manifest for {logical}: {e}"))?;
-
-        // Strategy: keep vanilla's composite_uid + composite_object_path so the
-        // GPK's MOD: folder (preserved by apply_manifest) still matches what the
-        // engine expects to find. Just point CompositePackageMapper at our new
-        // file via REPLACE-by-composite_uid. PkgMapper stays untouched for these.
         idx += 1;
+        let fresh_uid = format!("{}_{:04x}", args.uid_prefix, idx);
         let new_filename = format!("{}_{:04x}", args.filename_prefix, idx);
+        let texture_object_name = format!("{}_dup", tex_name);
+        let new_object_path = format!("{fresh_uid}.{texture_object_name}");
+        let modded_slice = composite_author::author_composite_slice(
+            &dds_img, &texture_object_name, &args.target_package, &new_object_path,
+        ).map_err(|e| format!("author {logical}: {e}"))?;
+
         let out_path = args.staging.join(format!("{new_filename}.gpk"));
         fs::write(&out_path, &modded_slice)
             .map_err(|e| format!("write {}: {e}", out_path.display()))?;
 
         additions.push(mapper_extend::MapperAddition {
             logical_path: logical.clone(),
-            composite_uid: composite_uid_vanilla.to_string(), // preserve vanilla
-            composite_object_path: composite_object_path.clone(),
+            composite_uid: fresh_uid,
+            composite_object_path: new_object_path,
             composite_filename: new_filename,
             composite_offset: 0,
             composite_size: modded_slice.len() as i64,
