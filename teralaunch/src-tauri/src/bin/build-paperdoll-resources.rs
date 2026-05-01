@@ -47,6 +47,12 @@ fn run() -> Result<(), String> {
             "modres_skin", "modres_paperdoll_skin", "S1UIRES_Skin",
             /* strip_bg_prefix = */ true,
         )?;
+        // ALSO emit numeric-coded variants for paperdoll silhouettes — v100
+        // engine sends numeric race/sex indices to the SWF, not foglio's letter
+        // codes. Without these, the silhouette URI never resolves to our art.
+        skin_count += process_paperdoll_silhouettes_numeric(
+            &skin_dir, &staging, &mut idx, &mut additions,
+        )?;
     }
     let component_dir = foglio_root.join("RES_Component");
     if component_dir.is_dir() {
@@ -74,6 +80,76 @@ fn run() -> Result<(), String> {
     println!("processed {skin_count} RES_Skin entries, {comp_count} RES_Component entries");
     println!("wrote {} GPKs + manifest to {}", additions.len(), staging.display());
     Ok(())
+}
+
+/// foglio's letter-coded silhouettes → v100's numeric race/sex naming.
+/// Convention (best guess from TERA + foglio code patterns):
+///   HM=0_0 HW=0_1 KM=1_0 KW=1_1 AM=2_0 AW=2_1 EM=3_0 EW=3_1 PP=4_0 BK=5_0 EL=5_1
+/// _2 variants (alt outfits) likewise mapped: HM_2 → 0_0_alt etc. v100 doesn't
+/// appear to expose _alt names in PkgMapper, so for now we only emit base codes.
+const RACE_NUMERIC_MAP: &[(&str, &str)] = &[
+    ("PaperDoll_HM", "PaperDoll_0_0"),
+    ("PaperDoll_HW", "PaperDoll_0_1"),
+    ("PaperDoll_KM", "PaperDoll_1_0"),
+    ("PaperDoll_KW", "PaperDoll_1_1"),
+    ("PaperDoll_AM", "PaperDoll_2_0"),
+    ("PaperDoll_AW", "PaperDoll_2_1"),
+    ("PaperDoll_EM", "PaperDoll_3_0"),
+    ("PaperDoll_EW", "PaperDoll_3_1"),
+    ("PaperDoll_PP", "PaperDoll_4_0"),
+    ("PaperDoll_BK", "PaperDoll_5_0"),
+    ("PaperDoll_EL", "PaperDoll_5_1"),
+    // PaperDoll2 (secondary instance / "compare with other" SWF)
+    ("PaperDoll2_HM", "PaperDoll2_0_0"),
+    ("PaperDoll2_HW", "PaperDoll2_0_1"),
+    ("PaperDoll2_KM", "PaperDoll2_1_0"),
+    ("PaperDoll2_KW", "PaperDoll2_1_1"),
+    ("PaperDoll2_AM", "PaperDoll2_2_0"),
+    ("PaperDoll2_AW", "PaperDoll2_2_1"),
+    ("PaperDoll2_EM", "PaperDoll2_3_0"),
+    ("PaperDoll2_EW", "PaperDoll2_3_1"),
+    ("PaperDoll2_PP", "PaperDoll2_4_0"),
+    ("PaperDoll2_BK", "PaperDoll2_5_0"),
+    ("PaperDoll2_EL", "PaperDoll2_5_1"),
+];
+
+fn process_paperdoll_silhouettes_numeric(
+    skin_dir: &Path,
+    staging: &Path,
+    idx: &mut u32,
+    additions: &mut Vec<mapper_extend::MapperAddition>,
+) -> Result<usize, String> {
+    let mut count = 0usize;
+    for (foglio_letter_name, v100_numeric_name) in RACE_NUMERIC_MAP {
+        let dds_path = skin_dir.join(format!("BG_{foglio_letter_name}.dds"));
+        if !dds_path.is_file() { continue; }
+        let bytes = fs::read(&dds_path)
+            .map_err(|e| format!("read DDS {}: {e}", dds_path.display()))?;
+        let dds = dds::parse_dds(&bytes)
+            .map_err(|e| format!("parse DDS {}: {e}", dds_path.display()))?;
+        *idx += 1;
+        let composite_uid = format!("modres_skin_n_{:04x}", *idx);
+        let composite_filename = format!("modres_paperdoll_skin_n_{:04x}", *idx);
+        let texture_object_name = format!("{v100_numeric_name}_dup");
+        let composite_object_path = format!("{composite_uid}.{texture_object_name}");
+
+        let gpk_bytes = composite_author::author_composite_slice(
+            &dds, &texture_object_name, "S1UIRES_Skin", &composite_object_path,
+        ).map_err(|e| format!("author numeric {}: {e}", v100_numeric_name))?;
+        let out_path = staging.join(format!("{composite_filename}.gpk"));
+        fs::write(&out_path, &gpk_bytes)
+            .map_err(|e| format!("write {}: {e}", out_path.display()))?;
+        additions.push(mapper_extend::MapperAddition {
+            logical_path: format!("S1UIRES_Skin.{v100_numeric_name}"),
+            composite_uid,
+            composite_object_path,
+            composite_filename,
+            composite_offset: 0,
+            composite_size: gpk_bytes.len() as i64,
+        });
+        count += 1;
+    }
+    Ok(count)
 }
 
 fn process_dir(
