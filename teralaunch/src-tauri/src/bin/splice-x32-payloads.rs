@@ -43,7 +43,7 @@ use patch_manifest::{
     ReferenceBaseline,
 };
 
-const USAGE: &str = "splice-x32-payloads --vanilla-x64 <path> --modded-x32 <path> --output <path> [--mod-id <id>] [--rename A=B ...] [--only-class <ClassName> ...]";
+const USAGE: &str = "splice-x32-payloads --vanilla-x64 <path> --modded-x32 <path> --output <path> [--mod-id <id>] [--rename A=B ...] [--only-class <ClassName> ...] [--gfx-swap]";
 
 struct CliArgs {
     vanilla_x64: PathBuf,
@@ -129,9 +129,80 @@ fn parse_args() -> Result<CliArgs, String> {
 
 fn find_gfx_offset(bytes: &[u8]) -> Option<usize> {
     // Scaleform GFx files start with "GFX" (47 46 58) + 1 version byte.
+    // Range 0x07–0x10 covers the AS2 versions present across foglio's source
+    // and v100 vanilla wrappers (observed: 0x09 in most mods, 0x0B in
+    // targetinfo, 0x0F in newer Scaleform builds — bosswindow + equipment-
+    // upgrade widget).
     bytes.windows(4).position(|w| {
-        w[0] == b'G' && w[1] == b'F' && w[2] == b'X' && (w[3] >= 0x07 && w[3] <= 0x0C)
+        w[0] == b'G' && w[1] == b'F' && w[2] == b'X' && (w[3] >= 0x07 && w[3] <= 0x10)
     })
+}
+
+fn build_gfx_swap_payload(
+    vanilla_payload: &[u8],
+    modded_payload: &[u8],
+) -> Result<Vec<u8>, String> {
+    let v_off = find_gfx_offset(vanilla_payload).ok_or("vanilla payload has no GFX magic")?;
+    let m_off = find_gfx_offset(modded_payload).ok_or("modded payload has no GFX magic")?;
+    let vanilla_count = read_u32_before(vanilla_payload, v_off, 4)? as usize;
+    let modded_count = read_u32_before(modded_payload, m_off, 4)? as usize;
+    let vanilla_end = v_off
+        .checked_add(vanilla_count)
+        .ok_or("vanilla GFX byte count overflows")?;
+    let modded_end = m_off
+        .checked_add(modded_count)
+        .ok_or("modded GFX byte count overflows")?;
+    if vanilla_end > vanilla_payload.len() {
+        return Err("vanilla GFX byte count extends past payload".into());
+    }
+    if modded_end > modded_payload.len() {
+        return Err("modded GFX byte count extends past payload".into());
+    }
+
+    let new_count = modded_count as u32;
+    let new_size = (modded_count + 4) as u32;
+    let mut new_payload =
+        Vec::with_capacity(v_off + modded_count + vanilla_payload.len() - vanilla_end);
+    new_payload.extend_from_slice(&vanilla_payload[..v_off]);
+    new_payload.extend_from_slice(&modded_payload[m_off..modded_end]);
+    new_payload.extend_from_slice(&vanilla_payload[vanilla_end..]);
+    patch_u32_before(&mut new_payload, v_off, 4, new_count)?;
+    patch_u32_before(&mut new_payload, v_off, 12, new_size)?;
+    Ok(new_payload)
+}
+
+fn read_u32_before(bytes: &[u8], offset: usize, distance: usize) -> Result<u32, String> {
+    let start = offset
+        .checked_sub(distance)
+        .ok_or_else(|| format!("offset {offset} is too small for -{distance}"))?;
+    let end = start
+        .checked_add(4)
+        .ok_or_else(|| "u32 read offset overflows".to_string())?;
+    let slice = bytes
+        .get(start..end)
+        .ok_or_else(|| format!("u32 read {start}..{end} is outside payload"))?;
+    Ok(u32::from_le_bytes(
+        slice.try_into().map_err(|_| "slice size mismatch")?,
+    ))
+}
+
+fn patch_u32_before(
+    bytes: &mut [u8],
+    offset: usize,
+    distance: usize,
+    value: u32,
+) -> Result<(), String> {
+    let start = offset
+        .checked_sub(distance)
+        .ok_or_else(|| format!("offset {offset} is too small for -{distance}"))?;
+    let end = start
+        .checked_add(4)
+        .ok_or_else(|| "u32 patch offset overflows".to_string())?;
+    let slice = bytes
+        .get_mut(start..end)
+        .ok_or_else(|| format!("u32 patch {start}..{end} is outside payload"))?;
+    slice.copy_from_slice(&value.to_le_bytes());
+    Ok(())
 }
 
 fn hex_lower(bytes: &[u8]) -> String {
@@ -272,41 +343,18 @@ fn main() {
                     eprintln!("FAIL: {e}");
                     std::process::exit(8);
                 });
-            // UE3 ArrayProperty<u8> wrapper (right before GFX bytes):
-            //   ... property header ending with Size (4) + ArrayIndex (4)
-            //   Count (4)
-            //   Raw bytes
-            // → Count is the u32 at v_off - 4
-            // → Size (= Count + 4) is the u32 at v_off - 12 (Count + ArrayIndex + Size)
-            let foglio_gfx_size = me.payload.len() - f_off;
-            let new_count = foglio_gfx_size as u32;
-            let new_size = (foglio_gfx_size + 4) as u32; // includes the 4-byte count
-
-            let mut new_payload = Vec::with_capacity(v_off + foglio_gfx_size);
-            new_payload.extend_from_slice(&ve.payload[..v_off]);
-            new_payload.extend_from_slice(&me.payload[f_off..]);
-
-            // Patch wrapper size fields. Locate by walking back from v_off:
-            //   v_off - 4  → array Count (u32)
-            //   v_off - 12 → property Size (u32)
-            if v_off >= 12 {
-                new_payload[v_off - 4..v_off].copy_from_slice(&new_count.to_le_bytes());
-                new_payload[v_off - 12..v_off - 8].copy_from_slice(&new_size.to_le_bytes());
-                let old_count =
-                    u32::from_le_bytes(ve.payload[v_off - 4..v_off].try_into().unwrap());
-                let old_size =
-                    u32::from_le_bytes(ve.payload[v_off - 12..v_off - 8].try_into().unwrap());
-                println!(
-                    "  gfx-swap '{}': v_off={} f_off={} v_old_count={} new_count={} v_old_size={} new_size={}",
-                    resolved_path, v_off, f_off, old_count, new_count, old_size, new_size
-                );
-            } else {
-                eprintln!(
-                    "  WARN: v_off={} too small to patch wrapper size fields",
-                    v_off
-                );
-            }
-            new_payload
+            let old_count = read_u32_before(&ve.payload, v_off, 4).unwrap_or(0);
+            let old_size = read_u32_before(&ve.payload, v_off, 12).unwrap_or(0);
+            let new_count = read_u32_before(&me.payload, f_off, 4).unwrap_or(0);
+            let new_size = new_count.saturating_add(4);
+            println!(
+                "  gfx-swap '{}': v_off={} f_off={} v_old_count={} new_count={} v_old_size={} new_size={}",
+                resolved_path, v_off, f_off, old_count, new_count, old_size, new_size
+            );
+            build_gfx_swap_payload(&ve.payload, &me.payload).unwrap_or_else(|e| {
+                eprintln!("FAIL: {e}");
+                std::process::exit(8);
+            })
         } else {
             me.payload.clone()
         };
@@ -423,5 +471,37 @@ fn main() {
     } else {
         println!("  ✗ derive_manifest will REJECT this output");
         std::process::exit(7);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gfx_swap_preserves_vanilla_payload_after_embedded_movie() {
+        let mut vanilla = Vec::new();
+        vanilla.extend_from_slice(b"pref");
+        vanilla.extend_from_slice(&(11u32).to_le_bytes());
+        vanilla.extend_from_slice(&(0u32).to_le_bytes());
+        vanilla.extend_from_slice(&(7u32).to_le_bytes());
+        vanilla.extend_from_slice(b"GFX\x09abc");
+        vanilla.extend_from_slice(b"TAIL");
+
+        let mut modded = Vec::new();
+        modded.extend_from_slice(b"pref");
+        modded.extend_from_slice(&(9u32).to_le_bytes());
+        modded.extend_from_slice(&(0u32).to_le_bytes());
+        modded.extend_from_slice(&(9u32).to_le_bytes());
+        modded.extend_from_slice(b"GFX\x09abcde");
+        modded.extend_from_slice(b"MODTRAIL");
+
+        let swapped = build_gfx_swap_payload(&vanilla, &modded).unwrap();
+        let gfx_offset = find_gfx_offset(&swapped).unwrap();
+
+        assert_eq!(read_u32_before(&swapped, gfx_offset, 4).unwrap(), 9);
+        assert_eq!(read_u32_before(&swapped, gfx_offset, 12).unwrap(), 13);
+        assert_eq!(&swapped[gfx_offset..gfx_offset + 9], b"GFX\x09abcde");
+        assert_eq!(&swapped[gfx_offset + 9..], b"TAIL");
     }
 }
