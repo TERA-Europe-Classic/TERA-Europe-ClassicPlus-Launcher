@@ -17,7 +17,9 @@
 //! - Name table: includes everything `texture_encoder::encode_texture2d_body`
 //!   needs plus `None`, `Core`, `Engine`, `Package`, `Class`,
 //!   `ObjectReferencer`, `Texture2D`, `ReferencedObjects`, `ArrayProperty`,
-//!   the composite prefix, the parent package name, and the texture name.
+//!   the composite prefix, and the texture name. The parent package name is
+//!   intentionally NOT interned — vanilla I147_dup omits it too, since the
+//!   mapper handles parent-resolution at runtime.
 //! - Imports (5 entries, 28 bytes each):
 //!   - 0: Core.Package
 //!   - 1: Core.Engine.ObjectReferencer
@@ -122,11 +124,13 @@ pub fn author_composite_slice(
     let referenced_objects_idx = name_builder.intern("ReferencedObjects");
     let array_property_idx = name_builder.intern("ArrayProperty");
     let composite_prefix_idx = name_builder.intern(composite_prefix);
-    // Parent package name interned for downstream tooling that may scan the
-    // name table for cross-references (e.g. mapper integration in Task 4).
-    // Texture's outer is still 0 — the parent_package_name isn't used in the
-    // export hierarchy here, mirroring I147_dup.
-    let _parent_package_name_idx = name_builder.intern(parent_package_name);
+    // parent_package_name is reserved for Task 4 (mapper_extend) which references
+    // it as the logical-path parent. It does NOT need to live in this slice's
+    // name table — vanilla I147_dup's name table contains only the composite
+    // prefix and texture name, never the parent package name. The mapper rows
+    // handle the S1UIRES_Skin.PaperDoll_<...> resolution at runtime. We accept
+    // the parameter to keep the API stable for the caller in Task 4.
+    let _ = parent_package_name; // silence unused-param warning
     let texture_name_idx = name_builder.intern(texture_name);
 
     let names = name_builder.into_entries();
@@ -461,7 +465,6 @@ fn patch_bulk_offsets(
     names: &[super::gpk_package::GpkNameEntry],
 ) -> Result<(), String> {
     use super::gpk_package::GpkExportEntry;
-    let body_len = out.len() - body_offset;
     let body = out[body_offset..].to_vec();
     let temp_export = GpkExportEntry {
         class_index: 0,
@@ -470,7 +473,7 @@ fn patch_bulk_offsets(
         object_name: String::new(),
         object_path: String::new(),
         class_name: Some("Core.Engine.Texture2D".to_string()),
-        serial_size: body_len as u32,
+        serial_size: body.len() as u32,
         serial_offset: Some(body_offset as u32),
         export_flags: 0,
         payload: body,
@@ -515,17 +518,14 @@ mod tests {
 
         let pkg = gpk_package::parse_package(&bytes).expect("re-parse");
         assert_eq!(pkg.summary.file_version, 897);
+        assert_eq!(pkg.exports.len(), 3);
         assert!(pkg.summary.package_name.starts_with("MOD:"));
-        assert!(pkg.exports.iter().any(|e| matches!(
-            e.class_name.as_deref(),
-            Some("Core.Engine.Texture2D") | Some("Core.Texture2D")
-        )));
-
         let tex = pkg
             .exports
             .iter()
             .find(|e| e.object_path.ends_with("PaperDoll_HighElf_F"))
             .expect("texture export");
+        assert_eq!(tex.class_name.as_deref(), Some("Core.Engine.Texture2D"));
         let mip = gpk_resource_inspector::first_mip_bulk_location(tex, &pkg.names, true)
             .expect("locate mip");
         let mip_bytes = &tex.payload[mip.payload_offset..mip.payload_offset + mip.payload_len];
