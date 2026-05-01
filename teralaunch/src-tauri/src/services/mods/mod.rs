@@ -13,6 +13,7 @@
 pub mod catalog;
 #[cfg(test)]
 pub mod catalog_audit;
+pub mod composite_author;
 pub mod composite_extract;
 pub mod dds;
 pub mod external_app;

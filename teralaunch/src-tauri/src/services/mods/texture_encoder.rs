@@ -12,10 +12,6 @@
 //! encoder's output back through the inspector to confirm byte-for-byte
 //! agreement.
 
-#![allow(dead_code)]
-// Task 2 output. Task 3 (composite_author.rs) is the consumer; remove this
-// allow when that lands.
-
 use super::dds::{DdsImage, DdsPixelFormat};
 use super::gpk_package::GpkNameEntry;
 
