@@ -62,6 +62,20 @@ fn run() -> Result<(), String> {
             /* strip_bg_prefix = */ false,
         )?;
     }
+    // PaperDoll-specific textures (slot icons, frames, decorations) live in
+    // foglio's PaperDoll/p87 directory and target the S1UI_PaperDoll
+    // namespace — separate from S1UIRES_Skin (silhouettes) and S1UIRES_Component
+    // (shared widgets). The slot-frame visuals are likely here.
+    let paperdoll_p87 = foglio_root.join("PaperDoll").join("p87");
+    let mut p87_count = 0usize;
+    if paperdoll_p87.is_dir() {
+        p87_count = process_dir(
+            &paperdoll_p87, &staging, &mut idx, &mut additions,
+            "modres_pdtex", "modres_paperdoll_pdtex", "S1UI_PaperDoll",
+            /* strip_bg_prefix = */ false,
+        )?;
+    }
+    let _ = p87_count;
 
     let manifest_path = staging.join("install-manifest.json");
     let json_entries: Vec<serde_json::Value> = additions.iter().map(|a| serde_json::json!({
