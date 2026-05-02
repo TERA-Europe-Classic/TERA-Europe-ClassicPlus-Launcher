@@ -478,6 +478,11 @@ fn patch_bulk_offsets(
         export_flags: 0,
         payload: body,
         payload_fingerprint: String::new(),
+        unk1: 0,
+        unk2: 0,
+        unk4: 0,
+        guid: [0u8; 16],
+        unk_extra_ints: Vec::new(),
     };
     let locations = gpk_resource_inspector::texture_bulk_locations(&temp_export, names, true)
         .map_err(|e| format!("locating texture bulk fields for offset patching: {e}"))?;

@@ -20,7 +20,10 @@ pub mod external_app;
 pub mod gpk;
 pub mod gpk_package;
 pub mod gpk_patch_applier;
+#[cfg(test)]
 pub mod gpk_property;
+#[cfg(test)]
+pub mod gpk_transform;
 pub mod gpk_patch_deploy;
 pub mod gpk_resource_inspector;
 pub mod manifest_store;

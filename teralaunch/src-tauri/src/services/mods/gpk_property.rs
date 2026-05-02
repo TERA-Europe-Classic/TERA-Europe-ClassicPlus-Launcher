@@ -1,7 +1,3 @@
-// Task 1 of the x32→x64 transformer pipeline.  The public API is consumed by
-// Task 5 (the transformer itself) which is not yet written.  Until then, allow
-// dead-code lints rather than force-wiring an incomplete pipeline.
-#![allow(dead_code)]
 
 //! UE3 property-block parser for TERA GPK exports.
 //!
@@ -218,6 +214,49 @@ fn parse_byte_property(
             value: 0,
             name_value: Some(name),
         })
+    }
+}
+
+/// Same as `parse_properties` but also returns the number of bytes consumed
+/// from `bytes` by the property block (including the None terminator).
+///
+/// Used by the x32→x64 transformer to determine where the property block ends
+/// so trailing bytes (mip tables, sound data, etc.) can be copied verbatim.
+pub fn parse_properties_with_consumed(
+    bytes: &[u8],
+    arch: ArchKind,
+    names: &[GpkNameEntry],
+) -> Result<(Vec<Property>, usize), String> {
+    let mut cursor = 0usize;
+    let mut props = Vec::new();
+
+    loop {
+        let name_idx = read_u64(bytes, &mut cursor)?;
+        let name = lookup_name(names, name_idx)?;
+
+        if name == "None" {
+            props.push(Property {
+                name: "None".into(),
+                type_name: "None".into(),
+                array_index: 0,
+                value: PropertyValue::None,
+            });
+            return Ok((props, cursor));
+        }
+
+        let type_idx = read_u64(bytes, &mut cursor)?;
+        let type_name = lookup_name(names, type_idx)?;
+        let size = read_i32(bytes, &mut cursor)? as usize;
+        let array_index = read_i32(bytes, &mut cursor)?;
+
+        let value = parse_value(bytes, &mut cursor, &type_name, size, arch, names)?;
+
+        props.push(Property {
+            name,
+            type_name,
+            array_index,
+            value,
+        });
     }
 }
 

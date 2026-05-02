@@ -1,0 +1,68 @@
+//! Integration test for the x32→x64 GPK transformer.
+//!
+//! Verifies that `transform_x32_to_x64` produces a file that `parse_package`
+//! accepts as x64, with the same export/import/name counts as the original.
+
+#[path = "../src/services/mods/test_fixtures.rs"]
+mod test_fixtures;
+
+#[allow(dead_code, unused_imports)]
+#[path = "../src/services/mods/gpk_package.rs"]
+mod gpk_package;
+
+#[allow(dead_code, unused_imports)]
+#[path = "../src/services/mods/gpk_property.rs"]
+mod gpk_property;
+
+#[allow(dead_code, unused_imports)]
+#[path = "../src/services/mods/gpk_transform.rs"]
+mod gpk_transform;
+
+use gpk_package::parse_package;
+use gpk_property::{parse_properties, ArchKind};
+use gpk_transform::transform_x32_to_x64;
+
+#[test]
+fn x32_minimap_transforms_to_parseable_x64() {
+    let x32 = include_bytes!("fixtures/minimap_x32.gpk");
+    let x64 = transform_x32_to_x64(x32).expect("transform");
+
+    let pkg = parse_package(&x64).expect("parse transformed");
+    assert_eq!(pkg.summary.file_version, 897, "must produce x64 file version");
+
+    let original = parse_package(x32).expect("parse original");
+    assert_eq!(
+        pkg.summary.export_count,
+        original.summary.export_count,
+        "export count must be preserved"
+    );
+    assert_eq!(
+        pkg.summary.name_count,
+        original.summary.name_count,
+        "name count must be preserved"
+    );
+    assert_eq!(
+        pkg.summary.import_count,
+        original.summary.import_count,
+        "import count must be preserved"
+    );
+
+    // Spot-check: first Texture2D export should have a parseable x64 property block.
+    let first_tex = pkg
+        .exports
+        .iter()
+        .find(|e| {
+            matches!(
+                e.class_name.as_deref(),
+                Some("Core.Engine.Texture2D") | Some("Core.Texture2D")
+            )
+        })
+        .expect("at least one Texture2D survives");
+    let prop_block = &first_tex.payload[4..];
+    let props = parse_properties(prop_block, ArchKind::X64, &pkg.names)
+        .expect("parse transformed property block as x64");
+    assert!(
+        props.iter().any(|p| p.name == "None"),
+        "must terminate with None"
+    );
+}

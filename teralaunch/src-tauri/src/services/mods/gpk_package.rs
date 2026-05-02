@@ -133,6 +133,12 @@ pub struct GpkExportEntry {
     pub export_flags: u32,
     pub payload: Vec<u8>,
     pub payload_fingerprint: String,
+    // Round-trip fields — captured by parse_exports, written back by the x32→x64 transformer.
+    pub unk1: u64,
+    pub unk2: u64,
+    pub unk4: u32,
+    pub guid: [u8; 16],
+    pub unk_extra_ints: Vec<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -220,6 +226,11 @@ struct RawExport {
     serial_size: u32,
     serial_offset: Option<u32>,
     export_flags: u32,
+    unk1: u64,
+    unk2: u64,
+    unk4: u32,
+    guid: [u8; 16],
+    unk_extra_ints: Vec<u32>,
 }
 
 /// Returns the uncompressed full-file representation of a GPK. For
@@ -749,8 +760,8 @@ fn parse_exports(
         let super_index = read_i32_le(bytes, &mut offset)?;
         let package_index = read_i32_le(bytes, &mut offset)?;
         let object_name_index = read_i32_le(bytes, &mut offset)?;
-        let _unk1 = read_u64_le(bytes, &mut offset)?;
-        let _unk2 = read_u64_le(bytes, &mut offset)?;
+        let unk1 = read_u64_le(bytes, &mut offset)?;
+        let unk2 = read_u64_le(bytes, &mut offset)?;
         let serial_size = read_u32_le(bytes, &mut offset)?;
         let serial_offset = if serial_size > 0 {
             Some(read_u32_le(bytes, &mut offset)?)
@@ -759,9 +770,14 @@ fn parse_exports(
         };
         let export_flags = read_u32_le(bytes, &mut offset)?;
         let unk_header_count = read_u32_le(bytes, &mut offset)? as usize;
-        let _unk4 = read_u32_le(bytes, &mut offset)?;
-        skip_exact(bytes, &mut offset, 16)?; // guid
-        skip_exact(bytes, &mut offset, unk_header_count.saturating_mul(4))?;
+        let unk4 = read_u32_le(bytes, &mut offset)?;
+        let guid_slice = read_slice(bytes, &mut offset, 16)?;
+        let mut guid = [0u8; 16];
+        guid.copy_from_slice(guid_slice);
+        let mut unk_extra_ints = Vec::with_capacity(unk_header_count);
+        for _ in 0..unk_header_count {
+            unk_extra_ints.push(read_u32_le(bytes, &mut offset)?);
+        }
         raw.push(RawExport {
             class_index,
             super_index,
@@ -770,6 +786,11 @@ fn parse_exports(
             serial_size,
             serial_offset,
             export_flags,
+            unk1,
+            unk2,
+            unk4,
+            guid,
+            unk_extra_ints,
         });
     }
 
@@ -812,6 +833,11 @@ fn parse_exports(
             export_flags: item.export_flags,
             payload,
             payload_fingerprint,
+            unk1: item.unk1,
+            unk2: item.unk2,
+            unk4: item.unk4,
+            guid: item.guid,
+            unk_extra_ints: item.unk_extra_ints.clone(),
         });
     }
 

@@ -8,7 +8,6 @@
 //! `super::super` resolves to this integration-test crate root.  We satisfy
 //! that by providing a re-exported `test_fixtures` module here.
 
-#[allow(dead_code)]
 #[path = "../src/services/mods/test_fixtures.rs"]
 mod test_fixtures;
 
@@ -20,8 +19,8 @@ mod gpk_package;
 #[path = "../src/services/mods/gpk_property.rs"]
 mod gpk_property;
 
-use gpk_package::parse_package;
-use gpk_property::{parse_properties, write_properties, ArchKind, PropertyValue};
+use gpk_package::{parse_package, GpkNameEntry};
+use gpk_property::{parse_properties, write_properties, ArchKind, Property, PropertyValue};
 
 /// Uses the foglio1024 minimap x32 GPK (file_version=610) as a real fixture.
 /// Each Texture2D export has 9 properties: SizeX, SizeY, Format,
@@ -195,4 +194,39 @@ fn x32_property_block_writes_back_byte_identical() {
         original,
         "round-trip must be byte-identical"
     );
+}
+
+#[test]
+fn x32_to_x64_writer_shrinks_bool_property_block() {
+    // Synthetic name table: the writer needs to find these names by index.
+    let names = vec![
+        GpkNameEntry { name: "Foo".into(), flags: 0 },
+        GpkNameEntry { name: "BoolProperty".into(), flags: 0 },
+        GpkNameEntry { name: "None".into(), flags: 0 },
+    ];
+    let props = vec![
+        Property {
+            name: "Foo".into(),
+            type_name: "BoolProperty".into(),
+            array_index: 0,
+            value: PropertyValue::Bool(true),
+        },
+        Property {
+            name: "None".into(),
+            type_name: "None".into(),
+            array_index: 0,
+            value: PropertyValue::None,
+        },
+    ];
+
+    let mut x32_out = Vec::new();
+    write_properties(&props, ArchKind::X32, &names, &mut x32_out).expect("x32 write");
+    let mut x64_out = Vec::new();
+    write_properties(&props, ArchKind::X64, &names, &mut x64_out).expect("x64 write");
+
+    // Header (24) + bool value (4 x32 / 1 x64) + None terminator (8 bytes name index only)
+    assert_eq!(x32_out.len(), 24 + 4 + 8);
+    assert_eq!(x64_out.len(), 24 + 1 + 8);
+    assert_eq!(x32_out.len() - x64_out.len(), 3,
+        "x32 BoolProperty stores 4 bytes, x64 stores 1 — savings = 3 bytes per BoolProperty");
 }
