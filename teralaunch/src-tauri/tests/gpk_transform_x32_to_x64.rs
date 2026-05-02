@@ -10,11 +10,11 @@ mod test_fixtures;
 #[path = "../src/services/mods/gpk_package.rs"]
 mod gpk_package;
 
-#[allow(dead_code, unused_imports)]
+#[allow(unused_imports)]
 #[path = "../src/services/mods/gpk_property.rs"]
 mod gpk_property;
 
-#[allow(dead_code, unused_imports)]
+#[allow(unused_imports)]
 #[path = "../src/services/mods/gpk_transform.rs"]
 mod gpk_transform;
 
