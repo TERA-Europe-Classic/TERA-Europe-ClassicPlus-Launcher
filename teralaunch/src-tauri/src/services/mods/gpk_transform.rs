@@ -1,3 +1,7 @@
+// Tasks 8-9 will wire runtime consumers (drop-in install + Tauri command
+// routing). Until then, suppress dead-code warnings on the public API.
+#![allow(dead_code)]
+
 //! Transform a Classic (x32, FileVersion 610) GPK into a Modern (x64,
 //! FileVersion 897) GPK by re-encoding the header and every export's
 //! property block. Output is uncompressed (compression_flags = 0).

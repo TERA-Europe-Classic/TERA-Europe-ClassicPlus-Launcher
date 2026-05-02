@@ -1,3 +1,6 @@
+// Tasks 8-9 will wire runtime consumers (drop-in install + Tauri command
+// routing). Until then, suppress dead-code warnings on the public API.
+#![allow(dead_code)]
 
 //! UE3 property-block parser for TERA GPK exports.
 //!
