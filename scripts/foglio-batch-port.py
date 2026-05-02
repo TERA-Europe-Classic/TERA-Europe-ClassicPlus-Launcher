@@ -38,6 +38,52 @@ RELEASE_TAG = "foglio-x64-port-batch-2026-05-01"
 
 SLICE_BIN = LAUNCHER / "teralaunch/src-tauri/target/release/extract-vanilla-slice-raw.exe"
 SPLICE_BIN = LAUNCHER / "teralaunch/src-tauri/target/release/splice-x32-payloads.exe"
+SPLICE_SHIFT_BIN = LAUNCHER / "teralaunch/src-tauri/target/release/splice-shift-aware.exe"
+
+
+# Cache: package_name (lowercase) -> first matching logical path in v100 PkgMapper.clean
+_PKG_FIRST_OBJECT: Optional[dict[str, str]] = None
+
+
+def build_package_first_object_map() -> dict[str, str]:
+    """Decrypt PkgMapper.clean, return {package_name_lower: first_full_logical_path}.
+    Used as a fallback when our naming convention can't guess the primary object."""
+    pkg_clean = GAME_ROOT / "S1Game/CookedPC/PkgMapper.clean"
+    enc = pkg_clean.read_bytes()
+    KEY1 = [12, 6, 9, 4, 3, 14, 1, 10, 13, 2, 7, 15, 0, 8, 5, 11]
+    KEY2 = b"GeneratePackageMapper"
+    out = bytearray(enc)
+    n = len(out)
+    blocks = n // 16
+    for b in range(blocks):
+        off = b * 16
+        original = bytes(out[off:off + 16])
+        for i in range(16):
+            out[off + i] = original[KEY1[i]]
+    a, b = 1, n - 1
+    iters = (n // 2 + 1) // 2
+    for _ in range(iters):
+        if a < n and b < n:
+            out[a], out[b] = out[b], out[a]
+            a += 2
+            b -= 2
+    for i in range(n):
+        out[i] ^= KEY2[i % 21]
+    if len(out) >= 2 and out[0] == 0xFF and out[1] == 0xFE:
+        out = out[2:]
+    plain = bytes(out).decode("utf-8", errors="replace")
+    result: dict[str, str] = {}
+    for cell in plain.split("|"):
+        cell = cell.strip()
+        if not cell or "," not in cell:
+            continue
+        uid = cell.split(",", 1)[0]
+        if "." not in uid:
+            continue
+        pkg = uid.split(".", 1)[0].lower()
+        if pkg not in result:
+            result[pkg] = uid
+    return result
 
 
 def derive_target_object_path(mod_id: str, gpk_filename: str) -> Optional[str]:
@@ -63,25 +109,62 @@ def derive_target_object_path(mod_id: str, gpk_filename: str) -> Optional[str]:
         # (the v100 PkgMapper for Awaken_SpiritKing uses
         # `Package.Skel.Object` not the simple `Package.Object` form).
         "foglio1024.toolbox-thinkblob": "Awaken_SpiritKing.Skel.Awaken_SpiritKing_Skel",
+        # taorelia: foglio source has 'Inventory' (no _dup); v100 routes
+        # InventoryWindow widget via S1UI_InventoryWindow.Inventory.
+        "taorelia.restyle-inventory": "S1UI_InventoryWindow.Inventory",
+        # teralove.targetinfo: target the TargetInfo widget directly so the
+        # rename TargetInfo=TargetInfo_dup picks up the GFxMovieInfo.
+        "teralove.targetinfo": "S1UI_TargetInfo.TargetInfo",
+        # deathdefying catalog data quality: URL files are actually ProgressBar
+        # mods (FlightGauge-style removers). Re-target to the real widget.
+        "deathdefying.ui-remover-quest-tracker": "S1UI_ProgressBar.ProgressBar",
+        "deathdefying.ui-remover-tera-rewards": "S1UI_ProgressBar.ProgressBar",
     }
     if mod_id in OVERRIDES:
         return OVERRIDES[mod_id]
 
     pkg_name = gpk_filename.replace(".gpk", "")
-    if pkg_name.startswith("S1UI_"):
-        widget = pkg_name[5:]  # strip S1UI_
-        return f"{pkg_name}.{widget}"
     if pkg_name == "Icon_Items":
-        # Multi-thousand-object package. Without per-icon disambiguation
-        # we can't auto-port — skip.
-        return None
-    if pkg_name.startswith("Icon_") or pkg_name.startswith("FX_"):
-        return None
-    if pkg_name == "Awaken_SpiritKing":
-        return None  # toolbox-thinkblob — single object but unusual structure
+        return None  # multi-thousand-object package; out of scope
     if pkg_name == "TexturedFonts":
-        return None  # Type D
-    return None
+        return None  # not in v100 vanilla
+
+    global _PKG_FIRST_OBJECT
+    if _PKG_FIRST_OBJECT is None:
+        _PKG_FIRST_OBJECT = build_package_first_object_map()
+
+    # Helper: check whether a logical path actually exists in PkgMapper.clean.
+    def has_path(logical: str) -> bool:
+        pkg, _, _ = logical.partition(".")
+        first = _PKG_FIRST_OBJECT.get(pkg.lower())
+        if first is None:
+            return False
+        # Either it's a hit (path found verbatim) or any path in this package
+        # would do — but we only stored ONE per package, so check the package
+        # has SOME path. The actual case-sensitive lookup happens later in the
+        # extract step; this just gates "is the package mapped at all".
+        return True
+
+    # Try Package.WidgetName conventions (strip common prefixes).
+    convention_candidates: list[str] = []
+    if pkg_name.startswith("S1UI_"):
+        convention_candidates.append(f"{pkg_name}.{pkg_name[5:]}")
+    if pkg_name.startswith("S1Data_"):
+        convention_candidates.append(f"{pkg_name}.{pkg_name[7:]}")
+    if pkg_name.startswith("Modern_"):
+        convention_candidates.append(f"{pkg_name}.{pkg_name[7:]}")
+    convention_candidates.append(f"{pkg_name}.{pkg_name}")  # Package.Package
+
+    # If any convention is in the smart map (i.e. the package is in
+    # PkgMapper at all), prefer the package's actual first-object instead
+    # of the convention guess (which might not exist).
+    pkg_lower = pkg_name.lower()
+    if pkg_lower in _PKG_FIRST_OBJECT:
+        return _PKG_FIRST_OBJECT[pkg_lower]
+
+    # Package not in PkgMapper at all — return the convention so the
+    # caller logs a clear error.
+    return convention_candidates[0]
 
 
 def derive_gpk_filename(catalog_entry: dict) -> Optional[str]:
@@ -120,8 +203,16 @@ def main() -> int:
     catalog_path = CATALOG_REPO / "catalog.json"
     catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
 
-    foglio = [m for m in catalog["mods"] if m["id"].startswith("foglio1024.") and "TERA-Europe-Classic" not in m["download_url"]]
-    print(f"Catalog has {len(foglio)} unported foglio entries")
+    # ALL unported GPK mods (not just foglio). Anything where:
+    #   kind == 'gpk' AND download_url doesn't already point to our release CDN
+    #   AND not already explicitly marked compatible_arch=x32
+    foglio = [
+        m for m in catalog["mods"]
+        if m.get("kind") == "gpk"
+        and "TERA-Europe-Classic" not in m["download_url"]
+        and m.get("compatible_arch") != "x32"
+    ]
+    print(f"Catalog has {len(foglio)} unported GPK entries (any author)")
 
     successes: list[tuple[str, dict]] = []
     skips: list[tuple[str, str]] = []
@@ -199,6 +290,41 @@ def main() -> int:
                 break
             last_err = (err or out).strip().split("\n")[-3:]
             last_err = " | ".join(last_err)[:300]
+        if not spliced:
+            # Fallback: shift-aware splice for tables-in-middle layouts
+            # (e.g. servant-storage where some bodies live after the export
+            # table). Tries the same rename combinations.
+            shift_attempts = [
+                ([f"--rename={widget}={widget}_dup"], f"shift {widget}={widget}_dup"),
+                ([f"--rename={widget}={wl}_dup"], f"shift {widget}={wl}_dup"),
+                ([f"--rename={wl}={wl}_dup"], f"shift {wl}={wl}_dup"),
+            ]
+            # Try multiple target_export forms with each rename combination,
+            # preferring widget casing variants.
+            target_variants = [
+                f"{widget}_dup",
+                f"{wl}_dup",
+                widget,
+                wl,
+            ]
+            for target_form in target_variants:
+                if spliced: break
+                for extra_args, label in shift_attempts:
+                    rename_pair = extra_args[0].replace("--rename=", "")
+                    code, out, err = run([
+                        str(SPLICE_SHIFT_BIN),
+                        "--vanilla-x64", str(vanilla_path),
+                        "--modded-x32", str(x32_path),
+                        "--output", str(out_path),
+                        "--target-export", target_form,
+                        "--rename", rename_pair,
+                    ])
+                    if code == 0:
+                        print(f"  shift-aware splice succeeded: target='{target_form}', {label}")
+                        spliced = True
+                        break
+                    last_err = (err or out).strip().split("\n")[-3:]
+                    last_err = " | ".join(last_err)[:300]
         if not spliced:
             skips.append((mod_id, f"splice failed: {last_err}"))
             continue
