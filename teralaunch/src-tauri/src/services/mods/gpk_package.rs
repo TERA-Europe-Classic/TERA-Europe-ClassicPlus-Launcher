@@ -25,6 +25,17 @@ const PACKAGE_MAGIC: u32 = 0x9E2A83C1;
 pub const X64_VERSION_THRESHOLD: u16 = 0x381;
 const CHUNK_BLOCK_SIGNATURE: u32 = PACKAGE_MAGIC;
 
+/// Target architecture for serialization. Mirrors `gpk_property::ArchKind`
+/// but lives here so `gpk_package` can be compiled independently of
+/// `gpk_property` (e.g. in bins that load it via `#[path]`).
+// Used by serialize_summary (Task 3b) and the upcoming x32→x64 converter (Task 4).
+#[allow(dead_code)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ArchKind {
+    X32,
+    X64,
+}
+
 /// Reads the FileVersion (u16 LE at offset 4) from a GPK header. Returns
 /// `None` if the buffer is too small or doesn't start with the package
 /// magic. Used by the install flow to refuse arch-mismatched mods before
@@ -75,6 +86,23 @@ pub struct GpkPackageSummary {
     pub import_offset: u32,
     pub depends_offset: u32,
     pub compression_flags: u32,
+    // Fields read but previously discarded by parse_package:
+    pub guid: [u8; 16],
+    pub generations: Vec<GpkGeneration>,
+    pub engine_version: u32,
+    pub cooker_version: u32,
+    // x64-only header fields (FileVersion >= 0x381). None on x32 packages.
+    pub import_export_guids_offset: Option<u32>,
+    pub import_guids_count: Option<u32>,
+    pub export_guids_count: Option<u32>,
+    pub thumbnail_table_offset: Option<u32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GpkGeneration {
+    pub export_count: u32,
+    pub name_count: u32,
+    pub net_object_count: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -304,20 +332,42 @@ pub fn parse_package(bytes: &[u8]) -> Result<GpkPackage, String> {
     let import_offset = read_u32_le(bytes, &mut cursor)?;
     let depends_offset = read_u32_le(bytes, &mut cursor)?;
 
-    if is_x64 {
-        // x64 (v100.02) inserts 4 extra u32 fields here per TeraCoreLib
-        // FStructs.cpp: ImportExportGuidsOffset, ImportGuidsCount,
-        // ExportGuidsCount, ThumbnailTableOffset (16 bytes total).
-        skip_exact(bytes, &mut cursor, 16)?;
-    }
+    let (import_export_guids_offset, import_guids_count, export_guids_count, thumbnail_table_offset) =
+        if is_x64 {
+            // x64 (v100.02) inserts 4 extra u32 fields here per TeraCoreLib
+            // FStructs.cpp: ImportExportGuidsOffset, ImportGuidsCount,
+            // ExportGuidsCount, ThumbnailTableOffset (16 bytes total).
+            let a = read_u32_le(bytes, &mut cursor)?;
+            let b = read_u32_le(bytes, &mut cursor)?;
+            let c = read_u32_le(bytes, &mut cursor)?;
+            let d = read_u32_le(bytes, &mut cursor)?;
+            (Some(a), Some(b), Some(c), Some(d))
+        } else {
+            (None, None, None, None)
+        };
 
-    skip_exact(bytes, &mut cursor, 16)?; // FGuid
+    let guid = {
+        let slice = read_slice(bytes, &mut cursor, 16)?;
+        let mut arr = [0u8; 16];
+        arr.copy_from_slice(slice);
+        arr
+    };
 
     let generation_count = read_u32_le(bytes, &mut cursor)? as usize;
-    skip_exact(bytes, &mut cursor, generation_count.saturating_mul(12))?;
+    let mut generations = Vec::with_capacity(generation_count);
+    for _ in 0..generation_count {
+        let ec = read_u32_le(bytes, &mut cursor)?;
+        let nc = read_u32_le(bytes, &mut cursor)?;
+        let noc = read_u32_le(bytes, &mut cursor)?;
+        generations.push(GpkGeneration {
+            export_count: ec,
+            name_count: nc,
+            net_object_count: noc,
+        });
+    }
 
-    let _engine_version = read_u32_le(bytes, &mut cursor)?;
-    let _cooker_version = read_u32_le(bytes, &mut cursor)?;
+    let engine_version = read_u32_le(bytes, &mut cursor)?;
+    let cooker_version = read_u32_le(bytes, &mut cursor)?;
     let compression_flags = read_u32_le(bytes, &mut cursor)?;
     let chunk_count = read_u32_le(bytes, &mut cursor)? as usize;
     let chunk_headers = read_chunk_headers(bytes, &mut cursor, chunk_count)?;
@@ -368,11 +418,136 @@ pub fn parse_package(bytes: &[u8]) -> Result<GpkPackage, String> {
             import_offset,
             depends_offset,
             compression_flags,
+            guid,
+            generations,
+            engine_version,
+            cooker_version,
+            import_export_guids_offset,
+            import_guids_count,
+            export_guids_count,
+            thumbnail_table_offset,
         },
         names,
         imports,
         exports,
     })
+}
+
+/// Serialize a `GpkPackageSummary` into the byte prefix that opens a GPK
+/// file, up to and including `chunk_count = 0` (uncompressed output).
+///
+/// The caller is responsible for patching the HeaderSize placeholder at
+/// offset 8–11 once the full header length is known.
+///
+/// For x32→x64 conversion (`arch == ArchKind::X64`) the four GUID-table
+/// fields (`import_export_guids_offset` etc.) are emitted from `summary`
+/// if present, or synthesised as safe zeros when the source was x32 and
+/// has no GUID tables. `import_export_guids_offset` falls back to
+/// `depends_offset` so the field points to a valid (empty) region.
+// Called by the gpk_header_transform integration test (Task 3c) and the
+// upcoming x32→x64 converter binary (Task 4). Not yet referenced in the
+// main application binary.
+#[allow(dead_code)]
+pub fn serialize_summary(
+    summary: &GpkPackageSummary,
+    arch: ArchKind,
+    out: &mut Vec<u8>,
+) -> Result<(), String> {
+    let is_x64 = matches!(arch, ArchKind::X64);
+
+    // Magic
+    out.extend_from_slice(&PACKAGE_MAGIC.to_le_bytes());
+
+    // FileVersion: normalise to canonical arch version
+    let file_version: u16 = if is_x64 { 897 } else { 610 };
+    out.extend_from_slice(&file_version.to_le_bytes());
+
+    // LicenseVersion: preserve from input
+    out.extend_from_slice(&summary.license_version.to_le_bytes());
+
+    // HeaderSize placeholder — caller patches once full header length is known
+    out.extend_from_slice(&0u32.to_le_bytes());
+
+    // PackageName as FString (i32 length+1 + bytes + null)
+    write_fstring(out, &summary.package_name);
+
+    // PackageFlags
+    out.extend_from_slice(&summary.package_flags.to_le_bytes());
+
+    // NameCount: x64 stores raw count; x32 cooked stores count + name_offset
+    let raw_name_count: u32 = if is_x64 {
+        summary.name_count
+    } else {
+        summary.name_count + summary.name_offset
+    };
+    out.extend_from_slice(&raw_name_count.to_le_bytes());
+
+    // NameOffset, ExportCount, ExportOffset, ImportCount, ImportOffset.
+    // These fields are stored on disk as i32 in the UE3 spec, but TERA offsets
+    // are always non-negative, so the LE byte representation is identical
+    // whether we treat them as u32 or i32 — emit the u32 bytes directly.
+    out.extend_from_slice(&summary.name_offset.to_le_bytes());
+    out.extend_from_slice(&summary.export_count.to_le_bytes());
+    out.extend_from_slice(&summary.export_offset.to_le_bytes());
+    out.extend_from_slice(&summary.import_count.to_le_bytes());
+    out.extend_from_slice(&summary.import_offset.to_le_bytes());
+
+    // DependsOffset (same reasoning — always non-negative in practice)
+    out.extend_from_slice(&summary.depends_offset.to_le_bytes());
+
+    // x64-only: ImportExportGuidsOffset, ImportGuidsCount, ExportGuidsCount,
+    // ThumbnailTableOffset (16 bytes). When converting from x32 (no GUID
+    // tables), use depends_offset for the offset field and zeros for the
+    // three counts — this is safe because chunk_count=0 means parsers will
+    // not try to read any table data.
+    if is_x64 {
+        let ieg_offset = summary
+            .import_export_guids_offset
+            .unwrap_or(summary.depends_offset);
+        let ig_count = summary.import_guids_count.unwrap_or(0);
+        let eg_count = summary.export_guids_count.unwrap_or(0);
+        let thumb_offset = summary.thumbnail_table_offset.unwrap_or(0);
+        out.extend_from_slice(&ieg_offset.to_le_bytes());
+        out.extend_from_slice(&ig_count.to_le_bytes());
+        out.extend_from_slice(&eg_count.to_le_bytes());
+        out.extend_from_slice(&thumb_offset.to_le_bytes());
+    }
+
+    // FGuid (16 bytes)
+    out.extend_from_slice(&summary.guid);
+
+    // GenerationCount + generations (3 x u32 each = 12 bytes)
+    out.extend_from_slice(&(summary.generations.len() as u32).to_le_bytes());
+    for gen in &summary.generations {
+        out.extend_from_slice(&gen.export_count.to_le_bytes());
+        out.extend_from_slice(&gen.name_count.to_le_bytes());
+        out.extend_from_slice(&gen.net_object_count.to_le_bytes());
+    }
+
+    // EngineVersion, CookerVersion
+    out.extend_from_slice(&summary.engine_version.to_le_bytes());
+    out.extend_from_slice(&summary.cooker_version.to_le_bytes());
+
+    // CompressionFlags (caller may override before calling for uncompressed output)
+    out.extend_from_slice(&summary.compression_flags.to_le_bytes());
+
+    // ChunkCount = 0 (Task 5 starts with uncompressed bodies; Task 6 adds
+    // the compressed-output path which will write real chunk headers here)
+    out.extend_from_slice(&0u32.to_le_bytes());
+
+    Ok(())
+}
+
+// Used exclusively by serialize_summary above.
+#[allow(dead_code)]
+fn write_fstring(out: &mut Vec<u8>, s: &str) {
+    // Encode as ASCII FString: i32 length (including null terminator) + bytes + null.
+    // The GPK FString format uses a negative length for UTF-16; all package
+    // names in the wild are ASCII so positive encoding is always correct here.
+    let len = (s.len() + 1) as i32;
+    out.extend_from_slice(&len.to_le_bytes());
+    out.extend_from_slice(s.as_bytes());
+    out.push(0);
 }
 
 fn read_chunk_headers(
