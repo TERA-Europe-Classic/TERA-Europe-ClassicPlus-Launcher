@@ -221,6 +221,161 @@ fn parse_byte_property(
     }
 }
 
+// ── Writer ────────────────────────────────────────────────────────────────────
+
+/// Write a UE3 property block into `out`.
+///
+/// `props` must end with a `Property { name: "None", … }` terminator (as
+/// returned by `parse_properties`).  Returns `Err` if the terminator is absent
+/// or if any name cannot be found in `names`.
+pub fn write_properties(
+    props: &[Property],
+    arch: ArchKind,
+    names: &[GpkNameEntry],
+    out: &mut Vec<u8>,
+) -> Result<(), String> {
+    let mut found_none = false;
+    for p in props {
+        let name_idx = encode_name_index(names, &p.name)?;
+        out.extend_from_slice(&name_idx.to_le_bytes());
+
+        if p.name == "None" {
+            found_none = true;
+            // None terminator: only the 8-byte name index; nothing else follows.
+            break;
+        }
+
+        let type_idx = encode_name_index(names, &p.type_name)?;
+        out.extend_from_slice(&type_idx.to_le_bytes());
+
+        let size = compute_value_size(&p.value, arch)? as i32;
+        out.extend_from_slice(&size.to_le_bytes());
+        out.extend_from_slice(&p.array_index.to_le_bytes());
+
+        write_value(&p.value, arch, names, out)?;
+    }
+
+    if !found_none {
+        return Err("property block missing None terminator".into());
+    }
+    Ok(())
+}
+
+/// Returns the value the parser sees in the on-disk `size` header field.
+///
+/// This is NOT the total bytes emitted by `write_value` — it excludes the
+/// arch-dependent overhead that the parser reads outside the size accounting
+/// (BoolProperty width, StructProperty inner_type prefix, x64 ByteProperty
+/// enum_type prefix).
+fn compute_value_size(value: &PropertyValue, _arch: ArchKind) -> Result<usize, String> {
+    let n = match value {
+        PropertyValue::Int(_) | PropertyValue::Float(_) | PropertyValue::Object(_) => 4,
+        PropertyValue::Bool(_) => 0,
+        PropertyValue::Byte {
+            name_value: Some(_),
+            ..
+        } => 8,
+        PropertyValue::Byte {
+            name_value: None, ..
+        } => 1,
+        PropertyValue::Name(_) => 8,
+        PropertyValue::Str(s) => {
+            if !s.is_ascii() {
+                return Err(format!(
+                    "StrProperty: non-ASCII string {s:?} is not supported"
+                ));
+            }
+            4 + s.len() + 1
+        }
+        PropertyValue::Struct { raw, .. } => raw.len(),
+        PropertyValue::Array(raw) => raw.len(),
+        PropertyValue::None => 0,
+    };
+    Ok(n)
+}
+
+/// Emit value bytes — exact inverse of `parse_value`.
+fn write_value(
+    value: &PropertyValue,
+    arch: ArchKind,
+    names: &[GpkNameEntry],
+    out: &mut Vec<u8>,
+) -> Result<(), String> {
+    match value {
+        PropertyValue::Int(v) => out.extend_from_slice(&v.to_le_bytes()),
+        PropertyValue::Float(v) => out.extend_from_slice(&v.to_le_bytes()),
+        PropertyValue::Bool(v) => match arch {
+            ArchKind::X32 => out.extend_from_slice(&(*v as i32).to_le_bytes()),
+            ArchKind::X64 => out.push(*v as u8),
+        },
+        PropertyValue::Byte {
+            enum_type,
+            value: raw_byte,
+            name_value,
+        } => {
+            // x64 only: 8-byte enum_type name-index prefix.
+            if arch == ArchKind::X64 {
+                let et_name = enum_type.as_deref().unwrap_or("None");
+                // An empty string or "None" maps to index 0 which the parser
+                // treats as "no enum type".
+                let et_idx = if et_name.is_empty() || et_name == "None" {
+                    0i64
+                } else {
+                    encode_name_index(names, et_name)?
+                };
+                out.extend_from_slice(&et_idx.to_le_bytes());
+            }
+            // Value: either 8-byte name index or raw byte.
+            if let Some(nv) = name_value {
+                let nv_idx = encode_name_index(names, nv)?;
+                out.extend_from_slice(&nv_idx.to_le_bytes());
+            } else {
+                out.push(*raw_byte);
+            }
+        }
+        PropertyValue::Name(s) => {
+            let idx = encode_name_index(names, s)?;
+            // i32 (lower 32 bits) + u32 padding 0 = 8 bytes total.
+            out.extend_from_slice(&(idx as i32).to_le_bytes());
+            out.extend_from_slice(&0u32.to_le_bytes());
+        }
+        PropertyValue::Object(v) => out.extend_from_slice(&v.to_le_bytes()),
+        PropertyValue::Str(s) => {
+            if !s.is_ascii() {
+                return Err(format!(
+                    "StrProperty: non-ASCII string {s:?} is not supported"
+                ));
+            }
+            let len = s.len() as i32 + 1; // +1 for null terminator
+            out.extend_from_slice(&len.to_le_bytes());
+            out.extend_from_slice(s.as_bytes());
+            out.push(0u8); // null terminator
+        }
+        PropertyValue::Struct { inner_type, raw } => {
+            let it_idx = encode_name_index(names, inner_type)?;
+            out.extend_from_slice(&it_idx.to_le_bytes());
+            out.extend_from_slice(raw);
+        }
+        PropertyValue::Array(raw) => out.extend_from_slice(raw),
+        PropertyValue::None => {
+            // Handled by write_properties directly; should not be reached.
+        }
+    }
+    Ok(())
+}
+
+/// Encode a name-table entry as an i64 for on-disk storage.
+///
+/// Lower 32 bits = the index into `names`; upper 32 bits = 0 (no numeric
+/// suffix in our data).
+fn encode_name_index(names: &[GpkNameEntry], wanted: &str) -> Result<i64, String> {
+    let idx = names
+        .iter()
+        .position(|e| e.name == wanted)
+        .ok_or_else(|| format!("name '{wanted}' not in name table"))?;
+    Ok(idx as i64)
+}
+
 // ── Low-level read helpers ────────────────────────────────────────────────────
 
 fn read_slice<'a>(bytes: &'a [u8], cursor: &mut usize, len: usize) -> Result<&'a [u8], String> {
