@@ -57,11 +57,11 @@ pub fn is_x64_file_version(file_version: u16) -> bool {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct ChunkHeader {
-    uncompressed_offset: u32,
-    uncompressed_size: u32,
-    compressed_offset: u32,
-    compressed_size: u32,
+pub struct ChunkHeader {
+    pub uncompressed_offset: u32,
+    pub uncompressed_size: u32,
+    pub compressed_offset: u32,
+    pub compressed_size: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -542,9 +542,43 @@ pub fn serialize_summary(
     // CompressionFlags (caller may override before calling for uncompressed output)
     out.extend_from_slice(&summary.compression_flags.to_le_bytes());
 
-    // ChunkCount = 0 (Task 5 starts with uncompressed bodies; Task 6 adds
-    // the compressed-output path which will write real chunk headers here)
+    // ChunkCount + chunk table entries.
     out.extend_from_slice(&0u32.to_le_bytes());
+
+    Ok(())
+}
+
+/// Like `serialize_summary` but also emits the chunk table immediately after
+/// `chunk_count`. Each entry is 16 bytes: `[uncompressed_offset | uncompressed_size
+/// | compressed_offset | compressed_size]`, all u32 LE.
+///
+/// Call this instead of `serialize_summary` when building a compressed output
+/// (compression_flags = 1 or 2). The `summary.compression_flags` field must
+/// already be set to the correct value by the caller.
+#[allow(dead_code)]
+pub fn serialize_summary_with_chunks(
+    summary: &GpkPackageSummary,
+    arch: ArchKind,
+    chunks: &[ChunkHeader],
+    out: &mut Vec<u8>,
+) -> Result<(), String> {
+    // Delegate to serialize_summary which always writes chunk_count=0, then
+    // patch the last 4 bytes (chunk_count field) to the real count and append
+    // the chunk table entries.
+    serialize_summary(summary, arch, out)?;
+
+    // Patch the chunk_count field that serialize_summary wrote as 0.
+    let count_pos = out.len() - 4;
+    let count = chunks.len() as u32;
+    out[count_pos..count_pos + 4].copy_from_slice(&count.to_le_bytes());
+
+    // Append the chunk table entries.
+    for ch in chunks {
+        out.extend_from_slice(&ch.uncompressed_offset.to_le_bytes());
+        out.extend_from_slice(&ch.uncompressed_size.to_le_bytes());
+        out.extend_from_slice(&ch.compressed_offset.to_le_bytes());
+        out.extend_from_slice(&ch.compressed_size.to_le_bytes());
+    }
 
     Ok(())
 }

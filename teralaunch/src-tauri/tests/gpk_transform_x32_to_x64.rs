@@ -20,7 +20,7 @@ mod gpk_transform;
 
 use gpk_package::parse_package;
 use gpk_property::{parse_properties, ArchKind};
-use gpk_transform::transform_x32_to_x64;
+use gpk_transform::{transform_x32_to_x64, transform_x32_to_x64_with, CompressionMode};
 
 #[test]
 fn x32_minimap_transforms_to_parseable_x64() {
@@ -65,4 +65,45 @@ fn x32_minimap_transforms_to_parseable_x64() {
         props.iter().any(|p| p.name == "None"),
         "must terminate with None"
     );
+}
+
+#[test]
+fn x32_minimap_transforms_to_lzo_compressed_x64_round_trips_on_parse() {
+    let x32 = include_bytes!("fixtures/minimap_x32.gpk");
+    let x64_lzo =
+        transform_x32_to_x64_with(x32, CompressionMode::Lzo).expect("transform lzo");
+
+    // The compressed output must be parseable and report LZO compression.
+    let pkg = parse_package(&x64_lzo).expect("parse compressed transformed");
+    assert_eq!(pkg.summary.file_version, 897, "must produce x64 file version");
+    assert_eq!(pkg.summary.compression_flags, 2, "must report LZO");
+
+    // Same export/import/name counts as original input.
+    let original = parse_package(x32).expect("parse original");
+    assert_eq!(
+        pkg.summary.export_count,
+        original.summary.export_count,
+        "export count must be preserved"
+    );
+    assert_eq!(
+        pkg.summary.name_count,
+        original.summary.name_count,
+        "name count must be preserved"
+    );
+
+    // Spot-check: Texture2D export survives parse-after-decompress.
+    let first_tex = pkg
+        .exports
+        .iter()
+        .find(|e| matches!(e.class_name.as_deref(), Some("Texture2D")))
+        .or_else(|| {
+            pkg.exports.iter().find(|e| {
+                matches!(
+                    e.class_name.as_deref(),
+                    Some("Core.Engine.Texture2D") | Some("Core.Texture2D")
+                )
+            })
+        })
+        .expect("Texture2D survives");
+    assert!(!first_tex.payload.is_empty(), "payload non-empty after roundtrip");
 }

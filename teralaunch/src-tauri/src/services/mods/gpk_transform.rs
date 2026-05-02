@@ -4,14 +4,45 @@
 
 //! Transform a Classic (x32, FileVersion 610) GPK into a Modern (x64,
 //! FileVersion 897) GPK by re-encoding the header and every export's
-//! property block. Output is uncompressed (compression_flags = 0).
-//! Task 6 will add LZO compression.
+//! property block. Output can be uncompressed (compression_flags = 0) or
+//! LZO-compressed (compression_flags = 2, chunked body).
 
 use super::gpk_package::{
-    parse_package, serialize_summary, GpkExportEntry, GpkImportEntry, GpkNameEntry,
+    parse_package, serialize_summary, serialize_summary_with_chunks, ChunkHeader,
+    GpkExportEntry, GpkImportEntry, GpkNameEntry,
 };
 use super::gpk_package::ArchKind as PkgArch;
 use super::gpk_property::{parse_properties_with_consumed, write_properties, ArchKind};
+
+const LZO_BLOCK_SIZE: usize = 131_072; // 128 KiB per block
+const LZO_CHUNK_CAP: usize = LZO_BLOCK_SIZE * 256; // 32 MiB per chunk (256 blocks max)
+
+/// Output compression mode for `transform_x32_to_x64_with`.
+pub enum CompressionMode {
+    /// No compression (compression_flags = 0). Equivalent to calling
+    /// `transform_x32_to_x64` directly.
+    None,
+    /// LZO chunked compression (compression_flags = 2). Body is split into
+    /// 32 MiB chunks of 128 KiB blocks, each block LZO-compressed.
+    Lzo,
+}
+
+/// Transform an x32 (FileVersion 610) GPK into an x64 (FileVersion 897) GPK
+/// with selectable output compression.
+///
+/// `None` is identical to calling `transform_x32_to_x64`.
+/// `Lzo` chunks the body with 32 MiB chunks / 128 KiB blocks and writes
+/// compression_flags=2.
+pub fn transform_x32_to_x64_with(
+    x32_bytes: &[u8],
+    mode: CompressionMode,
+) -> Result<Vec<u8>, String> {
+    let uncompressed = transform_x32_to_x64_inner(x32_bytes)?;
+    match mode {
+        CompressionMode::None => Ok(uncompressed),
+        CompressionMode::Lzo => compress_lzo(uncompressed),
+    }
+}
 
 /// Transform an x32 (FileVersion 610) GPK into an x64 (FileVersion 897) GPK.
 ///
@@ -20,9 +51,13 @@ use super::gpk_property::{parse_properties_with_consumed, write_properties, Arch
 /// Trailing payload bytes (mip tables, sound data) are preserved verbatim.
 /// Output is uncompressed regardless of input compression.
 pub fn transform_x32_to_x64(x32_bytes: &[u8]) -> Result<Vec<u8>, String> {
+    transform_x32_to_x64_with(x32_bytes, CompressionMode::None)
+}
+
+fn transform_x32_to_x64_inner(x32_bytes: &[u8]) -> Result<Vec<u8>, String> {
     let pkg = parse_package(x32_bytes)?;
     if pkg.summary.file_version >= 0x381 {
-        return Err("input is already x64".into());
+        return Err("input is already x64".to_string());
     }
 
     // Step 1: re-encode each export's property block.
@@ -242,4 +277,140 @@ fn find_name_i32(names: &[GpkNameEntry], wanted: &str) -> Result<i32, String> {
         .position(|e| e.name == wanted)
         .map(|i| i as i32)
         .ok_or_else(|| format!("name '{wanted}' not found in name table"))
+}
+
+// ---------------------------------------------------------------------------
+// LZO compression path (Task 6)
+// ---------------------------------------------------------------------------
+
+const CHUNK_BLOCK_SIGNATURE: u32 = 0x9E2A83C1;
+
+/// Take a fully-assembled uncompressed x64 GPK and rewrite it with an
+/// LZO-chunked body (compression_flags = 2).
+///
+/// Layout of the returned bytes:
+///   [header with chunk_count + chunk table]
+///   [chunk data blocks, back-to-back]
+///
+/// The `name_offset` from the uncompressed file marks the start of the logical
+/// body. The header prefix is re-serialised with updated compression_flags,
+/// chunk_count, and chunk table; everything from name_offset onward is split
+/// into 32 MiB chunks of 128 KiB LZO-compressed blocks.
+fn compress_lzo(uncompressed: Vec<u8>) -> Result<Vec<u8>, String> {
+    let pkg = parse_package(&uncompressed)?;
+    let name_offset = pkg.summary.name_offset as usize;
+
+    if name_offset > uncompressed.len() {
+        return Err(format!(
+            "name_offset {name_offset} exceeds uncompressed GPK length {}",
+            uncompressed.len()
+        ));
+    }
+
+    let body = &uncompressed[name_offset..];
+
+    // Compress each 32 MiB chunk.
+    let chunk_bodies: Vec<Vec<u8>> = body
+        .chunks(LZO_CHUNK_CAP)
+        .map(compress_one_chunk)
+        .collect::<Result<Vec<_>, _>>()?;
+
+    // Build the updated summary.
+    let mut summary = pkg.summary.clone();
+    summary.compression_flags = 2;
+    // Set the PKG_Compressed bit (0x02000000).
+    summary.package_flags |= 0x02000000;
+
+    // Compute header + chunk-table size. serialize_summary emits chunk_count=0,
+    // so base_header_size is the pre-table size; chunk table adds chunk_count*16.
+    let chunk_count = chunk_bodies.len();
+    let mut header_probe = Vec::new();
+    serialize_summary(&summary, PkgArch::X64, &mut header_probe)?;
+    let base_header_size = header_probe.len();
+    let chunk_table_size = chunk_count * 16;
+    let total_header_size = base_header_size + chunk_table_size;
+
+    // Compute per-chunk header entries.
+    let mut chunk_headers: Vec<ChunkHeader> = Vec::with_capacity(chunk_count);
+    let mut compressed_offset = total_header_size as u32;
+    let mut uncompressed_body_offset = 0usize;
+
+    for chunk_body in &chunk_bodies {
+        let unc_size = body[uncompressed_body_offset..].len().min(LZO_CHUNK_CAP) as u32;
+        chunk_headers.push(ChunkHeader {
+            // absolute offset in the logical uncompressed file
+            uncompressed_offset: (name_offset + uncompressed_body_offset) as u32,
+            uncompressed_size: unc_size,
+            compressed_offset,
+            compressed_size: chunk_body.len() as u32,
+        });
+        compressed_offset = compressed_offset
+            .checked_add(chunk_body.len() as u32)
+            .ok_or("compressed offset overflow")?;
+        uncompressed_body_offset += LZO_CHUNK_CAP;
+    }
+
+    // Serialize header + chunk table.
+    let total_data_size: usize = chunk_bodies.iter().map(|c| c.len()).sum();
+    let mut out = Vec::with_capacity(total_header_size + total_data_size);
+    serialize_summary_with_chunks(&summary, PkgArch::X64, &chunk_headers, &mut out)?;
+    // Patch HeaderSize at offset 8-11.
+    let hsize = total_header_size as u32;
+    out[8..12].copy_from_slice(&hsize.to_le_bytes());
+
+    if out.len() != total_header_size {
+        return Err(format!(
+            "header+chunk-table size mismatch: expected {total_header_size}, got {}",
+            out.len()
+        ));
+    }
+
+    for chunk_body in &chunk_bodies {
+        out.extend_from_slice(chunk_body);
+    }
+
+    Ok(out)
+}
+
+/// Compress one chunk into the on-disk format read by `decompress_chunk`:
+///
+/// ```text
+/// u32  signature        = CHUNK_BLOCK_SIGNATURE
+/// u32  block_size       = 131072
+/// u32  compressed_size  = sum(block.compressed_size)
+/// u32  uncompressed_size = chunk.len()
+/// [per block: u32 compressed_size, u32 uncompressed_size]
+/// [concatenated compressed block data]
+/// ```
+fn compress_one_chunk(chunk: &[u8]) -> Result<Vec<u8>, String> {
+    let block_size = LZO_BLOCK_SIZE;
+    let blocks_raw: Vec<(&[u8], Vec<u8>)> = chunk
+        .chunks(block_size)
+        .map(|block| {
+            let compressed = lzokay::compress::compress(block)
+                .map_err(|e| format!("LZO compress failed: {e}"))?;
+            Ok((block, compressed))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+
+    let total_compressed: usize = blocks_raw.iter().map(|(_, c)| c.len()).sum();
+    let header_bytes = 4 + 4 + 4 + 4 + blocks_raw.len() * 8;
+
+    let mut out = Vec::with_capacity(header_bytes + total_compressed);
+
+    out.extend_from_slice(&CHUNK_BLOCK_SIGNATURE.to_le_bytes());
+    out.extend_from_slice(&(block_size as u32).to_le_bytes());
+    out.extend_from_slice(&(total_compressed as u32).to_le_bytes());
+    out.extend_from_slice(&(chunk.len() as u32).to_le_bytes());
+
+    for (block, compressed) in &blocks_raw {
+        out.extend_from_slice(&(compressed.len() as u32).to_le_bytes());
+        out.extend_from_slice(&(block.len() as u32).to_le_bytes());
+    }
+
+    for (_, compressed) in &blocks_raw {
+        out.extend_from_slice(compressed);
+    }
+
+    Ok(out)
 }
