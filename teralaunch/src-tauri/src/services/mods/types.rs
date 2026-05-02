@@ -5,6 +5,21 @@
 
 use serde::{Deserialize, Serialize};
 
+/// How the launcher deploys a GPK mod into the game.
+///
+/// The default (`CompositePatch`) uses the existing composite-mapper splice
+/// path. `Dropin` writes the file directly to `S1Game/CookedPC/<filename>`
+/// without touching any mapper — used for Type-D mods whose target package
+/// isn't in v100 vanilla's PkgMapper.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DeployStrategy {
+    /// Default: composite mapper splice (existing path).
+    CompositePatch,
+    /// Drop-in CookedPC file (Type-D mods whose target package isn't in vanilla).
+    Dropin,
+}
+
 fn non_empty(s: &str) -> Option<String> {
     if s.is_empty() {
         None
@@ -166,6 +181,16 @@ pub struct ModEntry {
     /// badge when this disagrees with the client's arch (Classic+ is x64).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub compatible_arch: Option<String>,
+
+    /// How the launcher deployed this GPK. Copied from `CatalogEntry` at
+    /// install time so uninstall can take the right teardown path.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deploy_strategy: Option<DeployStrategy>,
+
+    /// The target filename used during a `Dropin` install. Copied from
+    /// `CatalogEntry` so uninstall can find and remove the file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_dropin_filename: Option<String>,
 }
 
 impl ModEntry {
@@ -229,6 +254,8 @@ impl ModEntry {
             long_description: None,
             screenshots: Vec::new(),
             compatible_arch: None,
+            deploy_strategy: None,
+            target_dropin_filename: None,
         }
     }
 
@@ -262,6 +289,8 @@ impl ModEntry {
             long_description: non_empty(&catalog.long_description),
             screenshots: catalog.screenshots.clone(),
             compatible_arch: catalog.compatible_arch.clone(),
+            deploy_strategy: catalog.deploy_strategy,
+            target_dropin_filename: catalog.target_dropin_filename.clone(),
         }
     }
 }
@@ -363,6 +392,18 @@ pub struct CatalogEntry {
     pub target_patch: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub composite_flag: Option<bool>,
+
+    /// How the launcher should deploy this GPK. `None` means `CompositePatch`
+    /// (the default path). Set to `dropin` for Type-D mods whose target
+    /// package isn't in v100 vanilla's PkgMapper.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deploy_strategy: Option<DeployStrategy>,
+
+    /// Target filename for `deploy_strategy=dropin`. Written as-is into
+    /// `S1Game/CookedPC/<target_dropin_filename>`. Required when
+    /// `deploy_strategy=dropin`; unused otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_dropin_filename: Option<String>,
 
     /// Full logical path (`Package.Object`) of the specific composite slice
     /// this mod replaces. Required for mods targeting multi-object widget
@@ -504,6 +545,8 @@ mod tests {
             composite_flag: None,
             target_object_path: None,
             compatible_arch: None,
+            deploy_strategy: None,
+            target_dropin_filename: None,
             updated_at: "".into(),
         };
         let entry = ModEntry::from_catalog(&catalog);
@@ -570,6 +613,8 @@ mod tests {
             composite_flag: Some(true),
             target_object_path: None,
             compatible_arch: Some("x64".into()),
+            deploy_strategy: None,
+            target_dropin_filename: None,
             updated_at: "2026-04-18".into(),
         };
         let entry = ModEntry::from_catalog(&catalog);
@@ -613,6 +658,8 @@ mod tests {
             composite_flag: None,
             target_object_path: None,
             compatible_arch: None,
+            deploy_strategy: None,
+            target_dropin_filename: None,
             updated_at: "".into(),
         };
         let entry = ModEntry::from_catalog(&catalog);

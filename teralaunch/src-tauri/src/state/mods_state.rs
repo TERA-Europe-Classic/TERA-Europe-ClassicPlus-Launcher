@@ -142,6 +142,8 @@ mod tests {
             long_description: None,
             screenshots: vec![],
             compatible_arch: None,
+            deploy_strategy: None,
+            target_dropin_filename: None,
         }
     }
 

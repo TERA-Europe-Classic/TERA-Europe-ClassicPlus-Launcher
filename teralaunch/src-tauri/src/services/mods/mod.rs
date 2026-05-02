@@ -18,6 +18,7 @@ pub mod composite_extract;
 pub mod dds;
 pub mod external_app;
 pub mod gpk;
+pub mod gpk_dropin_install;
 pub mod gpk_package;
 pub mod gpk_patch_applier;
 pub mod gpk_property;

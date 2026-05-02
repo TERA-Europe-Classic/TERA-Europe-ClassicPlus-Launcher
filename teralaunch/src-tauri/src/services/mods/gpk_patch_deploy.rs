@@ -1002,6 +1002,7 @@ mod tests {
             "test.mod",
             &InstallTarget::Composite {
                 package_name: PACKAGE_NAME.into(),
+                object_path: None,
             },
         )
         .unwrap();
@@ -1092,6 +1093,7 @@ mod tests {
             "first.mod",
             &InstallTarget::Composite {
                 package_name: "S1UI_GageBoss".into(),
+                object_path: None,
             },
         )
         .unwrap();
@@ -1106,6 +1108,7 @@ mod tests {
             "second.mod",
             &InstallTarget::Composite {
                 package_name: "PaperDoll_I147_dup".into(),
+                object_path: None,
             },
         )
         .unwrap();
@@ -1198,6 +1201,7 @@ mod tests {
             "test.mod",
             &InstallTarget::Composite {
                 package_name: PACKAGE_NAME.into(),
+                object_path: None,
             },
         )
         .unwrap();
@@ -1250,6 +1254,7 @@ mod tests {
             "test.mod",
             &InstallTarget::Composite {
                 package_name: PACKAGE_NAME.into(),
+                object_path: None,
             },
         )
         .unwrap();
@@ -1307,6 +1312,7 @@ mod tests {
             "test.mod",
             &InstallTarget::Composite {
                 package_name: PACKAGE_NAME.into(),
+                object_path: None,
             },
         )
         .unwrap();
@@ -1360,6 +1366,7 @@ mod tests {
             "test.mod",
             &InstallTarget::Composite {
                 package_name: PACKAGE_NAME.into(),
+                object_path: None,
             },
         )
         .unwrap();
@@ -1412,6 +1419,7 @@ mod tests {
             "test.mod",
             &InstallTarget::Composite {
                 package_name: PACKAGE_NAME.into(),
+                object_path: None,
             },
         )
         .unwrap();
@@ -1457,6 +1465,7 @@ mod tests {
             "evil.mod",
             &InstallTarget::Composite {
                 package_name: "..\\evil".into(),
+                object_path: None,
             },
         )
         .unwrap();
@@ -1899,6 +1908,7 @@ mod tests {
             "test.mod",
             &InstallTarget::Composite {
                 package_name: PACKAGE_NAME.into(),
+                object_path: None,
             },
         )
         .unwrap();

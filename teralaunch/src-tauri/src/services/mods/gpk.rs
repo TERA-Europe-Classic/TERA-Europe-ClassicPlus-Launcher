@@ -1101,7 +1101,7 @@ pub fn ensure_backup(game_root: &Path) -> Result<(), String> {
 /// plain leaf name (no separators, no parent traversal, no drive letters,
 /// no null bytes, not dot-only). Real TMM containers are flat filenames
 /// like `S1Data_2.gpk`; anything else is either malformed or hostile.
-pub(crate) fn is_safe_gpk_container_filename(name: &str) -> bool {
+pub fn is_safe_gpk_container_filename(name: &str) -> bool {
     if name.is_empty() {
         return false;
     }

@@ -20,9 +20,11 @@ use crate::services::mods::{
     catalog::{self, CachedCatalog},
     external_app,
     gpk::{self, ModConflict},
-    gpk_package, gpk_patch_deploy, patch_manifest,
+    gpk_dropin_install, gpk_package, gpk_patch_deploy,
+    gpk_transform::CompressionMode,
+    patch_manifest,
     registry::{get_external_apps_dir, get_gpk_dir, get_registry_path},
-    types::{Catalog, CatalogEntry, ModEntry, ModKind, ModStatus},
+    types::{Catalog, CatalogEntry, DeployStrategy, ModEntry, ModKind, ModStatus},
 };
 use crate::state::mods_state;
 
@@ -108,9 +110,14 @@ fn rebuild_gpk_runtime_state() -> Result<(), String> {
     migrate_legacy_gpk_installs(&game_root, &app_root)?;
 
     let installed = mods_state::list_mods()?;
+    // Dropin mods are plain files in CookedPC — they don't touch the composite
+    // mapper, so the disable/enable cycle that rebuilds mapper state must skip them.
     let gpk_mods: Vec<&ModEntry> = installed
         .iter()
-        .filter(|entry| matches!(entry.kind, ModKind::Gpk))
+        .filter(|entry| {
+            matches!(entry.kind, ModKind::Gpk)
+                && entry.deploy_strategy != Some(DeployStrategy::Dropin)
+        })
         .collect();
 
     for entry in &gpk_mods {
@@ -654,6 +661,8 @@ async fn install_gpk_mod(entry: CatalogEntry, window: tauri::Window) -> Result<M
                 &entry.gpk_files,
                 Some(&entry.download_url),
                 entry.target_object_path.as_deref(),
+                entry.deploy_strategy,
+                entry.target_dropin_filename.as_deref(),
             );
 
             let final_row = mods_state::mutate(|reg| {
@@ -700,6 +709,10 @@ async fn install_gpk_mod(entry: CatalogEntry, window: tauri::Window) -> Result<M
 /// or import drift, class changes, or unsupported compression formats) are
 /// refused at step 3 with a clear error so the user sees the failure mode up
 /// front instead of a silently broken client.
+// Eight parameters is one over clippy's default limit (7). All eight are
+// load-bearing routing inputs to this single-dispatch gate; splitting the
+// dropin pair into a sub-struct would add churn without clarity benefit.
+#[allow(clippy::too_many_arguments)]
 fn try_deploy_gpk(
     mod_id: &str,
     _mod_name: &str,
@@ -707,7 +720,70 @@ fn try_deploy_gpk(
     catalog_gpk_files: &[String],
     download_url: Option<&str>,
     target_object_path: Option<&str>,
+    deploy_strategy: Option<DeployStrategy>,
+    target_dropin_filename: Option<&str>,
 ) -> GpkDeployOutcome {
+    // Type-D mods bypass the composite-mapper path entirely.
+    if deploy_strategy == Some(DeployStrategy::Dropin) {
+        let target_filename = match target_dropin_filename {
+            Some(f) if !f.is_empty() => f,
+            _ => {
+                return GpkDeployOutcome {
+                    last_error: Some(
+                        "Dropin mod has no target_dropin_filename — catalog entry is incomplete"
+                            .into(),
+                    ),
+                    deployed_filename: None,
+                    blocks_enable: true,
+                };
+            }
+        };
+        let payload = match std::fs::read(source_gpk) {
+            Ok(b) => b,
+            Err(e) => {
+                return GpkDeployOutcome {
+                    last_error: Some(format!("Failed to read GPK for dropin install: {e}")),
+                    deployed_filename: None,
+                    blocks_enable: true,
+                };
+            }
+        };
+        // Auto-transform x32 payloads to x64 (LZO) so future Type-D mods
+        // from the old Classic catalog don't need a manual repack.
+        let payload = match crate::services::mods::gpk_transform::transform_x32_to_x64_with(
+            &payload,
+            CompressionMode::Lzo,
+        ) {
+            Ok(upgraded) => upgraded,
+            Err(_) => payload, // Already x64 — pass through unchanged.
+        };
+        let game_root = match resolve_game_root() {
+            Ok(p) => p,
+            Err(e) => {
+                return GpkDeployOutcome {
+                    last_error: Some(format!(
+                        "Downloaded, but game path isn't set yet — can't deploy. Set the game folder under Settings, then click Retry. ({})",
+                        e
+                    )),
+                    deployed_filename: None,
+                    blocks_enable: false,
+                };
+            }
+        };
+        return match gpk_dropin_install::install_dropin(&game_root, mod_id, target_filename, &payload) {
+            Ok(()) => GpkDeployOutcome {
+                last_error: None,
+                deployed_filename: Some(target_filename.to_string()),
+                blocks_enable: false,
+            },
+            Err(e) => GpkDeployOutcome {
+                last_error: Some(e),
+                deployed_filename: None,
+                blocks_enable: true,
+            },
+        };
+    }
+
     match read_gpk_file_version(source_gpk) {
         Ok(file_version) if !gpk_package::is_x64_file_version(file_version) => {
             return GpkDeployOutcome {
@@ -1019,7 +1095,8 @@ pub async fn add_mod_from_file(path: String) -> Result<ModEntry, String> {
         .file_name()
         .and_then(|n| n.to_str())
         .map(|n| format!("file:///{n}"));
-    let deploy = try_deploy_gpk(&entry.id, &entry.name, &dest, &[], url_hint.as_deref(), None);
+    // Local imports never use dropin strategy — always composite-patch.
+    let deploy = try_deploy_gpk(&entry.id, &entry.name, &dest, &[], url_hint.as_deref(), None, None, None);
     entry.deployed_filename = deploy.deployed_filename.clone();
     entry.last_error = deploy.last_error.clone();
     if deploy.blocks_enable {
@@ -1089,12 +1166,24 @@ pub async fn uninstall_mod(id: String, delete_settings: Option<bool>) -> Result<
             let _ = delete_settings; // GPK has no per-mod settings folder
 
             let game_root = resolve_game_root()?;
-            let app_root = patch_manifest::get_manifest_root()
-                .ok_or_else(|| "Could not resolve patch-manifest root directory".to_string())?;
-            if should_restore_gpk_patch_state(&entry, &app_root)? {
-                gpk_patch_deploy::uninstall_via_patch(&game_root, &app_root, &id)?;
+
+            if entry.deploy_strategy == Some(DeployStrategy::Dropin) {
+                let target_filename = entry
+                    .target_dropin_filename
+                    .as_deref()
+                    .or(entry.deployed_filename.as_deref())
+                    .unwrap_or("");
+                gpk_dropin_install::uninstall_dropin(&game_root, &id, target_filename)?;
             } else {
-                crate::services::mods::manifest_store::delete_manifest_at_root(&app_root, &id)?;
+                let app_root = patch_manifest::get_manifest_root()
+                    .ok_or_else(|| "Could not resolve patch-manifest root directory".to_string())?;
+                if should_restore_gpk_patch_state(&entry, &app_root)? {
+                    gpk_patch_deploy::uninstall_via_patch(&game_root, &app_root, &id)?;
+                } else {
+                    crate::services::mods::manifest_store::delete_manifest_at_root(
+                        &app_root, &id,
+                    )?;
+                }
             }
 
             mods_state::mutate(|reg| {
@@ -1529,6 +1618,8 @@ mod tests {
             long_description: None,
             screenshots: Vec::new(),
             compatible_arch: None,
+            deploy_strategy: None,
+            target_dropin_filename: None,
         }
     }
 
@@ -1806,7 +1897,7 @@ mod tests {
             "install_gpk_mod must route through try_deploy_gpk with id + display name so manifest gating is centralized"
         );
         assert!(
-            source.contains("let deploy = try_deploy_gpk(&entry.id, &entry.name, &dest, &[], url_hint.as_deref(), None);"),
+            source.contains("let deploy = try_deploy_gpk(&entry.id, &entry.name, &dest, &[], url_hint.as_deref(), None, None, None);"),
             "add_mod_from_file must route through the same shared deploy gate so local imports cannot bypass manifest checks"
         );
     }
@@ -1860,7 +1951,7 @@ mod tests {
         )
         .expect("write legacy gpk");
 
-        let outcome = try_deploy_gpk("tester.legacy", "Legacy", &source, &[], None, None);
+        let outcome = try_deploy_gpk("tester.legacy", "Legacy", &source, &[], None, None, None, None);
 
         assert!(outcome.blocks_enable);
         assert_eq!(outcome.deployed_filename, None);
@@ -1878,7 +1969,7 @@ mod tests {
         let source = temp.path().join("not-a-gpk.gpk");
         std::fs::write(&source, b"not-a-gpk").expect("write invalid gpk");
 
-        let outcome = try_deploy_gpk("tester.invalid", "Invalid", &source, &[], None, None);
+        let outcome = try_deploy_gpk("tester.invalid", "Invalid", &source, &[], None, None, None, None);
 
         assert!(outcome.blocks_enable);
         assert_eq!(outcome.deployed_filename, None);
@@ -1907,7 +1998,7 @@ mod tests {
             "S1UI_ShortCut.gpk".to_string(),
         ];
 
-        let outcome = try_deploy_gpk("tester.multi", "Multi", &source, &hints, None, None);
+        let outcome = try_deploy_gpk("tester.multi", "Multi", &source, &hints, None, None, None, None);
 
         assert!(outcome.blocks_enable);
         assert_eq!(outcome.deployed_filename, None);
@@ -1933,7 +2024,7 @@ mod tests {
         .expect("write modern gpk");
         let hints = vec!["..\\evil.gpk".to_string()];
 
-        let outcome = try_deploy_gpk("tester.unsafe", "Unsafe", &source, &hints, None, None);
+        let outcome = try_deploy_gpk("tester.unsafe", "Unsafe", &source, &hints, None, None, None, None);
 
         assert!(outcome.blocks_enable);
         assert_eq!(outcome.deployed_filename, None);
@@ -1941,6 +2032,44 @@ mod tests {
         assert!(
             err.contains("unsafe target package"),
             "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn try_deploy_gpk_dropin_routes_through_gpk_dropin_install() {
+        // Structural: verify try_deploy_gpk's dropin branch calls
+        // gpk_dropin_install and bypasses the x32/x64 header check.
+        // Checked via source scan so the test is env-independent.
+        let source = include_str!("mods.rs");
+        let fn_start = source
+            .find("fn try_deploy_gpk")
+            .expect("try_deploy_gpk present");
+        let fn_tail = &source[fn_start..];
+        let body_end = fn_tail[1..]
+            .find("\nfn ")
+            .map(|i| i + 1)
+            .unwrap_or(fn_tail.len());
+        let body = &fn_tail[..body_end];
+
+        assert!(
+            body.contains("DeployStrategy::Dropin"),
+            "try_deploy_gpk must branch on Dropin strategy"
+        );
+        assert!(
+            body.contains("gpk_dropin_install::install_dropin"),
+            "try_deploy_gpk must call gpk_dropin_install::install_dropin for dropin mods"
+        );
+        // The dropin branch must appear before the x32 header check so dropin
+        // mods bypass the architecture gate entirely.
+        let dropin_idx = body
+            .find("DeployStrategy::Dropin")
+            .expect("Dropin branch present");
+        let x32_check_idx = body
+            .find("legacy x32 GPK")
+            .expect("x32 guard present");
+        assert!(
+            dropin_idx < x32_check_idx,
+            "dropin branch must run before the x32 architecture check"
         );
     }
 
@@ -2003,6 +2132,7 @@ mod tests {
             &slot.id,
             &crate::services::mods::manifest_store::InstallTarget::Composite {
                 package_name: "S1UI_GageBoss".into(),
+                object_path: None,
             },
         )
         .unwrap();
@@ -2205,6 +2335,9 @@ mod tests {
             settings_folder: None,
             target_patch: None,
             composite_flag: None,
+            deploy_strategy: None,
+            target_dropin_filename: None,
+            target_object_path: None,
             compatible_arch: None,
             updated_at: "".into(),
         }
