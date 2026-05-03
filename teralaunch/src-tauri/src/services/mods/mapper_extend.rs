@@ -53,7 +53,7 @@ pub fn extend_mappers(game_root: &Path, additions: &[MapperAddition]) -> Result<
     for add in additions {
         let key_prefix = format!("{},", add.logical_path);
         let new_row = format!("{},{}", add.logical_path, add.composite_object_path);
-        let existed_with_same_target = rows.iter().any(|r| *r == new_row);
+        let existed_with_same_target = rows.contains(&new_row);
         let any_with_same_key = rows.iter().any(|r| r.starts_with(&key_prefix));
         if existed_with_same_target {
             // Already present and pointing where we want; ensure no other row with
@@ -67,7 +67,6 @@ pub fn extend_mappers(game_root: &Path, additions: &[MapperAddition]) -> Result<
         }
         if any_with_same_key {
             rows.retain(|r| !r.starts_with(&key_prefix));
-            pm_dirty = true;
         }
         rows.push(new_row);
         pm_dirty = true;

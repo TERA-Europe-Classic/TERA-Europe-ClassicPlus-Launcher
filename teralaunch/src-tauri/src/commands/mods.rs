@@ -770,12 +770,26 @@ fn try_deploy_gpk(
                 };
             }
         };
-        return match gpk_dropin_install::install_dropin(&game_root, mod_id, target_filename, &payload) {
-            Ok(()) => GpkDeployOutcome {
-                last_error: None,
-                deployed_filename: Some(target_filename.to_string()),
-                blocks_enable: false,
-            },
+        return match gpk_dropin_install::install_dropin_with_mapper(
+            &game_root,
+            mod_id,
+            target_filename,
+            &payload,
+        ) {
+            Ok(registered) => {
+                tracing::info!(
+                    mod_id = mod_id,
+                    target = target_filename,
+                    registered_count = registered.len(),
+                    registered_paths = ?registered,
+                    "dropin install: registered logical paths in PkgMapper"
+                );
+                GpkDeployOutcome {
+                    last_error: None,
+                    deployed_filename: Some(target_filename.to_string()),
+                    blocks_enable: false,
+                }
+            }
             Err(e) => GpkDeployOutcome {
                 last_error: Some(e),
                 deployed_filename: None,

@@ -5,11 +5,35 @@
 //! Type-D detection happens at the catalog level (deploy_strategy=Dropin);
 //! this module trusts its caller and does not introspect the GPK itself
 //! beyond a minimal sanity check.
+//!
+//! `install_dropin_with_mapper` extends the plain drop-in with PkgMapper +
+//! CompositePackageMapper registration so the v100 engine actually loads the
+//! file. `install_dropin` (no-mapper variant) remains available for callers
+//! that don't need mapper integration (e.g. tests that write fake payloads
+//! that won't parse as valid GPKs).
 
 use std::fs;
 use std::path::Path;
 
 use super::gpk::{is_safe_gpk_container_filename, COOKED_PC_DIR};
+
+/// Classes the engine looks up by logical path. Exports of any other class
+/// (ObjectReferencer, Package, etc.) are bookkeeping objects and must not be
+/// registered in PkgMapper.
+const INTERESTING_CLASSES: &[&str] = &[
+    "Texture2D",
+    "StaticMesh",
+    "SkeletalMesh",
+    "GFxMovieInfo",
+    "AnimSet",
+    "AnimNodeBlendList",
+    "Material",
+    "MaterialInstanceConstant",
+    "PhysicsAsset",
+    "ParticleSystem",
+    "SoundCue",
+    "SoundNodeWave",
+];
 
 /// Install a payload as `S1Game/CookedPC/<target_filename>`.
 ///
@@ -39,6 +63,110 @@ pub fn install_dropin(
     }
     fs::write(&target, payload).map_err(|e| format!("write {}: {e}", target.display()))?;
     Ok(())
+}
+
+/// Install a dropin payload AND register its exports in PkgMapper +
+/// CompositePackageMapper so the v100 engine actually loads the file.
+///
+/// The `composite_uid` is synthesised deterministically from `mod_id`
+/// (`modres_<sanitized_mod_id>`) so re-installs produce the same rows and a
+/// future uninstall pass can locate them by prefix.
+///
+/// `package_name` strategy: if the GPK header's package_name begins with
+/// `MOD:` it is a composite UID, not a real engine-visible name. In that case
+/// (and when package_name is otherwise empty) we fall back to
+/// `target_filename` stripped of the `.gpk` suffix. This mirrors how TMM
+/// names standalone mods and is what the engine expects for logical-path
+/// resolution.
+///
+/// Returns the logical paths registered in PkgMapper (for logging /
+/// future uninstall registry use).
+pub fn install_dropin_with_mapper(
+    game_root: &Path,
+    mod_id: &str,
+    target_filename: &str,
+    payload: &[u8],
+) -> Result<Vec<String>, String> {
+    // Sanity: filename must be safe.
+    if !is_safe_gpk_container_filename(target_filename) {
+        return Err(format!(
+            "drop-in install of '{mod_id}': unsafe target filename '{target_filename}'"
+        ));
+    }
+
+    // Step 1: parse to learn the package name + exports.
+    let pkg = super::gpk_package::parse_package(payload)
+        .map_err(|e| format!("dropin parse {target_filename}: {e}"))?;
+
+    // Determine the logical-path prefix. If the header's package_name is a
+    // composite UID (`MOD:…`) or is empty, fall back to the filename stem.
+    let package_name = if pkg.summary.package_name.starts_with("MOD:") || pkg.summary.package_name.is_empty() {
+        target_filename
+            .strip_suffix(".gpk")
+            .unwrap_or(target_filename)
+            .to_string()
+    } else {
+        pkg.summary.package_name.clone()
+    };
+
+    // Step 2: filter to engine-loadable exports.
+    // `class_name` is the full import object_path (e.g. `Core.Texture2D`),
+    // not just the bare class name. Match on the last path component so both
+    // `Core.Texture2D` and `Engine.Texture2D` are recognised.
+    let to_register: Vec<&super::gpk_package::GpkExportEntry> = pkg
+        .exports
+        .iter()
+        .filter(|e| {
+            e.class_name.as_deref().map(|c| {
+                let base = c.rsplit('.').next().unwrap_or(c);
+                INTERESTING_CLASSES.contains(&base)
+            }).unwrap_or(false)
+        })
+        .collect();
+
+    if to_register.is_empty() {
+        return Err(format!(
+            "dropin install of '{mod_id}': payload has no engine-loadable exports (only ObjectReferencer / Package)"
+        ));
+    }
+
+    // Step 3: write the file to CookedPC.
+    install_dropin(game_root, mod_id, target_filename, payload)?;
+
+    // Step 4: synthesise MapperAdditions.
+    let composite_filename = target_filename
+        .strip_suffix(".gpk")
+        .unwrap_or(target_filename)
+        .to_string();
+    // Deterministic uid: keeps the same composite group across re-installs.
+    let composite_uid = format!(
+        "modres_{}",
+        mod_id
+            .chars()
+            .map(|c| if c.is_alphanumeric() { c } else { '_' })
+            .collect::<String>()
+    );
+    let payload_size = payload.len() as i64;
+
+    let mut additions: Vec<super::mapper_extend::MapperAddition> =
+        Vec::with_capacity(to_register.len());
+    for export in &to_register {
+        let logical_path = format!("{}.{}", package_name, export.object_name);
+        let composite_object_path = format!("{}.{}", composite_uid, export.object_path);
+        additions.push(super::mapper_extend::MapperAddition {
+            logical_path: logical_path.clone(),
+            composite_uid: composite_uid.clone(),
+            composite_object_path,
+            composite_filename: composite_filename.clone(),
+            composite_offset: 0,
+            composite_size: payload_size,
+        });
+    }
+
+    super::mapper_extend::extend_mappers(game_root, &additions)
+        .map_err(|e| format!("dropin install of '{mod_id}': mapper extend failed: {e}"))?;
+
+    Ok(additions.iter().map(|a| a.logical_path.clone()).collect())
 }
 
 /// Remove a previously-dropin-installed file. Idempotent: missing file is OK.

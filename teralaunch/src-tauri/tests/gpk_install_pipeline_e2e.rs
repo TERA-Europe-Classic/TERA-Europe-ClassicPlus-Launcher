@@ -23,6 +23,10 @@ mod gpk_property;
 mod gpk_transform;
 
 #[allow(dead_code, unused_imports)]
+#[path = "../src/services/mods/mapper_extend.rs"]
+mod mapper_extend;
+
+#[allow(dead_code, unused_imports)]
 #[path = "../src/services/mods/gpk_dropin_install.rs"]
 mod gpk_dropin_install;
 
