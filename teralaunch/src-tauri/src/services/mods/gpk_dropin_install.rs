@@ -79,6 +79,16 @@ pub fn install_dropin(
 /// names standalone mods and is what the engine expects for logical-path
 /// resolution.
 ///
+/// `target_object_path`: when `Some`, the first mapper addition uses it as
+/// the logical_path and points at the matching primary export (matched by
+/// trailing component with optional `_dup` suffix). This is required for mods
+/// (e.g. artexlib-style) whose internal package_name is a composite UID that
+/// the engine cannot resolve — the catalog knows the real logical path the
+/// engine looks up. Remaining exports (if any) are still registered under the
+/// synthesised `package_name`. When `None`, all exports are registered under
+/// the synthesised `package_name` (existing behaviour for Type-D mods that
+/// don't override a specific logical path).
+///
 /// Returns the logical paths registered in PkgMapper (for logging /
 /// future uninstall registry use).
 pub fn install_dropin_with_mapper(
@@ -86,6 +96,7 @@ pub fn install_dropin_with_mapper(
     mod_id: &str,
     target_filename: &str,
     payload: &[u8],
+    target_object_path: Option<&str>,
 ) -> Result<Vec<String>, String> {
     // Sanity: filename must be safe.
     if !is_safe_gpk_container_filename(target_filename) {
@@ -148,19 +159,65 @@ pub fn install_dropin_with_mapper(
     );
     let payload_size = payload.len() as i64;
 
-    let mut additions: Vec<super::mapper_extend::MapperAddition> =
-        Vec::with_capacity(to_register.len());
-    for export in &to_register {
-        let logical_path = format!("{}.{}", package_name, export.object_name);
-        let composite_object_path = format!("{}.{}", composite_uid, export.object_path);
-        additions.push(super::mapper_extend::MapperAddition {
-            logical_path: logical_path.clone(),
+    let make_addition = |logical_path: String, export: &super::gpk_package::GpkExportEntry| {
+        super::mapper_extend::MapperAddition {
+            logical_path,
             composite_uid: composite_uid.clone(),
-            composite_object_path,
+            composite_object_path: format!("{}.{}", composite_uid, export.object_path),
             composite_filename: composite_filename.clone(),
             composite_offset: 0,
             composite_size: payload_size,
-        });
+        }
+    };
+
+    let mut additions: Vec<super::mapper_extend::MapperAddition> =
+        Vec::with_capacity(to_register.len());
+
+    if let Some(tap) = target_object_path {
+        // Find the primary export whose object_name matches the trailing
+        // component of target_object_path, with or without a `_dup` suffix.
+        let want = tap.rsplit('.').next().unwrap_or(tap);
+        let primary = to_register
+            .iter()
+            .find(|e| {
+                e.object_name == want
+                    || e.object_name == format!("{want}_dup")
+                    || e.object_name.strip_suffix("_dup") == Some(want)
+            })
+            .ok_or_else(|| {
+                format!(
+                    "dropin install of '{mod_id}': target_object_path '{tap}' has no matching export \
+                     (want object_name in {{{want}, {want}_dup}}; available: {:?})",
+                    to_register
+                        .iter()
+                        .map(|e| &e.object_name)
+                        .collect::<Vec<_>>()
+                )
+            })?;
+
+        // Primary export uses target_object_path as its logical_path.
+        additions.push(make_addition(tap.to_string(), primary));
+
+        // Register any remaining interesting exports under the synthesised
+        // package_name so cross-export references inside the mod still resolve.
+        for export in &to_register {
+            if export.object_name == primary.object_name {
+                continue;
+            }
+            additions.push(make_addition(
+                format!("{}.{}", package_name, export.object_name),
+                export,
+            ));
+        }
+    } else {
+        // No target_object_path: register every interesting export under the
+        // synthesised package_name (existing behaviour for Type-D mods).
+        for export in &to_register {
+            additions.push(make_addition(
+                format!("{}.{}", package_name, export.object_name),
+                export,
+            ));
+        }
     }
 
     super::mapper_extend::extend_mappers(game_root, &additions)

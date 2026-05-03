@@ -102,6 +102,7 @@ fn install_dropin_with_mapper_registers_logical_paths() {
         "test.dropin.minimap",
         "Minimap_Mod.gpk",
         &payload,
+        None,
     )
     .expect("install_dropin_with_mapper ok");
 
@@ -159,6 +160,7 @@ fn install_dropin_with_mapper_refuses_unsafe_filename() {
         "some.mod",
         "../escape.gpk",
         payload,
+        None,
     )
     .expect_err("must refuse unsafe filename");
     assert!(
@@ -177,10 +179,97 @@ fn install_dropin_with_mapper_fails_on_non_gpk_payload() {
         "some.mod",
         "Fake.gpk",
         b"not a gpk",
+        None,
     )
     .expect_err("must fail on invalid GPK payload");
     assert!(
         err.contains("dropin parse"),
         "wrong error message: {err}"
+    );
+}
+
+#[test]
+fn dropin_with_target_object_path_uses_it_as_logical_path() {
+    use gpk_transform::{transform_x32_to_x64_with, CompressionMode};
+    let x32_src = include_bytes!("fixtures/minimap_x32.gpk");
+    let payload = transform_x32_to_x64_with(x32_src, CompressionMode::Lzo)
+        .expect("transform fixture to x64");
+
+    let game_root = tempfile::TempDir::new().expect("tmpdir");
+    let cooked = game_root.path().join("S1Game/CookedPC");
+    fs::create_dir_all(&cooked).unwrap();
+    let empty_dat = gpk::encrypt_mapper(b"");
+    for name in &[
+        "PkgMapper.dat",
+        "PkgMapper.clean",
+        "CompositePackageMapper.dat",
+        "CompositePackageMapper.clean",
+    ] {
+        fs::write(cooked.join(name), &empty_dat).unwrap();
+    }
+
+    // Pick the first interesting export from the minimap fixture to build a
+    // target_object_path that the matcher can find.
+    let pkg = gpk_package::parse_package(&payload).expect("parse synth payload");
+    let first_interesting = pkg
+        .exports
+        .iter()
+        .find(|e| {
+            e.class_name.as_deref().map(|c| {
+                let base = c.rsplit('.').next().unwrap_or(c);
+                matches!(
+                    base,
+                    "Texture2D"
+                        | "StaticMesh"
+                        | "SkeletalMesh"
+                        | "GFxMovieInfo"
+                        | "AnimSet"
+                        | "AnimNodeBlendList"
+                        | "Material"
+                        | "MaterialInstanceConstant"
+                        | "PhysicsAsset"
+                        | "ParticleSystem"
+                        | "SoundCue"
+                        | "SoundNodeWave"
+                )
+            }).unwrap_or(false)
+        })
+        .expect("at least one interesting export in minimap fixture");
+
+    // Strip _dup suffix if present — target_object_path uses the canonical name.
+    let canonical = first_interesting
+        .object_name
+        .strip_suffix("_dup")
+        .unwrap_or(&first_interesting.object_name)
+        .to_string();
+    let target_object_path = format!("S1UI_Test_Pkg.{canonical}");
+
+    let registered = install_dropin_with_mapper(
+        game_root.path(),
+        "test.dropin.target_path",
+        "Synth_Mod.gpk",
+        &payload,
+        Some(&target_object_path),
+    )
+    .expect("install ok");
+
+    // The first registered logical path MUST be exactly target_object_path.
+    assert_eq!(
+        &registered[0], &target_object_path,
+        "primary mapper addition must use target_object_path as its logical_path"
+    );
+
+    // The on-disk PkgMapper.dat must contain the override row.
+    let pm_bytes = fs::read(cooked.join("PkgMapper.dat")).unwrap();
+    let pm_text = String::from_utf8_lossy(&gpk::decrypt_mapper(&pm_bytes)).to_string();
+    assert!(
+        pm_text.contains(&target_object_path),
+        "PkgMapper.dat must register {target_object_path}; full text: {pm_text}"
+    );
+
+    // The dropin file must be present in CookedPC.
+    assert!(
+        cooked.join("Synth_Mod.gpk").exists(),
+        "dropin file must be written to CookedPC"
     );
 }

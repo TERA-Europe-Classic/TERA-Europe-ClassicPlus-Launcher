@@ -775,6 +775,7 @@ fn try_deploy_gpk(
             mod_id,
             target_filename,
             &payload,
+            target_object_path,
         ) {
             Ok(registered) => {
                 tracing::info!(
