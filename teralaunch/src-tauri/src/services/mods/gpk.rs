@@ -1348,6 +1348,103 @@ pub fn install_legacy_gpk(
     Ok(target_filename)
 }
 
+/// Install a mod that targets a v100 vanilla composite slice.
+///
+/// Deploys the file to CookedPC under a name derived from `target_object_path`'s
+/// tail — `<tail>_dup.gpk` (the TMM convention for vanilla composite object
+/// filenames). Then rewrites every `CompositePackageMapper.dat` entry whose
+/// `object_path` ends with `.<tail>_dup` to redirect to our file at offset 0,
+/// size = file size. Both lookup paths (PkgMapper logical → composite UID →
+/// file, and direct composite-path → file) converge to the modded content.
+///
+/// The filename is derived from `target_object_path` directly, bypassing the
+/// GPK's own header package-name — which may differ from the target (e.g. an
+/// artexlib mod shipping as `LancerGigaChadBlock.gpk` but targeting
+/// `S1UI_Message.Message_I1CF`).
+pub fn install_composite_redirect(
+    game_root: &Path,
+    source_gpk: &Path,
+    target_object_path: &str,
+) -> Result<String, String> {
+    if !target_object_path.contains('.') {
+        return Err(format!(
+            "target_object_path '{target_object_path}' has no tail (expected 'Package.Object' format)"
+        ));
+    }
+    let tail = target_object_path
+        .rsplit('.')
+        .next()
+        .ok_or_else(|| format!("target_object_path '{target_object_path}' has no tail"))?;
+    let folder_name = if tail.ends_with("_dup") {
+        tail.to_string()
+    } else {
+        format!("{tail}_dup")
+    };
+    let target_filename = format!("{folder_name}.gpk");
+
+    if !is_safe_gpk_container_filename(&target_filename) {
+        return Err(format!(
+            "composite_redirect: derived filename '{target_filename}' is not safe"
+        ));
+    }
+
+    let cooked_pc = game_root.join(COOKED_PC_DIR);
+    fs::create_dir_all(&cooked_pc)
+        .map_err(|e| format!("Failed to create CookedPC dir: {e}"))?;
+    let dest = cooked_pc.join(&target_filename);
+
+    // Back up existing vanilla .gpk if present and no backup exists yet.
+    let backup = cooked_pc.join(format!("{target_filename}.vanilla-bak"));
+    if dest.exists() && !backup.exists() {
+        fs::copy(&dest, &backup)
+            .map_err(|e| format!("Failed to back up vanilla .gpk: {e}"))?;
+    }
+
+    fs::copy(source_gpk, &dest)
+        .map_err(|e| format!("Failed to install .gpk into CookedPC: {e}"))?;
+
+    // Redirect every composite mapper entry whose ObjectPath ends in
+    // `.<folder_name>` so the engine's direct composite-path lookup also
+    // resolves to our modded file.
+    ensure_backup(game_root)?;
+    let mapper_bytes = fs::read(mapper_path(game_root))
+        .map_err(|e| format!("Failed to read mapper after install: {e}"))?;
+    let decrypted = decrypt_mapper(&mapper_bytes);
+    let decrypted_str = String::from_utf8_lossy(&decrypted).to_string();
+    let mut map = parse_mapper(&decrypted_str);
+
+    let file_size = fs::metadata(&dest)
+        .map_err(|e| format!("Failed to stat installed .gpk: {e}"))?
+        .len() as i64;
+    let suffix = format!(".{folder_name}");
+
+    let mut rewritten = 0usize;
+    for entry in map.values_mut() {
+        if entry.object_path.ends_with(&suffix) || entry.object_path == folder_name {
+            entry.filename = target_filename.clone();
+            entry.offset = 0;
+            entry.size = file_size;
+            rewritten += 1;
+        }
+    }
+
+    if rewritten > 0 {
+        let new_plain = serialize_mapper(&map);
+        let new_encrypted = encrypt_mapper(new_plain.as_bytes());
+        fs::write(mapper_path(game_root), &new_encrypted)
+            .map_err(|e| format!("Failed to write patched mapper: {e}"))?;
+        log::info!(
+            "composite_redirect: installed {target_filename}, redirected {rewritten} mapper entries for `{folder_name}`"
+        );
+    } else {
+        log::info!(
+            "composite_redirect: installed {target_filename} (no CompositePackageMapper entry matched `{folder_name}`)"
+        );
+    }
+
+    Ok(target_filename)
+}
+
 /// Restores the vanilla .gpk for a legacy drop-in install. Removes
 /// the modded .gpk and copies the .vanilla-bak back over if present.
 /// If no backup exists (meaning the vanilla slot was empty before the

@@ -799,6 +799,76 @@ fn try_deploy_gpk(
         };
     }
 
+    // Mods that target a v100 vanilla composite slice use the redirect path.
+    if deploy_strategy == Some(DeployStrategy::CompositeRedirect) {
+        let top = match target_object_path {
+            Some(p) if !p.is_empty() => p,
+            _ => {
+                return GpkDeployOutcome {
+                    last_error: Some(
+                        "composite_redirect requires target_object_path in the catalog entry".into(),
+                    ),
+                    deployed_filename: None,
+                    blocks_enable: true,
+                };
+            }
+        };
+        let payload = match std::fs::read(source_gpk) {
+            Ok(b) => b,
+            Err(e) => {
+                return GpkDeployOutcome {
+                    last_error: Some(format!("Failed to read GPK for composite_redirect: {e}")),
+                    deployed_filename: None,
+                    blocks_enable: true,
+                };
+            }
+        };
+        // Auto-transform x32 payloads to x64 (LZO).
+        let payload = match crate::services::mods::gpk_transform::transform_x32_to_x64_with(
+            &payload,
+            CompressionMode::Lzo,
+        ) {
+            Ok(upgraded) => upgraded,
+            Err(_) => payload,
+        };
+        let game_root = match resolve_game_root() {
+            Ok(p) => p,
+            Err(e) => {
+                return GpkDeployOutcome {
+                    last_error: Some(format!(
+                        "Downloaded, but game path isn't set yet — can't deploy. Set the game folder under Settings, then click Retry. ({})",
+                        e
+                    )),
+                    deployed_filename: None,
+                    blocks_enable: false,
+                };
+            }
+        };
+        // Write transformed payload to a temp file so install_composite_redirect
+        // can receive a Path (it shares the copy + mapper-rewrite logic).
+        let temp_path = std::env::temp_dir()
+            .join(format!("teralaunch-cr-{}.gpk", mod_id.replace('.', "_")));
+        if let Err(e) = std::fs::write(&temp_path, &payload) {
+            return GpkDeployOutcome {
+                last_error: Some(format!("Failed to write temp GPK for composite_redirect: {e}")),
+                deployed_filename: None,
+                blocks_enable: true,
+            };
+        }
+        return match gpk::install_composite_redirect(&game_root, &temp_path, top) {
+            Ok(deployed) => GpkDeployOutcome {
+                last_error: None,
+                deployed_filename: Some(deployed),
+                blocks_enable: false,
+            },
+            Err(e) => GpkDeployOutcome {
+                last_error: Some(format!("composite_redirect install failed: {e}")),
+                deployed_filename: None,
+                blocks_enable: true,
+            },
+        };
+    }
+
     match read_gpk_file_version(source_gpk) {
         Ok(file_version) if !gpk_package::is_x64_file_version(file_version) => {
             return GpkDeployOutcome {

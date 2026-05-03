@@ -18,6 +18,10 @@ pub enum DeployStrategy {
     CompositePatch,
     /// Drop-in CookedPC file (Type-D mods whose target package isn't in vanilla).
     Dropin,
+    /// Targets a v100 vanilla composite slice. Deploys under a filename derived
+    /// from `target_object_path`'s tail (`<tail>_dup.gpk`), then rewrites the
+    /// matching `CompositePackageMapper.dat` entry to redirect to our file.
+    CompositeRedirect,
 }
 
 fn non_empty(s: &str) -> Option<String> {
