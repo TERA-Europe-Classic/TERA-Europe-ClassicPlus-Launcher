@@ -65,15 +65,21 @@ fn run() -> Result<(), String> {
         println!("restored: {}", live.display());
     }
 
-    // Remove stray artexlib dropin files left by the old dropin+mapper-extend
-    // install path. These are safe to delete — re-installing the mod via the
-    // launcher with the fixed composite_redirect strategy will redeploy them
-    // under the correct filename.
+    // Remove stray files left by prior install paths. Two categories:
+    // - Old dropin+mapper-extend filenames (bare object names from artexlib mods).
+    // - New composite_redirect filenames (<ObjectName>_dup.gpk) that may be
+    //   orphaned if the mod was uninstalled without removing the file.
     let strays = [
+        // dropin+mapper-extend era (old path)
         "LancerGigaChadBlock.gpk",
         "BrawlerChadBlocking.gpk",
         "GucciBackpack.gpk",
         "PinkValkyrieHelmet.gpk",
+        // composite_redirect era (_dup suffix)
+        "Message_I1CF_dup.gpk",
+        "Message_I207_dup.gpk",
+        "Attach_403_skel_dup.gpk",
+        "Switch_Aman_M_Hair03_262_dup.gpk",
     ];
     for stray in strays {
         let p = cooked.join(stray);

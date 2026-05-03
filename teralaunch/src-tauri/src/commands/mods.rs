@@ -855,7 +855,7 @@ fn try_deploy_gpk(
                 blocks_enable: true,
             };
         }
-        return match gpk::install_composite_redirect(&game_root, &temp_path, top) {
+        return match gpk::install_composite_redirect(&game_root, &temp_path, top, mod_id) {
             Ok(deployed) => GpkDeployOutcome {
                 last_error: None,
                 deployed_filename: Some(deployed),

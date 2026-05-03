@@ -5340,7 +5340,7 @@ dependencies = [
 
 [[package]]
 name = "tera-europe-classicplus-launcher"
-version = "0.2.13"
+version = "0.2.16"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",

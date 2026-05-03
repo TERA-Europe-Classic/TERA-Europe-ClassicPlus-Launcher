@@ -1348,6 +1348,107 @@ pub fn install_legacy_gpk(
     Ok(target_filename)
 }
 
+/// Restore mapper state to remove any leftover rows from prior
+/// dropin+mapper_extend installs of `mod_id`. Idempotent — no-op if
+/// no such rows exist.
+///
+/// PkgMapper rows whose right-hand side starts with `modres_<sanitized_mod_id>.`
+/// are restored to their .clean baseline (or removed if the logical path
+/// doesn't exist in .clean). CompositePackageMapper rows whose composite_name
+/// equals `modres_<sanitized_mod_id>` are removed entirely.
+pub fn clean_prior_dropin_state(game_root: &Path, mod_id: &str) -> Result<(), String> {
+    let cooked = game_root.join(COOKED_PC_DIR);
+    let sanitized: String = mod_id
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '_' })
+        .collect();
+    let composite_uid = format!("modres_{sanitized}");
+
+    // Step 1: clean PkgMapper.dat — restore or remove rows pointing at our composite uid.
+    let pm_path = cooked.join(PKG_MAPPER_FILE);
+    let pm_clean_path = cooked.join(PKG_MAPPER_BACKUP_FILE);
+    if pm_path.exists() && pm_clean_path.exists() {
+        let pm_live_bytes =
+            fs::read(&pm_path).map_err(|e| format!("read PkgMapper: {e}"))?;
+        let pm_clean_bytes =
+            fs::read(&pm_clean_path).map_err(|e| format!("read PkgMapper.clean: {e}"))?;
+        let pm_live_str =
+            String::from_utf8_lossy(&decrypt_mapper(&pm_live_bytes)).to_string();
+        let pm_clean_str =
+            String::from_utf8_lossy(&decrypt_mapper(&pm_clean_bytes)).to_string();
+
+        let needle = format!(",{composite_uid}.");
+        let mut rows: Vec<String> = pm_live_str
+            .split('|')
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect();
+
+        let mut pm_dirty = false;
+        let mut new_rows: Vec<String> = Vec::with_capacity(rows.len());
+        for row in rows.drain(..) {
+            if !row.contains(&needle) {
+                new_rows.push(row);
+                continue;
+            }
+            // Row points at our modres_ composite uid. Restore from .clean.
+            let logical = row.split(',').next().unwrap_or("").to_string();
+            let key_prefix = format!("{logical},");
+            let vanilla = pm_clean_str
+                .split('|')
+                .find(|r| r.starts_with(&key_prefix))
+                .map(|s| s.to_string());
+            if let Some(v) = vanilla {
+                new_rows.push(v);
+            }
+            // else: logical path has no clean baseline — drop it entirely.
+            pm_dirty = true;
+        }
+
+        if pm_dirty {
+            let mut new_text = String::with_capacity(pm_live_str.len());
+            for r in &new_rows {
+                new_text.push_str(r);
+                new_text.push('|');
+            }
+            let new_enc = encrypt_mapper(new_text.as_bytes());
+            write_atomic_file(&pm_path, &new_enc)?;
+        }
+    }
+
+    // Step 2: clean CompositePackageMapper.dat — remove rows with our composite_uid.
+    let cm_path = cooked.join(MAPPER_FILE);
+    let cm_clean_path = cooked.join(BACKUP_FILE);
+    if cm_path.exists() && cm_clean_path.exists() {
+        let cm_live_bytes =
+            fs::read(&cm_path).map_err(|e| format!("read CompositePackageMapper: {e}"))?;
+        let cm_str =
+            String::from_utf8_lossy(&decrypt_mapper(&cm_live_bytes)).to_string();
+        let mut cm_map = parse_mapper(&cm_str);
+        let to_remove: Vec<String> = cm_map
+            .iter()
+            .filter_map(|(k, v)| {
+                if v.composite_name == composite_uid {
+                    Some(k.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let cm_dirty = !to_remove.is_empty();
+        for k in to_remove {
+            cm_map.remove(&k);
+        }
+        if cm_dirty {
+            let new_plain = serialize_mapper(&cm_map);
+            let new_enc = encrypt_mapper(new_plain.as_bytes());
+            write_atomic_file(&cm_path, &new_enc)?;
+        }
+    }
+
+    Ok(())
+}
+
 /// Install a mod that targets a v100 vanilla composite slice.
 ///
 /// Deploys the file to CookedPC under a name derived from `target_object_path`'s
@@ -1361,11 +1462,17 @@ pub fn install_legacy_gpk(
 /// GPK's own header package-name — which may differ from the target (e.g. an
 /// artexlib mod shipping as `LancerGigaChadBlock.gpk` but targeting
 /// `S1UI_Message.Message_I1CF`).
+///
+/// `mod_id` is used only for the pre-flight cleanup of any prior
+/// dropin+mapper_extend state; it does not affect the deployed filename.
 pub fn install_composite_redirect(
     game_root: &Path,
     source_gpk: &Path,
     target_object_path: &str,
+    mod_id: &str,
 ) -> Result<String, String> {
+    // Pre-flight: remove any stale rows from a prior dropin+mapper_extend install.
+    clean_prior_dropin_state(game_root, mod_id)?;
     if !target_object_path.contains('.') {
         return Err(format!(
             "target_object_path '{target_object_path}' has no tail (expected 'Package.Object' format)"

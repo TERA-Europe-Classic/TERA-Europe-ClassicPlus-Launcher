@@ -67,6 +67,7 @@ fn composite_redirect_deploys_under_target_object_path_tail_filename() {
         game_root.path(),
         &src_path,
         "S1UI_Message.Message_I1CF",
+        "test.mod-happy-path",
     )
     .expect("install_composite_redirect should succeed");
 
@@ -125,6 +126,7 @@ fn composite_redirect_does_not_double_suffix_when_tail_already_ends_with_dup() {
         game_root.path(),
         &src_path,
         "S1UI_Message.Message_I1CF_dup",
+        "test.mod-no-double-dup",
     )
     .expect("should succeed when tail already has _dup");
 
@@ -139,10 +141,99 @@ fn composite_redirect_rejects_target_object_path_with_no_tail() {
     let src_path = game_root.path().join("source.gpk");
     fs::write(&src_path, b"anything").unwrap();
 
-    let err = gpk::install_composite_redirect(game_root.path(), &src_path, "NoDotsHere")
+    let err = gpk::install_composite_redirect(game_root.path(), &src_path, "NoDotsHere", "some.mod")
         .expect_err("must reject target_object_path with no dot");
     assert!(
         err.contains("no tail"),
         "wrong error message: {err}"
+    );
+}
+
+/// Simulate the corruption scenario: a mod was installed via the old
+/// dropin+mapper_extend path (leaving `modres_*` rows in both mapper files),
+/// then uninstalled without cleaning those rows, then reinstalled via
+/// composite_redirect. The pre-flight cleanup in install_composite_redirect
+/// must remove the stale modres rows before writing the redirect.
+#[test]
+fn idempotent_install_composite_redirect_after_prior_dropin() {
+    let x32_src = include_bytes!("fixtures/minimap_x32.gpk");
+    let payload = transform_x32_to_x64_with(x32_src, CompressionMode::Lzo)
+        .expect("transform fixture to x64");
+
+    let game_root = TempDir::new().expect("tmpdir");
+    let cooked = game_root.path().join("S1Game/CookedPC");
+    fs::create_dir_all(&cooked).unwrap();
+
+    // .clean files represent the vanilla (uncorrupted) baseline.
+    let vanilla_comp_plain =
+        b"some_container?ffe86d35_317168d3_ec.Message_I1CF_dup,ffe86d35_317168d3_ec,620986,21615,|!";
+    let vanilla_comp_enc = gpk::encrypt_mapper(vanilla_comp_plain);
+    fs::write(cooked.join("CompositePackageMapper.clean"), &vanilla_comp_enc).unwrap();
+
+    let vanilla_pkg_plain =
+        b"S1UI_Message.Message_I1CF,ffe86d35_317168d3_ec.Message_I1CF_dup|";
+    let vanilla_pkg_enc = gpk::encrypt_mapper(vanilla_pkg_plain);
+    fs::write(cooked.join("PkgMapper.clean"), &vanilla_pkg_enc).unwrap();
+
+    // .dat files represent the corrupted live state left by the old dropin+mapper_extend path.
+    // PkgMapper has the logical path pointing at the modres_ composite uid.
+    let corrupted_pkg_plain =
+        b"S1UI_Message.Message_I1CF,modres_artexlib_lancer_gigachad_block.Message_I1CF_dup|";
+    fs::write(
+        cooked.join("PkgMapper.dat"),
+        gpk::encrypt_mapper(corrupted_pkg_plain),
+    )
+    .unwrap();
+
+    // CompositePackageMapper has both the vanilla row AND a stray modres_ row.
+    let corrupted_comp_plain = b"some_container?ffe86d35_317168d3_ec.Message_I1CF_dup,ffe86d35_317168d3_ec,620986,21615,|!\
+LancerGigaChadBlock?modres_artexlib_lancer_gigachad_block.Message_I1CF_dup,modres_artexlib_lancer_gigachad_block,0,268245,|!";
+    fs::write(
+        cooked.join("CompositePackageMapper.dat"),
+        gpk::encrypt_mapper(corrupted_comp_plain),
+    )
+    .unwrap();
+
+    let src_path = game_root.path().join("source.gpk");
+    fs::write(&src_path, &payload).unwrap();
+
+    let deployed = gpk::install_composite_redirect(
+        game_root.path(),
+        &src_path,
+        "S1UI_Message.Message_I1CF",
+        "artexlib.lancer-gigachad-block",
+    )
+    .expect("install_composite_redirect must succeed even after prior dropin state");
+
+    assert_eq!(deployed, "Message_I1CF_dup.gpk");
+
+    // (1) PkgMapper must no longer point at the modres_ composite uid.
+    let pm_after = String::from_utf8_lossy(
+        &gpk::decrypt_mapper(&fs::read(cooked.join("PkgMapper.dat")).unwrap()),
+    )
+    .to_string();
+    assert!(
+        !pm_after.contains("modres_artexlib_lancer_gigachad_block"),
+        "modres_ row must be removed from PkgMapper; got: {pm_after}"
+    );
+
+    // (2) CompositePackageMapper must not contain the stray modres_ row.
+    let cm_after = String::from_utf8_lossy(
+        &gpk::decrypt_mapper(&fs::read(cooked.join("CompositePackageMapper.dat")).unwrap()),
+    )
+    .to_string();
+    assert!(
+        !cm_after.contains("modres_artexlib_lancer_gigachad_block"),
+        "modres_ row must be removed from CompositePackageMapper; got: {cm_after}"
+    );
+
+    // (3) The redirect entry must be present (offset 0 since it was just installed).
+    assert!(
+        cm_after.contains(",0,"),
+        "redirect entry with offset 0 must exist; got: {cm_after}"
+    );
+    assert!(
+        cooked.join("Message_I1CF_dup.gpk").exists(),
+        "deployed file must exist in CookedPC"
     );
 }

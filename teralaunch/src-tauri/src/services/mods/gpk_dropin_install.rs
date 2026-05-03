@@ -226,10 +226,11 @@ pub fn install_dropin_with_mapper(
     Ok(additions.iter().map(|a| a.logical_path.clone()).collect())
 }
 
-/// Remove a previously-dropin-installed file. Idempotent: missing file is OK.
+/// Remove a previously-dropin-installed file and clean up mapper-extend rows.
+/// Idempotent: missing file and missing mapper rows are both OK.
 pub fn uninstall_dropin(
     game_root: &Path,
-    _mod_id: &str,
+    mod_id: &str,
     target_filename: &str,
 ) -> Result<(), String> {
     if !is_safe_gpk_container_filename(target_filename) {
@@ -242,5 +243,8 @@ pub fn uninstall_dropin(
         fs::remove_file(&target)
             .map_err(|e| format!("remove {}: {e}", target.display()))?;
     }
+    // Remove the PkgMapper + CompositePackageMapper rows that
+    // install_dropin_with_mapper created for this mod.
+    super::gpk::clean_prior_dropin_state(game_root, mod_id)?;
     Ok(())
 }
