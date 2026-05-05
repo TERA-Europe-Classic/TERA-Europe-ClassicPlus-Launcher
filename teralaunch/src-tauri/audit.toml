@@ -1,0 +1,61 @@
+# cargo-audit configuration for `teralaunch`.
+#
+# All hard vulnerabilities are resolved. The advisories below are
+# informational warnings from upstream-locked transitive dependencies that
+# the launcher does not control directly. Each is enumerated here with its
+# justification so a future audit can quickly see what is accepted vs new.
+#
+# Recommended invocation (until upstream cargo-audit auto-reads this file):
+#
+#   cargo audit \
+#     $(grep -E '^\s*"RUSTSEC-' audit.toml | sed -E 's/.*"(RUSTSEC-[0-9-]+)".*/--ignore \1/' | tr '\n' ' ')
+
+[advisories]
+ignore = [
+    # ---------------------------------------------------------------------
+    # gtk-rs / GTK3 bindings — unmaintained.
+    #
+    # Pulled in transitively by `wry` (Tauri 2's WebView) for Linux. The
+    # gtk-rs project officially deprecated GTK3 in favour of GTK4. Tauri
+    # has not yet shipped a release that drops the GTK3 path, so these
+    # come along on every build (including Windows, where they're never
+    # linked at runtime). Track upstream:
+    # https://github.com/tauri-apps/tauri/issues/9904
+    # ---------------------------------------------------------------------
+    "RUSTSEC-2024-0411",  # gdkwayland-sys
+    "RUSTSEC-2024-0412",  # gdk
+    "RUSTSEC-2024-0413",  # atk
+    "RUSTSEC-2024-0414",  # gdkx11-sys
+    "RUSTSEC-2024-0415",  # gtk
+    "RUSTSEC-2024-0416",  # atk-sys
+    "RUSTSEC-2024-0417",  # gdkx11
+    "RUSTSEC-2024-0418",  # gdk-sys
+    "RUSTSEC-2024-0419",  # gtk3-macros
+    "RUSTSEC-2024-0420",  # gtk-sys
+
+    # ---------------------------------------------------------------------
+    # Misc unmaintained micro-deps from Tauri / WebView graph. None expose
+    # an API surface this app uses; replacement requires upstream changes.
+    # ---------------------------------------------------------------------
+    "RUSTSEC-2025-0057",  # fxhash — Tauri/WebView util
+    "RUSTSEC-2025-0119",  # number_prefix — pulled by indicatif/Tauri
+    "RUSTSEC-2024-0370",  # proc-macro-error — proc-macro graph
+    "RUSTSEC-2025-0075",  # unic-char-range — idna/url graph
+    "RUSTSEC-2025-0080",  # unic-common — idna/url graph
+    "RUSTSEC-2025-0081",  # unic-char-property — idna/url graph
+    "RUSTSEC-2025-0098",  # unic-ucd-version — idna/url graph
+    "RUSTSEC-2025-0100",  # unic-ucd-ident — idna/url graph
+
+    # ---------------------------------------------------------------------
+    # Unsoundness advisories — accepted because the unsound code path is
+    # not exercised by this launcher's usage.
+    # ---------------------------------------------------------------------
+    # `glib::VariantStrIter` Iterator/DoubleEndedIterator — Linux/GTK only.
+    # Windows builds never reach this code.
+    "RUSTSEC-2024-0429",
+    # `rand::rng()` is unsound only when the consuming app installs a
+    # custom panic logger that calls back into the RNG. The launcher
+    # uses a vanilla `env_logger` and does not. Affects rand 0.8.x and
+    # 0.9.x — both pulled transitively (reqwest/quinn-proto/Tauri).
+    "RUSTSEC-2026-0097",
+]

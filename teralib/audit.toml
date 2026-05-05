@@ -1,0 +1,12 @@
+# cargo-audit configuration for `teralib`.
+#
+# After upgrading rustls-webpki past RUSTSEC-2026-0104, this crate has no
+# remaining advisories. Kept as a sibling to `teralaunch/src-tauri/audit.toml`
+# so future bumps surface here uniformly.
+#
+# Read by cargo-audit 0.22+ from `$CARGO_HOME/audit.toml` automatically; for
+# per-crate runs use:
+#   cargo audit --file Cargo.lock $(grep '^"RUSTSEC' audit.toml | sed 's/^/--ignore /')
+
+[advisories]
+ignore = []
