@@ -1455,6 +1455,56 @@ fn ipv4_to_u32(ip: &str) -> u32 {
 mod tests {
     use super::*;
 
+    /// Reproduces the `[libprotobuf ERROR :123] missing required fields`
+    /// crash users see in the launcher's dev terminal: the TERA game client
+    /// is compiled against a proto2 schema where every `ServerInfo` bytes
+    /// field is `required`. proto3 (our `serverlist.proto`) + prost omits
+    /// any field at its default value — so an empty `host` is silently
+    /// dropped on the wire and libprotobuf rejects the whole payload.
+    ///
+    /// Wire tag for `ServerInfo.host` (field 11, wire type 2) is
+    /// `(11 << 3) | 2 = 0x5A`. For an empty bytes value the wire repr is
+    /// `[0x5A, 0x00]`. This fixture sets every bytes field to empty and
+    /// chooses fixed32 values that don't contain that byte sequence, so a
+    /// match in the encoded output unambiguously means the host tag was
+    /// emitted.
+    #[test]
+    fn encoded_serverlist_emits_empty_required_bytes_fields() {
+        use prost::Message;
+        use super::serverlist::{server_list::ServerInfo, ServerList};
+
+        let info = ServerInfo {
+            id: 1,
+            name: vec![],
+            category: vec![],
+            title: vec![],
+            queue: vec![],
+            population: vec![],
+            address: 0,
+            port: 7801, // 0x1E79 → LE bytes 79 1E 00 00, no 0x5A
+            available: 1,
+            unavailable_message: vec![],
+            host: vec![],
+        };
+        let list = ServerList {
+            servers: vec![info],
+            last_server_id: 0,
+            sort_criterion: 2,
+        };
+
+        let mut bytes = Vec::new();
+        list.encode(&mut bytes)
+            .expect("encode never fails for in-memory buffer");
+
+        let needle = [0x5A_u8, 0x00];
+        assert!(
+            bytes.windows(2).any(|w| w == needle),
+            "encoded ServerList must contain wire tag 0x5A 0x00 for empty `host`; \
+             encoded bytes were: {:02X?}",
+            bytes,
+        );
+    }
+
     #[test]
     fn test_to_wstring_empty() {
         let result = to_wstring("");

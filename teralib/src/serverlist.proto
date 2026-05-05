@@ -1,21 +1,35 @@
-syntax = "proto3";
+syntax = "proto2";
 
+// TERA's compiled-in `Tera.ServerList` schema treats every ServerInfo
+// bytes field plus the top-level scalar metadata as `required`. Encoding
+// in proto3 (the previous syntax) made prost omit any field at its
+// default value, which produced
+//   [libprotobuf ERROR :123] Can't parse message of type "Tera.ServerList"
+//   because it is missing required fields
+// in the launcher's terminal whenever the agnitor TCI hook had not yet
+// subclassed the game window. Switching to proto2 with explicit
+// `required` modifiers forces prost to emit every field — including
+// empty bytes — which libprotobuf accepts as a zero-length value.
+//
+// Wire format is identical between proto2 and proto3, so this change
+// does not affect the agnitor parser, the game client, or any consumer
+// reading the encoded message.
 message ServerList {
     message ServerInfo {
-        fixed32 id = 1;
-        bytes name = 2;
-        bytes category = 3;
-        bytes title = 4;
-        bytes queue = 5;
-        bytes population = 6;
-        fixed32 address = 7;
-        fixed32 port = 8;
-        fixed32 available = 9;
-        bytes unavailable_message = 10;
-        bytes host = 11;
+        required fixed32 id = 1;
+        required bytes name = 2;
+        required bytes category = 3;
+        required bytes title = 4;
+        required bytes queue = 5;
+        required bytes population = 6;
+        required fixed32 address = 7;
+        required fixed32 port = 8;
+        required fixed32 available = 9;
+        required bytes unavailable_message = 10;
+        required bytes host = 11;
     }
 
     repeated ServerInfo servers = 1;
-    fixed32 last_server_id = 2;
-    fixed32 sort_criterion = 3;
+    required fixed32 last_server_id = 2;
+    required fixed32 sort_criterion = 3;
 }
