@@ -21,20 +21,16 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 
-#[allow(dead_code)]
 #[path = "../services/mods/patch_manifest.rs"]
 mod patch_manifest;
 
-#[allow(dead_code)]
 #[path = "../services/mods/gpk_package.rs"]
 mod gpk_package;
 
-#[allow(dead_code)]
 #[path = "../services/mods/gpk_patch_applier.rs"]
 mod gpk_patch_applier;
 
 #[cfg(test)]
-#[allow(dead_code)]
 #[path = "../services/mods/test_fixtures.rs"]
 mod test_fixtures;
 

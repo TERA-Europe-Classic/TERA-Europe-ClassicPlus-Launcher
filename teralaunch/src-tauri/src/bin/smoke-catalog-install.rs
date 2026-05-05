@@ -10,17 +10,17 @@
 //!     --target-package S1UI_PaperDoll \
 //!     --source-gpk /path/to/downloaded.gpk
 
-#[allow(dead_code)] #[path = "../services/mods/composite_extract.rs"] mod composite_extract;
-#[allow(dead_code)] #[path = "../services/mods/gpk.rs"] mod gpk;
-#[allow(dead_code)] #[path = "../services/mods/gpk_package.rs"] mod gpk_package;
-#[allow(dead_code)] #[path = "../services/mods/gpk_patch_applier.rs"] mod gpk_patch_applier;
-#[allow(dead_code)] #[path = "../services/mods/gpk_patch_deploy.rs"] mod gpk_patch_deploy;
-#[allow(dead_code)] #[path = "../services/mods/gpk_resource_inspector.rs"] mod gpk_resource_inspector;
-#[allow(dead_code)] #[path = "../services/mods/manifest_store.rs"] mod manifest_store;
-#[allow(dead_code)] #[path = "../services/mods/mapper_extend.rs"] mod mapper_extend;
-#[allow(dead_code)] #[path = "../services/mods/patch_derivation.rs"] mod patch_derivation;
-#[allow(dead_code)] #[path = "../services/mods/patch_manifest.rs"] mod patch_manifest;
-#[allow(dead_code)] #[path = "../services/mods/vanilla_resolver.rs"] mod vanilla_resolver;
+#[path = "../services/mods/composite_extract.rs"] mod composite_extract;
+#[path = "../services/mods/gpk.rs"] mod gpk;
+#[path = "../services/mods/gpk_package.rs"] mod gpk_package;
+#[path = "../services/mods/gpk_patch_applier.rs"] mod gpk_patch_applier;
+#[path = "../services/mods/gpk_patch_deploy.rs"] mod gpk_patch_deploy;
+#[path = "../services/mods/gpk_resource_inspector.rs"] mod gpk_resource_inspector;
+#[path = "../services/mods/manifest_store.rs"] mod manifest_store;
+#[path = "../services/mods/mapper_extend.rs"] mod mapper_extend;
+#[path = "../services/mods/patch_derivation.rs"] mod patch_derivation;
+#[path = "../services/mods/patch_manifest.rs"] mod patch_manifest;
+#[path = "../services/mods/vanilla_resolver.rs"] mod vanilla_resolver;
 
 use std::env;
 use std::fs;

@@ -2,8 +2,8 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 
-#[allow(dead_code)] #[path = "../services/mods/gpk.rs"] mod gpk;
-#[allow(dead_code)] #[path = "../services/mods/mapper_extend.rs"] mod mapper_extend;
+#[path = "../services/mods/gpk.rs"] mod gpk;
+#[path = "../services/mods/mapper_extend.rs"] mod mapper_extend;
 
 const USAGE: &str = "install-paperdoll-resources --game-root <path> --staging <dir>";
 

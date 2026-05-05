@@ -6,8 +6,8 @@
 //! Usage:
 //!   extract-vanilla-slice-raw --game-root <path> --logical <Package.Object> --out <path>
 
-#[allow(dead_code)] #[path = "../services/mods/composite_extract.rs"] mod composite_extract;
-#[allow(dead_code)] #[path = "../services/mods/gpk.rs"] mod gpk;
+#[path = "../services/mods/composite_extract.rs"] mod composite_extract;
+#[path = "../services/mods/gpk.rs"] mod gpk;
 
 use std::env;
 use std::fs;

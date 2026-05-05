@@ -1,3 +1,8 @@
+// Shared between the main launcher bin and several experimental tooling
+// bins via `#[path = ...]` includes; each compilation context exercises
+// a different subset, so any single bin sees the rest as "dead".
+#![allow(dead_code)]
+
 //! Extracts the vanilla bytes for a target package from the user's
 //! composite container.
 //!
@@ -290,7 +295,7 @@ pub fn extract_vanilla_for_object_path(
     extract_from_container_entry(&cooked_pc, entry)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "lib-tests"))]
 mod tests {
     use super::*;
     use crate::services::mods::gpk::encrypt_mapper;

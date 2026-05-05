@@ -3,7 +3,6 @@
 
 use std::{env, fs, path::PathBuf};
 
-#[allow(dead_code)]
 #[path = "../services/mods/dds.rs"]
 mod dds;
 

@@ -4,10 +4,10 @@
 //! Usage:
 //!   rebuild-paperdoll-tmm --inner <path-to-existing-RestylePaperdoll.gpk> --out <path-to-new-RestylePaperdoll.gpk>
 
-#[allow(dead_code)] #[path = "../services/mods/gpk.rs"] mod gpk;
-#[allow(dead_code)] #[path = "../services/mods/gpk_package.rs"] mod gpk_package;
-#[allow(dead_code)] #[path = "../services/mods/mapper_extend.rs"] mod mapper_extend;
-#[allow(dead_code)] #[path = "../services/mods/tmm_wrap.rs"] mod tmm_wrap;
+#[path = "../services/mods/gpk.rs"] mod gpk;
+#[path = "../services/mods/gpk_package.rs"] mod gpk_package;
+#[path = "../services/mods/mapper_extend.rs"] mod mapper_extend;
+#[path = "../services/mods/tmm_wrap.rs"] mod tmm_wrap;
 
 use std::env;
 use std::fs;

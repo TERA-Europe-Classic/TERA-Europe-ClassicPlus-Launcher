@@ -1,5 +1,10 @@
-//! Minimal TERA GPK package parser supporting both Classic (x32, FileVersion
-//! 610) and v100.02 (x64, FileVersion 897) layouts.
+// Shared between the main launcher bin and several experimental tooling
+// bins via `#[path = ...]` includes; each compilation context exercises
+// a different subset, so any single bin sees the rest as "dead".
+#![allow(dead_code)]
+
+//! Minimal TERA GPK package parser supporting both Classic (x32, `FileVersion`
+//! 610) and v100.02 (x64, `FileVersion` 897) layouts.
 //!
 //! Read-only package-analysis seam used by the patch converter and the patch
 //! applier: package summary, name table, import table, export table,
@@ -9,12 +14,12 @@
 //!
 //! x32 vs x64 differences this parser handles:
 //! - x64 inserts 16 extra header bytes after `DependsOffset` (per
-//!   TeraCoreLib FStructs.cpp: `ImportExportGuidsOffset`, `ImportGuidsCount`,
+//!   `TeraCoreLib` FStructs.cpp: `ImportExportGuidsOffset`, `ImportGuidsCount`,
 //!   `ExportGuidsCount`, `ThumbnailTableOffset`).
 //! - x32 stores `NameCount` as `count + name_offset` when cooked; x64 stores
 //!   the raw count.
 //!
-//! Property-body differences (BoolProperty 1 vs 4 bytes, ByteProperty
+//! Property-body differences (`BoolProperty` 1 vs 4 bytes, `ByteProperty`
 //! enumType prefix) only matter when parsing inside an export payload, which
 //! we do not do — the applier replaces payloads byte-for-byte.
 
@@ -36,7 +41,7 @@ pub enum ArchKind {
     X64,
 }
 
-/// Reads the FileVersion (u16 LE at offset 4) from a GPK header. Returns
+/// Reads the `FileVersion` (u16 LE at offset 4) from a GPK header. Returns
 /// `None` if the buffer is too small or doesn't start with the package
 /// magic. Used by the install flow to refuse arch-mismatched mods before
 /// attempting derivation.
@@ -51,7 +56,7 @@ pub fn read_file_version(bytes: &[u8]) -> Option<u16> {
     Some(u16::from_le_bytes([bytes[4], bytes[5]]))
 }
 
-/// Returns true for FileVersion >= 0x381 (TERA v100.02 / Modern x64).
+/// Returns true for `FileVersion` >= 0x381 (TERA v100.02 / Modern x64).
 pub fn is_x64_file_version(file_version: u16) -> bool {
     file_version >= X64_VERSION_THRESHOLD
 }
@@ -246,8 +251,7 @@ pub fn extract_uncompressed_package_bytes(bytes: &[u8]) -> Result<Vec<u8>, Strin
     let tag = read_u32_le(bytes, &mut cursor)?;
     if tag != PACKAGE_MAGIC {
         return Err(format!(
-            "GPK package has invalid magic {:08X}; expected {:08X}",
-            tag, PACKAGE_MAGIC
+            "GPK package has invalid magic {tag:08X}; expected {PACKAGE_MAGIC:08X}"
         ));
     }
     let file_version = read_u16_le(bytes, &mut cursor)?;
@@ -322,8 +326,7 @@ pub fn parse_package(bytes: &[u8]) -> Result<GpkPackage, String> {
     let tag = read_u32_le(bytes, &mut cursor)?;
     if tag != PACKAGE_MAGIC {
         return Err(format!(
-            "GPK package has invalid magic {:08X}; expected {:08X}",
-            tag, PACKAGE_MAGIC
+            "GPK package has invalid magic {tag:08X}; expected {PACKAGE_MAGIC:08X}"
         ));
     }
 
@@ -447,7 +450,7 @@ pub fn parse_package(bytes: &[u8]) -> Result<GpkPackage, String> {
 /// Serialize a `GpkPackageSummary` into the byte prefix that opens a GPK
 /// file, up to and including `chunk_count = 0` (uncompressed output).
 ///
-/// The caller is responsible for patching the HeaderSize placeholder at
+/// The caller is responsible for patching the `HeaderSize` placeholder at
 /// offset 8–11 once the full header length is known.
 ///
 /// For x32→x64 conversion (`arch == ArchKind::X64`) the four GUID-table
@@ -553,7 +556,7 @@ pub fn serialize_summary(
 /// | compressed_offset | compressed_size]`, all u32 LE.
 ///
 /// Call this instead of `serialize_summary` when building a compressed output
-/// (compression_flags = 1 or 2). The `summary.compression_flags` field must
+/// (`compression_flags` = 1 or 2). The `summary.compression_flags` field must
 /// already be set to the correct value by the caller.
 #[allow(dead_code)]
 pub fn serialize_summary_with_chunks(
@@ -839,7 +842,7 @@ fn parse_exports(
             let end = start
                 .checked_add(item.serial_size as usize)
                 .ok_or_else(|| {
-                    format!("Export '{}' payload offset overflows usize", object_path)
+                    format!("Export '{object_path}' payload offset overflows usize")
                 })?;
             if end > bytes.len() {
                 return Err(format!(
@@ -898,14 +901,13 @@ fn build_import_path(
     }
     if owner_index > 0 {
         return Err(format!(
-            "Import '{}' references export owner index {}, which this minimal parser does not support yet",
-            object_name, owner_index
+            "Import '{object_name}' references export owner index {owner_index}, which this minimal parser does not support yet"
         ));
     }
     let parent = owner_index
         .checked_neg()
         .and_then(|v| v.checked_sub(1))
-        .ok_or_else(|| format!("Invalid import owner index {}", owner_index))?
+        .ok_or_else(|| format!("Invalid import owner index {owner_index}"))?
         as usize;
     let parent_path = build_import_path(raw, names, parent, depth + 1)?;
     Ok(format!("{parent_path}.{object_name}"))
@@ -933,7 +935,7 @@ fn build_export_path(
                 as usize;
             let parent_path = imports
                 .get(parent)
-                .ok_or_else(|| format!("Export owner import {} out of range", parent))?
+                .ok_or_else(|| format!("Export owner import {parent} out of range"))?
                 .object_path
                 .clone();
             Ok(format!("{parent_path}.{object_name}"))
@@ -971,7 +973,7 @@ fn resolve_object_ref_name(
         return imports
             .get(idx)
             .map(|i| i.object_path.clone())
-            .ok_or_else(|| format!("Import object index {} out of range", idx));
+            .ok_or_else(|| format!("Import object index {idx} out of range"));
     }
 
     let idx = object_index
@@ -980,7 +982,7 @@ fn resolve_object_ref_name(
         as usize;
     let export = raw_exports
         .get(idx)
-        .ok_or_else(|| format!("Export object index {} out of range", idx))?;
+        .ok_or_else(|| format!("Export object index {idx} out of range"))?;
     build_export_path(raw_exports, imports, names, idx, depth + 1)
         .or_else(|_| resolve_name_from_i32(names, export.object_name_index()))
 }
@@ -990,15 +992,15 @@ fn resolve_name(names: &[GpkNameEntry], encoded_index: u64) -> Result<String, St
     names
         .get(idx)
         .map(|entry| entry.name.clone())
-        .ok_or_else(|| format!("Name index {} out of range", idx))
+        .ok_or_else(|| format!("Name index {idx} out of range"))
 }
 
 fn resolve_name_from_i32(names: &[GpkNameEntry], index: i32) -> Result<String, String> {
-    let idx = usize::try_from(index).map_err(|_| format!("Negative name index {}", index))?;
+    let idx = usize::try_from(index).map_err(|_| format!("Negative name index {index}"))?;
     names
         .get(idx)
         .map(|entry| entry.name.clone())
-        .ok_or_else(|| format!("Name index {} out of range", idx))
+        .ok_or_else(|| format!("Name index {idx} out of range"))
 }
 
 fn read_fstring(bytes: &[u8], cursor: &mut usize) -> Result<String, String> {
@@ -1088,7 +1090,7 @@ impl ExportLike for RawExport {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "lib-tests"))]
 mod tests {
     use super::*;
     use flate2::{write::ZlibEncoder, Compression};

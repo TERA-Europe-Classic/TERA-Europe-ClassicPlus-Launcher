@@ -2,8 +2,8 @@
 //! against a real game tree. Prints the resolved bytes' length + first 16 hex
 //! for visual sanity.
 
-#[allow(dead_code)] #[path = "../services/mods/composite_extract.rs"] mod composite_extract;
-#[allow(dead_code)] #[path = "../services/mods/gpk.rs"] mod gpk;
+#[path = "../services/mods/composite_extract.rs"] mod composite_extract;
+#[path = "../services/mods/gpk.rs"] mod gpk;
 
 use std::env;
 use std::path::PathBuf;

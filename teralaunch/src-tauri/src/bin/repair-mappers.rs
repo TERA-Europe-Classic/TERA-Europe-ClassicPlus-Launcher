@@ -8,7 +8,6 @@
 //! Usage:
 //!   repair-mappers --game-root D:/Elinu
 
-#[allow(dead_code)]
 #[path = "../services/mods/gpk.rs"]
 mod gpk;
 

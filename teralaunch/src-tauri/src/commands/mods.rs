@@ -1006,7 +1006,7 @@ fn resolve_target_package_name(
 
     let url_hint = download_url
         .and_then(|url| url::Url::parse(url).ok())
-        .and_then(|u| u.path_segments().and_then(|s| s.last()).map(str::to_string));
+        .and_then(|u| u.path_segments().and_then(|mut s| s.next_back()).map(str::to_string));
 
     if let Some(hint) = url_hint {
         let stripped = hint.strip_suffix(".gpk").unwrap_or(&hint);

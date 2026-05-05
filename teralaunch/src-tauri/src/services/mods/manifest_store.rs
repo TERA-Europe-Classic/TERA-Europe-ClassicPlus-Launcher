@@ -1,3 +1,8 @@
+// Shared between the main launcher bin and several experimental tooling
+// bins via `#[path = ...]` includes; each compilation context exercises
+// a different subset, so any single bin sees the rest as "dead".
+#![allow(dead_code)]
+
 //! Save/load/delete persisted patch manifests under
 //! `<app_data>/mods/patch-manifests/<mod_id>/manifest.json`.
 //!
@@ -226,7 +231,7 @@ pub fn delete_manifest(mod_id: &str) -> Result<(), String> {
     delete_manifest_at_root(&root, mod_id)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "lib-tests"))]
 mod tests {
     use super::*;
     use crate::services::mods::patch_manifest::{

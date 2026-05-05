@@ -32,6 +32,7 @@ impl Default for FileInstallMode {
 
 /// Information about a file that needs to be downloaded/updated.
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Default)]
 pub struct FileInfo {
     /// Final game-relative path after installation.
     pub path: String,
@@ -54,21 +55,6 @@ pub struct FileInfo {
     pub install_mode: FileInstallMode,
 }
 
-impl Default for FileInfo {
-    fn default() -> Self {
-        Self {
-            path: String::new(),
-            hash: String::new(),
-            size: 0,
-            url: String::new(),
-            existing_size: 0,
-            download_path: None,
-            output_size: None,
-            hash_algorithm: FileHashAlgorithm::default(),
-            install_mode: FileInstallMode::default(),
-        }
-    }
-}
 
 /// Helper function for serde skip_serializing_if
 fn is_zero(v: &u64) -> bool {

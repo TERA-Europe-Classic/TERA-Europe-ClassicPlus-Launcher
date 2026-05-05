@@ -4,11 +4,9 @@
 //! what the parser read from a real x32 GPK fixture, and that the x64
 //! variant correctly inserts the 16-byte ImportExportGuids block.
 
-#[allow(dead_code)]
 #[path = "../src/services/mods/test_fixtures.rs"]
 mod test_fixtures;
 
-#[allow(dead_code)]
 #[path = "../src/services/mods/gpk_package.rs"]
 mod gpk_package;
 

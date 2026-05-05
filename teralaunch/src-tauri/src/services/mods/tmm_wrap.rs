@@ -1,3 +1,8 @@
+// Shared between the main launcher bin and several experimental tooling
+// bins via `#[path = ...]` includes; each compilation context exercises
+// a different subset, so any single bin sees the rest as "dead".
+#![allow(dead_code)]
+
 //! TMM mod-file footer writer.
 //!
 //! Inverse of `gpk::parse_mod_file`: takes one or more inner GPK byte
@@ -129,7 +134,7 @@ fn write_prefixed_ansi_no_null(out: &mut Vec<u8>, s: &str) {
     out.extend_from_slice(bytes);
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "lib-tests"))]
 mod tests {
     use super::*;
     use crate::services::mods::gpk::parse_mod_file;

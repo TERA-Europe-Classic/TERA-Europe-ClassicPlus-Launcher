@@ -1,3 +1,8 @@
+// Shared between the main launcher bin and several experimental tooling
+// bins via `#[path = ...]` includes; each compilation context exercises
+// a different subset, so any single bin sees the rest as "dead".
+#![allow(dead_code)]
+
 //! TMM-compatible GPK mod deployer.
 //!
 //! Port of VenoMKO/TMM's `CompositeMapper.cpp` and `Mod.cpp` to Rust:

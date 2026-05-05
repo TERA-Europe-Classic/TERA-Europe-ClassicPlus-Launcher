@@ -1,3 +1,8 @@
+// Shared between the main launcher bin and several experimental tooling
+// bins via `#[path = ...]` includes; each compilation context exercises
+// a different subset, so any single bin sees the rest as "dead".
+#![allow(dead_code)]
+
 //! Drop-in install path for Type-D GPK mods whose target package isn't
 //! in v100 vanilla's PkgMapper. Writes the (already-x64) GPK directly to
 //! S1Game/CookedPC/<target_filename>.gpk and removes it on uninstall.

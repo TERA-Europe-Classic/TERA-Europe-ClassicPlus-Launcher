@@ -5,7 +5,11 @@
 //! synthetic boss-window-shaped package without duplicating the byte-level
 //! layout.
 
-#![cfg(test)]
+// `#![cfg(test)]` was previously here but every consumer (bins,
+// integration tests, and the lib) already gates the `mod test_fixtures`
+// include with an outer `#[cfg(test)]`. Keeping both triggers
+// `clippy::duplicated_attributes` whenever the file is brought in via
+// `#[path]`. The outer cfg is sufficient.
 #![allow(dead_code)]
 
 const PACKAGE_MAGIC: u32 = 0x9E2A83C1;

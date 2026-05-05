@@ -6,11 +6,9 @@
 #[path = "../src/services/mods/test_fixtures.rs"]
 mod test_fixtures;
 
-#[allow(dead_code, unused_imports)]
 #[path = "../src/services/mods/gpk.rs"]
 mod gpk;
 
-#[allow(dead_code, unused_imports)]
 #[path = "../src/services/mods/gpk_package.rs"]
 mod gpk_package;
 
@@ -22,11 +20,9 @@ mod gpk_property;
 #[path = "../src/services/mods/gpk_transform.rs"]
 mod gpk_transform;
 
-#[allow(dead_code, unused_imports)]
 #[path = "../src/services/mods/mapper_extend.rs"]
 mod mapper_extend;
 
-#[allow(dead_code, unused_imports)]
 #[path = "../src/services/mods/gpk_dropin_install.rs"]
 mod gpk_dropin_install;
 

@@ -82,6 +82,17 @@ custom-protocol = ["tauri/custom-protocol"]
 custom-menu = []
 skip-updates = []  # Skip file verification; allow game launch without updates
 
+# Enables `#[cfg(test)] mod tests` blocks inside `services/mods/*` that
+# cross-reference sibling modules via `crate::services::mods::...`. Those
+# paths only resolve when the file is compiled as part of the main
+# launcher (which declares `mod services;` at its crate root); when an
+# auxiliary bin pulls the same file in via `#[path = ...]` the path
+# resolution fails. Run those tests with:
+#   cargo test --features lib-tests --bin tera-europe-classicplus-launcher
+# CI's default `cargo clippy --bins --tests -- -D warnings` runs without
+# this feature so aux-bin compile gates stay green.
+lib-tests = []
+
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ["cfg(tarpaulin_include)"] }
 

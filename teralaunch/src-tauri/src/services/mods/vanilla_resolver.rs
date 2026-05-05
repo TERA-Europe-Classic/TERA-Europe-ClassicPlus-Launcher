@@ -190,7 +190,7 @@ fn find_standalone_vanilla(
     Ok(None)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "lib-tests"))]
 mod tests {
     use super::*;
     use crate::services::mods::gpk::{encrypt_mapper, BACKUP_FILE};

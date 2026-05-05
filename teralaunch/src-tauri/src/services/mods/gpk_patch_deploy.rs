@@ -1,3 +1,8 @@
+// Shared between the main launcher bin and several experimental tooling
+// bins via `#[path = ...]` includes; each compilation context exercises
+// a different subset, so any single bin sees the rest as "dead".
+#![allow(dead_code)]
+
 //! Patch-based GPK install / enable / disable. Two deploy shapes are
 //! supported:
 //!
@@ -826,14 +831,8 @@ pub fn migrate_legacy_install(
         };
     }
 
-    let legacy_err = match super::gpk::uninstall_legacy_gpk(game_root, deployed_filename) {
-        Ok(()) => None,
-        Err(err) => Some(err),
-    };
-    let mapper_err = match gpk::restore_clean_mapper_state(game_root) {
-        Ok(()) => None,
-        Err(err) => Some(err),
-    };
+    let legacy_err = super::gpk::uninstall_legacy_gpk(game_root, deployed_filename).err();
+    let mapper_err = gpk::restore_clean_mapper_state(game_root).err();
 
     LegacyMigrationOutcome {
         mod_id: mod_id.to_string(),
@@ -847,7 +846,7 @@ pub fn migrate_legacy_install(
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "lib-tests"))]
 mod tests {
     use super::*;
     use crate::services::mods::gpk::{

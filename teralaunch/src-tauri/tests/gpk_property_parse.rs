@@ -11,11 +11,9 @@
 #[path = "../src/services/mods/test_fixtures.rs"]
 mod test_fixtures;
 
-#[allow(dead_code)]
 #[path = "../src/services/mods/gpk_package.rs"]
 mod gpk_package;
 
-#[allow(dead_code)]
 #[path = "../src/services/mods/gpk_property.rs"]
 mod gpk_property;
 

@@ -1,3 +1,10 @@
+// Shared between the main launcher bin and several experimental tooling
+// bins via `#[path = ...]` includes. Each bin exercises a different
+// subset of the public surface, so any single bin sees the rest as
+// "dead". Per-item allows would clutter the file; suppress at module
+// scope.
+#![allow(dead_code)]
+
 //! Minimal DDS reader for DXT1 / DXT3 / DXT5 textures.
 //!
 //! Parses the `DDSURFACEDESC2` header (Microsoft DirectX SDK) and slices the

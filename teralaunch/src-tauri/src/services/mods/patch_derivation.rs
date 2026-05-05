@@ -141,7 +141,7 @@ fn hex_lower(bytes: &[u8]) -> String {
     out
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "lib-tests"))]
 mod tests {
     use super::super::test_fixtures::{
         build_boss_window_test_package, build_x64_boss_window_test_package,

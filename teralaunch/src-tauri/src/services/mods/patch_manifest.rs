@@ -1,3 +1,8 @@
+// Shared between the main launcher bin and several experimental tooling
+// bins via `#[path = ...]` includes; each compilation context exercises
+// a different subset, so any single bin sees the rest as "dead".
+#![allow(dead_code)]
+
 //! Curated GPK patch-manifest schema and artifact-layout helpers.
 //!
 //! This module defines the launcher-side contract for drift-safe GPK patch
@@ -16,7 +21,7 @@ use serde::{Deserialize, Serialize};
 /// Curated patch artifact for one launcher-supported GPK mod.
 ///
 /// The launcher should eventually install these manifests instead of blindly
-/// dropping legacy whole-package GPK replacements into CookedPC. A manifest is
+/// dropping legacy whole-package GPK replacements into `CookedPC`. A manifest is
 /// authored offline from a known vanilla GPK plus a modded GPK, then reviewed
 /// by a maintainer before being shipped to users.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -74,8 +79,7 @@ impl PatchManifest {
             }
             if export.reference_export_fingerprint.trim().is_empty() {
                 return Err(format!(
-                    "Export patch #{} has empty reference_export_fingerprint",
-                    idx
+                    "Export patch #{idx} has empty reference_export_fingerprint"
                 ));
             }
             match export.operation {
@@ -92,14 +96,12 @@ impl PatchManifest {
                         .all(|c| c.is_ascii_hexdigit())
                     {
                         return Err(format!(
-                            "Export patch #{} replacement_payload_hex must contain only hex digits",
-                            idx
+                            "Export patch #{idx} replacement_payload_hex must contain only hex digits"
                         ));
                     }
                     if export.replacement_payload_hex.len() % 2 != 0 {
                         return Err(format!(
-                            "Export patch #{} replacement_payload_hex must have even length",
-                            idx
+                            "Export patch #{idx} replacement_payload_hex must have even length"
                         ));
                     }
                 }
@@ -115,17 +117,16 @@ impl PatchManifest {
             if imp.import_path.trim().is_empty() {
                 return Err(format!("Import patch #{idx} has empty import_path"));
             }
-            if matches!(imp.operation, ImportPatchOperation::AddImport) {
-                if imp
+            if matches!(imp.operation, ImportPatchOperation::AddImport)
+                && imp
                     .class_name
                     .as_ref()
-                    .map_or(true, |s| s.trim().is_empty())
+                    .is_none_or(|s| s.trim().is_empty())
                 {
                     return Err(format!(
                         "Import patch #{idx} (add_import) must specify class_name"
                     ));
                 }
-            }
         }
         for (idx, name) in self.name_patches.iter().enumerate() {
             if name.name.trim().is_empty() {
@@ -186,8 +187,7 @@ pub fn validate_bundle_layout(layout: &PatchArtifactLayout, mod_id: &str) -> Res
         })?;
     if actual != expected {
         return Err(format!(
-            "Patch artifact bundle dir name '{}' does not match sanitized mod id '{}'",
-            actual, expected
+            "Patch artifact bundle dir name '{actual}' does not match sanitized mod id '{expected}'"
         ));
     }
     if !layout.bundle_dir.exists() {
@@ -313,7 +313,7 @@ pub struct ExportPatch {
     pub target_export_fingerprint: Option<String>,
     /// How this export should be modified.
     pub operation: ExportPatchOperation,
-    /// New class name for ReplaceExportClassAndPayload (e.g. `Core.Texture2D`).
+    /// New class name for `ReplaceExportClassAndPayload` (e.g. `Core.Texture2D`).
     pub new_class_name: Option<String>,
     /// Replacement payload/body bytes encoded as hex.
     ///
@@ -329,7 +329,7 @@ pub enum ExportPatchOperation {
     ReplaceExportPayload,
     /// Reserved for future structured property patches.
     PatchProperties,
-    /// Replace the export's class (e.g. ObjectRedirector → Texture2D) and payload.
+    /// Replace the export's class (e.g. `ObjectRedirector` → `Texture2D`) and payload.
     ReplaceExportClassAndPayload,
     /// Remove the export from the export table entirely.
     RemoveExport,

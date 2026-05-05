@@ -4,19 +4,15 @@
 
 use std::{env, fs, path::PathBuf};
 
-#[allow(dead_code)]
 #[path = "../services/mods/dds.rs"]
 mod dds;
 
-#[allow(dead_code)]
 #[path = "../services/mods/gpk_package.rs"]
 mod gpk_package;
 
-#[allow(dead_code)]
 #[path = "../services/mods/gpk_resource_inspector.rs"]
 mod gpk_resource_inspector;
 
-#[allow(dead_code)]
 #[path = "../services/mods/texture_encoder.rs"]
 mod texture_encoder;
 

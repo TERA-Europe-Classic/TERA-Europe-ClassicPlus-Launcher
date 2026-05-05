@@ -1,3 +1,8 @@
+// Shared between the main launcher bin and several experimental tooling
+// bins via `#[path = ...]` includes; each compilation context exercises
+// a different subset, so any single bin sees the rest as "dead".
+#![allow(dead_code)]
+
 //! External-app mod lifecycle: download, extract, spawn, monitor.
 //!
 //! External apps are separate executables (Shinra Meter, TCC). Per the design
@@ -124,6 +129,12 @@ fn make_tree_writable(root: &Path) {
         if let Ok(metadata) = fs::metadata(path) {
             let mut permissions = metadata.permissions();
             if permissions.readonly() {
+                // `set_readonly(false)` is correct on Windows (the only target
+                // for the launcher binary). The clippy `permissions_set_readonly_false`
+                // lint warns because on POSIX this clears all write bits including
+                // group/other, which is undesirable. The launcher only ships for
+                // Windows, where this maps to clearing FILE_ATTRIBUTE_READONLY.
+                #[allow(clippy::permissions_set_readonly_false)]
                 permissions.set_readonly(false);
                 let _ = fs::set_permissions(path, permissions);
             }
@@ -730,8 +741,10 @@ fn graceful_stop_process(pid: u32, timeout_ms: u32) -> bool {
     } else {
         0
     };
-    drop(ctx);
-    // Shadow the original counter the rest of the function reads.
+    // The previous `ctx: EnumCtx` is shadowed below by the new `ctx:
+    // PostResult`. No explicit drop needed — `EnumCtx` doesn't implement
+    // `Drop` and the only consumer of its raw pointer (the EnumWindows
+    // callback) has already returned by the time we reach this line.
     struct PostResult {
         posted: u32,
     }

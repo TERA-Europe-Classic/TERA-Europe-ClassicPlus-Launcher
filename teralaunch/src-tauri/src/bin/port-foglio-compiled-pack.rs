@@ -22,17 +22,17 @@
 
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-#[allow(dead_code)] #[path = "../services/mods/dds.rs"] mod dds;
-#[allow(dead_code)] #[path = "../services/mods/gpk.rs"] mod gpk;
-#[allow(dead_code)] #[path = "../services/mods/gpk_package.rs"] mod gpk_package;
-#[allow(dead_code)] #[path = "../services/mods/gpk_patch_applier.rs"] mod gpk_patch_applier;
-#[allow(dead_code)] #[path = "../services/mods/gpk_resource_inspector.rs"] mod gpk_resource_inspector;
-#[allow(dead_code)] #[path = "../services/mods/patch_manifest.rs"] mod patch_manifest;
-#[allow(dead_code)] #[path = "../services/mods/mapper_extend.rs"] mod mapper_extend;
-#[allow(dead_code)] #[path = "../services/mods/texture_encoder.rs"] mod texture_encoder;
-#[allow(dead_code)] #[path = "../services/mods/composite_author.rs"] mod composite_author;
+#[path = "../services/mods/dds.rs"] mod dds;
+#[path = "../services/mods/gpk.rs"] mod gpk;
+#[path = "../services/mods/gpk_package.rs"] mod gpk_package;
+#[path = "../services/mods/gpk_patch_applier.rs"] mod gpk_patch_applier;
+#[path = "../services/mods/gpk_resource_inspector.rs"] mod gpk_resource_inspector;
+#[path = "../services/mods/patch_manifest.rs"] mod patch_manifest;
+#[path = "../services/mods/mapper_extend.rs"] mod mapper_extend;
+#[path = "../services/mods/texture_encoder.rs"] mod texture_encoder;
+#[path = "../services/mods/composite_author.rs"] mod composite_author;
 
 const USAGE: &str = "port-foglio-compiled-pack --foglio-gpk <path> --target-package <name> \
     --uid-prefix <prefix> --filename-prefix <prefix> --game-root <path> --staging <dir>";
@@ -83,6 +83,9 @@ fn parse_args() -> Result<Args, String> {
     })
 }
 
+// Diagnostic helper retained for re-enabling verbose hash dumps; kept
+// alongside the main pipeline so future debugging can simply add a call.
+#[allow(dead_code)]
 fn hex_lower(bytes: &[u8]) -> String {
     let mut s = String::with_capacity(bytes.len() * 2);
     for b in bytes { s.push_str(&format!("{:02x}", b)); }
@@ -181,7 +184,9 @@ fn run() -> Result<(), String> {
         // 5) ADD new CompositePackageMapper row for fresh_uid
         //
         // This avoids the failed REPLACE-by-vanilla-uid pattern that crashed the engine.
-        let foglio_mip = match gpk_resource_inspector::first_mip_bulk_location(
+        // Bind eagerly so a future change can read offset/len; the
+        // current pipeline only needs the success/failure signal.
+        let _foglio_mip = match gpk_resource_inspector::first_mip_bulk_location(
             foglio_export, &foglio_pkg.names, foglio_is_x64) {
             Ok(m) => m,
             Err(e) => { println!("  skip {logical} (foglio mip locate: {e})"); skipped += 1; continue; }
@@ -211,7 +216,7 @@ fn run() -> Result<(), String> {
         // Derive format from UNCOMPRESSED element_count (the pixel byte count
         // before LZO). For DXT1 (8B/block 4x4) total = (w/4)*(h/4)*8.
         // For DXT5 (16B/block 4x4) total = (w/4)*(h/4)*16.
-        let blocks = ((foglio_w as usize + 3) / 4) * ((foglio_h as usize + 3) / 4);
+        let blocks = (foglio_w as usize).div_ceil(4) * (foglio_h as usize).div_ceil(4);
         let bytes_per_block = if blocks == 0 { 0 } else { foglio_element_count as usize / blocks };
         let dds_format = match bytes_per_block {
             8 => dds::DdsPixelFormat::Dxt1,
@@ -313,8 +318,14 @@ fn run() -> Result<(), String> {
 /// Resizes the file by the length delta. Updates HeaderSize and shifts every
 /// later offset (NamesOffset, ImportsOffset, ExportsOffset, DependsOffset,
 /// chunk offsets, export SerialOffsets).
+///
+/// Retained for the alternative "rewrite folder in place" path that's
+/// currently disabled in favour of the splice approach. A follow-up will
+/// re-enable this when the splice pipeline gets a fast-path for unchanged
+/// payloads.
+#[allow(dead_code)]
 fn rewrite_mod_folder(bytes: &[u8], new_object_path: &str) -> Result<Vec<u8>, String> {
-    let mut buf = bytes.to_vec();
+    let buf = bytes.to_vec();
     if buf.len() < 16 {
         return Err("GPK too small to rewrite folder".into());
     }

@@ -1,3 +1,8 @@
+// Shared between the main launcher bin and several experimental tooling
+// bins via `#[path = ...]` includes; each compilation context exercises
+// a different subset, so any single bin sees the rest as "dead".
+#![allow(dead_code)]
+
 //! Add new logical→composite and composite→file rows to live mapper files.
 //!
 //! Used when installing a mod that introduces *new* resources (e.g. a custom

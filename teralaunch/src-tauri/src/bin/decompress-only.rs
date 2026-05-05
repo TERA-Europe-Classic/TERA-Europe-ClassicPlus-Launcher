@@ -5,16 +5,13 @@
 use std::env;
 use std::fs;
 
-#[allow(dead_code)]
 #[path = "../services/mods/gpk_package.rs"]
 mod gpk_package;
 
-#[allow(dead_code)]
 #[path = "../services/mods/patch_manifest.rs"]
 mod patch_manifest;
 
 #[cfg(test)]
-#[allow(dead_code)]
 #[path = "../services/mods/test_fixtures.rs"]
 mod test_fixtures;
 

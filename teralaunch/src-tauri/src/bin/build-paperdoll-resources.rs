@@ -2,13 +2,13 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-#[allow(dead_code)] #[path = "../services/mods/dds.rs"] mod dds;
-#[allow(dead_code)] #[path = "../services/mods/gpk_package.rs"] mod gpk_package;
-#[allow(dead_code)] #[path = "../services/mods/gpk_resource_inspector.rs"] mod gpk_resource_inspector;
-#[allow(dead_code)] #[path = "../services/mods/texture_encoder.rs"] mod texture_encoder;
-#[allow(dead_code)] #[path = "../services/mods/composite_author.rs"] mod composite_author;
-#[allow(dead_code)] #[path = "../services/mods/gpk.rs"] mod gpk;
-#[allow(dead_code)] #[path = "../services/mods/mapper_extend.rs"] mod mapper_extend;
+#[path = "../services/mods/dds.rs"] mod dds;
+#[path = "../services/mods/gpk_package.rs"] mod gpk_package;
+#[path = "../services/mods/gpk_resource_inspector.rs"] mod gpk_resource_inspector;
+#[path = "../services/mods/texture_encoder.rs"] mod texture_encoder;
+#[path = "../services/mods/composite_author.rs"] mod composite_author;
+#[path = "../services/mods/gpk.rs"] mod gpk;
+#[path = "../services/mods/mapper_extend.rs"] mod mapper_extend;
 
 const USAGE: &str = "build-paperdoll-resources --foglio-root <path> --staging <dir>";
 
@@ -166,6 +166,12 @@ fn process_paperdoll_silhouettes_numeric(
     Ok(count)
 }
 
+// Each argument here corresponds to a distinct knob in the
+// paperdoll-resource staging pipeline (output dir, UID/filename prefixes,
+// parent package, BG-strip toggle, etc.). Bundling them into a config
+// struct would only push the same eight values up one indirection level
+// and obscure the call site, so the lint is suppressed.
+#[allow(clippy::too_many_arguments)]
 fn process_dir(
     dir: &Path,
     staging: &Path,

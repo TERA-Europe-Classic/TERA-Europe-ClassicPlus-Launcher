@@ -6,7 +6,6 @@
 #[path = "../src/services/mods/test_fixtures.rs"]
 mod test_fixtures;
 
-#[allow(dead_code, unused_imports)]
 #[path = "../src/services/mods/gpk_package.rs"]
 mod gpk_package;
 
