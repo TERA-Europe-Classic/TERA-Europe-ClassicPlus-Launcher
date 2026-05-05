@@ -1,6 +1,6 @@
 [package]
 name = "tera-europe-classicplus-launcher"
-version = "0.2.16"
+version = "0.2.17"
 description = "TERA Europe Classic+ Launcher"
 authors = ["TNC97"]
 edition = "2021"
